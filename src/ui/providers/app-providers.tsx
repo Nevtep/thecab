@@ -7,32 +7,37 @@ import { base } from "wagmi/chains";
 import { injected, walletConnect } from "wagmi/connectors";
 
 const walletConnectProjectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
+const publicBaseRpcUrl = process.env.NEXT_PUBLIC_BASE_RPC_URL?.trim() || "https://mainnet.base.org";
 
-const connectors = [
-  ...(walletConnectProjectId
-    ? [
-        walletConnect({
-          projectId: walletConnectProjectId,
-          metadata: {
-            name: "The Cab",
-            description: "Connected-wallet ledger reconstruction on Base.",
-            url: "https://the-cab.local",
-            icons: []
-          },
-          showQrModal: true
-        })
-      ]
-    : []),
-  injected({ shimDisconnect: true })
-];
+function createWagmiRuntimeConfig() {
+  const connectors = typeof window === "undefined"
+    ? []
+    : [
+        ...(walletConnectProjectId
+          ? [
+              walletConnect({
+                projectId: walletConnectProjectId,
+                metadata: {
+                  name: "The Cab",
+                  description: "Connected-wallet ledger reconstruction on Base.",
+                  url: "https://the-cab.local",
+                  icons: []
+                },
+                showQrModal: true
+              })
+            ]
+          : []),
+        injected({ shimDisconnect: true })
+      ];
 
-const wagmiConfig = createConfig({
-  chains: [base],
-  connectors,
-  transports: {
-    [base.id]: http(process.env.NEXT_PUBLIC_BASE_RPC_URL)
-  }
-});
+  return createConfig({
+    chains: [base],
+    connectors,
+    transports: {
+      [base.id]: http(publicBaseRpcUrl)
+    }
+  });
+}
 
 type AppProvidersProps = {
   children: ReactNode;
@@ -40,6 +45,7 @@ type AppProvidersProps = {
 
 export function AppProviders({ children }: AppProvidersProps) {
   const [queryClient] = useState(() => new QueryClient());
+  const [wagmiConfig] = useState(() => createWagmiRuntimeConfig());
 
   return (
     <WagmiProvider config={wagmiConfig}>

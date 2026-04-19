@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { base } from "wagmi/chains";
 
 import {
   analysisSessionResponseSchema,
@@ -11,8 +12,20 @@ import { SessionRepository } from "@/domains/wallet-session/repositories/session
 
 export async function POST(request: NextRequest) {
   try {
-    const payload = createAnalysisSessionRequestSchema.parse(await request.json());
-    const session = await new AnalysisSessionService(new SessionRepository(getDb())).createOrResume({
+    const requestBody = await request.json();
+    if (typeof requestBody?.chainId === "number" && requestBody.chainId !== base.id) {
+      return NextResponse.json(
+        errorResponseSchema.parse({
+          error: "Connected wallet analysis is only available on Base."
+        }),
+        { status: 400 }
+      );
+    }
+
+    const payload = createAnalysisSessionRequestSchema.parse(requestBody);
+    const session = await new AnalysisSessionService(
+      new SessionRepository(getDb())
+    ).createOrResumeConnectedWalletSession({
       walletAddress: payload.walletAddress,
       chainId: payload.chainId,
       connectionSource: payload.connectionSource
@@ -24,6 +37,7 @@ export async function POST(request: NextRequest) {
         walletAddress: session.walletAddress,
         chainId: session.chainId,
         status: session.status,
+        reusedSession: session.reusedSession,
         latestAcceptedRunId: session.latestAcceptedRunId
       }),
       { status: 201 }

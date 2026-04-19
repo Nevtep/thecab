@@ -44,6 +44,28 @@ export class ReconstructionRunRepository {
     return runs.find((run) => run.status === "accepted") ?? null;
   }
 
+  async findLatestBySession(analysisSessionId: string) {
+    const [run] = await this.db
+      .select()
+      .from(reconstructionRuns)
+      .where(eq(reconstructionRuns.analysisSessionId, analysisSessionId))
+      .orderBy(desc(reconstructionRuns.startedAt))
+      .limit(1);
+
+    return run ?? null;
+  }
+
+  async findLatestFailedBySession(analysisSessionId: string) {
+    const runs = await this.db
+      .select()
+      .from(reconstructionRuns)
+      .where(eq(reconstructionRuns.analysisSessionId, analysisSessionId))
+      .orderBy(desc(reconstructionRuns.startedAt))
+      .limit(20);
+
+    return runs.find((run) => run.status === "failed") ?? null;
+  }
+
   async updateStatus(
     reconstructionRunId: string,
     input: {

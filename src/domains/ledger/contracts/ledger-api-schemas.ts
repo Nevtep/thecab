@@ -11,6 +11,7 @@ export const analysisSessionResponseSchema = z.object({
   walletAddress: z.string().min(1),
   chainId: z.number().int(),
   status: z.enum(["active", "archived", "failed"]),
+  reusedSession: z.boolean(),
   latestAcceptedRunId: z.string().min(1).nullable()
 });
 
@@ -23,11 +24,22 @@ export const startReconstructionRequestSchema = z.object({
 export const reconstructionRunResponseSchema = z.object({
   reconstructionRunId: z.string().min(1),
   sessionId: z.string().min(1),
+  runMode: z.enum(["initial", "incremental", "replay"]),
   status: z.enum(["pending", "ingesting", "normalizing", "projecting", "accepted", "failed"]),
   classifierVersion: z.string().min(1),
   heuristicsVersion: z.string().min(1),
   fromBlock: z.number().int().nullable(),
-  toBlock: z.number().int().nullable()
+  toBlock: z.number().int().nullable(),
+  startedAt: z.string().datetime(),
+  completedAt: z.string().datetime().nullable(),
+  errorSummary: z.string().min(1).nullable()
+});
+
+export const sessionStatusResponseSchema = z.object({
+  session: analysisSessionResponseSchema,
+  latestAcceptedRun: reconstructionRunResponseSchema.nullable(),
+  latestRun: reconstructionRunResponseSchema.nullable(),
+  hasAcceptedProjection: z.boolean()
 });
 
 export const ledgerRecordSummarySchema = z.object({
@@ -147,4 +159,7 @@ export const errorResponseSchema = z.object({
 });
 
 export type CreateAnalysisSessionRequest = z.infer<typeof createAnalysisSessionRequestSchema>;
+export type AnalysisSessionResponse = z.infer<typeof analysisSessionResponseSchema>;
 export type StartReconstructionRequest = z.infer<typeof startReconstructionRequestSchema>;
+export type ReconstructionRunResponse = z.infer<typeof reconstructionRunResponseSchema>;
+export type SessionStatusResponse = z.infer<typeof sessionStatusResponseSchema>;

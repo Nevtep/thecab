@@ -6,9 +6,19 @@ import { analysisSessions } from "@/infrastructure/db/schema";
 type Database = ReturnType<typeof import("@/infrastructure/db/client").getDb>;
 
 export type AnalysisSessionRecord = typeof analysisSessions.$inferSelect;
+export type AnalysisSessionRecordWithReuse = AnalysisSessionRecord & {
+  reusedSession: boolean;
+};
 
 export class SessionRepository {
   constructor(private readonly db: Database) {}
+
+  toSessionWithReuseState(session: AnalysisSessionRecord): AnalysisSessionRecordWithReuse {
+    return {
+      ...session,
+      reusedSession: session.lastRequestedAt.getTime() > session.createdAt.getTime()
+    };
+  }
 
   async findById(analysisSessionId: string) {
     const [session] = await this.db
@@ -48,7 +58,10 @@ export class SessionRepository {
         .where(eq(analysisSessions.analysisSessionId, existing.analysisSessionId))
         .returning();
 
-      return updated ?? existing;
+      return {
+        ...(updated ?? existing),
+        reusedSession: true
+      };
     }
 
     const [created] = await this.db
@@ -62,7 +75,10 @@ export class SessionRepository {
       })
       .returning();
 
-    return created;
+    return {
+      ...created,
+      reusedSession: false
+    };
   }
 
   async setLatestAcceptedRun(analysisSessionId: string, reconstructionRunId: string) {

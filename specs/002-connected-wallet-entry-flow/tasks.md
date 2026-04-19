@@ -17,10 +17,10 @@
 
 **Purpose**: Prepare the browser wallet runtime, local environment, and browser-test scaffolding needed for the connected-wallet flow.
 
-- [ ] T001 Define connected-wallet runtime environment variables in .env.example
-- [ ] T002 Configure the Base-only WalletConnect-compatible wallet runtime in src/ui/providers/app-providers.tsx
-- [ ] T003 [P] Add browser validation configuration for connected-wallet flows in playwright.config.ts
-- [ ] T004 [P] Document local wallet-enabled setup and runtime prerequisites in README.md
+- [x] T001 Define connected-wallet runtime environment variables in .env.example
+- [x] T002 Configure the Base-only WalletConnect-compatible wallet runtime in src/ui/providers/app-providers.tsx
+- [x] T003 [P] Add browser validation configuration for connected-wallet flows in playwright.config.ts
+- [x] T004 [P] Document local wallet-enabled setup and runtime prerequisites in README.md
 
 ---
 
@@ -30,17 +30,17 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T005 Update connected-wallet API schemas for reused sessions, session status, and reconstruction summaries in src/domains/ledger/contracts/ledger-api-schemas.ts
-- [ ] T006 [P] Define the session status read model in src/domains/wallet-session/model/session-status-snapshot.ts
-- [ ] T007 [P] Extend session reuse metadata and session lookup helpers in src/domains/wallet-session/repositories/session-repository.ts
-- [ ] T008 [P] Extend reconstruction run lookup helpers for latest-run and failure metadata in src/domains/ledger/repositories/reconstruction-run-repository.ts
-- [ ] T009 Implement session status aggregation for latest accepted and latest live runs in src/domains/wallet-session/services/session-status-service.ts
-- [ ] T010 Implement GET /api/analysis-sessions/{sessionId} session-status routing in app/api/analysis-sessions/[sessionId]/route.ts
-- [ ] T011 [P] Implement replay-only candidate discovery for deterministic validation in src/domains/ledger/services/replay-candidate-transaction-service.ts
-- [ ] T012 [P] Implement live-only candidate discovery for production runtime use in src/domains/ledger/services/live-candidate-transaction-service.ts
-- [ ] T013 Refactor discovery orchestration so production reconstruction uses live discovery only and replay validation uses replay adapters only in src/domains/ledger/services/candidate-transaction-service.ts and src/domains/ledger/services/reconstruction-executor.ts
-- [ ] T014 Persist failed reconstruction refresh runs for session polling in src/domains/ledger/services/reconstruction-executor.ts
-- [ ] T015 Implement shared connected-wallet analysis state primitives in src/ui/wallet/use-connected-wallet-analysis.ts
+- [x] T005 Update connected-wallet API schemas for reused sessions, session status, and reconstruction summaries in src/domains/ledger/contracts/ledger-api-schemas.ts
+- [x] T006 [P] Define the session status read model in src/domains/wallet-session/model/session-status-snapshot.ts
+- [x] T007 [P] Extend session reuse metadata and session lookup helpers in src/domains/wallet-session/repositories/session-repository.ts
+- [x] T008 [P] Extend reconstruction run lookup helpers for latest-run and failure metadata in src/domains/ledger/repositories/reconstruction-run-repository.ts
+- [x] T009 Implement session status aggregation for latest accepted and latest live runs in src/domains/wallet-session/services/session-status-service.ts
+- [x] T010 Implement GET /api/analysis-sessions/{sessionId} session-status routing in app/api/analysis-sessions/[sessionId]/route.ts
+- [x] T011 [P] Implement replay-only candidate discovery for deterministic validation in src/domains/ledger/services/replay-candidate-transaction-service.ts
+- [x] T012 [P] Implement live-only candidate discovery for production runtime use in src/domains/ledger/services/live-candidate-transaction-service.ts
+- [x] T013 Refactor discovery orchestration so production reconstruction uses live discovery only and replay validation uses replay adapters only in src/domains/ledger/services/candidate-transaction-service.ts and src/domains/ledger/services/reconstruction-executor.ts
+- [x] T014 Persist failed reconstruction refresh runs for session polling in src/domains/ledger/services/reconstruction-executor.ts
+- [x] T015 Implement shared connected-wallet analysis state primitives in src/ui/wallet/use-connected-wallet-analysis.ts
 
 **Checkpoint**: Foundation ready. User story work can now proceed in priority order or in parallel.
 
@@ -54,16 +54,16 @@
 
 ### Tests for User Story 1
 
-- [ ] T016 [P] [US1] Add contract coverage for create-or-resume session bootstrap responses in tests/contract/analysis-sessions.contract.test.ts
-- [ ] T017 [P] [US1] Add integration coverage for Base-only connected-wallet session bootstrap in tests/integration/connected-wallet-session-flow.test.ts
-- [ ] T018 [P] [US1] Add browser-flow coverage for connect, wrong-chain handling, and start-analysis entry in tests/e2e/connected-wallet-entry.spec.ts
+- [x] T016 [P] [US1] Add contract coverage for create-or-resume session bootstrap responses in tests/contract/analysis-sessions.contract.test.ts
+- [x] T017 [P] [US1] Add integration coverage for Base-only connected-wallet session bootstrap in tests/integration/connected-wallet-session-flow.test.ts
+- [x] T018 [P] [US1] Add browser-flow coverage for connect, wrong-chain handling, and start-analysis entry in tests/e2e/connected-wallet-entry.spec.ts
 
 ### Implementation for User Story 1
 
-- [ ] T019 [US1] Update analysis session bootstrap service to distinguish created versus reused sessions in src/domains/wallet-session/services/analysis-session-service.ts
-- [ ] T020 [US1] Update POST /api/analysis-sessions to enforce Base-only connected-wallet bootstrap responses in app/api/analysis-sessions/route.ts
-- [ ] T021 [US1] Implement the not-connected, wrong-chain, ready, and session-loading entry flow in src/ui/wallet/connected-wallet-ledger.tsx
-- [ ] T022 [US1] Wire the home page to the connected-wallet bootstrap flow in app/page.tsx
+- [x] T019 [US1] Update analysis session bootstrap service to distinguish created versus reused sessions in src/domains/wallet-session/services/analysis-session-service.ts
+- [x] T020 [US1] Update POST /api/analysis-sessions to enforce Base-only connected-wallet bootstrap responses in app/api/analysis-sessions/route.ts
+- [x] T021 [US1] Implement the not-connected, wrong-chain, ready, and session-loading entry flow in src/ui/wallet/connected-wallet-ledger.tsx
+- [x] T022 [US1] Wire the home page to the connected-wallet bootstrap flow in app/page.tsx
 
 **Checkpoint**: User Story 1 should now let a real user connect one wallet, satisfy Base validation, and start analysis from the connected wallet context.
 

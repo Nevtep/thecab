@@ -4,14 +4,20 @@ import { GET as getLedgerProjection } from "@/app/api/analysis-sessions/[session
 import { GET as getLedgerRecordDetail } from "@/app/api/analysis-sessions/[sessionId]/ledger/events/[ledgerRecordId]/route";
 import { GET as getDiscardedActivity } from "@/app/api/analysis-sessions/[sessionId]/discarded-activity/route";
 
-export async function createSession(walletAddress: string) {
+export async function createSession(
+  walletAddress: string,
+  options?: {
+    chainId?: number;
+    connectionSource?: string;
+  }
+) {
   const response = await createAnalysisSession(
     new Request("http://localhost/api/analysis-sessions", {
       method: "POST",
       body: JSON.stringify({
         walletAddress,
-        chainId: 8453,
-        connectionSource: "walletconnect"
+        chainId: options?.chainId ?? 8453,
+        connectionSource: options?.connectionSource ?? "walletconnect"
       }),
       headers: {
         "content-type": "application/json"

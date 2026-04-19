@@ -18,6 +18,7 @@ Copy `.env.example` to `.env.local` and provide the required values:
 - `BASE_RPC_URL`
 - `BASE_RPC_FALLBACK_URLS` optional comma-separated Base RPC backups for live reconstruction
 - `BASE_TRACE_RPC_URL` if trace-capable fallback access is available
+- `NEXT_PUBLIC_BASE_RPC_URL` for the browser wallet runtime transport on Base
 - `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` for WalletConnect in the browser UI
 
 The automated test helpers default to a local database at `postgres://postgres:postgres@localhost:5432/the_cab`.
@@ -36,10 +37,11 @@ The automated test helpers default to a local database at `postgres://postgres:p
 - `pnpm test:replay`
 - `pnpm test:contract`
 - `pnpm test:integration`
+- `pnpm test:e2e`
 - `pnpm build`
 - `pnpm validate:quickstart`
 
-`pnpm validate:quickstart` is the full acceptance bundle for the canonical ledger feature. It runs typecheck, all automated test suites, and the production build.
+`pnpm validate:quickstart` is the full acceptance bundle for the canonical ledger feature. It runs typecheck, all automated test suites, and the production build. Browser flow coverage lives under `pnpm test:e2e` and uses the Playwright configuration in `playwright.config.ts`.
 
 ## Feature Coverage
 
@@ -55,6 +57,7 @@ The automated test helpers default to a local database at `postgres://postgres:p
 
 - Session creation and reconstruction routes are implemented and tested.
 - The home page supports live wallet connection and starts reconstruction for the connected wallet.
+- The browser wallet runtime is Base-only and expects `NEXT_PUBLIC_BASE_RPC_URL` plus `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` for the connected-wallet entry flow.
 - Live reconstruction discovers wallet-related Base transactions from ERC20 transfer logs and Aerodrome position NFT transfers.
 - Live Mellow detection infers wrapper-style contracts from the wallet's own transaction history instead of requiring manual environment allowlists.
 - Fixture wallets under `tests/fixtures/wallets/` remain the deterministic validation path for automated tests.
