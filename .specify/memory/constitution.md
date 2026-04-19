@@ -1,11 +1,20 @@
 <!--
   Sync Impact Report
   ==================
-  Version change: 1.0.0 → 1.1.0
+  Version change: 1.1.0 → 1.1.1
+  Bump rationale: PATCH - clarifies and operationalizes existing principles
+    (deterministic classification, pool-first attribution edge cases,
+    durable Mellow modeling language, and delivery-path flexibility)
+    without adding/removing/redefining constitutional scope.
   Modified principles:
-    - VI. "No Manual Reconciliation" → "Automatic Classification
-      and Source Immutability" (expanded with immutable source data
-      rule and auditable override layer guidance)
+    - II. "Pool-First Analysis" (expanded with explicit residual/
+      unallocated portfolio bucket guidance)
+    - IV. "Position Lifecycle Integrity" (Mellow wording made more
+      durable and less implementation-tactical)
+    - V. "Deterministic Event Classification" (allows deterministic,
+      explicit, versioned, test-covered heuristics)
+    - XIV. "Spec-Driven Delivery Discipline" (strict for production
+      path, allows clearly labeled non-production exploratory artifacts)
   Added sections: none
   Removed sections: none
   Templates requiring updates:
@@ -32,9 +41,16 @@ movements.
 ### II. Pool-First Analysis
 
 Pools are the primary analytical grouping unit. Every strategy,
-position, capital flow, reward, and valuation MUST be attributable to
-a specific pool. Pool-level aggregation MUST always be available
-alongside strategy-level and position-level detail.
+position, capital flow, reward, and valuation SHOULD be attributable
+to a specific pool when attribution confidence is sufficient.
+Pool-level aggregation MUST always be available alongside
+strategy-level and position-level detail.
+
+When exact pool attribution is not confidently derivable, assets MUST
+still be represented through an explicit residual bucket (for example,
+`unallocated`, `residual`, or portfolio-level holdings). This bucket
+MUST include idle wallet assets, rebalance leftovers, and other
+residual balances, and MUST remain included in total portfolio value.
 
 ### III. Strategy Isolation
 
@@ -55,18 +71,22 @@ NFT `tokenId` is the primary identity:
 - An `increaseLiquidity()` call on an existing `tokenId` MUST extend
   that position entity without creating a new one.
 For Mellow exposure, the position instance MUST be modeled as a
-strategy-specific lifecycle entity tied to wrapper/staking behavior,
-not as if the user owned a manual LP NFT per deposit.
+strategy-specific lifecycle entity aligned to wrapper-level and
+staking-level strategy semantics, not as if the user owned a manual
+LP NFT per deposit.
 
 ### V. Deterministic Event Classification
 
 Every onchain transaction and log relevant to the connected wallet
 MUST be classified into a canonical event type using deterministic,
 reproducible rules. Classification MUST rely on onchain call
-semantics and contract interaction patterns, not on heuristics that
-vary across runs. The `IncreaseLiquidity` event, for example, MUST
-be disambiguated by whether the originating call was `mint()` or
-`increaseLiquidity()`.
+semantics and contract interaction patterns as the primary basis.
+Deterministic heuristics are permitted only when they are explicitly
+defined, versioned, and covered by automated tests. Heuristics MUST
+NOT introduce run-to-run variance: given the same inputs, the same
+classification output MUST be produced. The `IncreaseLiquidity`
+event, for example, MUST be disambiguated by whether the originating
+call was `mint()` or `increaseLiquidity()`.
 
 ### VI. Automatic Classification and Source Immutability
 
@@ -162,11 +182,16 @@ capabilities MUST be treated as a constitutional amendment.
 
 ### XIV. Spec-Driven Delivery Discipline
 
-All product development MUST follow the Spec-Driven Development
+Production-path product development (including any merge-intended
+feature implementation) MUST follow the Spec-Driven Development
 workflow: constitution → specification → plan → tasks →
-implementation → testing. No feature implementation may begin
-without a ratified specification and approved plan. Deviations from
-this sequence MUST be documented and justified.
+implementation → testing. No merge-intended feature implementation
+may begin without a ratified specification and approved plan.
+
+Research artifacts, spikes, and exploratory prototypes MAY exist
+outside this workflow only when they are clearly identified as
+non-production and non-merge-intended. Such exploratory work MUST NOT
+be used to bypass constitutional requirements for merged product work.
 
 ## Scope Constraints
 
@@ -226,4 +251,4 @@ with its principles and constraints.
 - **Versioning**: This constitution follows semantic versioning
   (MAJOR.MINOR.PATCH).
 
-**Version**: 1.1.0 | **Ratified**: 2026-04-18 | **Last Amended**: 2026-04-18
+**Version**: 1.1.1 | **Ratified**: 2026-04-18 | **Last Amended**: 2026-04-18
