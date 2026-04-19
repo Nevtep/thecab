@@ -19,8 +19,6 @@ Copy `.env.example` to `.env.local` and provide the required values:
 - `BASE_RPC_FALLBACK_URLS` optional comma-separated Base RPC backups for live reconstruction
 - `BASE_TRACE_RPC_URL` if trace-capable fallback access is available
 - `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` for WalletConnect in the browser UI
-- `MELLOW_WRAPPER_ADDRESSES` optional comma-separated supported Mellow wrapper token addresses
-- `MELLOW_STAKING_REWARDS_ADDRESSES` optional comma-separated staking rewards addresses aligned by index with wrappers
 
 The automated test helpers default to a local database at `postgres://postgres:postgres@localhost:5432/the_cab`.
 
@@ -58,7 +56,7 @@ The automated test helpers default to a local database at `postgres://postgres:p
 - Session creation and reconstruction routes are implemented and tested.
 - The home page supports live wallet connection and starts reconstruction for the connected wallet.
 - Live reconstruction discovers wallet-related Base transactions from ERC20 transfer logs and Aerodrome position NFT transfers.
+- Live Mellow detection infers wrapper-style contracts from the wallet's own transaction history instead of requiring manual environment allowlists.
 - Fixture wallets under `tests/fixtures/wallets/` remain the deterministic validation path for automated tests.
-- Supported Mellow live detection requires `MELLOW_WRAPPER_ADDRESSES` and, when applicable, `MELLOW_STAKING_REWARDS_ADDRESSES` to be configured.
 
 The minimal inspection surface is available at `/ledger` and can be queried with a session id after creating an analysis session and running a reconstruction.

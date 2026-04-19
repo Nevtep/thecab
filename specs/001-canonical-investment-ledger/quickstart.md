@@ -13,8 +13,6 @@ The implementation should support these minimum environment values:
 - `BASE_RPC_FALLBACK_URLS` for optional comma-separated fallback Base RPC providers
 - `BASE_TRACE_RPC_URL` for optional trace-capable fallback access
 - `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` for WalletConnect browser connectivity
-- `MELLOW_WRAPPER_ADDRESSES` for optional live Mellow wrapper detection
-- `MELLOW_STAKING_REWARDS_ADDRESSES` for optional live Mellow staking rewards detection
 
 ## Current Implementation Note
 
@@ -31,7 +29,7 @@ Expected results:
 
 - Wallet-scoped ERC20 transfers appear as external deposits or withdrawals when no supported protocol semantics are detected.
 - Aerodrome manual position activity is classified from live receipts and logs.
-- Supported Mellow live detection becomes active when wrapper and staking addresses are configured in the environment.
+- Supported Mellow live detection infers wrapper-style contracts from the connected wallet's own transaction history.
 
 ## Available Developer Scripts
 
