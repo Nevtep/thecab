@@ -1,0 +1,386 @@
+openapi: 3.1.0
+info:
+  title: The Cab Ledger API
+  version: 1.0.0
+  summary: Versioned application contract for wallet-scoped canonical ledger reconstruction.
+servers:
+  - url: http://localhost:3000
+paths:
+  /api/analysis-sessions:
+    post:
+      summary: Create or resume a wallet analysis session.
+      operationId: createAnalysisSession
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAnalysisSessionRequest'
+      responses:
+        '201':
+          description: Analysis session created or resumed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisSession'
+  /api/analysis-sessions/{sessionId}/reconstructions:
+    post:
+      summary: Start a deterministic reconstruction run for the active wallet session.
+      operationId: startReconstructionRun
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartReconstructionRequest'
+      responses:
+        '202':
+          description: Reconstruction accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReconstructionRun'
+  /api/analysis-sessions/{sessionId}/ledger:
+    get:
+      summary: Get the latest accepted canonical ledger projection for a wallet session.
+      operationId: getLedgerProjection
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Canonical ledger projection.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LedgerProjectionResponse'
+  /api/analysis-sessions/{sessionId}/ledger/events/{ledgerRecordId}:
+    get:
+      summary: Get one canonical ledger record with provenance and asset movements.
+      operationId: getLedgerRecord
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+        - $ref: '#/components/parameters/LedgerRecordId'
+      responses:
+        '200':
+          description: Canonical ledger record detail.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LedgerRecordDetailResponse'
+  /api/analysis-sessions/{sessionId}/discarded-activity:
+    get:
+      summary: List discarded activity for a wallet session.
+      operationId: listDiscardedActivity
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      responses:
+        '200':
+          description: Discarded activity records.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscardedActivityListResponse'
+components:
+  parameters:
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      schema:
+        type: string
+    LedgerRecordId:
+      name: ledgerRecordId
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    CreateAnalysisSessionRequest:
+      type: object
+      required: [walletAddress, chainId]
+      properties:
+        walletAddress:
+          type: string
+        chainId:
+          type: integer
+          enum: [8453]
+    AnalysisSession:
+      type: object
+      required: [sessionId, walletAddress, chainId, status]
+      properties:
+        sessionId:
+          type: string
+        walletAddress:
+          type: string
+        chainId:
+          type: integer
+        status:
+          type: string
+          enum: [active, archived, failed]
+        latestAcceptedRunId:
+          type: string
+          nullable: true
+    StartReconstructionRequest:
+      type: object
+      properties:
+        fromBlock:
+          type: integer
+          minimum: 0
+        toBlock:
+          type: integer
+          minimum: 0
+        mode:
+          type: string
+          enum: [initial, incremental, replay]
+    ReconstructionRun:
+      type: object
+      required:
+        [reconstructionRunId, sessionId, status, classifierVersion, heuristicsVersion]
+      properties:
+        reconstructionRunId:
+          type: string
+        sessionId:
+          type: string
+        status:
+          type: string
+          enum: [pending, ingesting, normalizing, projecting, accepted, failed]
+        classifierVersion:
+          type: string
+        heuristicsVersion:
+          type: string
+        fromBlock:
+          type: integer
+        toBlock:
+          type: integer
+    LedgerProjectionResponse:
+      type: object
+      required:
+        [contractVersion, classifierVersion, heuristicsVersion, sourceBlockRange, pools, residualHoldings, discardedSummary]
+      properties:
+        contractVersion:
+          type: string
+        classifierVersion:
+          type: string
+        heuristicsVersion:
+          type: string
+        sourceBlockRange:
+          $ref: '#/components/schemas/BlockRange'
+        pools:
+          type: array
+          items:
+            $ref: '#/components/schemas/PoolLedger'
+        residualHoldings:
+          type: array
+          items:
+            $ref: '#/components/schemas/ResidualHolding'
+        discardedSummary:
+          $ref: '#/components/schemas/DiscardedSummary'
+    PoolLedger:
+      type: object
+      required: [poolId, displayName, strategies]
+      properties:
+        poolId:
+          type: string
+        displayName:
+          type: string
+        poolAddress:
+          type: string
+        strategies:
+          type: array
+          items:
+            $ref: '#/components/schemas/StrategyLedger'
+    StrategyLedger:
+      type: object
+      required: [strategyId, strategyType, positions]
+      properties:
+        strategyId:
+          type: string
+        strategyType:
+          type: string
+          enum: [manual, mellow_auto]
+        sourceContractAddress:
+          type: string
+          nullable: true
+        positions:
+          type: array
+          items:
+            $ref: '#/components/schemas/PositionLifecycle'
+    PositionLifecycle:
+      type: object
+      required: [positionInstanceId, positionType, status, ledgerRecords]
+      properties:
+        positionInstanceId:
+          type: string
+        positionType:
+          type: string
+          enum: [manual_cl, mellow_exposure]
+        status:
+          type: string
+          enum: [open, partially_reduced, closed, burned, archived]
+        identityReference:
+          type: string
+        ledgerRecords:
+          type: array
+          items:
+            $ref: '#/components/schemas/LedgerRecordSummary'
+    LedgerRecordSummary:
+      type: object
+      required: [ledgerRecordId, eventType, txHash, timestamp]
+      properties:
+        ledgerRecordId:
+          type: string
+        eventType:
+          type: string
+        txHash:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+    LedgerRecordDetailResponse:
+      type: object
+      required: [contractVersion, record]
+      properties:
+        contractVersion:
+          type: string
+        record:
+          $ref: '#/components/schemas/LedgerRecordDetail'
+    LedgerRecordDetail:
+      type: object
+      required:
+        [ledgerRecordId, eventType, txHash, blockNumber, timestamp, sourceObservations, assetMovements]
+      properties:
+        ledgerRecordId:
+          type: string
+        poolId:
+          type: string
+          nullable: true
+        strategyId:
+          type: string
+          nullable: true
+        positionInstanceId:
+          type: string
+          nullable: true
+        eventType:
+          type: string
+        txHash:
+          type: string
+        blockNumber:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+        explanation:
+          type: string
+        sourceObservations:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceObservationRef'
+        assetMovements:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssetMovement'
+    SourceObservationRef:
+      type: object
+      required: [rawObservationId, sourceType, role]
+      properties:
+        rawObservationId:
+          type: string
+        sourceType:
+          type: string
+          enum: [block_header, transaction, receipt, log, trace_frame]
+        role:
+          type: string
+          enum: [primary_call, supporting_log, trace_validation, transfer_evidence]
+    AssetMovement:
+      type: object
+      required: [assetMovementId, tokenAddress, amountRaw, direction, movementRole]
+      properties:
+        assetMovementId:
+          type: string
+        tokenAddress:
+          type: string
+        symbol:
+          type: string
+        amountRaw:
+          type: string
+        direction:
+          type: string
+          enum: [in, out, internal]
+        movementRole:
+          type: string
+          enum: [principal, reward, fee, swap_leg, residual_change]
+    ResidualHolding:
+      type: object
+      required: [residualHoldingId, tokenAddress, amountRaw, attributionConfidence, reasonCode]
+      properties:
+        residualHoldingId:
+          type: string
+        tokenAddress:
+          type: string
+        symbol:
+          type: string
+        amountRaw:
+          type: string
+        attributionConfidence:
+          type: number
+        candidatePoolIds:
+          type: array
+          items:
+            type: string
+        reasonCode:
+          type: string
+          enum: [idle_wallet_balance, rebalance_leftover, unallocated_close_proceeds, low_confidence_attribution]
+    DiscardedSummary:
+      type: object
+      required: [totalCount]
+      properties:
+        totalCount:
+          type: integer
+        byReasonType:
+          type: object
+          additionalProperties:
+            type: integer
+    DiscardedActivityListResponse:
+      type: object
+      required: [contractVersion, items]
+      properties:
+        contractVersion:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiscardedActivity'
+    DiscardedActivity:
+      type: object
+      required: [discardedActivityId, txHash, reasonType, reasonCode, reasonMessage]
+      properties:
+        discardedActivityId:
+          type: string
+        txHash:
+          type: string
+        blockNumber:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+        reasonType:
+          type: string
+          enum: [unsupported, malicious, ambiguous, invalid]
+        reasonCode:
+          type: string
+        reasonMessage:
+          type: string
+        sourceObservationIds:
+          type: array
+          items:
+            type: string
+    BlockRange:
+      type: object
+      required: [fromBlock, toBlock]
+      properties:
+        fromBlock:
+          type: integer
+        toBlock:
+          type: integer
