@@ -10,7 +10,7 @@ describe("discarded activity contract", () => {
     await resetDatabase();
   });
 
-  it("returns residual holdings and discarded records through the contract routes", async () => {
+  it("keeps discarded activity reviewable without blocking the main ledger contract", async () => {
     const { body: session } = await createSession("0x3000000000000000000000000000000000000003");
     await reconstructSession(session.sessionId);
 
@@ -18,6 +18,10 @@ describe("discarded activity contract", () => {
     const discarded = await fetchDiscardedActivity(session.sessionId);
 
     expect(ledger.body.residualHoldings).toHaveLength(1);
+    expect(ledger.body.discardedSummary.totalCount).toBeGreaterThan(0);
+    expect(discarded.response.status).toBe(200);
+    expect(discarded.body.items[0].discardedActivityId).toBeTruthy();
     expect(discarded.body.items[0].reasonType).toBe("unsupported");
+    expect(discarded.body.items[0].reasonMessage).toBeTruthy();
   });
 });

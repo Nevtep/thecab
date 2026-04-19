@@ -41,7 +41,7 @@ The automated test helpers default to a local database at `postgres://postgres:p
 - `pnpm build`
 - `pnpm validate:quickstart`
 
-`pnpm validate:quickstart` is the full acceptance bundle for the canonical ledger feature. It runs typecheck, all automated test suites, and the production build. Browser flow coverage lives under `pnpm test:e2e` and uses the Playwright configuration in `playwright.config.ts`.
+`pnpm validate:quickstart` runs typecheck, unit, replay, contract, integration, and production build validation. Browser flow coverage runs separately under `pnpm test:e2e` and uses the Playwright configuration in `playwright.config.ts`.
 
 ## Feature Coverage
 
@@ -63,3 +63,5 @@ The automated test helpers default to a local database at `postgres://postgres:p
 - Fixture wallets under `tests/fixtures/wallets/` remain the deterministic validation path for automated tests.
 
 The minimal inspection surface is available at `/ledger` and can be queried with a session id after creating an analysis session and running a reconstruction.
+
+Connected-wallet inspection now distinguishes session loading, live reconstruction, refresh-with-latest, empty, failure, and stale wallet or chain recovery states while keeping discarded activity reviewable from the same ledger flow.

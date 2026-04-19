@@ -116,6 +116,8 @@ Expected results:
 - `pnpm test:e2e`
 - `pnpm build`
 
+`pnpm validate:quickstart` covers typecheck, unit, replay, contract, integration, and build validation. Run `pnpm test:e2e` separately for the browser-connected wallet coverage.
+
 ## Acceptance Threshold
 
 The feature is ready to move to task generation when the scenarios above are covered by automated or manual validation and the implementation demonstrates:
@@ -126,3 +128,14 @@ The feature is ready to move to task generation when the scenarios above are cov
 - live reconstruction backed by the canonical ledger path
 - clear running, refreshing, success, empty, and failure states
 - production isolation from fixture-backed runtime discovery
+
+## Validation Results
+
+Recorded after implementation completion on 2026-04-19.
+
+- `pnpm validate:quickstart`: passed
+- `pnpm test:e2e`: passed
+- Contract suite: 5 files passed, 6 tests passed
+- Integration suite: 6 files passed, 9 tests passed
+- Browser suite: 8 tests passed
+- Production build: passed with existing dependency warnings from MetaMask SDK optional async-storage resolution and `pino-pretty` optional formatting support

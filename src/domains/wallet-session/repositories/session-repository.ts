@@ -84,7 +84,7 @@ export class SessionRepository {
   async setLatestAcceptedRun(analysisSessionId: string, reconstructionRunId: string) {
     const [updated] = await this.db
       .update(analysisSessions)
-      .set({ latestAcceptedRunId: reconstructionRunId, lastRequestedAt: new Date() })
+      .set({ latestAcceptedRunId: reconstructionRunId })
       .where(eq(analysisSessions.analysisSessionId, analysisSessionId))
       .returning();
 

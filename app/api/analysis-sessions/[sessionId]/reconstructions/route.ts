@@ -46,28 +46,27 @@ export async function POST(request: NextRequest, context: RouteContext) {
       toBlock: payload.toBlock ?? null
     });
 
-    const completedRun =
-      (await reconstructionExecutor.execute({
+    void reconstructionExecutor.execute({
         analysisSessionId: sessionId,
         reconstructionRunId: run.reconstructionRunId,
         mode: payload.mode,
         fromBlock: payload.fromBlock ?? null,
         toBlock: payload.toBlock ?? null
-      })) ?? run;
+      });
 
     return NextResponse.json(
       reconstructionRunResponseSchema.parse({
-        reconstructionRunId: completedRun.reconstructionRunId,
-        sessionId: completedRun.analysisSessionId,
-        runMode: completedRun.runMode,
-        status: completedRun.status,
-        classifierVersion: completedRun.classifierVersion,
-        heuristicsVersion: completedRun.heuristicsVersion,
-        fromBlock: completedRun.fromBlock == null ? null : Number(completedRun.fromBlock),
-        toBlock: completedRun.toBlock == null ? null : Number(completedRun.toBlock),
-        startedAt: completedRun.startedAt.toISOString(),
-        completedAt: completedRun.completedAt?.toISOString() ?? null,
-        errorSummary: completedRun.errorSummary ?? null
+        reconstructionRunId: run.reconstructionRunId,
+        sessionId: run.analysisSessionId,
+        runMode: run.runMode,
+        status: run.status,
+        classifierVersion: run.classifierVersion,
+        heuristicsVersion: run.heuristicsVersion,
+        fromBlock: run.fromBlock == null ? null : Number(run.fromBlock),
+        toBlock: run.toBlock == null ? null : Number(run.toBlock),
+        startedAt: run.startedAt.toISOString(),
+        completedAt: run.completedAt?.toISOString() ?? null,
+        errorSummary: run.errorSummary ?? null
       }),
       { status: 202 }
     );

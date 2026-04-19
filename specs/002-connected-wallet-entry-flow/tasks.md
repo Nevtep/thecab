@@ -77,17 +77,17 @@
 
 ### Tests for User Story 2
 
-- [ ] T023 [P] [US2] Add contract coverage for GET /api/analysis-sessions/{sessionId} session-status summaries in tests/contract/analysis-session-status.contract.test.ts
-- [ ] T024 [P] [US2] Add integration coverage for session reuse, refresh-with-latest ledger loading, and minimal stale-context guarding in tests/integration/session-refresh-flow.test.ts
-- [ ] T025 [P] [US2] Add browser coverage for reused-session navigation, refresh-status banners, and minimal stale wallet or chain guarding in tests/e2e/connected-wallet-refresh.spec.ts
+- [x] T023 [P] [US2] Add contract coverage for GET /api/analysis-sessions/{sessionId} session-status summaries in tests/contract/analysis-session-status.contract.test.ts
+- [x] T024 [P] [US2] Add integration coverage for session reuse, refresh-with-latest ledger loading, and minimal stale-context guarding in tests/integration/session-refresh-flow.test.ts
+- [x] T025 [P] [US2] Add browser coverage for reused-session navigation, refresh-status banners, and minimal stale wallet or chain guarding in tests/e2e/connected-wallet-refresh.spec.ts
 
 ### Implementation for User Story 2
 
-- [ ] T026 [US2] Update reconstruction refresh responses to expose run metadata needed by the ledger flow in app/api/analysis-sessions/[sessionId]/reconstructions/route.ts
-- [ ] T027 [US2] Implement session polling, latest-accepted hydration, and refresh transitions in src/ui/wallet/use-connected-wallet-analysis.ts
-- [ ] T028 [US2] Implement the session-aware connected-wallet ledger view with a minimal pre-render stale wallet or chain guard in src/ui/wallet/connected-wallet-analysis-view.tsx
-- [ ] T029 [US2] Update the ledger route to render the session-aware connected-wallet analysis view and enforce guarded session rendering in app/ledger/page.tsx
-- [ ] T030 [US2] Extend canonical projection lookup for reused sessions and latest accepted run hydration in src/domains/ledger/projections/ledger-projection-service.ts
+- [x] T026 [US2] Update reconstruction refresh responses to expose run metadata needed by the ledger flow in app/api/analysis-sessions/[sessionId]/reconstructions/route.ts
+- [x] T027 [US2] Implement session polling, latest-accepted hydration, and refresh transitions in src/ui/wallet/use-connected-wallet-analysis.ts
+- [x] T028 [US2] Implement the session-aware connected-wallet ledger view with a minimal pre-render stale wallet or chain guard in src/ui/wallet/connected-wallet-analysis-view.tsx
+- [x] T029 [US2] Update the ledger route to render the session-aware connected-wallet analysis view and enforce guarded session rendering in app/ledger/page.tsx
+- [x] T030 [US2] Extend canonical projection lookup for reused sessions and latest accepted run hydration in src/domains/ledger/projections/ledger-projection-service.ts
 
 **Checkpoint**: User Story 2 should now deliver a meaningful live ledger experience with session reuse, refresh-with-latest behavior, and minimal stale-context protection before trusted results render.
 
@@ -101,16 +101,16 @@
 
 ### Tests for User Story 3
 
-- [ ] T031 [P] [US3] Add contract coverage for non-blocking discarded-activity inspection in tests/contract/discarded-activity.contract.test.ts
-- [ ] T032 [P] [US3] Add integration coverage for running, empty, failure, and rich stale-context recovery flows in tests/integration/connected-wallet-state-flow.test.ts
-- [ ] T033 [P] [US3] Add browser coverage for stale wallet or chain recovery and retry flows in tests/e2e/connected-wallet-states.spec.ts
+- [x] T031 [P] [US3] Add contract coverage for non-blocking discarded-activity inspection in tests/contract/discarded-activity.contract.test.ts
+- [x] T032 [P] [US3] Add integration coverage for running, empty, failure, and rich stale-context recovery flows in tests/integration/connected-wallet-state-flow.test.ts
+- [x] T033 [P] [US3] Add browser coverage for stale wallet or chain recovery and retry flows in tests/e2e/connected-wallet-states.spec.ts
 
 ### Implementation for User Story 3
 
-- [ ] T034 [US3] Implement rich stale-context recovery actions and final state derivation for running, empty, and failure outcomes in src/ui/wallet/use-connected-wallet-analysis.ts
-- [ ] T035 [US3] Update the connected-wallet analysis view to render empty, failure, stale-context recovery, and discarded-safe states in src/ui/wallet/connected-wallet-analysis-view.tsx
-- [ ] T036 [US3] Surface latest failure metadata without hiding earlier accepted results in src/domains/wallet-session/services/session-status-service.ts
-- [ ] T037 [US3] Keep discarded activity reviewable without blocking the main flow in app/api/analysis-sessions/[sessionId]/discarded-activity/route.ts
+- [x] T034 [US3] Implement rich stale-context recovery actions and final state derivation for running, empty, and failure outcomes in src/ui/wallet/use-connected-wallet-analysis.ts
+- [x] T035 [US3] Update the connected-wallet analysis view to render empty, failure, stale-context recovery, and discarded-safe states in src/ui/wallet/connected-wallet-analysis-view.tsx
+- [x] T036 [US3] Surface latest failure metadata without hiding earlier accepted results in src/domains/wallet-session/services/session-status-service.ts
+- [x] T037 [US3] Keep discarded activity reviewable without blocking the main flow in app/api/analysis-sessions/[sessionId]/discarded-activity/route.ts
 
 **Checkpoint**: All three user stories should now be independently functional, including state-correct running, empty, failure, and guarded-stale behavior.
 
@@ -120,10 +120,10 @@
 
 **Purpose**: Finalize documentation, contract examples, and full-flow validation across all stories.
 
-- [ ] T038 [P] Align connected-wallet API examples with implemented status and refresh fields in specs/002-connected-wallet-entry-flow/contracts/connected-wallet-entry.openapi.yaml
-- [ ] T039 [P] Update connected-wallet validation scenarios and execution notes in specs/002-connected-wallet-entry-flow/quickstart.md
-- [ ] T040 [P] Update connected-wallet runtime and validation guidance in README.md
-- [ ] T041 Record full connected-wallet validation results in specs/002-connected-wallet-entry-flow/quickstart.md
+- [x] T038 [P] Align connected-wallet API examples with implemented status and refresh fields in specs/002-connected-wallet-entry-flow/contracts/connected-wallet-entry.openapi.yaml
+- [x] T039 [P] Update connected-wallet validation scenarios and execution notes in specs/002-connected-wallet-entry-flow/quickstart.md
+- [x] T040 [P] Update connected-wallet runtime and validation guidance in README.md
+- [x] T041 Record full connected-wallet validation results in specs/002-connected-wallet-entry-flow/quickstart.md
 
 ---
 

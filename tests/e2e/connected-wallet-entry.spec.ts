@@ -107,7 +107,8 @@ async function installConnectedWalletTestOverride(
 
 test("connects one injected wallet on Base and starts analysis from the connected wallet", async ({ page }) => {
   await installMockInjectedWallet(page, {
-    chainIdHex: "0x2105"
+    chainIdHex: "0x2105",
+    accounts: ["0x1000000000000000000000000000000000000011"]
   });
 
   await page.goto("/");
@@ -117,12 +118,12 @@ test("connects one injected wallet on Base and starts analysis from the connecte
   await page.getByRole("button", { name: "Start analysis from connected wallet" }).click();
 
   await page.waitForURL(/\/ledger\?sessionId=/);
-  await expect(page.getByText("Canonical ledger projection")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Connected-wallet analysis" })).toBeVisible();
 });
 
 test("blocks session bootstrap on the wrong chain until the wallet switches to Base", async ({ page }) => {
   await installConnectedWalletTestOverride(page, {
-    walletAddress: "0x1000000000000000000000000000000000000001",
+    walletAddress: "0x1000000000000000000000000000000000000012",
     chainId: 1
   });
 

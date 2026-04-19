@@ -162,6 +162,9 @@ components:
       type: object
       required:
         - session
+        - latestAcceptedRun
+        - latestRun
+        - lastFailure
         - hasAcceptedProjection
       properties:
         session:
@@ -171,6 +174,10 @@ components:
             - $ref: '#/components/schemas/ReconstructionRunSummary'
           nullable: true
         latestRun:
+          allOf:
+            - $ref: '#/components/schemas/ReconstructionRunSummary'
+          nullable: true
+        lastFailure:
           allOf:
             - $ref: '#/components/schemas/ReconstructionRunSummary'
           nullable: true
@@ -197,11 +204,12 @@ components:
         latestRun:
           reconstructionRunId: run_live456
           sessionId: session_abc123
-          runMode: initial
+          runMode: incremental
           status: normalizing
           classifierVersion: 2026-04-19.1
           heuristicsVersion: 2026-04-19.1
           startedAt: 2026-04-19T17:00:00.000Z
           completedAt: null
           errorSummary: null
+        lastFailure: null
         hasAcceptedProjection: true

@@ -19,11 +19,23 @@ export class LedgerProjectionService {
     private readonly rawObservationRepository: RawObservationRepository
   ) {}
 
-  async getLatestProjection(analysisSessionId: string) {
+  private async resolveAcceptedRun(analysisSessionId: string) {
     const session = await this.sessionRepository.findById(analysisSessionId);
-    const acceptedRun = session?.latestAcceptedRunId
+    const preferredAcceptedRun = session?.latestAcceptedRunId
       ? await this.reconstructionRunRepository.findById(session.latestAcceptedRunId)
+      : null;
+    const acceptedRun = preferredAcceptedRun?.status === "accepted"
+      ? preferredAcceptedRun
       : await this.reconstructionRunRepository.findLatestAcceptedBySession(analysisSessionId);
+
+    return {
+      session,
+      acceptedRun
+    };
+  }
+
+  async getLatestProjection(analysisSessionId: string) {
+    const { session, acceptedRun } = await this.resolveAcceptedRun(analysisSessionId);
 
     if (!session || !acceptedRun) {
       return {
@@ -183,10 +195,7 @@ export class LedgerProjectionService {
   }
 
   async getLedgerRecordDetail(analysisSessionId: string, ledgerRecordId: string) {
-    const session = await this.sessionRepository.findById(analysisSessionId);
-    const acceptedRun = session?.latestAcceptedRunId
-      ? await this.reconstructionRunRepository.findById(session.latestAcceptedRunId)
-      : await this.reconstructionRunRepository.findLatestAcceptedBySession(analysisSessionId);
+    const { session, acceptedRun } = await this.resolveAcceptedRun(analysisSessionId);
 
     if (!session || !acceptedRun) {
       throw new Error("No accepted reconstruction run is available for this session.");
@@ -237,10 +246,7 @@ export class LedgerProjectionService {
   }
 
   async listDiscardedActivity(analysisSessionId: string) {
-    const session = await this.sessionRepository.findById(analysisSessionId);
-    const acceptedRun = session?.latestAcceptedRunId
-      ? await this.reconstructionRunRepository.findById(session.latestAcceptedRunId)
-      : await this.reconstructionRunRepository.findLatestAcceptedBySession(analysisSessionId);
+    const { session, acceptedRun } = await this.resolveAcceptedRun(analysisSessionId);
 
     if (!session || !acceptedRun) {
       return {

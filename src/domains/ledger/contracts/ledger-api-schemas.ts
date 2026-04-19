@@ -39,6 +39,7 @@ export const sessionStatusResponseSchema = z.object({
   session: analysisSessionResponseSchema,
   latestAcceptedRun: reconstructionRunResponseSchema.nullable(),
   latestRun: reconstructionRunResponseSchema.nullable(),
+  lastFailure: reconstructionRunResponseSchema.nullable(),
   hasAcceptedProjection: z.boolean()
 });
 
@@ -163,3 +164,5 @@ export type AnalysisSessionResponse = z.infer<typeof analysisSessionResponseSche
 export type StartReconstructionRequest = z.infer<typeof startReconstructionRequestSchema>;
 export type ReconstructionRunResponse = z.infer<typeof reconstructionRunResponseSchema>;
 export type SessionStatusResponse = z.infer<typeof sessionStatusResponseSchema>;
+export type LedgerProjectionResponse = z.infer<typeof ledgerProjectionResponseSchema>;
+export type DiscardedActivityListResponse = z.infer<typeof discardedActivityListResponseSchema>;

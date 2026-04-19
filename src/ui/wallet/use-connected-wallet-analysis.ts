@@ -7,6 +7,8 @@ import { base } from "wagmi/chains";
 
 import {
   type AnalysisSessionResponse,
+  type DiscardedActivityListResponse,
+  type LedgerProjectionResponse,
   type ReconstructionRunResponse,
   type SessionStatusResponse
 } from "@/domains/ledger/contracts/ledger-api-schemas";
@@ -23,9 +25,20 @@ export type ConnectedWalletContext = {
   isConnected: boolean;
 };
 
+export type ConnectedWalletAnalysisTestOverride = {
+  sessionStatus: SessionStatusResponse | null;
+  projection: LedgerProjectionResponse | null;
+  discardedActivity: DiscardedActivityListResponse | null;
+  errorMessage?: string | null;
+  isLoadingSession?: boolean;
+  isLoadingProjection?: boolean;
+  isRefreshing?: boolean;
+};
+
 declare global {
   interface Window {
     __THE_CAB_TEST_WALLET__?: ConnectedWalletContext;
+    __THE_CAB_TEST_ANALYSIS__?: Record<string, ConnectedWalletAnalysisTestOverride>;
   }
 }
 
@@ -38,7 +51,42 @@ export type LedgerEntryViewState =
   | "refreshing_with_latest"
   | "success"
   | "empty"
-  | "failure";
+  | "failure"
+  | "stale_context";
+
+export type SessionContextGuardReason =
+  | "wallet_mismatch"
+  | "wrong_chain"
+  | "not_connected"
+  | null;
+
+export type SessionContextGuard = {
+  isCurrent: boolean;
+  reason: SessionContextGuardReason;
+};
+
+export type StaleContextRecoveryAction = "return_home" | "switch_to_base";
+
+export type ConnectedWalletStaleContextRecovery = {
+  title: string;
+  description: string;
+  primaryActionLabel: string;
+  primaryAction: StaleContextRecoveryAction;
+};
+
+export type ConnectedWalletAnalysisResult = {
+  state: LedgerEntryViewState;
+  guard: SessionContextGuard;
+  connectedWallet: ConnectedWalletContext;
+  sessionStatus: SessionStatusResponse | null;
+  projection: LedgerProjectionResponse | null;
+  discardedActivity: DiscardedActivityListResponse | null;
+  isLoadingSession: boolean;
+  isLoadingProjection: boolean;
+  isRefreshing: boolean;
+  errorMessage: string | null;
+  retryAnalysis: () => void;
+};
 
 export type SessionBootstrapInput = {
   walletAddress: string;
@@ -47,6 +95,14 @@ export type SessionBootstrapInput = {
 };
 
 const CONNECTED_WALLET_TEST_OVERRIDE_EVENT = "thecab:test-wallet-changed";
+const CONNECTED_WALLET_ANALYSIS_TEST_OVERRIDE_EVENT = "thecab:test-analysis-changed";
+const RUNNING_RECONSTRUCTION_STATUSES = ["pending", "ingesting", "normalizing", "projecting"] as const;
+
+function isRunningReconstructionStatus(
+  status: ReconstructionRunResponse["status"] | null | undefined
+): status is (typeof RUNNING_RECONSTRUCTION_STATUSES)[number] {
+  return Boolean(status) && RUNNING_RECONSTRUCTION_STATUSES.includes(status as (typeof RUNNING_RECONSTRUCTION_STATUSES)[number]);
+}
 
 async function readJson<T>(response: Response) {
   return (await response.json().catch(() => ({}))) as T;
@@ -60,8 +116,67 @@ function readConnectedWalletTestOverride() {
   return window.__THE_CAB_TEST_WALLET__ ?? null;
 }
 
+function readConnectedWalletAnalysisTestOverride(sessionId: string) {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return window.__THE_CAB_TEST_ANALYSIS__?.[sessionId] ?? null;
+}
+
 export function buildSessionStatusQueryKey(sessionId: string) {
   return ["analysis-session", sessionId, "status"] as const;
+}
+
+export function buildLedgerProjectionQueryKey(sessionId: string) {
+  return ["analysis-session", sessionId, "ledger"] as const;
+}
+
+export function buildDiscardedActivityQueryKey(sessionId: string) {
+  return ["analysis-session", sessionId, "discarded-activity"] as const;
+}
+
+export function buildConnectedWalletSessionGuard(input: {
+  connectedWallet: ConnectedWalletContext;
+  session:
+    | {
+        walletAddress: string;
+        chainId: number;
+      }
+    | null;
+}): SessionContextGuard {
+  if (!input.connectedWallet.isConnected) {
+    return {
+      isCurrent: false,
+      reason: "not_connected"
+    };
+  }
+
+  if (!input.session) {
+    return {
+      isCurrent: true,
+      reason: null
+    };
+  }
+
+  if (input.connectedWallet.chainId !== input.session.chainId) {
+    return {
+      isCurrent: false,
+      reason: "wrong_chain"
+    };
+  }
+
+  if (input.connectedWallet.walletAddress?.toLowerCase() !== input.session.walletAddress.toLowerCase()) {
+    return {
+      isCurrent: false,
+      reason: "wallet_mismatch"
+    };
+  }
+
+  return {
+    isCurrent: true,
+    reason: null
+  };
 }
 
 export function buildConnectedWalletAnalysisState(input: {
@@ -84,7 +199,7 @@ export function buildConnectedWalletAnalysisState(input: {
   }
 
   const latestRun = input.sessionStatus?.latestRun;
-  if (latestRun && ["pending", "ingesting", "normalizing", "projecting"].includes(latestRun.status)) {
+  if (latestRun && isRunningReconstructionStatus(latestRun.status)) {
     return input.sessionStatus?.hasAcceptedProjection ? "refreshing_with_latest" : "reconstruction_running";
   }
 
@@ -97,6 +212,117 @@ export function buildConnectedWalletAnalysisState(input: {
   }
 
   return "ready";
+}
+
+export function buildConnectedWalletStaleContextRecovery(
+  reason: SessionContextGuardReason
+): ConnectedWalletStaleContextRecovery {
+  switch (reason) {
+    case "wrong_chain":
+      return {
+        title: "Switch the connected wallet back to Base",
+        description: "Trusted ledger results stay locked until the wallet returns to the same Base network used for this session.",
+        primaryActionLabel: "Switch back to Base",
+        primaryAction: "switch_to_base"
+      };
+    case "wallet_mismatch":
+      return {
+        title: "This session belongs to a different wallet",
+        description: "Return to a matching analysis so the connected wallet and persisted session agree before trusted results render.",
+        primaryActionLabel: "Return to a matching analysis",
+        primaryAction: "return_home"
+      };
+    case "not_connected":
+      return {
+        title: "Reconnect the wallet that owns this session",
+        description: "Trusted ledger results stay guarded until the original connected wallet is available again.",
+        primaryActionLabel: "Reconnect the matching wallet",
+        primaryAction: "return_home"
+      };
+    default:
+      return {
+        title: "Return to a matching connected-wallet analysis",
+        description: "Trusted results only render when the connected wallet context matches the persisted session.",
+        primaryActionLabel: "Return to the connected-wallet entry flow",
+        primaryAction: "return_home"
+      };
+  }
+}
+
+export function deriveConnectedWalletAnalysisState(input: {
+  connectedWallet: ConnectedWalletContext;
+  sessionStatus: SessionStatusResponse | null;
+  projection: LedgerProjectionResponse | null;
+  isSessionLoading: boolean;
+  isProjectionLoading: boolean;
+  isRefreshPending: boolean;
+}): {
+  state: LedgerEntryViewState;
+  guard: SessionContextGuard;
+} {
+  if (input.isSessionLoading) {
+    return {
+      state: "session_loading",
+      guard: {
+        isCurrent: true,
+        reason: null
+      }
+    };
+  }
+
+  const guard = buildConnectedWalletSessionGuard({
+    connectedWallet: input.connectedWallet,
+    session: input.sessionStatus?.session ?? null
+  });
+
+  if (!guard.isCurrent) {
+    return {
+      state: "stale_context",
+      guard
+    };
+  }
+
+  const latestRun = input.sessionStatus?.latestRun;
+  const hasVisibleProjection = Boolean(
+    input.projection &&
+      (input.projection.pools.length > 0 || input.projection.residualHoldings.length > 0)
+  );
+
+  if (
+    input.isRefreshPending ||
+    (latestRun && isRunningReconstructionStatus(latestRun.status))
+  ) {
+    return {
+      state: input.sessionStatus?.hasAcceptedProjection ? "refreshing_with_latest" : "reconstruction_running",
+      guard
+    };
+  }
+
+  if (latestRun?.status === "failed") {
+    return {
+      state: input.sessionStatus?.hasAcceptedProjection ? "success" : "failure",
+      guard
+    };
+  }
+
+  if (input.sessionStatus?.hasAcceptedProjection && input.isProjectionLoading) {
+    return {
+      state: "session_loading",
+      guard
+    };
+  }
+
+  if (input.sessionStatus?.hasAcceptedProjection) {
+    return {
+      state: hasVisibleProjection ? "success" : "empty",
+      guard
+    };
+  }
+
+  return {
+    state: "reconstruction_running",
+    guard
+  };
 }
 
 export function useConnectedWalletContext(): ConnectedWalletContext {
@@ -115,6 +341,7 @@ export function useConnectedWalletContext(): ConnectedWalletContext {
       setTestOverride(readConnectedWalletTestOverride());
     };
 
+    handleOverrideChange();
     window.addEventListener(CONNECTED_WALLET_TEST_OVERRIDE_EVENT, handleOverrideChange);
     return () => {
       window.removeEventListener(CONNECTED_WALLET_TEST_OVERRIDE_EVENT, handleOverrideChange);
@@ -147,10 +374,16 @@ export function switchConnectedWalletTestOverrideToBase() {
   return true;
 }
 
-export function useSessionStatusQuery(sessionId: string | null) {
+export function useSessionStatusQuery(sessionId: string | null, enabled = true) {
   return useQuery({
     queryKey: sessionId ? buildSessionStatusQueryKey(sessionId) : ["analysis-session", "idle", "status"],
-    enabled: Boolean(sessionId),
+    enabled: Boolean(sessionId) && enabled,
+    refetchInterval: (query) => {
+      const data = query.state.data as SessionStatusResponse | undefined;
+      const latestStatus = data?.latestRun?.status;
+
+      return isRunningReconstructionStatus(latestStatus) ? 750 : false;
+    },
     queryFn: async () => {
       if (!sessionId) {
         throw new Error("A session id is required to query session status.");
@@ -221,4 +454,187 @@ export function useStartReconstructionMutation(sessionId: string | null) {
       }
     }
   });
+}
+
+export function useLedgerProjectionQuery(sessionId: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: sessionId ? buildLedgerProjectionQueryKey(sessionId) : ["analysis-session", "idle", "ledger"],
+    enabled: Boolean(sessionId) && enabled,
+    queryFn: async () => {
+      if (!sessionId) {
+        throw new Error("A session id is required to query the ledger projection.");
+      }
+
+      const response = await fetch(`/api/analysis-sessions/${sessionId}/ledger`);
+      const payload = await readJson<LedgerProjectionResponse & ApiErrorResponse>(response);
+
+      if (!response.ok || !payload.contractVersion) {
+        throw new Error(payload.error ?? "Unable to load the latest ledger projection.");
+      }
+
+      return payload;
+    }
+  });
+}
+
+export function useDiscardedActivityQuery(sessionId: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: sessionId
+      ? buildDiscardedActivityQueryKey(sessionId)
+      : ["analysis-session", "idle", "discarded-activity"],
+    enabled: Boolean(sessionId) && enabled,
+    queryFn: async () => {
+      if (!sessionId) {
+        throw new Error("A session id is required to query discarded activity.");
+      }
+
+      const response = await fetch(`/api/analysis-sessions/${sessionId}/discarded-activity`);
+      const payload = await readJson<DiscardedActivityListResponse & ApiErrorResponse>(response);
+
+      if (!response.ok || !payload.contractVersion) {
+        throw new Error(payload.error ?? "Unable to load discarded activity.");
+      }
+
+      return payload;
+    }
+  });
+}
+
+export function useConnectedWalletAnalysis(sessionId: string): ConnectedWalletAnalysisResult {
+  const connectedWallet = useConnectedWalletContext();
+  const [analysisTestOverride, setAnalysisTestOverride] = useState<ConnectedWalletAnalysisTestOverride | null>(
+    () => readConnectedWalletAnalysisTestOverride(sessionId)
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    const handleOverrideChange = () => {
+      setAnalysisTestOverride(readConnectedWalletAnalysisTestOverride(sessionId));
+    };
+
+    handleOverrideChange();
+    window.addEventListener(CONNECTED_WALLET_ANALYSIS_TEST_OVERRIDE_EVENT, handleOverrideChange);
+    return () => {
+      window.removeEventListener(CONNECTED_WALLET_ANALYSIS_TEST_OVERRIDE_EVENT, handleOverrideChange);
+    };
+  }, [sessionId]);
+
+  const hasAnalysisTestOverride = analysisTestOverride !== null;
+  const sessionStatusQuery = useSessionStatusQuery(sessionId, !hasAnalysisTestOverride);
+  const startReconstruction = useStartReconstructionMutation(sessionId);
+  const guard = buildConnectedWalletSessionGuard({
+    connectedWallet,
+    session: sessionStatusQuery.data?.session ?? null
+  });
+  const projectionQuery = useLedgerProjectionQuery(
+    sessionId,
+    !hasAnalysisTestOverride && Boolean(sessionStatusQuery.data?.hasAcceptedProjection) && guard.isCurrent
+  );
+  const discardedActivityQuery = useDiscardedActivityQuery(
+    sessionId,
+    !hasAnalysisTestOverride && Boolean(sessionStatusQuery.data?.hasAcceptedProjection) && guard.isCurrent
+  );
+  const [refreshRequestSignature, setRefreshRequestSignature] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (hasAnalysisTestOverride || !sessionStatusQuery.data || !guard.isCurrent || startReconstruction.isPending) {
+      return;
+    }
+
+    const latestRun = sessionStatusQuery.data.latestRun;
+    if (latestRun && isRunningReconstructionStatus(latestRun.status)) {
+      return;
+    }
+
+    const requestedSignature = [
+      sessionId,
+      sessionStatusQuery.data.latestAcceptedRun?.reconstructionRunId ?? "no-accepted-run",
+      latestRun?.reconstructionRunId ?? "no-latest-run"
+    ].join(":");
+
+    if (refreshRequestSignature === requestedSignature) {
+      return;
+    }
+
+    setRefreshRequestSignature(requestedSignature);
+    startReconstruction.mutate(
+      sessionStatusQuery.data.hasAcceptedProjection ? "incremental" : "initial"
+    );
+  }, [
+    guard.isCurrent,
+    refreshRequestSignature,
+    sessionId,
+    sessionStatusQuery.data,
+    startReconstruction,
+    hasAnalysisTestOverride
+  ]);
+
+  if (analysisTestOverride) {
+    const derivedState = deriveConnectedWalletAnalysisState({
+      connectedWallet,
+      sessionStatus: analysisTestOverride.sessionStatus,
+      projection: analysisTestOverride.projection,
+      isSessionLoading: analysisTestOverride.isLoadingSession ?? false,
+      isProjectionLoading: analysisTestOverride.isLoadingProjection ?? false,
+      isRefreshPending: analysisTestOverride.isRefreshing ?? false
+    });
+
+    return {
+      state: derivedState.state,
+      guard: derivedState.guard,
+      connectedWallet,
+      sessionStatus: analysisTestOverride.sessionStatus,
+      projection: analysisTestOverride.projection,
+      discardedActivity: analysisTestOverride.discardedActivity,
+      isLoadingSession: analysisTestOverride.isLoadingSession ?? false,
+      isLoadingProjection: analysisTestOverride.isLoadingProjection ?? false,
+      isRefreshing: analysisTestOverride.isRefreshing ?? false,
+      errorMessage: analysisTestOverride.errorMessage ?? null,
+      retryAnalysis: () => {}
+    };
+  }
+
+  const derivedState = deriveConnectedWalletAnalysisState({
+    connectedWallet,
+    sessionStatus: sessionStatusQuery.data ?? null,
+    projection: projectionQuery.data ?? null,
+    isSessionLoading: sessionStatusQuery.isLoading,
+    isProjectionLoading: projectionQuery.isLoading,
+    isRefreshPending: startReconstruction.isPending
+  });
+
+  return {
+    state: derivedState.state,
+    guard: derivedState.guard,
+    connectedWallet,
+    sessionStatus: sessionStatusQuery.data ?? null,
+    projection: projectionQuery.data ?? null,
+    discardedActivity: discardedActivityQuery.data ?? null,
+    isLoadingSession: sessionStatusQuery.isLoading,
+    isLoadingProjection: projectionQuery.isLoading,
+    isRefreshing:
+      startReconstruction.isPending ||
+      Boolean(
+        sessionStatusQuery.data?.latestRun &&
+          isRunningReconstructionStatus(sessionStatusQuery.data.latestRun.status)
+      ),
+    errorMessage:
+      (sessionStatusQuery.error as Error | null)?.message ??
+      (projectionQuery.error as Error | null)?.message ??
+      (discardedActivityQuery.error as Error | null)?.message ??
+      startReconstruction.error?.message ??
+      null,
+    retryAnalysis: () => {
+      if (!guard.isCurrent) {
+        return;
+      }
+
+      startReconstruction.mutate(
+        sessionStatusQuery.data?.hasAcceptedProjection ? "incremental" : "initial"
+      );
+    }
+  };
 }

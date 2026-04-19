@@ -70,6 +70,7 @@ export async function GET(_request: Request, context: RouteContext) {
         },
         latestAcceptedRun: serializeRun(status.latestAcceptedRun),
         latestRun: serializeRun(status.latestRun),
+        lastFailure: serializeRun(status.lastFailure),
         hasAcceptedProjection: status.hasAcceptedProjection
       })
     );
