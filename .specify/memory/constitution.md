@@ -1,13 +1,12 @@
 <!--
   Sync Impact Report
   ==================
-  Version change: 0.0.0 → 1.0.0
-  Modified principles: none (initial ratification)
-  Added sections:
-    - Core Principles (14 principles)
-    - Scope Constraints
-    - Domain Model Constraints
-    - Governance
+  Version change: 1.0.0 → 1.1.0
+  Modified principles:
+    - VI. "No Manual Reconciliation" → "Automatic Classification
+      and Source Immutability" (expanded with immutable source data
+      rule and auditable override layer guidance)
+  Added sections: none
   Removed sections: none
   Templates requiring updates:
     - .specify/templates/plan-template.md ✅ reviewed (no changes needed)
@@ -69,13 +68,26 @@ vary across runs. The `IncreaseLiquidity` event, for example, MUST
 be disambiguated by whether the originating call was `mint()` or
 `increaseLiquidity()`.
 
-### VI. No Manual Reconciliation
+### VI. Automatic Classification and Source Immutability
 
-The system MUST NOT require manual user intervention to classify,
-correct, or reconcile transaction data under normal operation.
+The system MUST classify all transactions automatically without
+requiring manual user intervention under normal operation.
 Ambiguous, invalid, or unrecognizable events MUST be handled
 automatically through the discarded-event mechanism defined in
 Principle VII.
+
+Raw onchain observations — transactions, logs, and decoded event
+data — MUST be stored immutably once ingested. No process,
+override, or correction may alter the source event records.
+
+If manual reconciliation capabilities are introduced in the future,
+they MUST be implemented as an auditable override layer above the
+immutable source data. Overrides MUST record the original
+classification, the replacement classification, a reason, and a
+timestamp. The system MUST be able to revert to the automatic
+classification at any time by removing the override. Analytics
+MUST clearly distinguish between automatically classified events
+and manually overridden events.
 
 ### VII. Explicit Handling of Untrusted Transactions
 
@@ -214,4 +226,4 @@ with its principles and constraints.
 - **Versioning**: This constitution follows semantic versioning
   (MAJOR.MINOR.PATCH).
 
-**Version**: 1.0.0 | **Ratified**: 2026-04-18 | **Last Amended**: 2026-04-18
+**Version**: 1.1.0 | **Ratified**: 2026-04-18 | **Last Amended**: 2026-04-18
