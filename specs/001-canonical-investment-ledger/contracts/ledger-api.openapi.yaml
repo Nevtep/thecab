@@ -106,6 +106,13 @@ components:
         chainId:
           type: integer
           enum: [8453]
+        connectionSource:
+          type: string
+          default: walletconnect
+      example:
+        walletAddress: 0x2000000000000000000000000000000000000002
+        chainId: 8453
+        connectionSource: walletconnect
     AnalysisSession:
       type: object
       required: [sessionId, walletAddress, chainId, status]
@@ -122,6 +129,12 @@ components:
         latestAcceptedRunId:
           type: string
           nullable: true
+      example:
+        sessionId: session:8453:0x2000000000000000000000000000000000000002
+        walletAddress: 0x2000000000000000000000000000000000000002
+        chainId: 8453
+        status: active
+        latestAcceptedRunId: null
     StartReconstructionRequest:
       type: object
       properties:
@@ -134,6 +147,8 @@ components:
         mode:
           type: string
           enum: [initial, incremental, replay]
+      example:
+        mode: replay
     ReconstructionRun:
       type: object
       required:
@@ -154,6 +169,14 @@ components:
           type: integer
         toBlock:
           type: integer
+      example:
+        reconstructionRunId: run:8453:0x2000000000000000000000000000000000000002:1715200000
+        sessionId: session:8453:0x2000000000000000000000000000000000000002
+        status: accepted
+        classifierVersion: 2026-04-19.1
+        heuristicsVersion: 2026-04-19.1
+        fromBlock: 20450000
+        toBlock: 20450042
     LedgerProjectionResponse:
       type: object
       required:
@@ -177,6 +200,48 @@ components:
             $ref: '#/components/schemas/ResidualHolding'
         discardedSummary:
           $ref: '#/components/schemas/DiscardedSummary'
+      example:
+        contractVersion: 1.0.0
+        classifierVersion: 2026-04-19.1
+        heuristicsVersion: 2026-04-19.1
+        sourceBlockRange:
+          fromBlock: 20450000
+          toBlock: 20450042
+        pools:
+          - poolId: pool:weth-usdc
+            displayName: WETH / USDC
+            poolAddress: 0x1111111111111111111111111111111111111111
+            strategies:
+              - strategyId: strategy:weth-usdc:manual
+                strategyType: manual
+                sourceContractAddress: 0x2222222222222222222222222222222222222222
+                positions:
+                  - positionInstanceId: position:weth-usdc:manual:101
+                    positionType: manual_cl
+                    status: open
+                    identityReference: "101"
+                    ledgerRecords:
+                      - ledgerRecordId: ledger:manual-open:0xaaa
+                        eventType: manual_position_opened
+                        txHash: 0xaaa
+                        timestamp: 2024-01-01T00:00:00.000Z
+              - strategyId: strategy:weth-usdc:mellow
+                strategyType: mellow_auto
+                sourceContractAddress: 0x3333333333333333333333333333333333333333
+                positions:
+                  - positionInstanceId: position:weth-usdc:mellow:auto
+                    positionType: mellow_exposure
+                    status: open
+                    identityReference: 0x3333333333333333333333333333333333333333
+                    ledgerRecords:
+                      - ledgerRecordId: ledger:mellow-deposit:0xbbb
+                        eventType: mellow_deposit
+                        txHash: 0xbbb
+                        timestamp: 2024-01-01T01:00:00.000Z
+        residualHoldings: []
+        discardedSummary:
+          totalCount: 0
+          byReasonType: {}
     PoolLedger:
       type: object
       required: [poolId, displayName, strategies]
@@ -246,6 +311,38 @@ components:
           type: string
         record:
           $ref: '#/components/schemas/LedgerRecordDetail'
+      example:
+        contractVersion: 1.0.0
+        record:
+          ledgerRecordId: ledger:manual-open:0xaaa
+          poolId: pool:weth-usdc
+          strategyId: strategy:weth-usdc:manual
+          positionInstanceId: position:weth-usdc:manual:101
+          eventType: manual_position_opened
+          txHash: 0xaaa
+          blockNumber: 20450001
+          timestamp: 2024-01-01T00:00:00.000Z
+          explanation: Opened a manual Aerodrome concentrated liquidity position.
+          sourceObservations:
+            - rawObservationId: run:8453:0x2000000000000000000000000000000000000002:raw:0xaaa:tx
+              sourceType: transaction
+              role: primary_call
+            - rawObservationId: run:8453:0x2000000000000000000000000000000000000002:raw:0xaaa:log:0
+              sourceType: log
+              role: transfer_evidence
+          assetMovements:
+            - assetMovementId: movement:0xaaa:weth:out
+              tokenAddress: 0x4200000000000000000000000000000000000006
+              symbol: WETH
+              amountRaw: "1000000000000000000"
+              direction: out
+              movementRole: principal
+            - assetMovementId: movement:0xaaa:usdc:out
+              tokenAddress: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913
+              symbol: USDC
+              amountRaw: "2500000000"
+              direction: out
+              movementRole: principal
     LedgerRecordDetail:
       type: object
       required:
@@ -342,6 +439,10 @@ components:
           type: object
           additionalProperties:
             type: integer
+      example:
+        totalCount: 1
+        byReasonType:
+          unsupported: 1
     DiscardedActivityListResponse:
       type: object
       required: [contractVersion, items]
@@ -352,9 +453,23 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/DiscardedActivity'
+      example:
+        contractVersion: 1.0.0
+        items:
+          - discardedActivityId: discarded:0xccc
+            txHash: 0xccc
+            blockNumber: 20450100
+            timestamp: 2024-01-01T03:00:00.000Z
+            reasonType: unsupported
+            reasonCode: unsupported_protocol_surface
+            reasonMessage: Transaction touched an unsupported protocol contract.
+            classifierVersion: 2026-04-19.1
+            heuristicsVersion: 2026-04-19.1
+            sourceObservationIds:
+              - run:8453:0x3000000000000000000000000000000000000003:raw:0xccc:tx
     DiscardedActivity:
       type: object
-      required: [discardedActivityId, txHash, reasonType, reasonCode, reasonMessage]
+      required: [discardedActivityId, txHash, blockNumber, timestamp, reasonType, reasonCode, reasonMessage, classifierVersion, heuristicsVersion, sourceObservationIds]
       properties:
         discardedActivityId:
           type: string
@@ -371,6 +486,10 @@ components:
         reasonCode:
           type: string
         reasonMessage:
+          type: string
+        classifierVersion:
+          type: string
+        heuristicsVersion:
           type: string
         sourceObservationIds:
           type: array

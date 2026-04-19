@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This quickstart defines the validation path the implementation must support for the canonical ledger feature. It is written to guide implementation and acceptance, not to claim that the commands already exist in the current repository.
+This quickstart now reflects the implemented validation path for the canonical ledger feature. The commands below exist in the repository and were used to validate the feature-complete implementation.
 
 ## Required Environment
 
@@ -13,15 +13,17 @@ The implementation should support these minimum environment values:
 - `BASE_TRACE_RPC_URL` for optional trace-capable fallback access
 - `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` for one-wallet session initiation
 
-## Expected Developer Scripts
+## Available Developer Scripts
 
-The implementation should provide scripts equivalent to the following:
+The repository now provides the following validation commands:
 
 - `pnpm dev` to run the Next.js application locally
+- `pnpm db:migrate` to apply the append-only ledger migrations
 - `pnpm test:unit` for classifier and model unit tests
 - `pnpm test:replay` for deterministic wallet replay validation
 - `pnpm test:contract` for API contract validation
-- `pnpm test:e2e` for end-to-end session and ledger inspection flows
+- `pnpm test:integration` for route-level end-to-end validation
+- `pnpm validate:quickstart` to run typecheck, all automated tests, and a production build
 
 ## Validation Scenario 1: Manual Aerodrome Lifecycle Continuity
 
@@ -40,6 +42,11 @@ Expected results:
 - The `increaseLiquidity()` extends the same lifecycle rather than creating a second one.
 - All canonical ledger records link back to source transaction context and raw observations.
 
+Implementation notes:
+
+- Covered by fixture wallet `tests/fixtures/wallets/us1-wallet.json` and replay validation in `tests/replay/wallet-reconstruction.test.ts`.
+- Verified by `pnpm test:replay` and `pnpm test:integration`.
+
 ## Validation Scenario 2: Parallel Manual and Supported Mellow Strategies In One Pool
 
 1. Load a fixture wallet whose history includes both manual Aerodrome activity and supported Mellow wrapper or staking activity for the same pool.
@@ -51,6 +58,11 @@ Expected results:
 - Two strategies appear under that pool: `manual` and `mellow_auto`.
 - Supported Mellow activity is not represented as manual LP NFT ownership.
 - Manual and supported Mellow ledger records remain isolated while sharing the same pool context.
+
+Implementation notes:
+
+- Covered by fixture wallet `tests/fixtures/wallets/us2-wallet.json` and raw observations in `tests/fixtures/raw-observations/us2-wallet-observations.json`.
+- Verified by `tests/replay/pool-strategy-lifecycle.test.ts`, `tests/contract/ledger-projection.contract.test.ts`, and `tests/integration/pool-strategy-view.test.ts`.
 
 ## Validation Scenario 3: Residual Holdings And Discarded Activity
 
@@ -66,6 +78,11 @@ Expected results:
 - The unsafe transaction is stored as discarded activity with stable reason metadata.
 - Discarded activity is reviewable through the API but excluded from trusted ledger projections.
 
+Implementation notes:
+
+- Covered by fixture wallet `tests/fixtures/wallets/us3-wallet.json` and raw observations in `tests/fixtures/raw-observations/us3-wallet-observations.json`.
+- Verified by `tests/replay/residual-and-discarded.test.ts`, `tests/contract/discarded-activity.contract.test.ts`, and `tests/integration/residual-and-discarded-flow.test.ts`.
+
 ## Validation Scenario 4: Deterministic Replay
 
 1. Run reconstruction twice against the same fixture wallet and the same raw observation corpus.
@@ -78,6 +95,11 @@ Expected results:
 - No discarded reason codes drift between runs.
 - The latest accepted projection can be swapped to a newer run without mutating older runs.
 
+Implementation notes:
+
+- Verified by `tests/replay/wallet-reconstruction.test.ts` after isolating raw observation persistence per reconstruction run.
+- The canonical validation bundle `pnpm validate:quickstart` now completes with typecheck, unit, replay, contract, integration, and production build success.
+
 ## Acceptance Threshold
 
 This feature is ready to move to task generation when all four scenarios pass and the implementation demonstrates:
@@ -89,3 +111,16 @@ This feature is ready to move to task generation when all four scenarios pass an
 - lifecycle continuity rules
 - residual holding visibility
 - discarded activity isolation
+
+## Validation Record
+
+The following commands were executed successfully against the implemented feature:
+
+- `pnpm typecheck`
+- `pnpm test:unit`
+- `pnpm test:replay`
+- `pnpm test:contract`
+- `pnpm test:integration`
+- `pnpm build`
+
+The combined `pnpm validate:quickstart` script now represents the expected acceptance path for local verification.

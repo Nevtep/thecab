@@ -1,0 +1,112 @@
+[
+  {
+    "rawObservationId": "us2-tx1-transaction",
+    "sourceType": "transaction",
+    "chainId": 8453,
+    "blockNumber": 200,
+    "blockHash": "0xblock200",
+    "txHash": "0x2000000000000000000000000000000000000000000000000000000000000001",
+    "payloadJson": {
+      "timestamp": "2026-04-19T11:00:00.000Z",
+      "semantic": {
+        "protocol": "aerodrome",
+        "action": "mint",
+        "tokenId": "202",
+        "sourceContractAddress": "0x827922686190790b37229fd06084350e74485b72",
+        "pool": {
+          "address": "0xpool-weth-usdc",
+          "protocolFamily": "aerodrome_slipstream",
+          "displayName": "WETH / USDC",
+          "token0Address": "0xweth",
+          "token1Address": "0xusdc",
+          "feeTier": 100
+        },
+        "explanation": "Manual mint opens the manual strategy lifecycle.",
+        "assetMovements": [
+          {
+            "tokenAddress": "0xweth",
+            "symbol": "WETH",
+            "amountRaw": "1000000000000000000",
+            "decimals": 18,
+            "direction": "out",
+            "movementRole": "principal"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "rawObservationId": "us2-tx2-transaction",
+    "sourceType": "transaction",
+    "chainId": 8453,
+    "blockNumber": 201,
+    "blockHash": "0xblock201",
+    "txHash": "0x2000000000000000000000000000000000000000000000000000000000000002",
+    "payloadJson": {
+      "timestamp": "2026-04-19T11:05:00.000Z",
+      "semantic": {
+        "protocol": "mellow",
+        "action": "depositAndStake",
+        "sourceContractAddress": "0x1111111111111111111111111111111111111111",
+        "wrapperAddress": "0x1111111111111111111111111111111111111111",
+        "stakingRewardsAddress": "0x2222222222222222222222222222222222222222",
+        "shareBalanceRaw": "900000000000000000",
+        "pool": {
+          "address": "0xpool-weth-usdc",
+          "protocolFamily": "aerodrome_slipstream",
+          "displayName": "WETH / USDC",
+          "token0Address": "0xweth",
+          "token1Address": "0xusdc",
+          "feeTier": 100
+        },
+        "explanation": "Mellow wrapper deposit creates a distinct auto strategy under the same pool.",
+        "assetMovements": [
+          {
+            "tokenAddress": "0xweth",
+            "symbol": "WETH",
+            "amountRaw": "900000000000000000",
+            "decimals": 18,
+            "direction": "out",
+            "movementRole": "principal"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "rawObservationId": "us2-tx3-transaction",
+    "sourceType": "transaction",
+    "chainId": 8453,
+    "blockNumber": 202,
+    "blockHash": "0xblock202",
+    "txHash": "0x2000000000000000000000000000000000000000000000000000000000000003",
+    "payloadJson": {
+      "timestamp": "2026-04-19T11:10:00.000Z",
+      "semantic": {
+        "protocol": "aerodrome",
+        "action": "increaseLiquidity",
+        "tokenId": "202",
+        "sourceContractAddress": "0x827922686190790b37229fd06084350e74485b72",
+        "pool": {
+          "address": "0xpool-weth-usdc",
+          "protocolFamily": "aerodrome_slipstream",
+          "displayName": "WETH / USDC",
+          "token0Address": "0xweth",
+          "token1Address": "0xusdc",
+          "feeTier": 100
+        },
+        "explanation": "Manual increaseLiquidity stays on the existing manual lifecycle.",
+        "assetMovements": [
+          {
+            "tokenAddress": "0xusdc",
+            "symbol": "USDC",
+            "amountRaw": "300000000",
+            "decimals": 6,
+            "direction": "out",
+            "movementRole": "principal"
+          }
+        ]
+      }
+    }
+  }
+]

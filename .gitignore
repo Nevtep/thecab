@@ -1,1 +1,17 @@
 .DS_Store
+node_modules/
+.next/
+dist/
+build/
+coverage/
+playwright-report/
+test-results/
+*.log
+*.tmp
+*.tsbuildinfo
+.env*
+.env.local
+!.env.example
+.idea/
+.vscode/
+Thumbs.db

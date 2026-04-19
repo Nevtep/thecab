@@ -1,0 +1,17 @@
+{
+  "scenarioId": "us3-wallet",
+  "walletAddress": "0x3000000000000000000000000000000000000003",
+  "chainId": 8453,
+  "rawObservationFile": "us3-wallet-observations.json",
+  "txHashes": [
+    "0x3000000000000000000000000000000000000000000000000000000000000001",
+    "0x3000000000000000000000000000000000000000000000000000000000000002",
+    "0x3000000000000000000000000000000000000000000000000000000000000003"
+  ],
+  "expected": {
+    "pools": 1,
+    "strategyTypes": ["manual"],
+    "residualHoldings": 1,
+    "discardedItems": 1
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "name": "the-cab",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "db:migrate": "tsx src/infrastructure/db/migrate.ts",
+    "db:seed": "tsx src/infrastructure/db/migrate.ts --seed",
+    "typecheck": "tsc --noEmit",
+    "test": "pnpm test:unit && pnpm test:replay && pnpm test:contract",
+    "test:all": "pnpm test:unit && pnpm test:replay && pnpm test:contract && pnpm test:integration",
+    "test:unit": "vitest run tests/unit",
+    "test:replay": "vitest run tests/replay",
+    "test:contract": "vitest run tests/contract",
+    "test:integration": "vitest run tests/integration",
+    "test:e2e": "playwright test",
+    "validate:quickstart": "pnpm typecheck && pnpm test:all && pnpm build"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.62.8",
+    "drizzle-orm": "^0.36.4",
+    "next": "^15.0.4",
+    "postgres": "^3.4.5",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "viem": "^2.23.2",
+    "wagmi": "^2.14.11",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.1",
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.0.2",
+    "@types/react-dom": "^19.0.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
