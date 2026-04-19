@@ -30,39 +30,14 @@ export class ReconstructionExecutor {
     }
 
     const walletAddress = session.walletAddress;
-    const provisionalDiscovery = await this.candidateTransactionService.discover({
+    const context = await this.ingestionOrchestrator.buildCandidateDiscoveryContext({
       walletAddress,
-      fromBlock: input.fromBlock ?? 0n,
-      toBlock: input.toBlock ?? 9_999_999_999n
+      fromBlock: input.fromBlock,
+      toBlock: input.toBlock
     });
-    const context = provisionalDiscovery.fixtureWallet
-      ? {
-          walletAddress,
-          fromBlock: input.fromBlock ?? 0n,
-          toBlock:
-            input.toBlock ??
-            BigInt(
-              provisionalDiscovery.observationCorpus.reduce((highest, observation) => {
-                return observation.blockNumber != null && observation.blockNumber > highest
-                  ? observation.blockNumber
-                  : highest;
-              }, 0)
-            ),
-          protocolAllowlists: {
-            aerodrome: [],
-            mellow: []
-          }
-        }
-      : await this.ingestionOrchestrator.buildCandidateDiscoveryContext({
-          walletAddress,
-          fromBlock: input.fromBlock,
-          toBlock: input.toBlock
-        });
 
     await this.reconstructionRunService.transitionTo(input.reconstructionRunId, "ingesting");
-    const discovery = provisionalDiscovery.fixtureWallet
-      ? provisionalDiscovery
-      : await this.candidateTransactionService.discover(context);
+    const discovery = await this.candidateTransactionService.discover(context);
 
     const rawObservationSeeds = [];
     for (const txHash of discovery.txHashes) {
@@ -84,6 +59,7 @@ export class ReconstructionExecutor {
     await this.ledgerNormalizationService.normalize({
       reconstructionRunId: input.reconstructionRunId,
       analysisSessionId: input.analysisSessionId,
+      walletAddress,
       rawObservations
     });
 

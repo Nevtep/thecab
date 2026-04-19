@@ -1,4 +1,5 @@
 import { classifyExternalTransfer } from "@/domains/ledger/classifiers/external-transfer-classifier";
+import { deriveLiveSemantic } from "@/domains/ledger/classifiers/live-semantic-extractor";
 import { getCurrentRulesetMetadata } from "@/domains/ledger/heuristics/registry";
 import { buildLedgerRecordId } from "@/domains/ledger/model/ids";
 import { type PositionIdentity } from "@/domains/ledger/model/position-instance";
@@ -14,6 +15,18 @@ type MellowPositionState = {
   identityReference: string;
   shareBalanceRaw: string | null;
   status: "open" | "partially_reduced" | "closed";
+  wrapperAddress: string;
+  stakingRewardsAddress: string | null;
+  pool:
+    | {
+        address: string;
+        protocolFamily: string;
+        displayName: string;
+        token0Address: string;
+        token1Address: string;
+        feeTier?: number;
+      }
+    | null;
 };
 
 export type ClassificationState = {
@@ -51,32 +64,28 @@ export class ClassificationEngine {
   private readonly poolAssignmentService = new PoolAssignmentService();
   private readonly manualLifecycleService = new ManualPositionLifecycleService();
 
-  classifyTransaction(input: {
+  async classifyTransaction(input: {
     reconstructionRunId: string;
     analysisSessionId: string;
+    walletAddress: string;
     observations: FixtureObservation[];
     eventSequence: number;
     state: ClassificationState;
-  }): ClassifiedTransaction {
-    const semantic = input.observations
+  }): Promise<ClassifiedTransaction> {
+    const semanticFromFixtures = input.observations
       .map((observation) => getSemanticFromObservation(observation))
       .find((candidate) => candidate != null) ?? null;
+    const semantic =
+      semanticFromFixtures ??
+      (await deriveLiveSemantic({
+        walletAddress: input.walletAddress,
+        observations: input.observations,
+        state: input.state
+      }));
     const ruleset = getCurrentRulesetMetadata();
     const txHash = input.observations.find((observation) => observation.txHash)?.txHash ?? "0x";
     const blockNumber = BigInt(input.observations.find((observation) => observation.blockNumber != null)?.blockNumber ?? 0);
-    const timestamp = new Date(
-      String(
-        input.observations.find((observation) => {
-          const payload = observation.payloadJson as { timestamp?: string };
-          return typeof payload.timestamp === "string";
-        })
-          ? (input.observations.find((observation) => {
-              const payload = observation.payloadJson as { timestamp?: string };
-              return typeof payload.timestamp === "string";
-            })?.payloadJson as { timestamp: string }).timestamp
-          : new Date(0).toISOString()
-      )
-    );
+    const timestamp = this.resolveTimestamp(input.observations);
 
     const sourceRoles = input.observations.map((observation) => ({
       rawObservationId: observation.rawObservationId,
@@ -160,12 +169,22 @@ export class ClassificationEngine {
       const identityReference = semantic.wrapperAddress ?? semantic.stakingRewardsAddress ?? strategy.strategyId;
       const existing = input.state.mellowPositions.get(identityReference);
       const positionInstanceId = existing?.positionInstanceId ?? `${strategy.strategyId}:${identityReference}`;
-      const nextStatus = semantic.action === "unstakeAndWithdraw" ? "partially_reduced" : "open";
+      const nextShareBalance = semantic.shareBalanceRaw ?? existing?.shareBalanceRaw ?? null;
+      const nextStatus =
+        semantic.action === "unstakeAndWithdraw"
+          ? nextShareBalance != null && BigInt(nextShareBalance) <= 0n
+            ? "closed"
+            : "partially_reduced"
+          : "open";
       const nextState: MellowPositionState = {
         positionInstanceId,
         identityReference,
-        shareBalanceRaw: semantic.shareBalanceRaw ?? null,
-        status: nextStatus
+        shareBalanceRaw: nextShareBalance,
+        status: nextStatus,
+        wrapperAddress: semantic.wrapperAddress ?? existing?.wrapperAddress ?? strategy.sourceContractAddress ?? strategy.strategyId,
+        stakingRewardsAddress:
+          semantic.stakingRewardsAddress ?? existing?.stakingRewardsAddress ?? null,
+        pool: semantic.pool ?? existing?.pool ?? null
       };
       input.state.mellowPositions.set(identityReference, nextState);
       positionIdentity = {
@@ -200,5 +219,20 @@ export class ClassificationEngine {
       semantic,
       sourceRoles
     };
+  }
+
+  private resolveTimestamp(observations: FixtureObservation[]) {
+    for (const observation of observations) {
+      const payload = observation.payloadJson as { timestamp?: string | number };
+      if (typeof payload.timestamp === "string") {
+        return new Date(payload.timestamp);
+      }
+
+      if (typeof payload.timestamp === "number") {
+        return new Date(payload.timestamp * 1000);
+      }
+    }
+
+    return new Date(0);
   }
 }

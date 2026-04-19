@@ -1,13 +1,16 @@
+import { ConnectedWalletLedger } from "@/ui/wallet/connected-wallet-ledger";
+
 export default function HomePage() {
   return (
     <main className="shell">
       <section className="panel">
         <p className="eyebrow">The Cab</p>
-        <h1>Canonical investment ledger foundation</h1>
+        <h1>Connected-wallet canonical ledger</h1>
         <p>
-          Phase 1 and Phase 2 implementation are in progress. User-facing ledger
-          inspection routes will arrive in later story phases.
+          Connect a wallet on Base and reconstruct its live canonical ledger from real wallet
+          transfers, Aerodrome position activity, and supported Mellow strategy surfaces.
         </p>
+        <ConnectedWalletLedger />
       </section>
     </main>
   );

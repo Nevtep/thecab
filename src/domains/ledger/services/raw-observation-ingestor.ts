@@ -5,6 +5,7 @@ import { base } from "viem/chains";
 
 import { buildRawObservationId } from "@/domains/ledger/model/ids";
 import { getBasePublicClient, getBaseTraceClient } from "@/infrastructure/chain/clients";
+import { normalizeJsonValue } from "@/infrastructure/serialization/json";
 import { type FixtureObservation } from "@/lib/fixture-loader";
 
 export type RawObservationSeed = {
@@ -22,7 +23,9 @@ export type RawObservationSeed = {
 };
 
 function hashPayload(payload: unknown) {
-  return createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+  return createHash("sha256")
+    .update(JSON.stringify(normalizeJsonValue(payload)))
+    .digest("hex");
 }
 
 export class RawObservationIngestor {
@@ -53,7 +56,7 @@ export class RawObservationIngestor {
         logIndex: observation.logIndex ?? null,
         tracePath: observation.tracePath ?? null,
         contractAddress: observation.contractAddress ?? null,
-        payloadJson: observation.payloadJson,
+        payloadJson: normalizeJsonValue(observation.payloadJson),
         payloadHash: observation.payloadHash ?? hashPayload(observation.payloadJson)
       }));
     }
@@ -165,7 +168,7 @@ export class RawObservationIngestor {
       logIndex: input.logIndex ?? null,
       tracePath: input.tracePath ?? null,
       contractAddress: input.contractAddress ?? null,
-      payloadJson: input.payloadJson,
+      payloadJson: normalizeJsonValue(input.payloadJson),
       payloadHash: hashPayload(input.payloadJson)
     };
   }

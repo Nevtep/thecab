@@ -61,3 +61,105 @@ p {
   font-size: 1.05rem;
   line-height: 1.7;
 }
+
+.wallet-panel {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+}
+
+.wallet-panel__header {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.wallet-panel__header h2 {
+  margin: 0;
+  font-size: 1.45rem;
+}
+
+.wallet-panel__body {
+  margin-top: 0.75rem;
+}
+
+.wallet-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.wallet-card {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 1rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+}
+
+.button {
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  padding: 0.75rem 1.2rem;
+  background: var(--accent);
+  color: #04111d;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 120ms ease, opacity 120ms ease;
+}
+
+.button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.button--secondary {
+  background: transparent;
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.status {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.9rem;
+  border: 1px solid transparent;
+  font-size: 0.96rem;
+}
+
+.status strong {
+  color: inherit;
+}
+
+.status.success {
+  background: rgba(56, 189, 124, 0.12);
+  border-color: rgba(56, 189, 124, 0.35);
+  color: #c7f9da;
+}
+
+.status.error {
+  background: rgba(248, 113, 113, 0.12);
+  border-color: rgba(248, 113, 113, 0.35);
+  color: #ffd2d2;
+}
+
+.status.warning {
+  background: rgba(250, 204, 21, 0.12);
+  border-color: rgba(250, 204, 21, 0.35);
+  color: #ffe9a3;
+}
+
+a {
+  color: var(--accent);
+}
+
+strong {
+  color: var(--text);
+}

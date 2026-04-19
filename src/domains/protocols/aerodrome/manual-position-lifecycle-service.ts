@@ -7,6 +7,17 @@ export type ManualPositionState = {
   tokenId: string;
   status: PositionStatus;
   identityReference: string;
+  pool:
+    | {
+        address: string;
+        protocolFamily: string;
+        displayName: string;
+        token0Address: string;
+        token1Address: string;
+        feeTier?: number;
+      }
+    | null;
+  sourceContractAddress: string | null;
 };
 
 export class ManualPositionLifecycleService {
@@ -26,11 +37,16 @@ export class ManualPositionLifecycleService {
         positionInstanceId: buildPositionInstanceId(input.strategyId, tokenId),
         tokenId,
         status: "open",
-        identityReference: tokenId
+        identityReference: tokenId,
+        pool: input.semantic.pool ?? null,
+        sourceContractAddress: input.semantic.sourceContractAddress ?? null
       };
       input.state.set(tokenId, created);
       return created;
     }
+
+    existing.pool ??= input.semantic.pool ?? null;
+    existing.sourceContractAddress ??= input.semantic.sourceContractAddress ?? null;
 
     if (input.semantic.action === "decreaseLiquidity") {
       existing.status = "partially_reduced";

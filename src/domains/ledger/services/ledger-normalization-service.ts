@@ -16,6 +16,7 @@ export class LedgerNormalizationService {
   async normalize(input: {
     reconstructionRunId: string;
     analysisSessionId: string;
+    walletAddress: string;
     rawObservations: RawObservationRecord[];
   }) {
     const groups = new Map<string, RawObservationRecord[]>();
@@ -46,9 +47,10 @@ export class LedgerNormalizationService {
 
     let eventSequence = 0;
     for (const [, observations] of orderedGroups) {
-      const classification = this.classificationEngine.classifyTransaction({
+      const classification = await this.classificationEngine.classifyTransaction({
         reconstructionRunId: input.reconstructionRunId,
         analysisSessionId: input.analysisSessionId,
+        walletAddress: input.walletAddress,
         observations: observations.map((observation) => ({
           rawObservationId: observation.rawObservationId,
           sourceType: observation.sourceType as

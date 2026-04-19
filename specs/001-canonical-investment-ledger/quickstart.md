@@ -10,8 +10,28 @@ The implementation should support these minimum environment values:
 
 - `DATABASE_URL` for PostgreSQL
 - `BASE_RPC_URL` for an archive-capable Base RPC provider
+- `BASE_RPC_FALLBACK_URLS` for optional comma-separated fallback Base RPC providers
 - `BASE_TRACE_RPC_URL` for optional trace-capable fallback access
-- `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` for one-wallet session initiation
+- `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` for WalletConnect browser connectivity
+- `MELLOW_WRAPPER_ADDRESSES` for optional live Mellow wrapper detection
+- `MELLOW_STAKING_REWARDS_ADDRESSES` for optional live Mellow staking rewards detection
+
+## Current Implementation Note
+
+The application now supports live connected-wallet reconstruction through the browser UI and the existing session/reconstruction API routes. The fixture corpus remains the deterministic validation path used by automated tests and the scenarios below.
+
+## Live Wallet Flow
+
+1. Set `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` and start the app with `pnpm dev`.
+2. Connect a wallet on Base from the home page.
+3. Start reconstruction for the connected wallet.
+4. The app will create a session, run reconstruction, and open `/ledger?sessionId=...` with the latest projection.
+
+Expected results:
+
+- Wallet-scoped ERC20 transfers appear as external deposits or withdrawals when no supported protocol semantics are detected.
+- Aerodrome manual position activity is classified from live receipts and logs.
+- Supported Mellow live detection becomes active when wrapper and staking addresses are configured in the environment.
 
 ## Available Developer Scripts
 

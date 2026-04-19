@@ -1,10 +1,26 @@
 import { base } from "viem/chains";
-import { createPublicClient, http } from "viem";
+import { createPublicClient, fallback, http } from "viem";
 
-function createBaseClient(rpcUrl: string) {
+function getBaseRpcUrls(primaryRpcUrl?: string) {
+  const configuredFallbacks = (process.env.BASE_RPC_FALLBACK_URLS ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  return [...new Set([
+    primaryRpcUrl,
+    ...configuredFallbacks,
+    ...(base.rpcUrls.default.http ?? []),
+    "https://mainnet.base.org",
+    "https://base-rpc.publicnode.com",
+    "https://base.llamarpc.com"
+  ].filter((value): value is string => Boolean(value)))];
+}
+
+function createBaseClient(rpcUrls: string[]) {
   return createPublicClient({
     chain: base,
-    transport: http(rpcUrl)
+    transport: fallback(rpcUrls.map((rpcUrl) => http(rpcUrl, { timeout: 20_000 })))
   });
 }
 
@@ -26,7 +42,7 @@ function requireBaseRpcUrl(): string {
 
 export function getBasePublicClient(): PublicClient {
   if (!global.__theCabBasePublicClient__) {
-    global.__theCabBasePublicClient__ = createBaseClient(requireBaseRpcUrl());
+    global.__theCabBasePublicClient__ = createBaseClient(getBaseRpcUrls(requireBaseRpcUrl()));
   }
 
   const client = global.__theCabBasePublicClient__;
@@ -44,7 +60,7 @@ export function getBaseTraceClient(): PublicClient | null {
   }
 
   if (!global.__theCabBaseTraceClient__) {
-    global.__theCabBaseTraceClient__ = createBaseClient(traceRpcUrl);
+    global.__theCabBaseTraceClient__ = createBaseClient([traceRpcUrl]);
   }
 
   return global.__theCabBaseTraceClient__ ?? null;

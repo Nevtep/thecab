@@ -4,6 +4,7 @@ import { ReconstructionRunRepository } from "@/domains/ledger/repositories/recon
 import { RawObservationRepository } from "@/domains/ledger/repositories/raw-observation-repository";
 import { SessionRepository } from "@/domains/wallet-session/repositories/session-repository";
 import { getDb } from "@/infrastructure/db/client";
+import { ConnectedWalletLedger } from "@/ui/wallet/connected-wallet-ledger";
 
 type LedgerPageProps = {
   searchParams?: Promise<{
@@ -19,11 +20,12 @@ export default async function LedgerPage({ searchParams }: LedgerPageProps) {
       <main className="shell">
         <section className="panel">
           <p className="eyebrow">Ledger Inspection</p>
-          <h1>Open a reconstructed session</h1>
+          <h1>Connect and reconstruct a wallet</h1>
           <p>
-            Provide <strong>?sessionId=...</strong> in the URL after creating a session and starting a
-            reconstruction to inspect the canonical ledger projection.
+            Run a live reconstruction for the connected wallet or open an existing session with
+            <strong> ?sessionId=...</strong>.
           </p>
+          <ConnectedWalletLedger />
         </section>
       </main>
     );
