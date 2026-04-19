@@ -166,7 +166,7 @@ export class ClassificationEngine {
     }
 
     if (semantic.protocol === "mellow" && strategy) {
-      const identityReference = semantic.wrapperAddress ?? semantic.stakingRewardsAddress ?? strategy.strategyId;
+      const identityReference = semantic.wrapperAddress ?? strategy.sourceContractAddress ?? strategy.strategyId;
       const existing = input.state.mellowPositions.get(identityReference);
       const positionInstanceId = existing?.positionInstanceId ?? `${strategy.strategyId}:${identityReference}`;
       const nextShareBalance = semantic.shareBalanceRaw ?? existing?.shareBalanceRaw ?? null;

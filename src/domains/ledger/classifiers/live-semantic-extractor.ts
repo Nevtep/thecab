@@ -9,9 +9,10 @@ import {
 import { DISCARDED_REASON_CODES } from "@/domains/ledger/model/discarded-reasons";
 import { AERODROME_POSITION_MANAGER_ADDRESSES } from "@/domains/protocols/aerodrome/contracts";
 import {
-  findSupportedMellowStrategy,
-  type SupportedMellowStrategyConfig
-} from "@/domains/protocols/mellow/contracts";
+  findKnownMellowStrategy,
+  inferMellowStakingRewardsAddress,
+  inferMellowStrategyFromTransaction
+} from "@/domains/protocols/mellow/mellow-strategy-inference";
 import {
   TokenMetadataService,
   type TokenMetadata
@@ -429,11 +430,21 @@ async function buildMellowSemantic(input: {
   transactionTarget: string | null;
   state: LiveSemanticState;
 }) {
-  const strategy = findSupportedMellowStrategy([
-    input.transactionTarget,
-    ...input.walletTransfers.map((transfer) => transfer.tokenAddress),
-    ...input.logPayloads.map((payload) => payload.address)
-  ]);
+  const strategy =
+    findKnownMellowStrategy({
+      candidateAddresses: [
+        input.transactionTarget,
+        ...input.walletTransfers.map((transfer) => transfer.tokenAddress),
+        ...input.logPayloads.map((payload) => payload.address)
+      ],
+      positions: input.state.mellowPositions.values()
+    }) ??
+    inferMellowStrategyFromTransaction({
+      walletAddress: input.walletAddress,
+      transactionTarget: input.transactionTarget,
+      transfers: input.walletTransfers,
+      positions: input.state.mellowPositions.values()
+    });
 
   if (!strategy) {
     return null;
@@ -453,7 +464,15 @@ async function buildMellowSemantic(input: {
 
     return sum;
   }, 0n);
-  const identityReference = strategy.stakingRewardsAddress ?? strategy.wrapperAddress;
+  const inferredStakingRewardsAddress =
+    strategy.stakingRewardsAddress ??
+    inferMellowStakingRewardsAddress({
+      walletAddress: input.walletAddress,
+      transactionTarget: input.transactionTarget,
+      wrapperAddress: strategy.wrapperAddress,
+      transfers: input.walletTransfers
+    });
+  const identityReference = strategy.wrapperAddress;
   const existingPosition = input.state.mellowPositions.get(identityReference);
   const previousShareBalance = toBigInt(existingPosition?.shareBalanceRaw);
   const nextShareBalance = previousShareBalance + shareDelta;
@@ -463,8 +482,8 @@ async function buildMellowSemantic(input: {
       .map((transfer) => transfer.tokenAddress)
       .filter((tokenAddress) => tokenAddress !== strategy.wrapperAddress),
     protocolFamily: "mellow_aerodrome",
-    fallbackPool: existingPosition?.pool ?? null,
-    excludedAddresses: [strategy.wrapperAddress, strategy.stakingRewardsAddress ?? ""]
+    fallbackPool: existingPosition?.pool ?? strategy.pool ?? null,
+    excludedAddresses: [strategy.wrapperAddress, inferredStakingRewardsAddress ?? ""]
   });
 
   if (shareDelta > 0n) {
@@ -472,9 +491,9 @@ async function buildMellowSemantic(input: {
     return {
       protocol: "mellow",
       action: "depositAndStake",
-      sourceContractAddress: input.transactionTarget ?? strategy.wrapperAddress,
+      sourceContractAddress: strategy.sourceContractAddress,
       wrapperAddress: strategy.wrapperAddress,
-      stakingRewardsAddress: strategy.stakingRewardsAddress ?? undefined,
+      stakingRewardsAddress: inferredStakingRewardsAddress ?? undefined,
       shareBalanceRaw: nextShareBalance.toString(),
       lifecycleSequence,
       pool: pool ?? undefined,
@@ -495,9 +514,9 @@ async function buildMellowSemantic(input: {
     return {
       protocol: "mellow",
       action: "unstakeAndWithdraw",
-      sourceContractAddress: input.transactionTarget ?? strategy.wrapperAddress,
+      sourceContractAddress: strategy.sourceContractAddress,
       wrapperAddress: strategy.wrapperAddress,
-      stakingRewardsAddress: strategy.stakingRewardsAddress ?? undefined,
+      stakingRewardsAddress: inferredStakingRewardsAddress ?? undefined,
       shareBalanceRaw: nextShareBalance.toString(),
       pool: pool ?? undefined,
       classificationConfidence: 0.93,
@@ -521,9 +540,9 @@ async function buildMellowSemantic(input: {
     return {
       protocol: "mellow",
       action: "claimReward",
-      sourceContractAddress: input.transactionTarget ?? strategy.stakingRewardsAddress ?? strategy.wrapperAddress,
+      sourceContractAddress: strategy.sourceContractAddress,
       wrapperAddress: strategy.wrapperAddress,
-      stakingRewardsAddress: strategy.stakingRewardsAddress ?? undefined,
+      stakingRewardsAddress: inferredStakingRewardsAddress ?? undefined,
       shareBalanceRaw: previousShareBalance.toString(),
       pool: pool ?? undefined,
       classificationConfidence: 0.91,
