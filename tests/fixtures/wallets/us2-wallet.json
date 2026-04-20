@@ -12,6 +12,12 @@
     "pools": 1,
     "strategyTypes": ["manual", "mellow_auto"],
     "residualHoldings": 0,
-    "discardedItems": 0
+    "discardedItems": 0,
+    "accounting": {
+      "totalValueUsd": "4290.0000",
+      "poolValueUsd": "4290.0000",
+      "manualStrategyValueUsd": "2400.0000",
+      "mellowStrategyValueUsd": "1890.0000"
+    }
   }
 }

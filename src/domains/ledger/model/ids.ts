@@ -82,3 +82,17 @@ export function buildResidualHoldingId(
 export function buildDiscardedActivityId(reconstructionRunId: string, txHash: string, ordinal: number) {
   return buildId("discarded", [reconstructionRunId, txHash.toLowerCase(), ordinal]);
 }
+
+export function buildPriceAssetId(chainId: number, tokenAddress: string) {
+  return buildId("price_asset", [chainId, tokenAddress.toLowerCase()]);
+}
+
+export function buildPricePointId(
+  priceAssetId: string,
+  quoteCurrency: string,
+  sourceKind: string,
+  effectiveAt: Date,
+  pricingMethod: string
+) {
+  return buildId("price_point", [priceAssetId, quoteCurrency, sourceKind, effectiveAt, pricingMethod]);
+}

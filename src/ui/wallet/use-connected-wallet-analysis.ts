@@ -6,6 +6,9 @@ import { useAccount, useChainId } from "wagmi";
 import { base } from "wagmi/chains";
 
 import {
+  type AccountingResponse,
+} from "@/domains/accounting/contracts/accounting-api-schemas";
+import {
   type AnalysisSessionResponse,
   type DiscardedActivityListResponse,
   type LedgerProjectionResponse,
@@ -28,6 +31,7 @@ export type ConnectedWalletContext = {
 export type ConnectedWalletAnalysisTestOverride = {
   sessionStatus: SessionStatusResponse | null;
   projection: LedgerProjectionResponse | null;
+  accounting?: AccountingResponse | null;
   discardedActivity: DiscardedActivityListResponse | null;
   errorMessage?: string | null;
   isLoadingSession?: boolean;
@@ -80,6 +84,7 @@ export type ConnectedWalletAnalysisResult = {
   connectedWallet: ConnectedWalletContext;
   sessionStatus: SessionStatusResponse | null;
   projection: LedgerProjectionResponse | null;
+  accounting: AccountingResponse | null;
   discardedActivity: DiscardedActivityListResponse | null;
   isLoadingSession: boolean;
   isLoadingProjection: boolean;
@@ -134,6 +139,10 @@ export function buildLedgerProjectionQueryKey(sessionId: string) {
 
 export function buildDiscardedActivityQueryKey(sessionId: string) {
   return ["analysis-session", sessionId, "discarded-activity"] as const;
+}
+
+export function buildAccountingQueryKey(sessionId: string) {
+  return ["analysis-session", sessionId, "accounting"] as const;
 }
 
 export function buildConnectedWalletSessionGuard(input: {
@@ -500,6 +509,27 @@ export function useDiscardedActivityQuery(sessionId: string | null, enabled: boo
   });
 }
 
+export function useAccountingQuery(sessionId: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: sessionId ? buildAccountingQueryKey(sessionId) : ["analysis-session", "idle", "accounting"],
+    enabled: Boolean(sessionId) && enabled,
+    queryFn: async () => {
+      if (!sessionId) {
+        throw new Error("A session id is required to query accounting.");
+      }
+
+      const response = await fetch(`/api/analysis-sessions/${sessionId}/accounting`);
+      const payload = await readJson<AccountingResponse & ApiErrorResponse>(response);
+
+      if (!response.ok || !payload.contractVersion) {
+        throw new Error(payload.error ?? "Unable to load portfolio accounting.");
+      }
+
+      return payload;
+    }
+  });
+}
+
 export function useConnectedWalletAnalysis(sessionId: string): ConnectedWalletAnalysisResult {
   const connectedWallet = useConnectedWalletContext();
   const [analysisTestOverride, setAnalysisTestOverride] = useState<ConnectedWalletAnalysisTestOverride | null>(
@@ -534,6 +564,10 @@ export function useConnectedWalletAnalysis(sessionId: string): ConnectedWalletAn
     !hasAnalysisTestOverride && Boolean(sessionStatusQuery.data?.hasAcceptedProjection) && guard.isCurrent
   );
   const discardedActivityQuery = useDiscardedActivityQuery(
+    sessionId,
+    !hasAnalysisTestOverride && Boolean(sessionStatusQuery.data?.hasAcceptedProjection) && guard.isCurrent
+  );
+  const accountingQuery = useAccountingQuery(
     sessionId,
     !hasAnalysisTestOverride && Boolean(sessionStatusQuery.data?.hasAcceptedProjection) && guard.isCurrent
   );
@@ -588,6 +622,7 @@ export function useConnectedWalletAnalysis(sessionId: string): ConnectedWalletAn
       connectedWallet,
       sessionStatus: analysisTestOverride.sessionStatus,
       projection: analysisTestOverride.projection,
+      accounting: analysisTestOverride.accounting ?? null,
       discardedActivity: analysisTestOverride.discardedActivity,
       isLoadingSession: analysisTestOverride.isLoadingSession ?? false,
       isLoadingProjection: analysisTestOverride.isLoadingProjection ?? false,
@@ -612,6 +647,7 @@ export function useConnectedWalletAnalysis(sessionId: string): ConnectedWalletAn
     connectedWallet,
     sessionStatus: sessionStatusQuery.data ?? null,
     projection: projectionQuery.data ?? null,
+    accounting: accountingQuery.data ?? null,
     discardedActivity: discardedActivityQuery.data ?? null,
     isLoadingSession: sessionStatusQuery.isLoading,
     isLoadingProjection: projectionQuery.isLoading,
@@ -624,6 +660,7 @@ export function useConnectedWalletAnalysis(sessionId: string): ConnectedWalletAn
     errorMessage:
       (sessionStatusQuery.error as Error | null)?.message ??
       (projectionQuery.error as Error | null)?.message ??
+      (accountingQuery.error as Error | null)?.message ??
       (discardedActivityQuery.error as Error | null)?.message ??
       startReconstruction.error?.message ??
       null,

@@ -19,6 +19,85 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PortfolioAccountingResponse'
+              examples:
+                portfolioTotals:
+                  summary: Portfolio totals with idle balance included
+                  value:
+                    contractVersion: 1.0.0
+                    sessionId: session_us1
+                    acceptedRunId: run_us1
+                    asOf: 2026-04-19T10:15:00.000Z
+                    quoteCurrency: usd
+                    totalValue:
+                      currency: usd
+                      amount: '3950.0000'
+                    capitalEntered:
+                      currency: usd
+                      amount: '1000.0000'
+                    capitalWithdrawn:
+                      currency: usd
+                      amount: '200.0000'
+                    realizedPnl:
+                      currency: usd
+                      amount: '0.0000'
+                    unrealizedPnl:
+                      currency: usd
+                      amount: '150.0000'
+                    idleBalanceValue:
+                      currency: usd
+                      amount: '300.0000'
+                    coverageSummary:
+                      coverageStatus: full
+                      pricedValue:
+                        currency: usd
+                        amount: '3950.0000'
+                      excludedValue: null
+                      unpricedComponentsCount: 0
+                      reasonCodes: []
+                    pools: []
+                    idleBalances: []
+                    traceRefs:
+                      ledgerRecordIds: [ledger_deposit, ledger_position]
+                      pricePointIds: [price_usdc, price_weth]
+                partialCoverage:
+                  summary: Partial coverage with discarded exclusion disclosure
+                  value:
+                    contractVersion: 1.0.0
+                    sessionId: session_us3
+                    acceptedRunId: run_us3
+                    asOf: 2026-04-19T12:10:00.000Z
+                    quoteCurrency: usd
+                    totalValue:
+                      currency: usd
+                      amount: '400.0000'
+                    capitalEntered:
+                      currency: usd
+                      amount: '0.0000'
+                    capitalWithdrawn:
+                      currency: usd
+                      amount: '0.0000'
+                    realizedPnl:
+                      currency: usd
+                      amount: '0.0000'
+                    unrealizedPnl:
+                      currency: usd
+                      amount: '0.0000'
+                    idleBalanceValue:
+                      currency: usd
+                      amount: '400.0000'
+                    coverageSummary:
+                      coverageStatus: partial
+                      pricedValue:
+                        currency: usd
+                        amount: '400.0000'
+                      excludedValue: null
+                      unpricedComponentsCount: 1
+                      reasonCodes: [unsupported_protocol]
+                    pools: []
+                    idleBalances: []
+                    traceRefs:
+                      ledgerRecordIds: [ledger_close]
+                      pricePointIds: [price_usdc]
 components:
   parameters:
     SessionId:
@@ -189,6 +268,7 @@ components:
             type: string
         traceRefs:
           $ref: '#/components/schemas/TraceRefs'
+      description: Idle balances include direct wallet cash-like balances plus residual holdings that remain outside active positions.
     PortfolioAccountingResponse:
       type: object
       required:
@@ -230,6 +310,7 @@ components:
             $ref: '#/components/schemas/IdleBalanceSummary'
         traceRefs:
           $ref: '#/components/schemas/TraceRefs'
+      description: Priced totals include only trusted priced components. Unsupported or unpriced components are disclosed through coverage metadata and never silently treated as zero.
       example:
         contractVersion: 1.0.0
         sessionId: session_abc123

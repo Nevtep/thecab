@@ -12,6 +12,12 @@
     "pools": 1,
     "strategyTypes": ["manual"],
     "residualHoldings": 1,
-    "discardedItems": 1
+    "discardedItems": 1,
+    "accounting": {
+      "totalValueUsd": "400.0000",
+      "idleBalanceValueUsd": "400.0000",
+      "coverageStatus": "partial",
+      "reasonCodes": ["unsupported_protocol"]
+    }
   }
 }

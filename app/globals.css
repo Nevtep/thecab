@@ -99,6 +99,98 @@ p {
   background: color-mix(in srgb, var(--bg) 72%, transparent);
 }
 
+.wallet-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.9rem;
+  margin-top: 1.5rem;
+}
+
+.wallet-metric-card {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1rem 1.1rem;
+  border-radius: 1rem;
+  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+  background: linear-gradient(180deg, rgba(120, 210, 255, 0.12), rgba(8, 17, 31, 0.35));
+}
+
+.wallet-metric-card__label {
+  color: var(--muted);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.wallet-metric-card__value {
+  font-size: 1.5rem;
+}
+
+.wallet-metric-card__meta,
+.wallet-scope__meta {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.wallet-hierarchy {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.wallet-hierarchy__card,
+.wallet-explainability {
+  display: grid;
+  gap: 0.8rem;
+  padding: 1.1rem;
+  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--bg) 74%, transparent);
+}
+
+.wallet-hierarchy__header,
+.wallet-scope__header,
+.wallet-scope__detail {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.wallet-scope {
+  display: grid;
+  gap: 0.55rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+.wallet-scope__detail,
+.wallet-scope-list {
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.wallet-explainability {
+  margin-top: 1.25rem;
+}
+
+.wallet-reason-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.wallet-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  background: rgba(120, 210, 255, 0.08);
+  color: var(--text);
+  font-size: 0.85rem;
+}
+
 .button {
   border: 1px solid var(--accent);
   border-radius: 999px;

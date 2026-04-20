@@ -21,5 +21,14 @@ export const logger = {
   },
   error(message: string, metadata?: Record<string, unknown>) {
     log("error", message, metadata);
+  },
+  priceCacheMiss(tokenAddress: string, metadata?: Record<string, unknown>) {
+    log("warn", "Pricing cache miss", {
+      tokenAddress,
+      ...(metadata ?? {})
+    });
+  },
+  pricingCoveragePartial(metadata?: Record<string, unknown>) {
+    log("warn", "Pricing coverage partial", metadata);
   }
 };

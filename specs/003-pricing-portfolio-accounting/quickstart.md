@@ -123,6 +123,13 @@ Expected results:
 
 `pnpm validate:quickstart` should continue to cover typecheck, unit, replay, contract, integration, and build validation. Run `pnpm test:e2e` separately for browser coverage if that remains the repository convention.
 
+## Implementation Notes
+
+- `pnpm typecheck` passes after wiring the accounting route, pricing provider, and connected-wallet accounting query.
+- Focused pricing and accounting validation passes across unit, replay, contract, integration, and Playwright coverage.
+- `pnpm test:all` passes for the repository Vitest suite after the accounting additions.
+- `pnpm build` succeeds and emits upstream wallet-package warnings for `@metamask/sdk` and `pino-pretty`; the build still completes successfully.
+
 ## Acceptance Threshold
 
 The feature is ready to move to task generation when the implementation demonstrates:

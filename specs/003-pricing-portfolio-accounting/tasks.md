@@ -17,10 +17,10 @@
 
 **Purpose**: Add the shared project configuration required for pricing-provider access and accounting development.
 
-- [ ] T001 Define pricing-provider and accounting environment variables in .env.example
-- [ ] T002 Add pricing-provider runtime dependency and accounting validation script updates in package.json
-- [ ] T003 [P] Create pricing domain barrel exports in src/domains/pricing/contracts/index.ts
-- [ ] T004 [P] Create accounting domain barrel exports in src/domains/accounting/contracts/index.ts
+- [X] T001 Define pricing-provider and accounting environment variables in .env.example
+- [X] T002 Add pricing-provider runtime dependency and accounting validation script updates in package.json
+- [X] T003 [P] Create pricing domain barrel exports in src/domains/pricing/contracts/index.ts
+- [X] T004 [P] Create accounting domain barrel exports in src/domains/accounting/contracts/index.ts
 
 ---
 
@@ -30,17 +30,17 @@
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T005 Create the pricing and accounting foundation migration in db/migrations/0003_pricing_accounting_foundation.sql
-- [ ] T006 [P] Map price asset, price point, and accounting support tables in src/infrastructure/db/schema.ts
-- [ ] T007 [P] Define PriceAsset, PricePoint, and PriceCoverageDecision domain models in src/domains/pricing/model/price-point.ts
-- [ ] T008 [P] Define portfolio accounting snapshot and coverage models in src/domains/accounting/model/accounting-snapshot.ts
-- [ ] T009 [P] Implement normalized price point persistence and lookup operations in src/domains/pricing/repositories/price-point-repository.ts
-- [ ] T010 [P] Define provider request and response contracts in src/domains/pricing/contracts/price-provider.ts
-- [ ] T011 [P] Implement accounting API Zod schemas aligned to the contract in src/domains/accounting/contracts/accounting-api-schemas.ts
-- [ ] T012 Implement direct-price, wrapped-asset, and stable-alias normalization rules in src/domains/pricing/services/price-normalization-service.ts
-- [ ] T013 Implement event-time price selection and confidence windows in src/domains/pricing/services/price-selection-service.ts
-- [ ] T014 Implement session-scoped accounting snapshot orchestration over accepted ledger runs in src/domains/accounting/services/accounting-snapshot-service.ts
-- [ ] T014A Implement discarded-activity exclusion ingestion and reason-code propagation into accounting coverage summaries in src/domains/accounting/services/accounting-exclusion-service.ts
+- [X] T005 Create the pricing and accounting foundation migration in db/migrations/0003_pricing_accounting_foundation.sql
+- [X] T006 [P] Map price asset, price point, and accounting support tables in src/infrastructure/db/schema.ts
+- [X] T007 [P] Define PriceAsset, PricePoint, and PriceCoverageDecision domain models in src/domains/pricing/model/price-point.ts
+- [X] T008 [P] Define portfolio accounting snapshot and coverage models in src/domains/accounting/model/accounting-snapshot.ts
+- [X] T009 [P] Implement normalized price point persistence and lookup operations in src/domains/pricing/repositories/price-point-repository.ts
+- [X] T010 [P] Define provider request and response contracts in src/domains/pricing/contracts/price-provider.ts
+- [X] T011 [P] Implement accounting API Zod schemas aligned to the contract in src/domains/accounting/contracts/accounting-api-schemas.ts
+- [X] T012 Implement direct-price, wrapped-asset, and stable-alias normalization rules in src/domains/pricing/services/price-normalization-service.ts
+- [X] T013 Implement event-time price selection and confidence windows in src/domains/pricing/services/price-selection-service.ts
+- [X] T014 Implement session-scoped accounting snapshot orchestration over accepted ledger runs in src/domains/accounting/services/accounting-snapshot-service.ts
+- [X] T014A Implement discarded-activity exclusion ingestion and reason-code propagation into accounting coverage summaries in src/domains/accounting/services/accounting-exclusion-service.ts
 
 **Checkpoint**: Shared pricing and accounting foundations are ready. User story work can now proceed in priority order or in parallel.
 
@@ -54,22 +54,22 @@
 
 ### Tests for User Story 1
 
-- [ ] T015 [P] [US1] Add unit tests for price selection, capital-flow classification, and portfolio totals in tests/unit/portfolio-accounting.test.ts
-- [ ] T016 [P] [US1] Add replay tests for event-time valuation and current portfolio totals in tests/replay/portfolio-accounting.test.ts
-- [ ] T017 [P] [US1] Add contract tests for GET /api/analysis-sessions/{sessionId}/accounting portfolio fields in tests/contract/accounting.contract.test.ts
-- [ ] T018 [P] [US1] Add integration test for portfolio totals and idle-balance visibility in tests/integration/accounting-portfolio-flow.test.ts
-- [ ] T018A [P] [US1] Add Playwright validation for connected-wallet portfolio totals and idle-balance visibility in tests/e2e/accounting-portfolio.spec.ts
+- [X] T015 [P] [US1] Add unit tests for price selection, capital-flow classification, and portfolio totals in tests/unit/portfolio-accounting.test.ts
+- [X] T016 [P] [US1] Add replay tests for event-time valuation and current portfolio totals in tests/replay/portfolio-accounting.test.ts
+- [X] T017 [P] [US1] Add contract tests for GET /api/analysis-sessions/{sessionId}/accounting portfolio fields in tests/contract/accounting.contract.test.ts
+- [X] T018 [P] [US1] Add integration test for portfolio totals and idle-balance visibility in tests/integration/accounting-portfolio-flow.test.ts
+- [X] T018A [P] [US1] Add Playwright validation for connected-wallet portfolio totals and idle-balance visibility in tests/e2e/accounting-portfolio.spec.ts
 
 ### Implementation for User Story 1
 
-- [ ] T019 [P] [US1] Define valued movement and current holding valuation models in src/domains/accounting/model/valued-movement.ts
-- [ ] T020 [P] [US1] Implement the external historical and current price provider adapter in src/domains/pricing/providers/http-price-provider.ts
-- [ ] T021 [US1] Implement event-time valued movement generation from canonical asset movements in src/domains/accounting/services/valued-movement-service.ts
-- [ ] T022 [US1] Implement current holdings and idle-balance valuation in src/domains/accounting/services/current-holdings-valuation-service.ts
-- [ ] T023 [US1] Implement portfolio-level capital-in, capital-out, realized, and unrealized PnL calculation in src/domains/accounting/services/portfolio-accounting-service.ts
-- [ ] T024 [US1] Implement GET /api/analysis-sessions/{sessionId}/accounting route for portfolio snapshot delivery in app/api/analysis-sessions/[sessionId]/accounting/route.ts
-- [ ] T025 [US1] Surface portfolio totals and idle-balance value in src/ui/wallet/connected-wallet-ledger.tsx
-- [ ] T026 [US1] Extend baseline valuation expectations in tests/fixtures/wallets/us1-wallet.json
+- [X] T019 [P] [US1] Define valued movement and current holding valuation models in src/domains/accounting/model/valued-movement.ts
+- [X] T020 [P] [US1] Implement the external historical and current price provider adapter in src/domains/pricing/providers/http-price-provider.ts
+- [X] T021 [US1] Implement event-time valued movement generation from canonical asset movements in src/domains/accounting/services/valued-movement-service.ts
+- [X] T022 [US1] Implement current holdings and idle-balance valuation in src/domains/accounting/services/current-holdings-valuation-service.ts
+- [X] T023 [US1] Implement portfolio-level capital-in, capital-out, realized, and unrealized PnL calculation in src/domains/accounting/services/portfolio-accounting-service.ts
+- [X] T024 [US1] Implement GET /api/analysis-sessions/{sessionId}/accounting route for portfolio snapshot delivery in app/api/analysis-sessions/[sessionId]/accounting/route.ts
+- [X] T025 [US1] Surface portfolio totals and idle-balance value in src/ui/wallet/connected-wallet-ledger.tsx
+- [X] T026 [US1] Extend baseline valuation expectations in tests/fixtures/wallets/us1-wallet.json
 
 **Checkpoint**: User Story 1 delivers an independently testable portfolio accounting snapshot for one wallet.
 
@@ -83,20 +83,20 @@
 
 ### Tests for User Story 2
 
-- [ ] T027 [P] [US2] Add unit tests for pool and strategy rollups plus weighted-average scope inventory in tests/unit/pool-strategy-accounting.test.ts
-- [ ] T028 [P] [US2] Add replay tests for multi-pool and mixed manual/Mellow accounting rollups in tests/replay/pool-strategy-accounting.test.ts
-- [ ] T029 [P] [US2] Add contract tests for pool, strategy, and position summaries in tests/contract/accounting-breakdown.contract.test.ts
-- [ ] T030 [P] [US2] Add integration test for hierarchical accounting display in tests/integration/accounting-breakdown-flow.test.ts
+- [X] T027 [P] [US2] Add unit tests for pool and strategy rollups plus weighted-average scope inventory in tests/unit/pool-strategy-accounting.test.ts
+- [X] T028 [P] [US2] Add replay tests for multi-pool and mixed manual/Mellow accounting rollups in tests/replay/pool-strategy-accounting.test.ts
+- [X] T029 [P] [US2] Add contract tests for pool, strategy, and position summaries in tests/contract/accounting-breakdown.contract.test.ts
+- [X] T030 [P] [US2] Add integration test for hierarchical accounting display in tests/integration/accounting-breakdown-flow.test.ts
 
 ### Implementation for User Story 2
 
-- [ ] T031 [P] [US2] Define pool, strategy, and position accounting summary models in src/domains/accounting/model/scope-accounting-summary.ts
-- [ ] T032 [US2] Implement weighted-average inventory propagation and rollups by portfolio, pool, and strategy in src/domains/accounting/services/scope-accounting-service.ts
-- [ ] T033 [US2] Implement deterministic position-level precision gating and rolled-up fallback handling based on stable positionInstance linkage, unambiguous lifecycle ordering, and non-overlapping residual inventory in src/domains/accounting/services/position-accounting-service.ts
-- [ ] T034 [US2] Extend accounting snapshot assembly with pool, strategy, and position summaries in src/domains/accounting/services/accounting-snapshot-service.ts
-- [ ] T035 [US2] Extend accounting route serialization with hierarchical breakdowns in app/api/analysis-sessions/[sessionId]/accounting/route.ts
-- [ ] T036 [US2] Render pool, strategy, and position breakdowns in src/ui/wallet/connected-wallet-ledger.tsx
-- [ ] T037 [US2] Extend multi-strategy accounting expectations in tests/fixtures/wallets/us2-wallet.json
+- [X] T031 [P] [US2] Define pool, strategy, and position accounting summary models in src/domains/accounting/model/scope-accounting-summary.ts
+- [X] T032 [US2] Implement weighted-average inventory propagation and rollups by portfolio, pool, and strategy in src/domains/accounting/services/scope-accounting-service.ts
+- [X] T033 [US2] Implement deterministic position-level precision gating and rolled-up fallback handling based on stable positionInstance linkage, unambiguous lifecycle ordering, and non-overlapping residual inventory in src/domains/accounting/services/position-accounting-service.ts
+- [X] T034 [US2] Extend accounting snapshot assembly with pool, strategy, and position summaries in src/domains/accounting/services/accounting-snapshot-service.ts
+- [X] T035 [US2] Extend accounting route serialization with hierarchical breakdowns in app/api/analysis-sessions/[sessionId]/accounting/route.ts
+- [X] T036 [US2] Render pool, strategy, and position breakdowns in src/ui/wallet/connected-wallet-ledger.tsx
+- [X] T037 [US2] Extend multi-strategy accounting expectations in tests/fixtures/wallets/us2-wallet.json
 
 **Checkpoint**: User Story 2 adds independently testable pool and strategy accounting without breaking portfolio totals.
 
@@ -110,22 +110,22 @@
 
 ### Tests for User Story 3
 
-- [ ] T038 [P] [US3] Add unit tests for coverage summaries, fallback reasons, and trace references in tests/unit/accounting-explainability.test.ts
-- [ ] T039 [P] [US3] Add replay tests for indirect pricing paths and partial-coverage outputs in tests/replay/accounting-coverage.test.ts
-- [ ] T040 [P] [US3] Add contract tests for coverage metadata and trace refs in tests/contract/accounting-explainability.contract.test.ts
-- [ ] T041 [P] [US3] Add integration test for partial coverage and explainability display in tests/integration/accounting-explainability-flow.test.ts
-- [ ] T041A [P] [US3] Add Playwright validation for partial coverage, fallback disclosure, and traceability states in tests/e2e/accounting-explainability.spec.ts
+- [X] T038 [P] [US3] Add unit tests for coverage summaries, fallback reasons, and trace references in tests/unit/accounting-explainability.test.ts
+- [X] T039 [P] [US3] Add replay tests for indirect pricing paths and partial-coverage outputs in tests/replay/accounting-coverage.test.ts
+- [X] T040 [P] [US3] Add contract tests for coverage metadata and trace refs in tests/contract/accounting-explainability.contract.test.ts
+- [X] T041 [P] [US3] Add integration test for partial coverage and explainability display in tests/integration/accounting-explainability-flow.test.ts
+- [X] T041A [P] [US3] Add Playwright validation for partial coverage, fallback disclosure, and traceability states in tests/e2e/accounting-explainability.spec.ts
 
 ### Implementation for User Story 3
 
-- [ ] T042 [P] [US3] Define accounting trace and explainability models in src/domains/accounting/model/accounting-trace.ts
-- [ ] T043 [US3] Implement coverage summary and excluded-value assembly in src/domains/accounting/services/accounting-coverage-service.ts
-- [ ] T044 [US3] Implement ledger-record and price-point trace reference assembly in src/domains/accounting/services/accounting-trace-service.ts
-- [ ] T045 [US3] Extend normalization fallback reasoning and confidence metadata in src/domains/pricing/services/price-normalization-service.ts
-- [ ] T046 [US3] Extend accounting snapshot assembly with confidence, fallback, and partial-coverage disclosures in src/domains/accounting/services/accounting-snapshot-service.ts
-- [ ] T047 [US3] Render coverage status, fallback basis, and traceability metadata in src/ui/wallet/connected-wallet-ledger.tsx
-- [ ] T048 [US3] Extend partial-coverage expectations in tests/fixtures/wallets/us3-wallet.json
-- [ ] T048A [US3] Add replay coverage for discarded-activity exclusion reasons and excluded-portion disclosure in tests/replay/accounting-coverage.test.ts
+- [X] T042 [P] [US3] Define accounting trace and explainability models in src/domains/accounting/model/accounting-trace.ts
+- [X] T043 [US3] Implement coverage summary and excluded-value assembly in src/domains/accounting/services/accounting-coverage-service.ts
+- [X] T044 [US3] Implement ledger-record and price-point trace reference assembly in src/domains/accounting/services/accounting-trace-service.ts
+- [X] T045 [US3] Extend normalization fallback reasoning and confidence metadata in src/domains/pricing/services/price-normalization-service.ts
+- [X] T046 [US3] Extend accounting snapshot assembly with confidence, fallback, and partial-coverage disclosures in src/domains/accounting/services/accounting-snapshot-service.ts
+- [X] T047 [US3] Render coverage status, fallback basis, and traceability metadata in src/ui/wallet/connected-wallet-ledger.tsx
+- [X] T048 [US3] Extend partial-coverage expectations in tests/fixtures/wallets/us3-wallet.json
+- [X] T048A [US3] Add replay coverage for discarded-activity exclusion reasons and excluded-portion disclosure in tests/replay/accounting-coverage.test.ts
 
 **Checkpoint**: User Story 3 makes accounting outputs independently testable for pricing quality, confidence, and traceability.
 
@@ -135,10 +135,10 @@
 
 **Purpose**: Finish cross-story documentation, observability, and final validation.
 
-- [ ] T049 [P] Update accounting contract examples and response notes in specs/003-pricing-portfolio-accounting/contracts/accounting-api.openapi.yaml
-- [ ] T050 [P] Update pricing-provider setup, environment, and validation commands in README.md
-- [ ] T051 [P] Add pricing-cache miss and coverage observability helpers in src/infrastructure/observability/logger.ts
-- [ ] T052 Run quickstart validation scenarios, including `pnpm test:e2e`, and record implementation notes in specs/003-pricing-portfolio-accounting/quickstart.md
+- [X] T049 [P] Update accounting contract examples and response notes in specs/003-pricing-portfolio-accounting/contracts/accounting-api.openapi.yaml
+- [X] T050 [P] Update pricing-provider setup, environment, and validation commands in README.md
+- [X] T051 [P] Add pricing-cache miss and coverage observability helpers in src/infrastructure/observability/logger.ts
+- [X] T052 Run quickstart validation scenarios, including `pnpm test:e2e`, and record implementation notes in specs/003-pricing-portfolio-accounting/quickstart.md
 
 ---
 

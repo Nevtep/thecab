@@ -202,6 +202,59 @@ export const discardedActivity = pgTable(
   })
 );
 
+export const priceAssets = pgTable(
+  "price_assets",
+  {
+    priceAssetId: text("price_asset_id").primaryKey(),
+    chainId: integer("chain_id").notNull(),
+    tokenAddress: text("token_address").notNull(),
+    symbol: text("symbol"),
+    decimals: integer("decimals"),
+    providerAssetKey: text("provider_asset_key"),
+    aliasTargetAssetId: text("alias_target_asset_id"),
+    pricingStatus: text("pricing_status").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => ({
+    chainTokenIdx: index("price_assets_chain_token_idx").on(table.chainId, table.tokenAddress)
+  })
+);
+
+export const pricePoints = pgTable(
+  "price_points",
+  {
+    pricePointId: text("price_point_id").primaryKey(),
+    priceAssetId: text("price_asset_id")
+      .references(() => priceAssets.priceAssetId)
+      .notNull(),
+    quoteCurrency: text("quote_currency").notNull(),
+    sourceKind: text("source_kind").notNull(),
+    effectiveAt: timestamp("effective_at", { withTimezone: true }).notNull(),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull(),
+    priceValue: numeric("price_value", { precision: 36, scale: 18 }).notNull(),
+    resolution: text("resolution").notNull(),
+    confidence: text("confidence").notNull(),
+    pricingMethod: text("pricing_method").notNull(),
+    providerName: text("provider_name").notNull(),
+    providerReference: text("provider_reference"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => ({
+    assetEffectiveIdx: index("price_points_asset_effective_idx").on(
+      table.priceAssetId,
+      table.effectiveAt
+    ),
+    assetFetchedIdx: index("price_points_asset_fetched_idx").on(table.priceAssetId, table.fetchedAt),
+    assetSourceEffectiveIdx: index("price_points_asset_source_effective_idx").on(
+      table.priceAssetId,
+      table.sourceKind,
+      table.effectiveAt,
+      table.pricingMethod
+    )
+  })
+);
+
 export const analysisSessionsRelations = relations(analysisSessions, ({ many }) => ({
   reconstructionRuns: many(reconstructionRuns)
 }));
@@ -215,4 +268,15 @@ export const reconstructionRunsRelations = relations(reconstructionRuns, ({ one,
   canonicalLedgerRecords: many(canonicalLedgerRecords),
   residualHoldings: many(residualHoldings),
   discardedActivity: many(discardedActivity)
+}));
+
+export const priceAssetsRelations = relations(priceAssets, ({ many }) => ({
+  pricePoints: many(pricePoints)
+}));
+
+export const pricePointsRelations = relations(pricePoints, ({ one }) => ({
+  priceAsset: one(priceAssets, {
+    fields: [pricePoints.priceAssetId],
+    references: [priceAssets.priceAssetId]
+  })
 }));

@@ -15,15 +15,17 @@
     "typecheck": "tsc --noEmit",
     "test": "pnpm test:unit && pnpm test:replay && pnpm test:contract",
     "test:all": "pnpm test:unit && pnpm test:replay && pnpm test:contract && pnpm test:integration",
+    "test:feature003": "pnpm test:unit && pnpm test:replay && pnpm test:contract && pnpm test:integration && pnpm test:e2e",
     "test:unit": "vitest run tests/unit",
     "test:replay": "vitest run tests/replay",
     "test:contract": "vitest run tests/contract",
     "test:integration": "vitest run tests/integration",
     "test:e2e": "playwright test",
-    "validate:quickstart": "pnpm typecheck && pnpm test:all && pnpm build"
+    "validate:quickstart": "pnpm typecheck && pnpm test:all && pnpm test:e2e && pnpm build"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.62.8",
+    "decimal.js": "^10.6.0",
     "drizzle-orm": "^0.36.4",
     "next": "^15.0.4",
     "postgres": "^3.4.5",

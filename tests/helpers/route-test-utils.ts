@@ -4,6 +4,7 @@ import { POST as startReconstruction } from "@/app/api/analysis-sessions/[sessio
 import { GET as getLedgerProjection } from "@/app/api/analysis-sessions/[sessionId]/ledger/route";
 import { GET as getLedgerRecordDetail } from "@/app/api/analysis-sessions/[sessionId]/ledger/events/[ledgerRecordId]/route";
 import { GET as getDiscardedActivity } from "@/app/api/analysis-sessions/[sessionId]/discarded-activity/route";
+import { GET as getAccountingSnapshot } from "@/app/api/analysis-sessions/[sessionId]/accounting/route";
 
 const RUN_SETTLED_STATUSES = new Set(["accepted", "failed"]);
 
@@ -141,6 +142,16 @@ export async function fetchLedgerRecord(sessionId: string, ledgerRecordId: strin
 
 export async function fetchDiscardedActivity(sessionId: string) {
   const response = await getDiscardedActivity(new Request("http://localhost") as never, {
+    params: Promise.resolve({ sessionId })
+  });
+  return {
+    response,
+    body: await response.json()
+  };
+}
+
+export async function fetchAccounting(sessionId: string) {
+  const response = await getAccountingSnapshot(new Request("http://localhost") as never, {
     params: Promise.resolve({ sessionId })
   });
   return {

@@ -117,7 +117,7 @@ test("shows the latest accepted ledger while a reused session refresh runs", asy
 
   await expect(page.getByText("Latest accepted ledger loaded")).toBeVisible();
   await expect(page.getByText("Refreshing live reconstruction")).toBeVisible();
-  await expect(page.locator("ul li").filter({ hasText: "WETH / USDC" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "WETH / USDC" })).toBeVisible();
 });
 
 test("guards a reused session when the connected wallet no longer matches", async ({ page }) => {

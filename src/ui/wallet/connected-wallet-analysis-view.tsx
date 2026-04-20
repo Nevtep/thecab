@@ -6,9 +6,11 @@ import { base } from "wagmi/chains";
 
 import {
   buildConnectedWalletStaleContextRecovery,
+  type ConnectedWalletAnalysisResult,
   switchConnectedWalletTestOverrideToBase,
   useConnectedWalletAnalysis
 } from "@/ui/wallet/use-connected-wallet-analysis";
+import { ConnectedWalletAccountingPanel } from "@/ui/wallet/connected-wallet-ledger";
 
 type ConnectedWalletAnalysisViewProps = {
   sessionId: string;
@@ -111,13 +113,7 @@ export function ConnectedWalletAnalysisView({ sessionId }: ConnectedWalletAnalys
               Discarded items: {projection.discardedSummary.totalCount}
             </p>
 
-            {projection.pools.length > 0 ? (
-              <ul>
-                {projection.pools.map((pool) => (
-                  <li key={pool.poolId}>{pool.displayName}</li>
-                ))}
-              </ul>
-            ) : null}
+            <ConnectedWalletAccountingPanel accounting={analysis.accounting} projection={projection} />
 
             {analysis.discardedActivity && analysis.discardedActivity.items.length > 0 ? (
               <div>

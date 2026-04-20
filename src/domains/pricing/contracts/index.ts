@@ -1,0 +1,1 @@
+export * from "@/domains/pricing/contracts/price-provider";

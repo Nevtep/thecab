@@ -20,6 +20,8 @@ Copy `.env.example` to `.env.local` and provide the required values:
 - `BASE_TRACE_RPC_URL` if trace-capable fallback access is available
 - `NEXT_PUBLIC_BASE_RPC_URL` for the browser wallet runtime transport on Base
 - `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` for WalletConnect in the browser UI
+- `PRICE_PROVIDER_BASE_URL` for the historical or current price source base URL
+- `PRICE_PROVIDER_API_KEY` if the configured price source requires authentication
 
 The automated test helpers default to a local database at `postgres://postgres:postgres@localhost:5432/the_cab`.
 
@@ -38,16 +40,21 @@ The automated test helpers default to a local database at `postgres://postgres:p
 - `pnpm test:contract`
 - `pnpm test:integration`
 - `pnpm test:e2e`
+- `pnpm test:feature003`
 - `pnpm build`
 - `pnpm validate:quickstart`
 
 `pnpm validate:quickstart` runs typecheck, unit, replay, contract, integration, and production build validation. Browser flow coverage runs separately under `pnpm test:e2e` and uses the Playwright configuration in `playwright.config.ts`.
+
+`pnpm test:feature003` runs the feature-specific unit, replay, contract, integration, and Playwright suites for pricing and portfolio accounting.
 
 ## Feature Coverage
 
 - Live wallet reconstruction for connected Base wallets
 - Deterministic replay for fixture-backed validation scenarios
 - Canonical ledger projections grouped by pool, strategy, and lifecycle
+- Pricing-backed portfolio accounting totals, idle-balance visibility, and hierarchical pool or strategy breakdowns
+- Partial-coverage disclosure with discarded-activity exclusion reasons and trace references
 - External deposit and withdrawal classification
 - Live Aerodrome manual position lifecycle classification from receipts and logs
 - Residual holding visibility without synthetic pool attribution
@@ -65,3 +72,7 @@ The automated test helpers default to a local database at `postgres://postgres:p
 The minimal inspection surface is available at `/ledger` and can be queried with a session id after creating an analysis session and running a reconstruction.
 
 Connected-wallet inspection now distinguishes session loading, live reconstruction, refresh-with-latest, empty, failure, and stale wallet or chain recovery states while keeping discarded activity reviewable from the same ledger flow.
+
+The `/api/analysis-sessions/{sessionId}/accounting` route now returns the latest portfolio snapshot over the accepted ledger run, including current total value, capital entered and withdrawn, unrealized PnL, idle balances, pool and strategy breakdowns, and explicit coverage metadata.
+
+Production builds currently succeed with third-party wallet warnings from `@metamask/sdk` and `pino-pretty` resolution inside upstream packages. These warnings predate the accounting feature and do not block `next build`.
