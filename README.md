@@ -22,6 +22,13 @@ Copy `.env.example` to `.env.local` and provide the required values:
 - `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` for WalletConnect in the browser UI
 - `PRICE_PROVIDER_BASE_URL` for the historical or current price source base URL
 - `PRICE_PROVIDER_API_KEY` if the configured price source requires authentication
+- `MORALIS_API_KEY` for indexed wallet activity discovery primary provider
+- `ALCHEMY_API_KEY` for indexed wallet activity discovery supplemental provider
+- `DISCOVERY_PROVIDER_ORDER` optional provider cascade override, default `moralis,alchemy,basescan`
+- `INITIAL_LIVE_LOOKBACK_BLOCKS` optional first live run lookback window (default 250000)
+- `HYDRATION_WORKER_BATCH_SIZE` optional hydration claim batch size (default 25)
+- `HYDRATION_WORKER_CONCURRENCY` optional parallel hydration worker count per batch (default 4)
+- `HYDRATION_WORKER_MAX_ATTEMPTS` optional max hydration attempts before terminal failure (default 2)
 
 The automated test helpers default to a local database at `postgres://postgres:postgres@localhost:5432/the_cab`.
 
@@ -74,5 +81,13 @@ The minimal inspection surface is available at `/ledger` and can be queried with
 Connected-wallet inspection now distinguishes session loading, live reconstruction, refresh-with-latest, empty, failure, and stale wallet or chain recovery states while keeping discarded activity reviewable from the same ledger flow.
 
 The `/api/analysis-sessions/{sessionId}/accounting` route now returns the latest portfolio snapshot over the accepted ledger run, including current total value, capital entered and withdrawn, unrealized PnL, idle balances, pool and strategy breakdowns, and explicit coverage metadata.
+
+The `/api/analysis-sessions/{sessionId}/accounting/bootstrap` route returns fast-first accounting context (`empty`, `warming`, `ready`) plus snapshot payload when an accepted run exists.
+
+The `/api/analysis-sessions/{sessionId}/accounting/time-series` route returns an extensible chart surface with portfolio series points, pool series points, and classified event markers.
+
+The `/api/analysis-sessions/{sessionId}/accounting/rebalance-flows` route returns inferred cross-pool flow links for explainability and future rebalance panels.
+
+The `/api/analysis-sessions/{sessionId}/reconstructions/{runId}/progress` route now includes hydration lifecycle counters (`queued`, `processing`, `retry`, `hydrated`, `failed`).
 
 Production builds currently succeed with third-party wallet warnings from `@metamask/sdk` and `pino-pretty` resolution inside upstream packages. These warnings predate the accounting feature and do not block `next build`.

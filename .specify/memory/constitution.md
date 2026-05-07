@@ -1,20 +1,22 @@
 <!--
   Sync Impact Report
   ==================
-  Version change: 1.1.0 → 1.1.1
-  Bump rationale: PATCH - clarifies and operationalizes existing principles
-    (deterministic classification, pool-first attribution edge cases,
-    durable Mellow modeling language, and delivery-path flexibility)
-    without adding/removing/redefining constitutional scope.
+  Version change: 1.1.1 -> 1.2.0
+  Bump rationale: MINOR - adds dashboard-focused governance requirements
+    (time-series obligations, explainable chart points, rebalance neutrality,
+    progressive delivery states, and portfolio dashboard SLO guidance)
+    while preserving existing constitutional scope and boundaries.
   Modified principles:
-    - II. "Pool-First Analysis" (expanded with explicit residual/
-      unallocated portfolio bucket guidance)
-    - IV. "Position Lifecycle Integrity" (Mellow wording made more
-      durable and less implementation-tactical)
-    - V. "Deterministic Event Classification" (allows deterministic,
-      explicit, versioned, test-covered heuristics)
-    - XIV. "Spec-Driven Delivery Discipline" (strict for production
-      path, allows clearly labeled non-production exploratory artifacts)
+    - II. "Pool-First Analysis" (requires pool timelines and cross-pool flow visibility)
+    - IX. "Economic Explainability" (extends explainability to every chart point and KPI)
+    - X. "Performance Attribution Decomposition" (adds rebalance neutrality rule)
+    - XI. "Portfolio Completeness" (requires residual/idle inclusion in timeline views)
+    - XII. "Auditability, Reproducibility, and Testability" (adds dashboard read-model determinism)
+  Added principles:
+    - XV. "Dashboard Read-Model Contract Stability"
+    - XVI. "Temporal Coherence of Portfolio Views"
+    - XVII. "Progressive Portfolio Delivery"
+    - XVIII. "Dashboard SLO and Operational Visibility"
   Added sections: none
   Removed sections: none
   Templates requiring updates:
@@ -22,6 +24,7 @@
     - .specify/templates/spec-template.md ✅ reviewed (no changes needed)
     - .specify/templates/tasks-template.md ✅ reviewed (no changes needed)
     - .specify/templates/checklist-template.md ✅ reviewed (no changes needed)
+    - .specify/templates/commands/*.md ✅ not present (no changes needed)
   Follow-up TODOs: none
 -->
 
@@ -41,7 +44,7 @@ movements.
 ### II. Pool-First Analysis
 
 Pools are the primary analytical grouping unit. Every strategy,
-position, capital flow, reward, and valuation SHOULD be attributable
+position, capital flow, reward, and valuation MUST be attributable
 to a specific pool when attribution confidence is sufficient.
 Pool-level aggregation MUST always be available alongside
 strategy-level and position-level detail.
@@ -51,6 +54,11 @@ still be represented through an explicit residual bucket (for example,
 `unallocated`, `residual`, or portfolio-level holdings). This bucket
 MUST include idle wallet assets, rebalance leftovers, and other
 residual balances, and MUST remain included in total portfolio value.
+
+For dashboard delivery, pool-level analysis MUST be available as a
+historical timeline and not only as a latest snapshot. Cross-pool
+capital movement inferred from canonical events MUST be exposed as an
+explicit explainability surface.
 
 ### III. Strategy Isolation
 
@@ -96,8 +104,8 @@ Ambiguous, invalid, or unrecognizable events MUST be handled
 automatically through the discarded-event mechanism defined in
 Principle VII.
 
-Raw onchain observations — transactions, logs, and decoded event
-data — MUST be stored immutably once ingested. No process,
+Raw onchain observations - transactions, logs, and decoded event
+data - MUST be stored immutably once ingested. No process,
 override, or correction may alter the source event records.
 
 If manual reconciliation capabilities are introduced in the future,
@@ -136,6 +144,11 @@ that produced it. No reported figure may be a black box. The system
 MUST support navigation from any dashboard metric to its constituent
 ledger events and asset movements.
 
+For dashboard surfaces, explainability MUST also apply to time-series
+points, event markers, and rebalance-flow links. Any displayed point
+or marker MUST retain traceable references to canonical ledger records
+and price inputs when pricing is involved.
+
 ### X. Performance Attribution Decomposition
 
 The system MUST decompose investment performance into the following
@@ -154,6 +167,11 @@ independently reportable components:
 Capital deposits and withdrawals MUST NOT distort strategy-level
 performance metrics.
 
+Rebalance-induced capital migration between pools MUST NOT be
+misclassified as realized loss by default. Realized loss attribution
+MUST require explicit evidence from canonical event semantics and
+movement roles.
+
 ### XI. Portfolio Completeness
 
 Total portfolio value MUST include all relevant holdings of the
@@ -163,14 +181,22 @@ rebalances or partial redeployments. No asset that belongs to the
 wallet and falls within the product scope may be omitted from the
 portfolio total.
 
+Residual and idle balances MUST be represented not only in latest
+snapshots but also in historical portfolio views whenever timeline
+surfaces are presented.
+
 ### XII. Auditability, Reproducibility, and Testability
 
-The entire analytics pipeline — from raw onchain data through
-normalization, pricing, and metric computation — MUST be
+The entire analytics pipeline - from raw onchain data through
+normalization, pricing, and metric computation - MUST be
 deterministic and reproducible. Given the same onchain state and
 price data, reprocessing MUST produce identical results. Every
 layer of the pipeline MUST be independently testable with
 well-defined inputs and expected outputs.
+
+Dashboard read models (including bootstrap, progress, time-series,
+and rebalance-flow views) MUST be deterministic for the same accepted
+run and pricing state.
 
 ### XIII. Analytics-Only Boundary
 
@@ -184,14 +210,44 @@ capabilities MUST be treated as a constitutional amendment.
 
 Production-path product development (including any merge-intended
 feature implementation) MUST follow the Spec-Driven Development
-workflow: constitution → specification → plan → tasks →
-implementation → testing. No merge-intended feature implementation
+workflow: constitution -> specification -> plan -> tasks ->
+implementation -> testing. No merge-intended feature implementation
 may begin without a ratified specification and approved plan.
 
 Research artifacts, spikes, and exploratory prototypes MAY exist
 outside this workflow only when they are clearly identified as
 non-production and non-merge-intended. Such exploratory work MUST NOT
 be used to bypass constitutional requirements for merged product work.
+
+### XV. Dashboard Read-Model Contract Stability
+
+Portfolio dashboard APIs MUST be treated as versioned product
+contracts. Backward-compatible evolution is required for active
+consumers. Breaking response changes MUST be introduced through an
+explicit contract version bump and migration plan.
+
+### XVI. Temporal Coherence of Portfolio Views
+
+Dashboard panels that are presented together MUST declare and honor a
+coherent time context. Each payload MUST expose run identity and/or
+as-of semantics so users can distinguish `ready` accepted results from
+in-progress `warming` results. Mixed-freshness views MUST be clearly
+labeled and MUST NOT appear as a single finalized state.
+
+### XVII. Progressive Portfolio Delivery
+
+The user experience MUST provide progressive value delivery: fast
+bootstrap first, then live reconstruction progress, then full accepted
+portfolio and accounting views. Empty, warming, and ready states MUST
+be explicit and testable.
+
+### XVIII. Dashboard SLO and Operational Visibility
+
+Portfolio dashboard delivery MUST be observable in production.
+Implementations MUST expose operational signals for reconstruction and
+hydration progress, degraded provider mode, and stage-level status.
+Specifications SHOULD define measurable dashboard latency targets, and
+plans MUST include validation paths for those targets.
 
 ## Scope Constraints
 
@@ -229,8 +285,8 @@ respected by all specifications and implementations:
   extends an existing one.
 - Mellow exposure MUST be modeled as a distinct strategy under the
   same pool, not merged into the manual strategy.
-- The hierarchy is: Portfolio → Pool → Strategy → PositionInstance →
-  LedgerEvent → AssetMovement.
+- The hierarchy is: Portfolio -> Pool -> Strategy -> PositionInstance ->
+  LedgerEvent -> AssetMovement.
 
 ## Governance
 
@@ -251,4 +307,4 @@ with its principles and constraints.
 - **Versioning**: This constitution follows semantic versioning
   (MAJOR.MINOR.PATCH).
 
-**Version**: 1.1.1 | **Ratified**: 2026-04-18 | **Last Amended**: 2026-04-18
+**Version**: 1.2.0 | **Ratified**: 2026-04-18 | **Last Amended**: 2026-05-07
