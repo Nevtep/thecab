@@ -1,8 +1,11 @@
 import { getCurrentRulesetMetadata } from "@/domains/ledger/heuristics/registry";
+import { type ResidualHoldingSnapshot } from "@/domains/ledger/model/analysis-session-state";
+import { AnalysisSessionStateRepository } from "@/domains/ledger/repositories/analysis-session-state-repository";
 import { LedgerProjectionService } from "@/domains/ledger/projections/ledger-projection-service";
 import { LedgerOutputRepository } from "@/domains/ledger/repositories/ledger-output-repository";
 import { ReconstructionRunRepository } from "@/domains/ledger/repositories/reconstruction-run-repository";
 import { RawObservationRepository } from "@/domains/ledger/repositories/raw-observation-repository";
+import { resolveAcceptedRunChain } from "@/domains/ledger/services/accepted-run-chain";
 import { AccountingExclusionService } from "@/domains/accounting/services/accounting-exclusion-service";
 import { CurrentHoldingsValuationService } from "@/domains/accounting/services/current-holdings-valuation-service";
 import { PortfolioAccountingService } from "@/domains/accounting/services/portfolio-accounting-service";
@@ -32,35 +35,38 @@ export class AccountingSnapshotService {
     private readonly reconstructionRunRepository: ReconstructionRunRepository,
     private readonly ledgerOutputRepository: LedgerOutputRepository,
     private readonly pricePointRepository: PricePointRepository,
-    private readonly rawObservationRepository: RawObservationRepository
+    private readonly rawObservationRepository: RawObservationRepository,
+    private readonly analysisSessionStateRepository: AnalysisSessionStateRepository
   ) {}
 
   async getSnapshotInputs(analysisSessionId: string) {
     const session = await this.sessionRepository.findById(analysisSessionId);
-    const acceptedRun = session?.latestAcceptedRunId
-      ? await this.reconstructionRunRepository.findById(session.latestAcceptedRunId)
-      : await this.reconstructionRunRepository.findLatestAcceptedBySession(analysisSessionId);
+    const acceptedRuns = resolveAcceptedRunChain(
+      await this.reconstructionRunRepository.listAcceptedBySession(analysisSessionId)
+    );
+    const acceptedRun = acceptedRuns.at(-1) ?? null;
 
     if (!session || !acceptedRun || acceptedRun.status !== "accepted") {
       return null;
     }
 
-    const [records, residuals, discarded] = await Promise.all([
-      this.ledgerOutputRepository.listCanonicalLedgerRecordsByRun(acceptedRun.reconstructionRunId),
-      this.ledgerOutputRepository.listResidualHoldingsByRun(acceptedRun.reconstructionRunId),
-      this.ledgerOutputRepository.listDiscardedActivityByRun(acceptedRun.reconstructionRunId)
-    ]);
+    const acceptedRunIds = acceptedRuns.map((run) => run.reconstructionRunId);
 
-    const movements = (
-      await Promise.all(records.map((record) => this.ledgerOutputRepository.listAssetMovements(record.ledgerRecordId)))
-    ).flat();
+    const [records, sessionState, discarded] = await Promise.all([
+      this.ledgerOutputRepository.listCanonicalLedgerRecordsByRuns(acceptedRunIds),
+      this.analysisSessionStateRepository.findBySession(analysisSessionId),
+      this.ledgerOutputRepository.listDiscardedActivityByRuns(acceptedRunIds)
+    ]);
+    const movements = await this.ledgerOutputRepository.listAssetMovementsByLedgerRecordIds(
+      records.map((record) => record.ledgerRecordId)
+    );
 
     return {
       session,
       acceptedRun,
       records,
       movements,
-      residuals,
+      residuals: (sessionState?.residualHoldings ?? []) as ResidualHoldingSnapshot[],
       discarded
     };
   }
@@ -142,7 +148,8 @@ export class AccountingSnapshotService {
       this.sessionRepository,
       this.reconstructionRunRepository,
       this.ledgerOutputRepository,
-      this.rawObservationRepository
+      this.rawObservationRepository,
+      this.analysisSessionStateRepository
     ).getLatestProjection(analysisSessionId);
 
     const poolSummaries = this.scopeAccountingService.buildScopeSummaries({

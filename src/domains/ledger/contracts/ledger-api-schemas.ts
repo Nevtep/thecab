@@ -30,6 +30,7 @@ export const reconstructionRunResponseSchema = z.object({
   heuristicsVersion: z.string().min(1),
   fromBlock: z.number().int().nullable(),
   toBlock: z.number().int().nullable(),
+  checkpointBlock: z.number().int().nullable().optional(),
   startedAt: z.string().datetime(),
   completedAt: z.string().datetime().nullable(),
   errorSummary: z.string().min(1).nullable()

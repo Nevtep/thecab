@@ -7,11 +7,14 @@ export type CandidateDiscoveryResult = {
   txHashes: string[];
   fixtureWallet: FixtureWalletMetadata | null;
   observationCorpus: FixtureObservation[];
+  providerKey: string | null;
 };
 
 export class CandidateTransactionService {
-  private readonly liveCandidateTransactionService = new LiveCandidateTransactionService();
-  private readonly replayCandidateTransactionService = new ReplayCandidateTransactionService();
+  constructor(
+    private readonly liveCandidateTransactionService = new LiveCandidateTransactionService(),
+    private readonly replayCandidateTransactionService = new ReplayCandidateTransactionService()
+  ) {}
 
   async discover(input: {
     walletAddress: string;

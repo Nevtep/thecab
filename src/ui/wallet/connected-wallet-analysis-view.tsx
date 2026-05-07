@@ -16,11 +16,48 @@ type ConnectedWalletAnalysisViewProps = {
   sessionId: string;
 };
 
+function formatBlockNumber(value: number | null | undefined) {
+  if (value == null) {
+    return "Unknown";
+  }
+
+  return new Intl.NumberFormat("en-US").format(value);
+}
+
+function formatRunProgress(run: NonNullable<ConnectedWalletAnalysisResult["sessionStatus"]>["latestRun"]) {
+  if (!run) {
+    return null;
+  }
+
+  const latestProcessedBlock = run.checkpointBlock ?? (run.status === "accepted" ? run.toBlock : null);
+  const fromBlock = run.fromBlock;
+  const toBlock = run.toBlock;
+  const hasProgressRange = fromBlock != null && toBlock != null && latestProcessedBlock != null;
+  const progressPercent = hasProgressRange && toBlock >= fromBlock
+    ? Math.max(
+        0,
+        Math.min(
+          100,
+          Math.round(
+            ((latestProcessedBlock - fromBlock + 1) / (toBlock - fromBlock + 1)) * 100
+          )
+        )
+      )
+    : null;
+
+  return {
+    latestProcessedBlock,
+    progressPercent
+  };
+}
+
 export function ConnectedWalletAnalysisView({ sessionId }: ConnectedWalletAnalysisViewProps) {
   const analysis = useConnectedWalletAnalysis(sessionId);
   const projection = analysis.projection;
   const staleRecovery = buildConnectedWalletStaleContextRecovery(analysis.guard.reason);
   const { switchChainAsync, isPending: isSwitching } = useSwitchChain();
+  const latestRunProgress = formatRunProgress(analysis.sessionStatus?.latestRun ?? null);
+  const latestAcceptedRun = analysis.sessionStatus?.latestAcceptedRun ?? null;
 
   const switchToBase = async () => {
     if (switchConnectedWalletTestOverrideToBase()) {
@@ -38,6 +75,31 @@ export function ConnectedWalletAnalysisView({ sessionId }: ConnectedWalletAnalys
         <p>Session: <strong>{sessionId}</strong></p>
 
         {analysis.errorMessage ? <p className="status error">{analysis.errorMessage}</p> : null}
+
+        {analysis.sessionStatus?.latestRun ? (
+          <div>
+            <p>
+              Current run: <strong>{analysis.sessionStatus.latestRun.status}</strong>
+            </p>
+            <p>
+              Block window: <strong>{formatBlockNumber(analysis.sessionStatus.latestRun.fromBlock)}</strong> to <strong>{formatBlockNumber(analysis.sessionStatus.latestRun.toBlock)}</strong>
+            </p>
+            <p>
+              Latest processed block: <strong>{formatBlockNumber(latestRunProgress?.latestProcessedBlock ?? null)}</strong>
+            </p>
+            {latestRunProgress?.progressPercent != null ? (
+              <p>
+                Ingestion progress: <strong>{latestRunProgress.progressPercent}%</strong>
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {latestAcceptedRun ? (
+          <p>
+            Latest indexed snapshot: <strong>{formatBlockNumber(latestAcceptedRun.fromBlock)}</strong> to <strong>{formatBlockNumber(latestAcceptedRun.checkpointBlock ?? latestAcceptedRun.toBlock)}</strong>
+          </p>
+        ) : null}
 
         {analysis.state === "stale_context" ? (
           <>

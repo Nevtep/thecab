@@ -1,10 +1,12 @@
 import { getSemanticFromObservation } from "@/lib/fixture-loader";
 
+import { AnalysisSessionStateRepository } from "@/domains/ledger/repositories/analysis-session-state-repository";
 import { getCurrentRulesetMetadata } from "@/domains/ledger/heuristics/registry";
 import { LedgerOutputRepository } from "@/domains/ledger/repositories/ledger-output-repository";
 import { ReconstructionRunRepository } from "@/domains/ledger/repositories/reconstruction-run-repository";
 import { RawObservationRepository } from "@/domains/ledger/repositories/raw-observation-repository";
 import { PositionLifecycleProjectionService } from "@/domains/ledger/projections/position-lifecycle-projection-service";
+import { resolveAcceptedRunChain } from "@/domains/ledger/services/accepted-run-chain";
 import { SessionRepository } from "@/domains/wallet-session/repositories/session-repository";
 
 const CONTRACT_VERSION = "1.0.0";
@@ -16,28 +18,27 @@ export class LedgerProjectionService {
     private readonly sessionRepository: SessionRepository,
     private readonly reconstructionRunRepository: ReconstructionRunRepository,
     private readonly ledgerOutputRepository: LedgerOutputRepository,
-    private readonly rawObservationRepository: RawObservationRepository
+    private readonly rawObservationRepository: RawObservationRepository,
+    private readonly analysisSessionStateRepository: AnalysisSessionStateRepository
   ) {}
 
-  private async resolveAcceptedRun(analysisSessionId: string) {
+  private async resolveAcceptedRuns(analysisSessionId: string) {
     const session = await this.sessionRepository.findById(analysisSessionId);
-    const preferredAcceptedRun = session?.latestAcceptedRunId
-      ? await this.reconstructionRunRepository.findById(session.latestAcceptedRunId)
-      : null;
-    const acceptedRun = preferredAcceptedRun?.status === "accepted"
-      ? preferredAcceptedRun
-      : await this.reconstructionRunRepository.findLatestAcceptedBySession(analysisSessionId);
+    const acceptedRuns = resolveAcceptedRunChain(
+      await this.reconstructionRunRepository.listAcceptedBySession(analysisSessionId)
+    );
 
     return {
       session,
-      acceptedRun
+      acceptedRuns,
+      latestAcceptedRun: acceptedRuns.at(-1) ?? null
     };
   }
 
   async getLatestProjection(analysisSessionId: string) {
-    const { session, acceptedRun } = await this.resolveAcceptedRun(analysisSessionId);
+    const { session, acceptedRuns, latestAcceptedRun } = await this.resolveAcceptedRuns(analysisSessionId);
 
-    if (!session || !acceptedRun) {
+    if (!session || !latestAcceptedRun) {
       return {
         contractVersion: CONTRACT_VERSION,
         classifierVersion: getCurrentRulesetMetadata().classifierVersion,
@@ -55,12 +56,14 @@ export class LedgerProjectionService {
       };
     }
 
-    const [records, residualHoldings, discardedItems] = await Promise.all([
-      this.ledgerOutputRepository.listCanonicalLedgerRecordsByRun(acceptedRun.reconstructionRunId),
-      this.ledgerOutputRepository.listResidualHoldingsByRun(acceptedRun.reconstructionRunId),
-      this.ledgerOutputRepository.listDiscardedActivityByRun(acceptedRun.reconstructionRunId)
+    const acceptedRunIds = acceptedRuns.map((run) => run.reconstructionRunId);
+
+    const [records, sessionState, discardedItems, rawObservations] = await Promise.all([
+      this.ledgerOutputRepository.listCanonicalLedgerRecordsByRuns(acceptedRunIds),
+      this.analysisSessionStateRepository.findBySession(analysisSessionId),
+      this.ledgerOutputRepository.listDiscardedActivityByRuns(acceptedRunIds),
+      this.rawObservationRepository.listByRuns(acceptedRunIds)
     ]);
-    const rawObservations = await this.rawObservationRepository.listByRun(acceptedRun.reconstructionRunId);
     const semanticEntries: Array<[string, NonNullable<ReturnType<typeof getSemanticFromObservation>>]> = [];
     for (const observation of rawObservations) {
       const txHash = observation.txHash ?? "";
@@ -145,11 +148,11 @@ export class LedgerProjectionService {
 
     return {
       contractVersion: CONTRACT_VERSION,
-      classifierVersion: acceptedRun.classifierVersion,
-      heuristicsVersion: acceptedRun.heuristicsVersion,
+      classifierVersion: latestAcceptedRun.classifierVersion,
+      heuristicsVersion: latestAcceptedRun.heuristicsVersion,
       sourceBlockRange: {
-        fromBlock: Number(acceptedRun.fromBlock ?? 0n),
-        toBlock: Number(acceptedRun.toBlock ?? 0n)
+        fromBlock: Number(acceptedRuns[0]?.fromBlock ?? 0n),
+        toBlock: Number(latestAcceptedRun.checkpointBlock ?? latestAcceptedRun.toBlock ?? 0n)
       },
       pools: [...pools.values()].map((pool) => ({
         poolId: pool.poolId,
@@ -175,7 +178,7 @@ export class LedgerProjectionService {
           }))
         }))
       })),
-      residualHoldings: residualHoldings.map((holding) => ({
+      residualHoldings: (sessionState?.residualHoldings ?? []).map((holding) => ({
         residualHoldingId: holding.residualHoldingId,
         tokenAddress: holding.tokenAddress,
         symbol: holding.symbol,
@@ -195,9 +198,9 @@ export class LedgerProjectionService {
   }
 
   async getLedgerRecordDetail(analysisSessionId: string, ledgerRecordId: string) {
-    const { session, acceptedRun } = await this.resolveAcceptedRun(analysisSessionId);
+    const { session, latestAcceptedRun } = await this.resolveAcceptedRuns(analysisSessionId);
 
-    if (!session || !acceptedRun) {
+    if (!session || !latestAcceptedRun) {
       throw new Error("No accepted reconstruction run is available for this session.");
     }
 
@@ -246,16 +249,18 @@ export class LedgerProjectionService {
   }
 
   async listDiscardedActivity(analysisSessionId: string) {
-    const { session, acceptedRun } = await this.resolveAcceptedRun(analysisSessionId);
+    const { session, acceptedRuns, latestAcceptedRun } = await this.resolveAcceptedRuns(analysisSessionId);
 
-    if (!session || !acceptedRun) {
+    if (!session || !latestAcceptedRun) {
       return {
         contractVersion: CONTRACT_VERSION,
         items: []
       };
     }
 
-    const items = await this.ledgerOutputRepository.listDiscardedActivityByRun(acceptedRun.reconstructionRunId);
+    const items = await this.ledgerOutputRepository.listDiscardedActivityByRuns(
+      acceptedRuns.map((run) => run.reconstructionRunId)
+    );
     return {
       contractVersion: CONTRACT_VERSION,
       items: items.map((item) => ({

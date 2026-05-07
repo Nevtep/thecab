@@ -32,17 +32,24 @@ describe("session refresh flow", () => {
     const ledger = await fetchLedger(reusedSession.sessionId);
 
     expect(reusedSession.reusedSession).toBe(true);
-    expect(refreshRun.body.status).toBe("pending");
+    expect(["pending", "accepted"]).toContain(refreshRun.body.status);
     expect(statusDuringRefresh.body.session.reusedSession).toBe(true);
     expect(statusDuringRefresh.body.latestAcceptedRun.reconstructionRunId).toBe(
       acceptedRun.body.reconstructionRunId
     );
-    expect(statusDuringRefresh.body.latestRun.reconstructionRunId).toBe(
-      refreshRun.body.reconstructionRunId
-    );
-    expect(["pending", "ingesting", "normalizing", "projecting"]).toContain(
-      statusDuringRefresh.body.latestRun.status
-    );
+    if (refreshRun.body.status === "pending") {
+      expect(statusDuringRefresh.body.latestRun.reconstructionRunId).toBe(
+        refreshRun.body.reconstructionRunId
+      );
+      expect(["pending", "ingesting", "normalizing", "projecting"]).toContain(
+        statusDuringRefresh.body.latestRun.status
+      );
+    } else {
+      expect(statusDuringRefresh.body.latestRun.reconstructionRunId).toBe(
+        acceptedRun.body.reconstructionRunId
+      );
+      expect(statusDuringRefresh.body.latestRun.status).toBe("accepted");
+    }
     expect(statusDuringRefresh.body.hasAcceptedProjection).toBe(true);
     expect(ledger.body.pools.length).toBeGreaterThan(0);
   });

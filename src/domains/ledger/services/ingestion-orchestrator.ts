@@ -1,6 +1,7 @@
 import { getBasePublicClient } from "@/infrastructure/chain/clients";
 
 const DEFAULT_FINALITY_CONFIRMATIONS = 20n;
+const MAX_INCREMENTAL_BLOCK_WINDOW = 9_999n;
 
 export type CandidateDiscoveryContext = {
   walletAddress: string;
@@ -45,4 +46,25 @@ export class IngestionOrchestrator {
   async discoverCandidateTransactions(_context: CandidateDiscoveryContext) {
     return [] as string[];
   }
+
+  buildProcessingWindows(input: {
+    fromBlock: bigint;
+    toBlock: bigint;
+    maxWindowSize?: bigint;
+  }) {
+    const windows: Array<{ fromBlock: bigint; toBlock: bigint }> = [];
+    const maxWindowSize = input.maxWindowSize ?? MAX_INCREMENTAL_BLOCK_WINDOW;
+
+    for (let start = input.fromBlock; start <= input.toBlock; start += maxWindowSize + 1n) {
+      const end = start + maxWindowSize > input.toBlock ? input.toBlock : start + maxWindowSize;
+      windows.push({
+        fromBlock: start,
+        toBlock: end
+      });
+    }
+
+    return windows;
+  }
 }
+
+export { DEFAULT_FINALITY_CONFIRMATIONS, MAX_INCREMENTAL_BLOCK_WINDOW };

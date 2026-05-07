@@ -1,5 +1,6 @@
 import { AssetMovementService } from "@/domains/ledger/services/asset-movement-service";
 import { ClassificationEngine, type ClassificationState } from "@/domains/ledger/classifiers/classification-engine";
+import { type ResidualHoldingSnapshot } from "@/domains/ledger/model/analysis-session-state";
 import { DiscardedActivityService } from "@/domains/ledger/services/discarded-activity-service";
 import { LedgerOutputRepository } from "@/domains/ledger/repositories/ledger-output-repository";
 import { type RawObservationRecord } from "@/domains/ledger/repositories/raw-observation-repository";
@@ -18,6 +19,8 @@ export class LedgerNormalizationService {
     analysisSessionId: string;
     walletAddress: string;
     rawObservations: RawObservationRecord[];
+    initialState?: ClassificationState;
+    initialResidualHoldings?: ResidualHoldingSnapshot[];
   }) {
     const groups = new Map<string, RawObservationRecord[]>();
     for (const observation of input.rawObservations) {
@@ -34,9 +37,13 @@ export class LedgerNormalizationService {
     });
 
     const state: ClassificationState = {
-      manualPositions: new Map(),
-      mellowPositions: new Map(),
-      poolAddressToId: new Map()
+      manualPositions: new Map(
+        [...(input.initialState?.manualPositions.entries() ?? [])].map(([tokenId, value]) => [tokenId, { ...value }])
+      ),
+      mellowPositions: new Map(
+        [...(input.initialState?.mellowPositions.entries() ?? [])].map(([identityReference, value]) => [identityReference, { ...value }])
+      ),
+      poolAddressToId: new Map(input.initialState?.poolAddressToId.entries() ?? [])
     };
 
     const records = [];
@@ -128,12 +135,29 @@ export class LedgerNormalizationService {
     await this.ledgerOutputRepository.appendResidualHoldings(residuals);
     await this.ledgerOutputRepository.appendDiscardedActivity(discarded);
 
+    const residualSnapshot: ResidualHoldingSnapshot[] = [
+      ...(input.initialResidualHoldings ?? []),
+      ...residuals.map((residual) => ({
+        residualHoldingId: residual.residualHoldingId,
+        tokenAddress: residual.tokenAddress,
+        symbol: residual.symbol,
+        amountRaw: residual.amountRaw,
+        decimals: residual.decimals,
+        attributionConfidence: residual.attributionConfidence,
+        candidatePoolIds: residual.candidatePoolIds,
+        latestSourceLedgerRecordId: residual.latestSourceLedgerRecordId,
+        reasonCode: residual.reasonCode
+      }))
+    ];
+
     return {
       records,
       sources,
       movements,
       residuals,
-      discarded
+      discarded,
+      state,
+      residualSnapshot
     };
   }
 }

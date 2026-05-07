@@ -25,6 +25,7 @@ function serializeRun(
     heuristicsVersion: string;
     fromBlock: bigint | null;
     toBlock: bigint | null;
+    checkpointBlock: bigint | null;
     startedAt: Date;
     completedAt: Date | null;
     errorSummary: string | null;
@@ -43,6 +44,7 @@ function serializeRun(
     heuristicsVersion: run.heuristicsVersion,
     fromBlock: run.fromBlock == null ? null : Number(run.fromBlock),
     toBlock: run.toBlock == null ? null : Number(run.toBlock),
+    checkpointBlock: run.checkpointBlock == null ? null : Number(run.checkpointBlock),
     startedAt: run.startedAt.toISOString(),
     completedAt: run.completedAt?.toISOString() ?? null,
     errorSummary: run.errorSummary

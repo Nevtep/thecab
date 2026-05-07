@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useConnect, useDisconnect, useSwitchChain } from "wagmi";
 import { base } from "wagmi/chains";
 
@@ -134,9 +134,14 @@ export function ConnectedWalletLedger() {
   const { disconnect } = useDisconnect();
   const { switchChainAsync, error: switchError, isPending: isSwitching } = useSwitchChain();
   const bootstrapSession = useBootstrapConnectedWalletSessionMutation();
+  const [hasMounted, setHasMounted] = useState(false);
   const [openedSession, setOpenedSession] = useState<BootstrappedSession | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isNavigating, startNavigationTransition] = useTransition();
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   const isSessionLoading = bootstrapSession.isPending || isNavigating;
   const entryState = buildConnectedWalletAnalysisState({
@@ -199,7 +204,9 @@ export function ConnectedWalletLedger() {
         <h2>Analyze live Base activity</h2>
       </div>
 
-      {entryState === "not_connected" ? (
+      {!hasMounted ? (
+        <p className="wallet-panel__body">Loading wallet connection controls...</p>
+      ) : entryState === "not_connected" ? (
         <>
           <p className="wallet-panel__body">
             Connect one wallet, validate that it is on Base, and start or resume its analysis
@@ -265,15 +272,15 @@ export function ConnectedWalletLedger() {
         </>
       )}
 
-      {openedSession ? (
+      {hasMounted && openedSession ? (
         <p className="status success">
           Session {openedSession.reusedSession ? "resumed" : "created"}. Opening the ledger view for{" "}
           {openedSession.sessionId}. If navigation is blocked, open{" "}
           <Link href={`/ledger?sessionId=${openedSession.sessionId}`}>the session ledger manually</Link>.
         </p>
       ) : null}
-      {activeError ? <p className="status error">{activeError}</p> : null}
-      {!process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ? (
+      {hasMounted && activeError ? <p className="status error">{activeError}</p> : null}
+      {hasMounted && !process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ? (
         <p className="status warning">
           WalletConnect is enabled when <strong>NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID</strong> is set.
           Injected wallets remain available without it.

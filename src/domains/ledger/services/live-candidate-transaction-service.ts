@@ -1,82 +1,41 @@
-import { parseAbiItem } from "viem";
-
-import { AERODROME_POSITION_MANAGER_ADDRESSES } from "@/domains/protocols/aerodrome/contracts";
-import { getBasePublicClient } from "@/infrastructure/chain/clients";
-
-const ERC20_TRANSFER_EVENT = parseAbiItem(
-  "event Transfer(address indexed from, address indexed to, uint256 value)"
-);
-const ERC721_TRANSFER_EVENT = parseAbiItem(
-  "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)"
-);
-const DISCOVERY_CHUNK_SIZE = 250_000n;
+import { BasescanWalletActivityProvider } from "@/domains/ledger/services/basescan-wallet-activity-provider";
+import { RpcLogCandidateTransactionService } from "@/domains/ledger/services/rpc-log-candidate-transaction-service";
+import { type WalletActivityDiscoveryProvider } from "@/domains/ledger/services/wallet-activity-discovery-provider";
+import { logger } from "@/infrastructure/observability/logger";
 
 export class LiveCandidateTransactionService {
+  constructor(
+    private readonly walletActivityProvider: WalletActivityDiscoveryProvider = new BasescanWalletActivityProvider(),
+    private readonly rpcFallbackService = new RpcLogCandidateTransactionService()
+  ) {}
+
   async discover(input: {
     walletAddress: string;
     fromBlock: bigint;
     toBlock: bigint;
   }) {
-    return {
-      txHashes: await this.discoverLiveTxHashes(input),
-      fixtureWallet: null,
-      observationCorpus: []
-    };
-  }
-
-  private async discoverLiveTxHashes(input: {
-    walletAddress: string;
-    fromBlock: bigint;
-    toBlock: bigint;
-  }) {
-    const publicClient = getBasePublicClient();
-    const txHashes = new Set<string>();
-    const walletAddress = input.walletAddress.toLowerCase() as `0x${string}`;
-
-    for (let start = input.fromBlock; start <= input.toBlock; start += DISCOVERY_CHUNK_SIZE + 1n) {
-      const end = start + DISCOVERY_CHUNK_SIZE > input.toBlock ? input.toBlock : start + DISCOVERY_CHUNK_SIZE;
-
-      const [incomingTransfers, outgoingTransfers, incomingNfts, outgoingNfts] = await Promise.all([
-        publicClient.getLogs({
-          event: ERC20_TRANSFER_EVENT,
-          args: { to: walletAddress },
-          fromBlock: start,
-          toBlock: end
-        }),
-        publicClient.getLogs({
-          event: ERC20_TRANSFER_EVENT,
-          args: { from: walletAddress },
-          fromBlock: start,
-          toBlock: end
-        }),
-        publicClient.getLogs({
-          address: [...AERODROME_POSITION_MANAGER_ADDRESSES],
-          event: ERC721_TRANSFER_EVENT,
-          args: { to: walletAddress },
-          fromBlock: start,
-          toBlock: end
-        }),
-        publicClient.getLogs({
-          address: [...AERODROME_POSITION_MANAGER_ADDRESSES],
-          event: ERC721_TRANSFER_EVENT,
-          args: { from: walletAddress },
-          fromBlock: start,
-          toBlock: end
-        })
-      ]);
-
-      for (const log of [
-        ...incomingTransfers,
-        ...outgoingTransfers,
-        ...incomingNfts,
-        ...outgoingNfts
-      ]) {
-        if (log.transactionHash) {
-          txHashes.add(log.transactionHash.toLowerCase());
-        }
+    if (this.walletActivityProvider.isConfigured()) {
+      try {
+        const activities = await this.walletActivityProvider.discover(input);
+        return {
+          txHashes: activities.map((activity) => activity.txHash),
+          fixtureWallet: null,
+          observationCorpus: [],
+          providerKey: this.walletActivityProvider.providerKey
+        };
+      } catch (error) {
+        logger.warn("Falling back to RPC log discovery after indexed wallet discovery failed.", {
+          providerKey: this.walletActivityProvider.providerKey,
+          error: error instanceof Error ? error.message : String(error)
+        });
       }
     }
 
-    return [...txHashes].sort();
+    logger.info("Using RPC log fallback for live candidate discovery.", {
+      providerKey: this.rpcFallbackService.providerKey,
+      hasIndexedProvider: this.walletActivityProvider.isConfigured()
+    });
+
+    return this.rpcFallbackService.discover(input);
   }
 }

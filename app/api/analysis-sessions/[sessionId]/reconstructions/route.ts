@@ -5,8 +5,11 @@ import {
   reconstructionRunResponseSchema,
   startReconstructionRequestSchema
 } from "@/domains/ledger/contracts/ledger-api-schemas";
+import { AnalysisSessionStateRepository } from "@/domains/ledger/repositories/analysis-session-state-repository";
 import { LedgerOutputRepository } from "@/domains/ledger/repositories/ledger-output-repository";
 import { ReconstructionRunService } from "@/domains/ledger/services/reconstruction-run-service";
+import { WalletDiscoveryCheckpointRepository } from "@/domains/ledger/repositories/wallet-discovery-checkpoint-repository";
+import { markReconstructionRunActive } from "@/domains/ledger/services/active-reconstruction-run-registry";
 import { ReconstructionExecutor } from "@/domains/ledger/services/reconstruction-executor";
 import { ReconstructionRunRepository } from "@/domains/ledger/repositories/reconstruction-run-repository";
 import { RawObservationRepository } from "@/domains/ledger/repositories/raw-observation-repository";
@@ -28,15 +31,19 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const db = getDb();
     const sessionRepository = new SessionRepository(db);
     const reconstructionRunRepository = new ReconstructionRunRepository(db);
+    const walletDiscoveryCheckpointRepository = new WalletDiscoveryCheckpointRepository(db);
     const reconstructionRunService = new ReconstructionRunService(
       reconstructionRunRepository,
-      sessionRepository
+      sessionRepository,
+      walletDiscoveryCheckpointRepository
     );
     const reconstructionExecutor = new ReconstructionExecutor(
       sessionRepository,
       new RawObservationRepository(db),
       reconstructionRunService,
-      new LedgerNormalizationService(new LedgerOutputRepository(db))
+      new LedgerNormalizationService(new LedgerOutputRepository(db)),
+      new AnalysisSessionStateRepository(db),
+      walletDiscoveryCheckpointRepository
     );
 
     const run = await reconstructionRunService.startPendingRun({
@@ -46,13 +53,16 @@ export async function POST(request: NextRequest, context: RouteContext) {
       toBlock: payload.toBlock ?? null
     });
 
-    void reconstructionExecutor.execute({
+    if (run.status === "pending") {
+      markReconstructionRunActive(run.reconstructionRunId);
+      void reconstructionExecutor.execute({
         analysisSessionId: sessionId,
         reconstructionRunId: run.reconstructionRunId,
         mode: payload.mode,
-        fromBlock: payload.fromBlock ?? null,
-        toBlock: payload.toBlock ?? null
+        fromBlock: run.fromBlock,
+        toBlock: run.toBlock
       });
+    }
 
     return NextResponse.json(
       reconstructionRunResponseSchema.parse({
@@ -64,6 +74,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
         heuristicsVersion: run.heuristicsVersion,
         fromBlock: run.fromBlock == null ? null : Number(run.fromBlock),
         toBlock: run.toBlock == null ? null : Number(run.toBlock),
+        checkpointBlock: run.checkpointBlock == null ? null : Number(run.checkpointBlock),
         startedAt: run.startedAt.toISOString(),
         completedAt: run.completedAt?.toISOString() ?? null,
         errorSummary: run.errorSummary ?? null

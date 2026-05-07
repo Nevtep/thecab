@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { asc, desc, eq, inArray } from "drizzle-orm";
 
 import { reconstructionRuns } from "@/infrastructure/db/schema";
 
@@ -44,6 +44,16 @@ export class ReconstructionRunRepository {
     return runs.find((run) => run.status === "accepted") ?? null;
   }
 
+  async listAcceptedBySession(analysisSessionId: string) {
+    const runs = await this.db
+      .select()
+      .from(reconstructionRuns)
+      .where(eq(reconstructionRuns.analysisSessionId, analysisSessionId))
+      .orderBy(asc(reconstructionRuns.startedAt));
+
+    return runs.filter((run) => run.status === "accepted");
+  }
+
   async findLatestBySession(analysisSessionId: string) {
     const [run] = await this.db
       .select()
@@ -87,5 +97,16 @@ export class ReconstructionRunRepository {
       .returning();
 
     return updated ?? null;
+  }
+
+  async listByIds(reconstructionRunIds: string[]) {
+    if (reconstructionRunIds.length === 0) {
+      return [];
+    }
+
+    return this.db
+      .select()
+      .from(reconstructionRuns)
+      .where(inArray(reconstructionRuns.reconstructionRunId, reconstructionRunIds));
   }
 }

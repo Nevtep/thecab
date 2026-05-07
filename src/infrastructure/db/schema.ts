@@ -33,6 +33,24 @@ export const analysisSessions = pgTable(
   })
 );
 
+export const analysisSessionStates = pgTable(
+  "analysis_session_states",
+  {
+    analysisSessionId: text("analysis_session_id")
+      .primaryKey()
+      .references(() => analysisSessions.analysisSessionId),
+    latestAcceptedRunId: text("latest_accepted_run_id"),
+    manualPositionsJson: jsonb("manual_positions_json").$type<unknown[]>().notNull(),
+    mellowPositionsJson: jsonb("mellow_positions_json").$type<unknown[]>().notNull(),
+    poolAddressToIdJson: jsonb("pool_address_to_id_json").$type<unknown[]>().notNull(),
+    residualHoldingsJson: jsonb("residual_holdings_json").$type<unknown[]>().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => ({
+    latestAcceptedRunIdx: index("analysis_session_states_latest_run_idx").on(table.latestAcceptedRunId)
+  })
+);
+
 export const reconstructionRuns = pgTable(
   "reconstruction_runs",
   {
@@ -55,6 +73,33 @@ export const reconstructionRuns = pgTable(
     sessionIdx: index("reconstruction_runs_session_idx").on(
       table.analysisSessionId,
       table.startedAt
+    )
+  })
+);
+
+export const walletDiscoveryCheckpoints = pgTable(
+  "wallet_discovery_checkpoints",
+  {
+    walletAddress: text("wallet_address").notNull(),
+    chainId: integer("chain_id").notNull(),
+    providerKey: text("provider_key").notNull(),
+    latestIndexedBlock: bigint("latest_indexed_block", { mode: "bigint" }),
+    latestHydratedBlock: bigint("latest_hydrated_block", { mode: "bigint" }),
+    latestAcceptedBlock: bigint("latest_accepted_block", { mode: "bigint" }),
+    providerCursor: text("provider_cursor"),
+    pendingReconstructionRunId: text("pending_reconstruction_run_id"),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.walletAddress, table.chainId] }),
+    latestAcceptedBlockIdx: index("wallet_discovery_checkpoints_latest_accepted_block_idx").on(
+      table.chainId,
+      table.latestAcceptedBlock
+    ),
+    pendingRunIdx: index("wallet_discovery_checkpoints_pending_run_idx").on(
+      table.pendingReconstructionRunId
     )
   })
 );

@@ -15,7 +15,8 @@ export class ReplayCandidateTransactionService {
       return {
         txHashes: [],
         fixtureWallet: null,
-        observationCorpus: []
+        observationCorpus: [],
+        providerKey: "replay_fixture"
       };
     }
 
@@ -33,7 +34,8 @@ export class ReplayCandidateTransactionService {
     return {
       txHashes,
       fixtureWallet: fixtureWallet as FixtureWalletMetadata,
-      observationCorpus
+      observationCorpus,
+      providerKey: "replay_fixture"
     };
   }
 }

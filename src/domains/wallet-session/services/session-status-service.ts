@@ -1,7 +1,16 @@
 import { type ReconstructionRunRecord, ReconstructionRunRepository } from "@/domains/ledger/repositories/reconstruction-run-repository";
+import { isReconstructionRunActive } from "@/domains/ledger/services/active-reconstruction-run-registry";
 import { type ReconstructionRunSnapshot, type SessionStatusSnapshot } from "@/domains/wallet-session/model/session-status-snapshot";
 import { type WalletAnalysisSessionStatus } from "@/domains/wallet-session/model/analysis-session";
 import { SessionRepository } from "@/domains/wallet-session/repositories/session-repository";
+
+const ORPHANED_RECONSTRUCTION_RUN_GRACE_MS = 15 * 1000;
+const STALE_RECONSTRUCTION_RUN_TIMEOUT_MS = 2 * 60 * 60 * 1000;
+const RUNNING_RECONSTRUCTION_STATUSES = new Set(["pending", "ingesting", "normalizing", "projecting"]);
+const ORPHANED_RECONSTRUCTION_RUN_ERROR =
+  "Reconstruction run was interrupted before completion. Start a new reconstruction to resume from the latest checkpoint.";
+const STALE_RECONSTRUCTION_RUN_ERROR =
+  "Reconstruction run timed out while in progress. The previous process likely exited before completion. Start a new reconstruction to retry with the current RPC configuration.";
 
 export class SessionStatusService {
   constructor(
@@ -15,9 +24,10 @@ export class SessionStatusService {
       throw new Error("Analysis session not found.");
     }
 
-    const [latestAcceptedRun, latestRun, lastFailure] = await Promise.all([
+    const latestRun = await this.reconcileStaleLatestRun(analysisSessionId);
+
+    const [latestAcceptedRun, lastFailure] = await Promise.all([
       this.reconstructionRunRepository.findLatestAcceptedBySession(analysisSessionId),
-      this.reconstructionRunRepository.findLatestBySession(analysisSessionId),
       this.reconstructionRunRepository.findLatestFailedBySession(analysisSessionId)
     ]);
 
@@ -36,6 +46,35 @@ export class SessionStatusService {
     };
   }
 
+  private async reconcileStaleLatestRun(analysisSessionId: string) {
+    const latestRun = await this.reconstructionRunRepository.findLatestBySession(analysisSessionId);
+    if (!latestRun || !RUNNING_RECONSTRUCTION_STATUSES.has(latestRun.status)) {
+      return latestRun;
+    }
+
+    if (!isReconstructionRunActive(latestRun.reconstructionRunId)) {
+      if (Date.now() - latestRun.startedAt.getTime() < ORPHANED_RECONSTRUCTION_RUN_GRACE_MS) {
+        return latestRun;
+      }
+
+      return this.reconstructionRunRepository.updateStatus(latestRun.reconstructionRunId, {
+        status: "failed",
+        completedAt: new Date(),
+        errorSummary: ORPHANED_RECONSTRUCTION_RUN_ERROR
+      });
+    }
+
+    if (Date.now() - latestRun.startedAt.getTime() < STALE_RECONSTRUCTION_RUN_TIMEOUT_MS) {
+      return latestRun;
+    }
+
+    return this.reconstructionRunRepository.updateStatus(latestRun.reconstructionRunId, {
+      status: "failed",
+      completedAt: new Date(),
+      errorSummary: STALE_RECONSTRUCTION_RUN_ERROR
+    });
+  }
+
   private toRunSnapshot(run: ReconstructionRunRecord | null): ReconstructionRunSnapshot | null {
     if (!run) {
       return null;
@@ -50,9 +89,17 @@ export class SessionStatusService {
       heuristicsVersion: run.heuristicsVersion,
       fromBlock: run.fromBlock,
       toBlock: run.toBlock,
+      checkpointBlock: run.checkpointBlock,
       startedAt: run.startedAt,
       completedAt: run.completedAt,
       errorSummary: run.errorSummary
     };
   }
 }
+
+export {
+  ORPHANED_RECONSTRUCTION_RUN_ERROR,
+  ORPHANED_RECONSTRUCTION_RUN_GRACE_MS,
+  STALE_RECONSTRUCTION_RUN_ERROR,
+  STALE_RECONSTRUCTION_RUN_TIMEOUT_MS
+};

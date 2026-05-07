@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 
 import {
   assetMovements,
@@ -88,6 +88,22 @@ export class LedgerOutputRepository {
       .where(eq(canonicalLedgerRecords.reconstructionRunId, reconstructionRunId));
   }
 
+  async listCanonicalLedgerRecordsByRuns(reconstructionRunIds: string[]) {
+    if (reconstructionRunIds.length === 0) {
+      return [];
+    }
+
+    return this.db
+      .select()
+      .from(canonicalLedgerRecords)
+      .where(inArray(canonicalLedgerRecords.reconstructionRunId, reconstructionRunIds))
+      .orderBy(
+        asc(canonicalLedgerRecords.blockNumber),
+        asc(canonicalLedgerRecords.timestamp),
+        asc(canonicalLedgerRecords.eventSequence)
+      );
+  }
+
   async findCanonicalLedgerRecord(ledgerRecordId: string) {
     const [record] = await this.db
       .select()
@@ -112,6 +128,17 @@ export class LedgerOutputRepository {
       .where(eq(assetMovements.ledgerRecordId, ledgerRecordId));
   }
 
+  async listAssetMovementsByLedgerRecordIds(ledgerRecordIds: string[]) {
+    if (ledgerRecordIds.length === 0) {
+      return [];
+    }
+
+    return this.db
+      .select()
+      .from(assetMovements)
+      .where(inArray(assetMovements.ledgerRecordId, ledgerRecordIds));
+  }
+
   async listResidualHoldingsByRun(reconstructionRunId: string) {
     return this.db
       .select()
@@ -124,5 +151,17 @@ export class LedgerOutputRepository {
       .select()
       .from(discardedActivity)
       .where(eq(discardedActivity.reconstructionRunId, reconstructionRunId));
+  }
+
+  async listDiscardedActivityByRuns(reconstructionRunIds: string[]) {
+    if (reconstructionRunIds.length === 0) {
+      return [];
+    }
+
+    return this.db
+      .select()
+      .from(discardedActivity)
+      .where(inArray(discardedActivity.reconstructionRunId, reconstructionRunIds))
+      .orderBy(asc(discardedActivity.blockNumber), asc(discardedActivity.timestamp));
   }
 }

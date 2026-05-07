@@ -10,7 +10,7 @@ import { classifyMellowEventType } from "@/domains/protocols/mellow/mellow-class
 import { PoolAssignmentService } from "@/domains/ledger/services/pool-assignment-service";
 import { type FixtureObservation, getSemanticFromObservation } from "@/lib/fixture-loader";
 
-type MellowPositionState = {
+export type MellowPositionState = {
   positionInstanceId: string;
   identityReference: string;
   shareBalanceRaw: string | null;

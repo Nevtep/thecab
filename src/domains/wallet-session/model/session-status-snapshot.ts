@@ -10,6 +10,7 @@ export type ReconstructionRunSnapshot = {
   heuristicsVersion: string;
   fromBlock: bigint | null;
   toBlock: bigint | null;
+  checkpointBlock: bigint | null;
   startedAt: Date;
   completedAt: Date | null;
   errorSummary: string | null;

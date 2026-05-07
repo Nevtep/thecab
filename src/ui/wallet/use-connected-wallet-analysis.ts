@@ -102,6 +102,7 @@ export type SessionBootstrapInput = {
 const CONNECTED_WALLET_TEST_OVERRIDE_EVENT = "thecab:test-wallet-changed";
 const CONNECTED_WALLET_ANALYSIS_TEST_OVERRIDE_EVENT = "thecab:test-analysis-changed";
 const RUNNING_RECONSTRUCTION_STATUSES = ["pending", "ingesting", "normalizing", "projecting"] as const;
+const AUTO_REFRESH_INTERVAL_MS = 15_000;
 
 function isRunningReconstructionStatus(
   status: ReconstructionRunResponse["status"] | null | undefined
@@ -391,7 +392,7 @@ export function useSessionStatusQuery(sessionId: string | null, enabled = true) 
       const data = query.state.data as SessionStatusResponse | undefined;
       const latestStatus = data?.latestRun?.status;
 
-      return isRunningReconstructionStatus(latestStatus) ? 750 : false;
+      return isRunningReconstructionStatus(latestStatus) ? 2_500 : false;
     },
     queryFn: async () => {
       if (!sessionId) {
@@ -530,6 +531,48 @@ export function useAccountingQuery(sessionId: string | null, enabled: boolean) {
   });
 }
 
+export function shouldAutoStartConnectedWalletReconstruction(
+  sessionStatus: SessionStatusResponse | null
+) {
+  const latestRun = sessionStatus?.latestRun;
+
+  if (!sessionStatus) {
+    return false;
+  }
+
+  if (!latestRun) {
+    return true;
+  }
+
+  if (isRunningReconstructionStatus(latestRun.status)) {
+    return false;
+  }
+
+  if (latestRun.status === "failed") {
+    return false;
+  }
+
+  if (sessionStatus.hasAcceptedProjection) {
+    return false;
+  }
+
+  return true;
+}
+
+export function shouldAutoRecoverFailedConnectedWalletReconstruction(
+  sessionStatus: SessionStatusResponse | null
+) {
+  if (!sessionStatus) {
+    return false;
+  }
+
+  return Boolean(
+    sessionStatus.session.reusedSession &&
+      !sessionStatus.hasAcceptedProjection &&
+      sessionStatus.latestRun?.status === "failed"
+  );
+}
+
 export function useConnectedWalletAnalysis(sessionId: string): ConnectedWalletAnalysisResult {
   const connectedWallet = useConnectedWalletContext();
   const [analysisTestOverride, setAnalysisTestOverride] = useState<ConnectedWalletAnalysisTestOverride | null>(
@@ -572,16 +615,27 @@ export function useConnectedWalletAnalysis(sessionId: string): ConnectedWalletAn
     !hasAnalysisTestOverride && Boolean(sessionStatusQuery.data?.hasAcceptedProjection) && guard.isCurrent
   );
   const [refreshRequestSignature, setRefreshRequestSignature] = useState<string | null>(null);
+  const [hasAutoRecoveredFailedRun, setHasAutoRecoveredFailedRun] = useState(false);
 
   useEffect(() => {
     if (hasAnalysisTestOverride || !sessionStatusQuery.data || !guard.isCurrent || startReconstruction.isPending) {
       return;
     }
 
-    const latestRun = sessionStatusQuery.data.latestRun;
-    if (latestRun && isRunningReconstructionStatus(latestRun.status)) {
+    if (
+      !hasAutoRecoveredFailedRun &&
+      shouldAutoRecoverFailedConnectedWalletReconstruction(sessionStatusQuery.data)
+    ) {
+      setHasAutoRecoveredFailedRun(true);
+      startReconstruction.mutate("initial");
       return;
     }
+
+    if (!shouldAutoStartConnectedWalletReconstruction(sessionStatusQuery.data)) {
+      return;
+    }
+
+    const latestRun = sessionStatusQuery.data.latestRun;
 
     const requestedSignature = [
       sessionId,
@@ -604,6 +658,38 @@ export function useConnectedWalletAnalysis(sessionId: string): ConnectedWalletAn
     sessionStatusQuery.data,
     startReconstruction,
     hasAnalysisTestOverride
+  ]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    if (hasAnalysisTestOverride || !sessionStatusQuery.data || !guard.isCurrent || startReconstruction.isPending) {
+      return undefined;
+    }
+
+    const latestRun = sessionStatusQuery.data.latestRun;
+    if (!sessionStatusQuery.data.hasAcceptedProjection || !latestRun) {
+      return undefined;
+    }
+
+    if (isRunningReconstructionStatus(latestRun.status) || latestRun.status === "failed") {
+      return undefined;
+    }
+
+    const timerId = window.setTimeout(() => {
+      startReconstruction.mutate("incremental");
+    }, AUTO_REFRESH_INTERVAL_MS);
+
+    return () => {
+      window.clearTimeout(timerId);
+    };
+  }, [
+    guard.isCurrent,
+    hasAnalysisTestOverride,
+    sessionStatusQuery.data,
+    startReconstruction
   ]);
 
   if (analysisTestOverride) {

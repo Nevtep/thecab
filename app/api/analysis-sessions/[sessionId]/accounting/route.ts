@@ -4,6 +4,7 @@ import {
   accountingErrorResponseSchema,
   accountingResponseSchema
 } from "@/domains/accounting/contracts/accounting-api-schemas";
+import { AnalysisSessionStateRepository } from "@/domains/ledger/repositories/analysis-session-state-repository";
 import { AccountingSnapshotService } from "@/domains/accounting/services/accounting-snapshot-service";
 import { LedgerOutputRepository } from "@/domains/ledger/repositories/ledger-output-repository";
 import { ReconstructionRunRepository } from "@/domains/ledger/repositories/reconstruction-run-repository";
@@ -27,7 +28,8 @@ export async function GET(_request: Request, context: RouteContext) {
       new ReconstructionRunRepository(db),
       new LedgerOutputRepository(db),
       new PricePointRepository(db),
-      new RawObservationRepository(db)
+      new RawObservationRepository(db),
+      new AnalysisSessionStateRepository(db)
     ).getLatestSnapshot(sessionId);
 
     return NextResponse.json(accountingResponseSchema.parse(snapshot));

@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 
 import { rawObservations } from "@/infrastructure/db/schema";
 
@@ -38,5 +38,17 @@ export class RawObservationRepository {
       .from(rawObservations)
       .where(eq(rawObservations.reconstructionRunId, reconstructionRunId))
       .orderBy(asc(rawObservations.ingestedAt));
+  }
+
+  async listByRuns(reconstructionRunIds: string[]) {
+    if (reconstructionRunIds.length === 0) {
+      return [];
+    }
+
+    return this.db
+      .select()
+      .from(rawObservations)
+      .where(inArray(rawObservations.reconstructionRunId, reconstructionRunIds))
+      .orderBy(asc(rawObservations.blockNumber), asc(rawObservations.ingestedAt));
   }
 }
