@@ -87,6 +87,7 @@ export const walletDiscoveryCheckpoints = pgTable(
     latestHydratedBlock: bigint("latest_hydrated_block", { mode: "bigint" }),
     latestAcceptedBlock: bigint("latest_accepted_block", { mode: "bigint" }),
     providerCursor: text("provider_cursor"),
+    providerStates: jsonb("provider_states").$type<Record<string, { cursor: string | null; updatedAt: string }>>(),
     pendingReconstructionRunId: text("pending_reconstruction_run_id"),
     lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -125,6 +126,55 @@ export const rawObservations = pgTable(
   },
   (table) => ({
     runIdx: index("raw_observations_run_idx").on(table.reconstructionRunId, table.sourceType)
+  })
+);
+
+export const discoveredActivities = pgTable(
+  "discovered_activities",
+  {
+    reconstructionRunId: text("reconstruction_run_id")
+      .references(() => reconstructionRuns.reconstructionRunId)
+      .notNull(),
+    txHash: text("tx_hash").notNull(),
+    providerKey: text("provider_key").notNull(),
+    providerCursor: text("provider_cursor"),
+    blockNumberHint: bigint("block_number_hint", { mode: "bigint" }),
+    timestampHint: timestamp("timestamp_hint", { withTimezone: true }),
+    hydrationStatus: text("hydration_status").notNull(),
+    errorSummary: text("error_summary"),
+    discoveredAt: timestamp("discovered_at", { withTimezone: true }).defaultNow().notNull(),
+    hydratedAt: timestamp("hydrated_at", { withTimezone: true })
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.reconstructionRunId, table.txHash] }),
+    statusIdx: index("discovered_activities_status_idx").on(table.reconstructionRunId, table.hydrationStatus),
+    providerIdx: index("discovered_activities_provider_idx").on(table.providerKey, table.discoveredAt)
+  })
+);
+
+export const hydrationJobStates = pgTable(
+  "hydration_job_states",
+  {
+    reconstructionRunId: text("reconstruction_run_id")
+      .references(() => reconstructionRuns.reconstructionRunId)
+      .notNull(),
+    txHash: text("tx_hash").notNull(),
+    jobStatus: text("job_status").notNull(),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    leaseOwner: text("lease_owner"),
+    leasedAt: timestamp("leased_at", { withTimezone: true }),
+    nextRetryAt: timestamp("next_retry_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.reconstructionRunId, table.txHash] }),
+    runStatusIdx: index("hydration_job_states_run_status_idx").on(
+      table.reconstructionRunId,
+      table.jobStatus,
+      table.nextRetryAt
+    ),
+    leaseIdx: index("hydration_job_states_lease_idx").on(table.leaseOwner, table.leasedAt)
   })
 );
 

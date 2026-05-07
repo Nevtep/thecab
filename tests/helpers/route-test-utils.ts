@@ -1,10 +1,14 @@
 import { POST as createAnalysisSession } from "@/app/api/analysis-sessions/route";
 import { GET as getSessionStatus } from "@/app/api/analysis-sessions/[sessionId]/route";
 import { POST as startReconstruction } from "@/app/api/analysis-sessions/[sessionId]/reconstructions/route";
+import { GET as getReconstructionProgress } from "@/app/api/analysis-sessions/[sessionId]/reconstructions/[reconstructionRunId]/progress/route";
 import { GET as getLedgerProjection } from "@/app/api/analysis-sessions/[sessionId]/ledger/route";
 import { GET as getLedgerRecordDetail } from "@/app/api/analysis-sessions/[sessionId]/ledger/events/[ledgerRecordId]/route";
 import { GET as getDiscardedActivity } from "@/app/api/analysis-sessions/[sessionId]/discarded-activity/route";
 import { GET as getAccountingSnapshot } from "@/app/api/analysis-sessions/[sessionId]/accounting/route";
+import { GET as getAccountingBootstrap } from "@/app/api/analysis-sessions/[sessionId]/accounting/bootstrap/route";
+import { GET as getAccountingTimeSeries } from "@/app/api/analysis-sessions/[sessionId]/accounting/time-series/route";
+import { GET as getAccountingRebalanceFlows } from "@/app/api/analysis-sessions/[sessionId]/accounting/rebalance-flows/route";
 
 const RUN_SETTLED_STATUSES = new Set(["accepted", "failed"]);
 
@@ -130,6 +134,17 @@ export async function fetchLedger(sessionId: string) {
   };
 }
 
+export async function fetchReconstructionProgress(sessionId: string, reconstructionRunId: string) {
+  const response = await getReconstructionProgress(new Request("http://localhost") as never, {
+    params: Promise.resolve({ sessionId, reconstructionRunId })
+  });
+
+  return {
+    response,
+    body: await response.json()
+  };
+}
+
 export async function fetchLedgerRecord(sessionId: string, ledgerRecordId: string) {
   const response = await getLedgerRecordDetail(new Request("http://localhost") as never, {
     params: Promise.resolve({ sessionId, ledgerRecordId })
@@ -154,6 +169,39 @@ export async function fetchAccounting(sessionId: string) {
   const response = await getAccountingSnapshot(new Request("http://localhost") as never, {
     params: Promise.resolve({ sessionId })
   });
+  return {
+    response,
+    body: await response.json()
+  };
+}
+
+export async function fetchAccountingBootstrap(sessionId: string) {
+  const response = await getAccountingBootstrap(new Request("http://localhost") as never, {
+    params: Promise.resolve({ sessionId })
+  });
+
+  return {
+    response,
+    body: await response.json()
+  };
+}
+
+export async function fetchAccountingTimeSeries(sessionId: string) {
+  const response = await getAccountingTimeSeries(new Request("http://localhost") as never, {
+    params: Promise.resolve({ sessionId })
+  });
+
+  return {
+    response,
+    body: await response.json()
+  };
+}
+
+export async function fetchAccountingRebalanceFlows(sessionId: string) {
+  const response = await getAccountingRebalanceFlows(new Request("http://localhost") as never, {
+    params: Promise.resolve({ sessionId })
+  });
+
   return {
     response,
     body: await response.json()

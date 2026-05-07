@@ -9,6 +9,7 @@ import { SessionRepository } from "@/domains/wallet-session/repositories/session
 const RUNNING_RECONSTRUCTION_STATUSES = new Set(["pending", "ingesting", "normalizing", "projecting"]);
 const INTERRUPTED_RECONSTRUCTION_RUN_ERROR =
   "Reconstruction run was superseded after its worker stopped. A new reconstruction run resumed from the latest checkpoint.";
+const DEFAULT_INITIAL_LIVE_LOOKBACK_BLOCKS = 250_000n;
 const NOOP_WALLET_DISCOVERY_CHECKPOINT_REPOSITORY: Pick<WalletDiscoveryCheckpointRepository, "findByWallet"> = {
   async findByWallet() {
     return null;
@@ -120,6 +121,20 @@ export class ReconstructionRunService {
     return this.reconstructionRunRepository.findLatestAcceptedBySession(analysisSessionId);
   }
 
+  private getInitialLiveLookbackBlocks() {
+    const configured = process.env.INITIAL_LIVE_LOOKBACK_BLOCKS?.trim();
+    if (!configured) {
+      return DEFAULT_INITIAL_LIVE_LOOKBACK_BLOCKS;
+    }
+
+    try {
+      const parsed = BigInt(configured);
+      return parsed >= 0n ? parsed : DEFAULT_INITIAL_LIVE_LOOKBACK_BLOCKS;
+    } catch {
+      return DEFAULT_INITIAL_LIVE_LOOKBACK_BLOCKS;
+    }
+  }
+
   private async resolveRunRange(input: {
     analysisSessionId: string;
     mode: "initial" | "incremental" | "replay";
@@ -145,8 +160,12 @@ export class ReconstructionRunService {
       ?? latestAcceptedRun?.fromBlock
       ?? null;
     const resolvedFromBlock = input.fromBlock ?? (
-      input.mode !== "replay" && latestProcessedBlock != null
-        ? latestProcessedBlock + 1n
+      input.mode !== "replay"
+        ? latestProcessedBlock != null
+          ? latestProcessedBlock + 1n
+          : resolvedToBlock > this.getInitialLiveLookbackBlocks()
+            ? resolvedToBlock - this.getInitialLiveLookbackBlocks()
+            : 0n
         : 0n
     );
 

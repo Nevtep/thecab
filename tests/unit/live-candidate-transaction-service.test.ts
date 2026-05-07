@@ -96,32 +96,19 @@ describe("live candidate transaction service", () => {
   });
 
   it("prefers the indexed provider when configured", async () => {
-    const provider = {
-      providerKey: "basescan_v2",
-      isConfigured: vi.fn().mockReturnValue(true),
-      discover: vi.fn().mockResolvedValue([
-        {
-          txHash: "0x1111",
-          blockNumber: 10n,
-          transactionIndex: 1,
-          sourceKind: "native",
-          timestamp: null
-        },
-        {
-          txHash: "0x2222",
-          blockNumber: 11n,
-          transactionIndex: 0,
-          sourceKind: "erc20",
-          timestamp: null
-        }
-      ])
+    const providerChainOrchestrator = {
+      discoverWithFallback: vi.fn().mockResolvedValue({
+        txHashes: ["0x1111", "0x2222"],
+        providerKey: "basescan_v2",
+        providerCursor: null
+      })
     };
     const fallback = {
       providerKey: "rpc_logs",
       discover: vi.fn()
     };
 
-    const service = new LiveCandidateTransactionService(provider as never, fallback as never);
+    const service = new LiveCandidateTransactionService(providerChainOrchestrator as never, fallback as never);
     const result = await service.discover({
       walletAddress: "0xabc",
       fromBlock: 0n,
@@ -130,6 +117,7 @@ describe("live candidate transaction service", () => {
 
     expect(result.txHashes).toEqual(["0x1111", "0x2222"]);
     expect(result.providerKey).toBe("basescan_v2");
+    expect(providerChainOrchestrator.discoverWithFallback).toHaveBeenCalled();
     expect(fallback.discover).not.toHaveBeenCalled();
   });
 });

@@ -58,6 +58,7 @@ export function ConnectedWalletAnalysisView({ sessionId }: ConnectedWalletAnalys
   const { switchChainAsync, isPending: isSwitching } = useSwitchChain();
   const latestRunProgress = formatRunProgress(analysis.sessionStatus?.latestRun ?? null);
   const latestAcceptedRun = analysis.sessionStatus?.latestAcceptedRun ?? null;
+  const bootstrap = analysis.accountingBootstrap;
 
   const switchToBase = async () => {
     if (switchConnectedWalletTestOverrideToBase()) {
@@ -99,6 +100,21 @@ export function ConnectedWalletAnalysisView({ sessionId }: ConnectedWalletAnalys
           <p>
             Latest indexed snapshot: <strong>{formatBlockNumber(latestAcceptedRun.fromBlock)}</strong> to <strong>{formatBlockNumber(latestAcceptedRun.checkpointBlock ?? latestAcceptedRun.toBlock)}</strong>
           </p>
+        ) : null}
+
+        {bootstrap ? (
+          <div>
+            <p>
+              Bootstrap state: <strong>{bootstrap.bootstrapState}</strong>
+            </p>
+            {bootstrap.snapshot ? (
+              <p>
+                Bootstrap portfolio value: <strong>{bootstrap.snapshot.totalValue.amount} {bootstrap.snapshot.totalValue.currency.toUpperCase()}</strong>
+              </p>
+            ) : (
+              <p>Bootstrap snapshot not available yet.</p>
+            )}
+          </div>
         ) : null}
 
         {analysis.state === "stale_context" ? (

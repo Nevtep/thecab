@@ -50,4 +50,38 @@ describe("reconstruction run service", () => {
       8453
     );
   });
+
+  it("starts first live runs from an initial lookback window instead of block zero", async () => {
+    const sessionRepository = {
+      findById: vi.fn().mockResolvedValue({
+        analysisSessionId: "session_1",
+        walletAddress: "0x1000000000000000000000000000000000000001",
+        chainId: 8453
+      })
+    };
+    const reconstructionRunRepository = {
+      findLatestBySession: vi.fn().mockResolvedValue(null),
+      findLatestAcceptedBySession: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockImplementation(async (input) => input),
+      updateStatus: vi.fn()
+    };
+    const walletDiscoveryCheckpointRepository = {
+      findByWallet: vi.fn().mockResolvedValue(null)
+    };
+
+    const service = new ReconstructionRunService(
+      reconstructionRunRepository as never,
+      sessionRepository as never,
+      walletDiscoveryCheckpointRepository as never
+    );
+
+    const run = await service.startPendingRun({
+      analysisSessionId: "session_1",
+      mode: "initial",
+      toBlock: 1_000_000n
+    });
+
+    expect(run.fromBlock).toBe(750_000n);
+    expect(run.toBlock).toBe(1_000_000n);
+  });
 });

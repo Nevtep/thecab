@@ -63,8 +63,9 @@ describe("basescan wallet activity provider", () => {
       toBlock: 100n
     });
 
-    expect(result.map((activity) => activity.txHash)).toEqual(["0xaaa", "0xbbb", "0xccc", "0xddd"]);
-    expect(result.find((activity) => activity.txHash === "0xbbb")?.transactionIndex).toBe(2);
+    expect(result.activities.map((activity) => activity.txHash)).toEqual(["0xaaa", "0xbbb", "0xccc", "0xddd"]);
+    expect(result.activities.find((activity) => activity.txHash === "0xbbb")?.transactionIndex).toBe(2);
+    expect(result.providerCursor).toBeNull();
     expect(fetchMock).toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("chainid=8453"));
   });

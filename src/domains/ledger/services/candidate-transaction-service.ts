@@ -8,6 +8,7 @@ export type CandidateDiscoveryResult = {
   fixtureWallet: FixtureWalletMetadata | null;
   observationCorpus: FixtureObservation[];
   providerKey: string | null;
+  providerCursor?: string | null;
 };
 
 export class CandidateTransactionService {
@@ -21,6 +22,7 @@ export class CandidateTransactionService {
     fromBlock: bigint;
     toBlock: bigint;
     mode: ReconstructionRunMode;
+    providerCursor?: string | null;
   }): Promise<CandidateDiscoveryResult> {
     if (input.mode === "replay") {
       return this.replayCandidateTransactionService.discover(input);

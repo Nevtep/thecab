@@ -6,6 +6,7 @@ import { useAccount, useChainId } from "wagmi";
 import { base } from "wagmi/chains";
 
 import {
+  type AccountingBootstrapResponse,
   type AccountingResponse,
 } from "@/domains/accounting/contracts/accounting-api-schemas";
 import {
@@ -85,6 +86,7 @@ export type ConnectedWalletAnalysisResult = {
   sessionStatus: SessionStatusResponse | null;
   projection: LedgerProjectionResponse | null;
   accounting: AccountingResponse | null;
+  accountingBootstrap: AccountingBootstrapResponse | null;
   discardedActivity: DiscardedActivityListResponse | null;
   isLoadingSession: boolean;
   isLoadingProjection: boolean;
@@ -144,6 +146,10 @@ export function buildDiscardedActivityQueryKey(sessionId: string) {
 
 export function buildAccountingQueryKey(sessionId: string) {
   return ["analysis-session", sessionId, "accounting"] as const;
+}
+
+export function buildAccountingBootstrapQueryKey(sessionId: string) {
+  return ["analysis-session", sessionId, "accounting-bootstrap"] as const;
 }
 
 export function buildConnectedWalletSessionGuard(input: {
@@ -531,6 +537,27 @@ export function useAccountingQuery(sessionId: string | null, enabled: boolean) {
   });
 }
 
+export function useAccountingBootstrapQuery(sessionId: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: sessionId ? buildAccountingBootstrapQueryKey(sessionId) : ["analysis-session", "idle", "accounting-bootstrap"],
+    enabled: Boolean(sessionId) && enabled,
+    queryFn: async () => {
+      if (!sessionId) {
+        throw new Error("A session id is required to query accounting bootstrap.");
+      }
+
+      const response = await fetch(`/api/analysis-sessions/${sessionId}/accounting/bootstrap`);
+      const payload = await readJson<AccountingBootstrapResponse & ApiErrorResponse>(response);
+
+      if (!response.ok || !payload.contractVersion) {
+        throw new Error(payload.error ?? "Unable to load accounting bootstrap.");
+      }
+
+      return payload;
+    }
+  });
+}
+
 export function shouldAutoStartConnectedWalletReconstruction(
   sessionStatus: SessionStatusResponse | null
 ) {
@@ -613,6 +640,10 @@ export function useConnectedWalletAnalysis(sessionId: string): ConnectedWalletAn
   const accountingQuery = useAccountingQuery(
     sessionId,
     !hasAnalysisTestOverride && Boolean(sessionStatusQuery.data?.hasAcceptedProjection) && guard.isCurrent
+  );
+  const accountingBootstrapQuery = useAccountingBootstrapQuery(
+    sessionId,
+    !hasAnalysisTestOverride && guard.isCurrent
   );
   const [refreshRequestSignature, setRefreshRequestSignature] = useState<string | null>(null);
   const [hasAutoRecoveredFailedRun, setHasAutoRecoveredFailedRun] = useState(false);
@@ -709,6 +740,7 @@ export function useConnectedWalletAnalysis(sessionId: string): ConnectedWalletAn
       sessionStatus: analysisTestOverride.sessionStatus,
       projection: analysisTestOverride.projection,
       accounting: analysisTestOverride.accounting ?? null,
+      accountingBootstrap: null,
       discardedActivity: analysisTestOverride.discardedActivity,
       isLoadingSession: analysisTestOverride.isLoadingSession ?? false,
       isLoadingProjection: analysisTestOverride.isLoadingProjection ?? false,
@@ -734,6 +766,7 @@ export function useConnectedWalletAnalysis(sessionId: string): ConnectedWalletAn
     sessionStatus: sessionStatusQuery.data ?? null,
     projection: projectionQuery.data ?? null,
     accounting: accountingQuery.data ?? null,
+    accountingBootstrap: accountingBootstrapQuery.data ?? null,
     discardedActivity: discardedActivityQuery.data ?? null,
     isLoadingSession: sessionStatusQuery.isLoading,
     isLoadingProjection: projectionQuery.isLoading,
@@ -746,6 +779,7 @@ export function useConnectedWalletAnalysis(sessionId: string): ConnectedWalletAn
     errorMessage:
       (sessionStatusQuery.error as Error | null)?.message ??
       (projectionQuery.error as Error | null)?.message ??
+      (accountingBootstrapQuery.error as Error | null)?.message ??
       (accountingQuery.error as Error | null)?.message ??
       (discardedActivityQuery.error as Error | null)?.message ??
       startReconstruction.error?.message ??

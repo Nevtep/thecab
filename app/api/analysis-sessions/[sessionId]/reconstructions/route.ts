@@ -13,6 +13,8 @@ import { markReconstructionRunActive } from "@/domains/ledger/services/active-re
 import { ReconstructionExecutor } from "@/domains/ledger/services/reconstruction-executor";
 import { ReconstructionRunRepository } from "@/domains/ledger/repositories/reconstruction-run-repository";
 import { RawObservationRepository } from "@/domains/ledger/repositories/raw-observation-repository";
+import { DiscoveredActivityRepository } from "@/domains/ledger/repositories/discovered-activity-repository";
+import { HydrationJobStateRepository } from "@/domains/ledger/repositories/hydration-job-state-repository";
 import { LedgerNormalizationService } from "@/domains/ledger/services/ledger-normalization-service";
 import { SessionRepository } from "@/domains/wallet-session/repositories/session-repository";
 import { getDb } from "@/infrastructure/db/client";
@@ -40,6 +42,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const reconstructionExecutor = new ReconstructionExecutor(
       sessionRepository,
       new RawObservationRepository(db),
+      new DiscoveredActivityRepository(db),
+      new HydrationJobStateRepository(db),
       reconstructionRunService,
       new LedgerNormalizationService(new LedgerOutputRepository(db)),
       new AnalysisSessionStateRepository(db),

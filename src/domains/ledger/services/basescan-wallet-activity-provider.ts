@@ -2,6 +2,7 @@ import { logger } from "@/infrastructure/observability/logger";
 
 import {
   type DiscoveredWalletActivity,
+  type WalletActivityDiscoveryResult,
   type WalletActivityDiscoveryProvider
 } from "@/domains/ledger/services/wallet-activity-discovery-provider";
 
@@ -35,7 +36,8 @@ export class BasescanWalletActivityProvider implements WalletActivityDiscoveryPr
     walletAddress: string;
     fromBlock: bigint;
     toBlock: bigint;
-  }): Promise<DiscoveredWalletActivity[]> {
+    providerCursor?: string | null;
+  }): Promise<WalletActivityDiscoveryResult> {
     const walletAddress = input.walletAddress.toLowerCase();
     const responses = await Promise.all([
       this.collectAction("txlist", walletAddress, input.fromBlock, input.toBlock),
@@ -53,7 +55,10 @@ export class BasescanWalletActivityProvider implements WalletActivityDiscoveryPr
       }
     }
 
-    return [...ordered.values()].sort((left, right) => this.compareActivity(left, right));
+    return {
+      activities: [...ordered.values()].sort((left, right) => this.compareActivity(left, right)),
+      providerCursor: null
+    };
   }
 
   private async collectAction(

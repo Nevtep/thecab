@@ -36,6 +36,29 @@ export const reconstructionRunResponseSchema = z.object({
   errorSummary: z.string().min(1).nullable()
 });
 
+export const reconstructionProgressResponseSchema = z.object({
+  reconstructionRunId: z.string().min(1),
+  sessionId: z.string().min(1),
+  runMode: z.enum(["initial", "incremental", "replay"]),
+  status: z.enum(["pending", "ingesting", "normalizing", "projecting", "accepted", "failed"]),
+  fromBlock: z.number().int().nullable(),
+  toBlock: z.number().int().nullable(),
+  checkpointBlock: z.number().int().nullable(),
+  latestProcessedBlock: z.number().int().nullable(),
+  progressPercent: z.number().int().min(0).max(100).nullable(),
+  startedAt: z.string().datetime(),
+  completedAt: z.string().datetime().nullable(),
+  errorSummary: z.string().min(1).nullable(),
+  hydration: z.object({
+    queued: z.number().int().nonnegative(),
+    processing: z.number().int().nonnegative(),
+    retry: z.number().int().nonnegative(),
+    hydrated: z.number().int().nonnegative(),
+    failed: z.number().int().nonnegative(),
+    total: z.number().int().nonnegative()
+  })
+});
+
 export const sessionStatusResponseSchema = z.object({
   session: analysisSessionResponseSchema,
   latestAcceptedRun: reconstructionRunResponseSchema.nullable(),
@@ -164,6 +187,7 @@ export type CreateAnalysisSessionRequest = z.infer<typeof createAnalysisSessionR
 export type AnalysisSessionResponse = z.infer<typeof analysisSessionResponseSchema>;
 export type StartReconstructionRequest = z.infer<typeof startReconstructionRequestSchema>;
 export type ReconstructionRunResponse = z.infer<typeof reconstructionRunResponseSchema>;
+export type ReconstructionProgressResponse = z.infer<typeof reconstructionProgressResponseSchema>;
 export type SessionStatusResponse = z.infer<typeof sessionStatusResponseSchema>;
 export type LedgerProjectionResponse = z.infer<typeof ledgerProjectionResponseSchema>;
 export type DiscardedActivityListResponse = z.infer<typeof discardedActivityListResponseSchema>;
