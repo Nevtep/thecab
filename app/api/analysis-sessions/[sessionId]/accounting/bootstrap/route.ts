@@ -4,6 +4,7 @@ import {
   accountingBootstrapResponseSchema,
   accountingErrorResponseSchema
 } from "@/domains/accounting/contracts/accounting-api-schemas";
+import { DashboardCompositionService } from "@/domains/accounting/services/dashboard-composition-service";
 import { AccountingSnapshotService } from "@/domains/accounting/services/accounting-snapshot-service";
 import { AnalysisSessionStateRepository } from "@/domains/ledger/repositories/analysis-session-state-repository";
 import { LedgerOutputRepository } from "@/domains/ledger/repositories/ledger-output-repository";
@@ -19,24 +20,12 @@ type RouteContext = {
   }>;
 };
 
-const RUNNING_STATUSES = new Set(["pending", "ingesting", "normalizing", "projecting"]);
-
 export async function GET(_request: Request, context: RouteContext) {
   try {
     const { sessionId } = await context.params;
     const db = getDb();
     const sessionRepository = new SessionRepository(db);
     const reconstructionRunRepository = new ReconstructionRunRepository(db);
-
-    const [session, latestAcceptedRun, latestRun] = await Promise.all([
-      sessionRepository.findById(sessionId),
-      reconstructionRunRepository.findLatestAcceptedBySession(sessionId),
-      reconstructionRunRepository.findLatestBySession(sessionId)
-    ]);
-
-    if (!session) {
-      throw new Error("Analysis session not found.");
-    }
 
     const snapshotService = new AccountingSnapshotService(
       sessionRepository,
@@ -47,32 +36,33 @@ export async function GET(_request: Request, context: RouteContext) {
       new AnalysisSessionStateRepository(db)
     );
 
-    const snapshot = latestAcceptedRun ? await snapshotService.getLatestSnapshot(sessionId) : null;
-
-    const hasAcceptedSnapshot = Boolean(latestAcceptedRun);
-    const isReconstructionRunning = Boolean(latestRun && RUNNING_STATUSES.has(latestRun.status));
+    const composition = await new DashboardCompositionService(
+      sessionRepository,
+      reconstructionRunRepository,
+      snapshotService
+    ).composeBootstrap(sessionId);
 
     return NextResponse.json(
       accountingBootstrapResponseSchema.parse({
         contractVersion: "1.0.0",
         sessionId,
-        walletAddress: session.walletAddress,
-        chainId: session.chainId,
-        hasAcceptedSnapshot,
-        isReconstructionRunning,
-        bootstrapState: hasAcceptedSnapshot ? (isReconstructionRunning ? "warming" : "ready") : "empty",
-        snapshot,
-        latestRun: latestRun
+        walletAddress: composition.session.walletAddress,
+        chainId: composition.session.chainId,
+        hasAcceptedSnapshot: composition.hasAcceptedSnapshot,
+        isReconstructionRunning: composition.isReconstructionRunning,
+        bootstrapState: composition.bootstrapState,
+        snapshot: composition.snapshot,
+        latestRun: composition.latestRun
           ? {
-              reconstructionRunId: latestRun.reconstructionRunId,
-              runMode: latestRun.runMode,
-              status: latestRun.status,
-              fromBlock: latestRun.fromBlock == null ? null : Number(latestRun.fromBlock),
-              toBlock: latestRun.toBlock == null ? null : Number(latestRun.toBlock),
-              checkpointBlock: latestRun.checkpointBlock == null ? null : Number(latestRun.checkpointBlock),
-              startedAt: latestRun.startedAt.toISOString(),
-              completedAt: latestRun.completedAt?.toISOString() ?? null,
-              errorSummary: latestRun.errorSummary ?? null
+              reconstructionRunId: composition.latestRun.reconstructionRunId,
+              runMode: composition.latestRun.runMode,
+              status: composition.latestRun.status,
+              fromBlock: composition.latestRun.fromBlock == null ? null : Number(composition.latestRun.fromBlock),
+              toBlock: composition.latestRun.toBlock == null ? null : Number(composition.latestRun.toBlock),
+              checkpointBlock: composition.latestRun.checkpointBlock == null ? null : Number(composition.latestRun.checkpointBlock),
+              startedAt: composition.latestRun.startedAt.toISOString(),
+              completedAt: composition.latestRun.completedAt?.toISOString() ?? null,
+              errorSummary: composition.latestRun.errorSummary ?? null
             }
           : null
       })

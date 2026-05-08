@@ -21,5 +21,16 @@ describe("accounting breakdown flow", () => {
     );
 
     expect(strategyTotal.toFixed(4)).toBe(body.pools[0].currentValue.amount);
+
+    const strategyTypes = new Set(body.pools[0].strategies.map((strategy: any) => strategy.strategyType));
+    expect(strategyTypes.has("manual")).toBe(true);
+    expect(strategyTypes.has("mellow_auto")).toBe(true);
+
+    const poolTotal = body.pools.reduce(
+      (total: number, pool: any) => total + Number(pool.currentValue.amount),
+      0
+    );
+    const totalWithIdle = poolTotal + Number(body.idleBalanceValue.amount);
+    expect(totalWithIdle.toFixed(4)).toBe(body.totalValue.amount);
   });
 });

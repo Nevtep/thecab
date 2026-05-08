@@ -20,15 +20,23 @@ Copy `.env.example` to `.env.local` and provide the required values:
 - `BASE_TRACE_RPC_URL` if trace-capable fallback access is available
 - `NEXT_PUBLIC_BASE_RPC_URL` for the browser wallet runtime transport on Base
 - `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` for WalletConnect in the browser UI
-- `PRICE_PROVIDER_BASE_URL` for the historical or current price source base URL
-- `PRICE_PROVIDER_API_KEY` if the configured price source requires authentication
+- `PRICE_PROVIDER_BASE_URL` for the Alchemy pricing API base URL (default `https://api.g.alchemy.com/prices/v1`)
+- `PRICE_PROVIDER_API_KEY` for Alchemy pricing API authentication
 - `MORALIS_API_KEY` for indexed wallet activity discovery primary provider
-- `ALCHEMY_API_KEY` for indexed wallet activity discovery supplemental provider
-- `DISCOVERY_PROVIDER_ORDER` optional provider cascade override, default `moralis,alchemy,basescan`
+- `ALCHEMY_API_KEY` for Alchemy APIs (RPC and pricing)
+- `DISCOVERY_PROVIDER_ORDER` optional provider cascade override, default `moralis,basescan`
 - `INITIAL_LIVE_LOOKBACK_BLOCKS` optional first live run lookback window (default 250000)
 - `HYDRATION_WORKER_BATCH_SIZE` optional hydration claim batch size (default 25)
 - `HYDRATION_WORKER_CONCURRENCY` optional parallel hydration worker count per batch (default 4)
 - `HYDRATION_WORKER_MAX_ATTEMPTS` optional max hydration attempts before terminal failure (default 2)
+
+## Provider Policy
+
+- Wallet recovery and indexed discovery must use Moralis as the primary provider.
+- Wallet recovery fallback must use BaseScan.
+- Pricing must use Alchemy.
+- No additional providers may be introduced without explicit clarification and approval.
+- If a requirement is generic or ambiguous about providers, treat it as `NEEDS CLARIFICATION` and resolve it before implementation.
 
 The automated test helpers default to a local database at `postgres://postgres:postgres@localhost:5432/the_cab`.
 
@@ -80,13 +88,21 @@ The minimal inspection surface is available at `/ledger` and can be queried with
 
 Connected-wallet inspection now distinguishes session loading, live reconstruction, refresh-with-latest, empty, failure, and stale wallet or chain recovery states while keeping discarded activity reviewable from the same ledger flow.
 
+Connected-wallet dashboard rendering also includes historical portfolio value points, pool deployed-capital series, accepted-run timeline markers, and rebalance flow links with confidence and explanation metadata.
+
 The `/api/analysis-sessions/{sessionId}/accounting` route now returns the latest portfolio snapshot over the accepted ledger run, including current total value, capital entered and withdrawn, unrealized PnL, idle balances, pool and strategy breakdowns, and explicit coverage metadata.
 
 The `/api/analysis-sessions/{sessionId}/accounting/bootstrap` route returns fast-first accounting context (`empty`, `warming`, `ready`) plus snapshot payload when an accepted run exists.
 
 The `/api/analysis-sessions/{sessionId}/accounting/time-series` route returns an extensible chart surface with portfolio series points, pool series points, and classified event markers.
 
+Time-series responses now include explicit `seriesState` (`empty`, `partial`, `ready`) plus `partialReasonCodes` so sparse historical coverage remains visible without hiding known points.
+
 The `/api/analysis-sessions/{sessionId}/accounting/rebalance-flows` route returns inferred cross-pool flow links for explainability and future rebalance panels.
+
+The `/api/analysis-sessions/{sessionId}/dashboard/pools` and `/api/analysis-sessions/{sessionId}/dashboard/pools/{poolId}` routes expose pool-first drilldowns with strategy-level reconciliation checks.
+
+The `/api/analysis-sessions/{sessionId}/dashboard/timeline` route exposes accepted-run timeline markers aligned with accounting historical markers.
 
 The `/api/analysis-sessions/{sessionId}/reconstructions/{runId}/progress` route now includes hydration lifecycle counters (`queued`, `processing`, `retry`, `hydrated`, `failed`).
 

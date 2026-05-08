@@ -7,7 +7,10 @@ import { base } from "wagmi/chains";
 
 import {
   type AccountingBootstrapResponse,
+  type AccountingRebalanceFlowsResponse,
   type AccountingResponse,
+  type AccountingTimeSeriesResponse,
+  type DashboardDisplayState,
 } from "@/domains/accounting/contracts/accounting-api-schemas";
 import {
   type AnalysisSessionResponse,
@@ -33,6 +36,9 @@ export type ConnectedWalletAnalysisTestOverride = {
   sessionStatus: SessionStatusResponse | null;
   projection: LedgerProjectionResponse | null;
   accounting?: AccountingResponse | null;
+  accountingBootstrap?: AccountingBootstrapResponse | null;
+  accountingTimeSeries?: AccountingTimeSeriesResponse | null;
+  accountingRebalanceFlows?: AccountingRebalanceFlowsResponse | null;
   discardedActivity: DiscardedActivityListResponse | null;
   errorMessage?: string | null;
   isLoadingSession?: boolean;
@@ -81,12 +87,15 @@ export type ConnectedWalletStaleContextRecovery = {
 
 export type ConnectedWalletAnalysisResult = {
   state: LedgerEntryViewState;
+  dashboardDisplayState: DashboardDisplayState;
   guard: SessionContextGuard;
   connectedWallet: ConnectedWalletContext;
   sessionStatus: SessionStatusResponse | null;
   projection: LedgerProjectionResponse | null;
   accounting: AccountingResponse | null;
   accountingBootstrap: AccountingBootstrapResponse | null;
+  accountingTimeSeries: AccountingTimeSeriesResponse | null;
+  accountingRebalanceFlows: AccountingRebalanceFlowsResponse | null;
   discardedActivity: DiscardedActivityListResponse | null;
   isLoadingSession: boolean;
   isLoadingProjection: boolean;
@@ -105,6 +114,41 @@ const CONNECTED_WALLET_TEST_OVERRIDE_EVENT = "thecab:test-wallet-changed";
 const CONNECTED_WALLET_ANALYSIS_TEST_OVERRIDE_EVENT = "thecab:test-analysis-changed";
 const RUNNING_RECONSTRUCTION_STATUSES = ["pending", "ingesting", "normalizing", "projecting"] as const;
 const AUTO_REFRESH_INTERVAL_MS = 15_000;
+
+function mapLedgerStateToDashboardDisplayState(state: LedgerEntryViewState): DashboardDisplayState {
+  switch (state) {
+    case "session_loading":
+    case "reconstruction_running":
+      return "loading";
+    case "failure":
+      return "failure";
+    case "empty":
+      return "empty";
+    case "refreshing_with_latest":
+      return "partial";
+    default:
+      return "ready";
+  }
+}
+
+function mapBootstrapStateToDashboardDisplayState(
+  bootstrapState: AccountingBootstrapResponse["bootstrapState"] | null | undefined,
+  fallback: DashboardDisplayState
+): DashboardDisplayState {
+  if (bootstrapState === "empty") {
+    return "empty";
+  }
+
+  if (bootstrapState === "warming") {
+    return "partial";
+  }
+
+  if (bootstrapState === "ready") {
+    return "ready";
+  }
+
+  return fallback;
+}
 
 function isRunningReconstructionStatus(
   status: ReconstructionRunResponse["status"] | null | undefined
@@ -150,6 +194,14 @@ export function buildAccountingQueryKey(sessionId: string) {
 
 export function buildAccountingBootstrapQueryKey(sessionId: string) {
   return ["analysis-session", sessionId, "accounting-bootstrap"] as const;
+}
+
+export function buildAccountingTimeSeriesQueryKey(sessionId: string) {
+  return ["analysis-session", sessionId, "accounting-time-series"] as const;
+}
+
+export function buildAccountingRebalanceFlowsQueryKey(sessionId: string) {
+  return ["analysis-session", sessionId, "accounting-rebalance-flows"] as const;
 }
 
 export function buildConnectedWalletSessionGuard(input: {
@@ -558,6 +610,50 @@ export function useAccountingBootstrapQuery(sessionId: string | null, enabled: b
   });
 }
 
+export function useAccountingTimeSeriesQuery(sessionId: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: sessionId ? buildAccountingTimeSeriesQueryKey(sessionId) : ["analysis-session", "idle", "accounting-time-series"],
+    enabled: Boolean(sessionId) && enabled,
+    queryFn: async () => {
+      if (!sessionId) {
+        throw new Error("A session id is required to query accounting time series.");
+      }
+
+      const response = await fetch(`/api/analysis-sessions/${sessionId}/accounting/time-series`);
+      const payload = await readJson<AccountingTimeSeriesResponse & ApiErrorResponse>(response);
+
+      if (!response.ok || !payload.contractVersion) {
+        throw new Error(payload.error ?? "Unable to load accounting time series.");
+      }
+
+      return payload;
+    }
+  });
+}
+
+export function useAccountingRebalanceFlowsQuery(sessionId: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: sessionId
+      ? buildAccountingRebalanceFlowsQueryKey(sessionId)
+      : ["analysis-session", "idle", "accounting-rebalance-flows"],
+    enabled: Boolean(sessionId) && enabled,
+    queryFn: async () => {
+      if (!sessionId) {
+        throw new Error("A session id is required to query accounting rebalance flows.");
+      }
+
+      const response = await fetch(`/api/analysis-sessions/${sessionId}/accounting/rebalance-flows`);
+      const payload = await readJson<AccountingRebalanceFlowsResponse & ApiErrorResponse>(response);
+
+      if (!response.ok || !payload.contractVersion) {
+        throw new Error(payload.error ?? "Unable to load accounting rebalance flows.");
+      }
+
+      return payload;
+    }
+  });
+}
+
 export function shouldAutoStartConnectedWalletReconstruction(
   sessionStatus: SessionStatusResponse | null
 ) {
@@ -637,13 +733,27 @@ export function useConnectedWalletAnalysis(sessionId: string): ConnectedWalletAn
     sessionId,
     !hasAnalysisTestOverride && Boolean(sessionStatusQuery.data?.hasAcceptedProjection) && guard.isCurrent
   );
-  const accountingQuery = useAccountingQuery(
-    sessionId,
-    !hasAnalysisTestOverride && Boolean(sessionStatusQuery.data?.hasAcceptedProjection) && guard.isCurrent
-  );
   const accountingBootstrapQuery = useAccountingBootstrapQuery(
     sessionId,
     !hasAnalysisTestOverride && guard.isCurrent
+  );
+  const accountingQuery = useAccountingQuery(
+    sessionId,
+    !hasAnalysisTestOverride &&
+      Boolean(sessionStatusQuery.data?.hasAcceptedProjection) &&
+      guard.isCurrent &&
+      Boolean(
+        accountingBootstrapQuery.data?.hasAcceptedSnapshot &&
+          accountingBootstrapQuery.data.bootstrapState !== "empty"
+      )
+  );
+  const accountingTimeSeriesQuery = useAccountingTimeSeriesQuery(
+    sessionId,
+    !hasAnalysisTestOverride && Boolean(sessionStatusQuery.data?.hasAcceptedProjection) && guard.isCurrent
+  );
+  const accountingRebalanceFlowsQuery = useAccountingRebalanceFlowsQuery(
+    sessionId,
+    !hasAnalysisTestOverride && Boolean(sessionStatusQuery.data?.hasAcceptedProjection) && guard.isCurrent
   );
   const [refreshRequestSignature, setRefreshRequestSignature] = useState<string | null>(null);
   const [hasAutoRecoveredFailedRun, setHasAutoRecoveredFailedRun] = useState(false);
@@ -735,12 +845,19 @@ export function useConnectedWalletAnalysis(sessionId: string): ConnectedWalletAn
 
     return {
       state: derivedState.state,
+      dashboardDisplayState:
+        mapBootstrapStateToDashboardDisplayState(
+          analysisTestOverride.accountingBootstrap?.bootstrapState,
+          mapLedgerStateToDashboardDisplayState(derivedState.state)
+        ),
       guard: derivedState.guard,
       connectedWallet,
       sessionStatus: analysisTestOverride.sessionStatus,
       projection: analysisTestOverride.projection,
       accounting: analysisTestOverride.accounting ?? null,
-      accountingBootstrap: null,
+      accountingBootstrap: analysisTestOverride.accountingBootstrap ?? null,
+      accountingTimeSeries: analysisTestOverride.accountingTimeSeries ?? null,
+      accountingRebalanceFlows: analysisTestOverride.accountingRebalanceFlows ?? null,
       discardedActivity: analysisTestOverride.discardedActivity,
       isLoadingSession: analysisTestOverride.isLoadingSession ?? false,
       isLoadingProjection: analysisTestOverride.isLoadingProjection ?? false,
@@ -761,12 +878,19 @@ export function useConnectedWalletAnalysis(sessionId: string): ConnectedWalletAn
 
   return {
     state: derivedState.state,
+    dashboardDisplayState:
+      mapBootstrapStateToDashboardDisplayState(
+        accountingBootstrapQuery.data?.bootstrapState,
+        mapLedgerStateToDashboardDisplayState(derivedState.state)
+      ),
     guard: derivedState.guard,
     connectedWallet,
     sessionStatus: sessionStatusQuery.data ?? null,
     projection: projectionQuery.data ?? null,
     accounting: accountingQuery.data ?? null,
     accountingBootstrap: accountingBootstrapQuery.data ?? null,
+    accountingTimeSeries: accountingTimeSeriesQuery.data ?? null,
+    accountingRebalanceFlows: accountingRebalanceFlowsQuery.data ?? null,
     discardedActivity: discardedActivityQuery.data ?? null,
     isLoadingSession: sessionStatusQuery.isLoading,
     isLoadingProjection: projectionQuery.isLoading,
@@ -780,6 +904,8 @@ export function useConnectedWalletAnalysis(sessionId: string): ConnectedWalletAn
       (sessionStatusQuery.error as Error | null)?.message ??
       (projectionQuery.error as Error | null)?.message ??
       (accountingBootstrapQuery.error as Error | null)?.message ??
+      (accountingTimeSeriesQuery.error as Error | null)?.message ??
+      (accountingRebalanceFlowsQuery.error as Error | null)?.message ??
       (accountingQuery.error as Error | null)?.message ??
       (discardedActivityQuery.error as Error | null)?.message ??
       startReconstruction.error?.message ??

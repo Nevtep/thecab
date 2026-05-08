@@ -74,6 +74,9 @@ export class AccountingRebalanceFlowService {
         }
 
         const flowId = `${txHash}:${current.ledgerRecordId}->${next.ledgerRecordId}`;
+        const usesExplicitRebalanceEvent =
+          current.eventType.toLowerCase().includes("rebalance") ||
+          next.eventType.toLowerCase().includes("rebalance");
         flows.push({
           flowId,
           txHash,
@@ -83,8 +86,10 @@ export class AccountingRebalanceFlowService {
           toEventType: next.eventType,
           blockNumber: Number(next.blockNumber),
           timestamp: next.timestamp.toISOString(),
-          confidence: "heuristic",
-          explanation: "Cross-pool movement inferred from sequential canonical ledger events in the same transaction."
+          confidence: usesExplicitRebalanceEvent ? "high" : "heuristic",
+          explanation: usesExplicitRebalanceEvent
+            ? "Cross-pool movement inferred from canonical events containing explicit rebalance semantics."
+            : "Cross-pool movement inferred from sequential canonical ledger events in the same transaction."
         });
       }
     }

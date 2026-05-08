@@ -85,3 +85,91 @@ test("renders partial coverage, fallback disclosure, and discarded activity", as
   await expect(page.getByText("unsupported_protocol")).toBeVisible();
   await expect(page.getByText("Discarded Activity")).toBeVisible();
 });
+
+test("renders historical portfolio series and accepted-run timeline markers", async ({ page }) => {
+  await installConnectedWalletTestOverride(page, {
+    walletAddress: "0x2000000000000000000000000000000000000002",
+    chainId: 8453
+  });
+  await installConnectedWalletAnalysisTestOverride(page, {
+    sessionId: "session_historical_series",
+    payload: {
+      sessionStatus: {
+        session: { sessionId: "session_historical_series", walletAddress: "0x2000000000000000000000000000000000000002", chainId: 8453, status: "active", reusedSession: true, latestAcceptedRunId: "run_hist" },
+        latestAcceptedRun: { reconstructionRunId: "run_hist", sessionId: "session_historical_series", runMode: "initial", status: "accepted", classifierVersion: "2026-04-19.1", heuristicsVersion: "2026-04-19.1", fromBlock: 1, toBlock: 4, startedAt: "2026-04-19T17:00:00.000Z", completedAt: "2026-04-19T17:00:10.000Z", errorSummary: null },
+        lastFailure: null,
+        latestRun: { reconstructionRunId: "run_hist", sessionId: "session_historical_series", runMode: "initial", status: "accepted", classifierVersion: "2026-04-19.1", heuristicsVersion: "2026-04-19.1", fromBlock: 1, toBlock: 4, startedAt: "2026-04-19T17:00:00.000Z", completedAt: "2026-04-19T17:00:10.000Z", errorSummary: null },
+        hasAcceptedProjection: true
+      },
+      projection: {
+        contractVersion: "1.0.0",
+        classifierVersion: "2026-04-19.1",
+        heuristicsVersion: "2026-04-19.1",
+        sourceBlockRange: { fromBlock: 1, toBlock: 4 },
+        pools: [
+          {
+            poolId: "pool_hist",
+            displayName: "WETH / USDC",
+            poolAddress: "0xpoolhist",
+            strategies: [
+              { strategyId: "strategy_hist", strategyType: "manual", sourceContractAddress: "0xmanual", positions: [{ positionInstanceId: "position_hist", positionType: "manual_cl", status: "open", identityReference: "501", ledgerRecords: [] }] }
+            ]
+          }
+        ],
+        residualHoldings: [],
+        discardedSummary: { totalCount: 0, byReasonType: {} }
+      },
+      accounting: {
+        contractVersion: "1.0.0",
+        sessionId: "session_historical_series",
+        acceptedRunId: "run_hist",
+        asOf: "2026-04-19T17:00:10.000Z",
+        quoteCurrency: "usd",
+        totalValue: { currency: "usd", amount: "4290.0000" },
+        capitalEntered: { currency: "usd", amount: "4200.0000" },
+        capitalWithdrawn: { currency: "usd", amount: "0.0000" },
+        realizedPnl: { currency: "usd", amount: "0.0000" },
+        unrealizedPnl: { currency: "usd", amount: "90.0000" },
+        idleBalanceValue: { currency: "usd", amount: "0.0000" },
+        coverageSummary: { coverageStatus: "full", pricedValue: { currency: "usd", amount: "4290.0000" }, excludedValue: null, unpricedComponentsCount: 0, reasonCodes: [] },
+        pools: [],
+        idleBalances: [],
+        traceRefs: { ledgerRecordIds: ["ledger_hist_1"], pricePointIds: ["price_hist_1"] }
+      },
+      accountingTimeSeries: {
+        contractVersion: "1.0.0",
+        sessionId: "session_historical_series",
+        acceptedRunId: "run_hist",
+        quoteCurrency: "usd",
+        seriesState: "partial",
+        partialReasonCodes: ["missing_asset_movements"],
+        portfolioSeries: [
+          { ledgerRecordId: "ledger_hist_1", blockNumber: 10, timestamp: "2026-04-19T12:00:00.000Z", eventType: "deposit", totalValue: { currency: "usd", amount: "1000.0000" }, coverageStatus: "full" },
+          { ledgerRecordId: "ledger_hist_2", blockNumber: 12, timestamp: "2026-04-19T12:10:00.000Z", eventType: "rebalance", totalValue: { currency: "usd", amount: "950.0000" }, coverageStatus: "partial" }
+        ],
+        poolSeries: [
+          {
+            poolId: "pool_hist",
+            displayName: "WETH / USDC",
+            points: [
+              { ledgerRecordId: "ledger_hist_1", blockNumber: 10, timestamp: "2026-04-19T12:00:00.000Z", eventType: "deposit", flowDirection: "in", deployedCapital: { currency: "usd", amount: "1000.0000" } },
+              { ledgerRecordId: "ledger_hist_2", blockNumber: 12, timestamp: "2026-04-19T12:10:00.000Z", eventType: "rebalance", flowDirection: "internal", deployedCapital: { currency: "usd", amount: "950.0000" } }
+            ]
+          }
+        ],
+        eventMarkers: [
+          { ledgerRecordId: "ledger_hist_2", blockNumber: 12, timestamp: "2026-04-19T12:10:00.000Z", markerType: "rebalance", label: "rebalance" },
+          { ledgerRecordId: "ledger_hist_3", blockNumber: 14, timestamp: "2026-04-19T12:20:00.000Z", markerType: "close", label: "close_position" }
+        ]
+      },
+      discardedActivity: { contractVersion: "1.0.0", items: [] }
+    }
+  });
+
+  await page.goto("/ledger?sessionId=session_historical_series");
+
+  await expect(page.getByText("Historical Portfolio Series")).toBeVisible();
+  await expect(page.getByText("Series state:").locator("..")).toContainText("partial");
+  await expect(page.getByText("Accepted-Run Timeline Markers")).toBeVisible();
+  await expect(page.getByText("rebalance (rebalance)")).toBeVisible();
+});

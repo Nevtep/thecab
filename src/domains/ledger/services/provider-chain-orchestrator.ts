@@ -1,10 +1,9 @@
-import { AlchemyWalletActivityProvider } from "@/domains/ledger/services/alchemy-wallet-activity-provider";
 import { BasescanWalletActivityProvider } from "@/domains/ledger/services/basescan-wallet-activity-provider";
 import { MoralisWalletActivityProvider } from "@/domains/ledger/services/moralis-wallet-activity-provider";
 import { type WalletActivityDiscoveryProvider } from "@/domains/ledger/services/wallet-activity-discovery-provider";
 import { logger } from "@/infrastructure/observability/logger";
 
-const DEFAULT_PROVIDER_ORDER = ["moralis", "alchemy", "basescan"] as const;
+const DEFAULT_PROVIDER_ORDER = ["moralis", "basescan"] as const;
 
 export type ProviderChainDiscoveryResult = {
   txHashes: string[];
@@ -16,7 +15,6 @@ export class ProviderChainOrchestrator {
   constructor(
     private readonly providersByAlias: Record<string, WalletActivityDiscoveryProvider> = {
       moralis: new MoralisWalletActivityProvider(),
-      alchemy: new AlchemyWalletActivityProvider(),
       basescan: new BasescanWalletActivityProvider()
     }
   ) {}

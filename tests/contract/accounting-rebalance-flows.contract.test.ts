@@ -39,6 +39,9 @@ describe("accounting rebalance-flows contract", () => {
       expect(first).toHaveProperty("fromPoolId");
       expect(first).toHaveProperty("toPoolId");
       expect(first).toHaveProperty("confidence");
+      expect(["heuristic", "high"]).toContain(first.confidence);
+      expect(typeof first.explanation).toBe("string");
+      expect(first.explanation.length).toBeGreaterThan(0);
     }
   });
 });

@@ -8,7 +8,7 @@ export function ensureTestEnvironment() {
   process.env.BASESCAN_API_BASE_URL ??= "https://api.etherscan.io/v2/api";
   process.env.BASESCAN_API_KEY ??= "";
   process.env.BASESCAN_PAGE_SIZE ??= "100";
-  process.env.PRICE_PROVIDER_BASE_URL ??= "https://api.coingecko.com/api/v3";
+  process.env.PRICE_PROVIDER_BASE_URL ??= "https://api.g.alchemy.com/prices/v1";
   process.env.PRICE_PROVIDER_API_KEY ??= "";
   process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ??= "test-project-id";
 }

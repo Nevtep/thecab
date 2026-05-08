@@ -14,7 +14,16 @@ Set the minimum environment needed for canonical ledger reconstruction plus pric
 - `BASE_TRACE_RPC_URL` for optional trace-capable fallback access
 - `NEXT_PUBLIC_BASE_RPC_URL` for the client wallet runtime transport
 - `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` for WalletConnect-compatible browser connectivity
-- `PRICE_PROVIDER_API_KEY` for the configured external price provider, if required by the deployment environment
+- `PRICE_PROVIDER_BASE_URL` for Alchemy pricing (default `https://api.g.alchemy.com/prices/v1`)
+- `PRICE_PROVIDER_API_KEY` for Alchemy pricing authentication
+- `MORALIS_API_KEY` for wallet recovery indexed discovery primary provider
+- `DISCOVERY_PROVIDER_ORDER` defaulting to `moralis,basescan` for discovery fallback behavior
+
+Provider policy for this feature:
+
+- Wallet recovery and indexed discovery: Moralis primary, BaseScan fallback.
+- Pricing: Alchemy only.
+- Any generic provider language must be treated as `NEEDS CLARIFICATION` before implementation.
 
 ## Local Startup
 

@@ -36,5 +36,6 @@ describe("accounting bootstrap contract", () => {
     expect(bootstrap.body.hasAcceptedSnapshot).toBe(true);
     expect(bootstrap.body.snapshot).toBeTruthy();
     expect(bootstrap.body.snapshot.quoteCurrency).toBe("usd");
+    expect(bootstrap.body.snapshot.totalValue.amount).toMatch(/^[0-9]+\.[0-9]{4}$/);
   });
 });

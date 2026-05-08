@@ -52,24 +52,16 @@ describe("provider chain orchestrator", () => {
   });
 
   it("uses provider order and returns first successful provider result", async () => {
-    process.env.DISCOVERY_PROVIDER_ORDER = "moralis,alchemy,basescan";
+    process.env.DISCOVERY_PROVIDER_ORDER = "moralis,basescan";
 
     const orchestrator = new ProviderChainOrchestrator({
       moralis: buildProvider({ key: "moralis_v2", configured: true, throws: true }),
-      alchemy: buildProvider({
-        key: "alchemy_v2",
-        configured: true,
-        discoverResult: {
-          txHashes: ["0xaaa", "0xbbb"],
-          providerCursor: "cursor_1"
-        }
-      }),
       basescan: buildProvider({
         key: "basescan_v2",
         configured: true,
         discoverResult: {
-          txHashes: ["0xccc"],
-          providerCursor: null
+          txHashes: ["0xaaa", "0xbbb"],
+          providerCursor: "cursor_1"
         }
       })
     });
@@ -83,17 +75,16 @@ describe("provider chain orchestrator", () => {
 
     expect(result).toEqual({
       txHashes: ["0xaaa", "0xbbb"],
-      providerKey: "alchemy_v2",
+      providerKey: "basescan_v2",
       providerCursor: "cursor_1"
     });
   });
 
   it("returns null when no configured provider succeeds", async () => {
-    process.env.DISCOVERY_PROVIDER_ORDER = "moralis,alchemy,basescan";
+    process.env.DISCOVERY_PROVIDER_ORDER = "moralis,basescan";
 
     const orchestrator = new ProviderChainOrchestrator({
       moralis: buildProvider({ key: "moralis_v2", configured: false }),
-      alchemy: buildProvider({ key: "alchemy_v2", configured: true, throws: true }),
       basescan: buildProvider({ key: "basescan_v2", configured: true, throws: true })
     });
 

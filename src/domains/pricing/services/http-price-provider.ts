@@ -55,29 +55,36 @@ export class HttpPriceProvider implements PriceProvider {
       });
     }
 
-    const providerAssetKey = request.asset.providerAssetKey;
-    const baseUrl = process.env.PRICE_PROVIDER_BASE_URL;
-    if (!providerAssetKey || !baseUrl) {
+    const baseUrl = process.env.PRICE_PROVIDER_BASE_URL?.trim();
+    const apiKey = process.env.PRICE_PROVIDER_API_KEY?.trim() || process.env.ALCHEMY_API_KEY?.trim();
+    if (!baseUrl || !apiKey) {
       return null;
     }
 
-    const url = new URL("simple/price", baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`);
-    url.searchParams.set("ids", providerAssetKey);
-    url.searchParams.set("vs_currencies", "usd");
+    const providerAssetKey = request.asset.providerAssetKey;
+    const symbol = this.resolvePricingSymbol(providerAssetKey, request.asset.symbol);
+    const endpoint = symbol ? "tokens/by-symbol" : "tokens/by-address";
 
-    const headers: HeadersInit = {};
-    if (process.env.PRICE_PROVIDER_API_KEY) {
-      headers["x-cg-pro-api-key"] = process.env.PRICE_PROVIDER_API_KEY;
+    const url = this.buildAlchemyPriceUrl({
+      baseUrl,
+      apiKey,
+      endpoint
+    });
+
+    if (symbol) {
+      url.searchParams.set("symbols", symbol);
+    } else {
+      url.searchParams.set("addresses", request.asset.tokenAddress.toLowerCase());
     }
 
-    const response = await fetch(url, { headers, cache: "no-store" });
+    const response = await fetch(url, { cache: "no-store" });
     if (!response.ok) {
       return null;
     }
 
-    const payload = (await response.json()) as Record<string, { usd?: number }>;
-    const usd = payload[providerAssetKey]?.usd;
-    if (typeof usd !== "number") {
+    const payload = (await response.json()) as unknown;
+    const usd = this.extractUsdPrice(payload);
+    if (!usd) {
       return null;
     }
 
@@ -85,13 +92,94 @@ export class HttpPriceProvider implements PriceProvider {
       sourceKind: "current" as const,
       effectiveAt: request.asOf,
       fetchedAt: request.asOf,
-      priceValue: usd.toString(),
+      priceValue: usd,
       resolution: "spot" as const,
       confidence: "medium" as const,
       pricingMethod: "direct" as const,
-      providerName: "coingecko",
-      providerReference: providerAssetKey
+      providerName: "alchemy",
+      providerReference: symbol ?? request.asset.tokenAddress.toLowerCase()
     };
+  }
+
+  private buildAlchemyPriceUrl(input: { baseUrl: string; apiKey: string; endpoint: string }) {
+    const normalizedBaseUrl = input.baseUrl.replace(/\/+$/, "");
+    const includesApiKey = /\/v1\/[^/]+$/.test(normalizedBaseUrl);
+    const root = includesApiKey ? normalizedBaseUrl : `${normalizedBaseUrl}/${encodeURIComponent(input.apiKey)}`;
+    return new URL(`${root}/${input.endpoint}`);
+  }
+
+  private resolvePricingSymbol(providerAssetKey: string | null, symbol: string | null) {
+    const normalizedKey = providerAssetKey?.trim().toLowerCase();
+    if (!normalizedKey && symbol) {
+      return symbol.trim().toUpperCase();
+    }
+
+    if (normalizedKey === "eth") {
+      return "ETH";
+    }
+
+    if (normalizedKey === "usd-coin") {
+      return "USDC";
+    }
+
+    if (normalizedKey?.startsWith("0x")) {
+      return null;
+    }
+
+    return normalizedKey ? normalizedKey.toUpperCase() : null;
+  }
+
+  private extractUsdPrice(payload: unknown): string | null {
+    if (!payload || typeof payload !== "object") {
+      return null;
+    }
+
+    const data = (payload as { data?: unknown }).data;
+    if (!Array.isArray(data) || data.length === 0) {
+      return null;
+    }
+
+    for (const entry of data) {
+      if (!entry || typeof entry !== "object") {
+        continue;
+      }
+
+      const price = (entry as { price?: unknown }).price;
+      if (typeof price === "number" && Number.isFinite(price)) {
+        return price.toString();
+      }
+
+      if (typeof price === "string" && price.trim().length > 0) {
+        return price;
+      }
+
+      const prices = (entry as { prices?: unknown }).prices;
+      if (!Array.isArray(prices)) {
+        continue;
+      }
+
+      for (const pricedItem of prices) {
+        if (!pricedItem || typeof pricedItem !== "object") {
+          continue;
+        }
+
+        const currency = (pricedItem as { currency?: unknown }).currency;
+        if (typeof currency === "string" && currency.toLowerCase() !== "usd") {
+          continue;
+        }
+
+        const value = (pricedItem as { value?: unknown }).value;
+        if (typeof value === "number" && Number.isFinite(value)) {
+          return value.toString();
+        }
+
+        if (typeof value === "string" && value.trim().length > 0) {
+          return value;
+        }
+      }
+    }
+
+    return null;
   }
 
   private getStaticPrice(providerAssetKey: string | null, tokenAddress: string) {

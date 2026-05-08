@@ -86,6 +86,20 @@ export class WalletDiscoveryCheckpointRepository {
     return providerStates[providerAlias]?.cursor ?? null;
   }
 
+  async getAcceptedRunAnchor(walletAddress: string, chainId: number) {
+    const checkpoint = await this.findByWallet(walletAddress, chainId);
+    if (!checkpoint) {
+      return null;
+    }
+
+    return {
+      latestAcceptedBlock: checkpoint.latestAcceptedBlock,
+      latestHydratedBlock: checkpoint.latestHydratedBlock,
+      pendingReconstructionRunId: checkpoint.pendingReconstructionRunId,
+      updatedAt: checkpoint.updatedAt
+    };
+  }
+
   async upsertProviderCursor(input: {
     walletAddress: string;
     chainId: number;

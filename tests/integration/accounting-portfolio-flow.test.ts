@@ -1,4 +1,10 @@
-import { createSession, fetchAccounting, reconstructSession } from "@/tests/helpers/route-test-utils";
+import {
+  createSession,
+  fetchAccounting,
+  fetchAccountingBootstrap,
+  fetchSessionStatus,
+  reconstructSession
+} from "@/tests/helpers/route-test-utils";
 import { prepareDatabase, resetDatabase } from "@/tests/helpers/test-environment";
 
 describe("portfolio accounting flow", () => {
@@ -52,5 +58,22 @@ describe("portfolio accounting flow", () => {
     expect(body.idleBalanceValue.amount).toBe("400.0000");
     expect(body.coverageSummary.coverageStatus).toBe("partial");
     expect(body.coverageSummary.reasonCodes).toContain("unsupported_protocol");
+  });
+
+  it("anchors bootstrap to accepted runs and exposes warm-up fallback states", async () => {
+    const { body: session } = await createSession("0x1000000000000000000000000000000000000001");
+
+    const beforeAccepted = await fetchAccountingBootstrap(session.sessionId);
+    expect(beforeAccepted.body.bootstrapState).toBe("empty");
+
+    await reconstructSession(session.sessionId, { mode: "replay" });
+
+    const status = await fetchSessionStatus(session.sessionId);
+    const acceptedRunId = status.body.latestAcceptedRun?.reconstructionRunId;
+
+    const afterAccepted = await fetchAccountingBootstrap(session.sessionId);
+    expect(afterAccepted.body.hasAcceptedSnapshot).toBe(true);
+    expect(afterAccepted.body.snapshot?.acceptedRunId).toBe(acceptedRunId);
+    expect(["ready", "warming"]).toContain(afterAccepted.body.bootstrapState);
   });
 });

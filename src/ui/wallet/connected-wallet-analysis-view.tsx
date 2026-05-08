@@ -107,6 +107,9 @@ export function ConnectedWalletAnalysisView({ sessionId }: ConnectedWalletAnalys
             <p>
               Bootstrap state: <strong>{bootstrap.bootstrapState}</strong>
             </p>
+            <p>
+              Dashboard display state: <strong>{analysis.dashboardDisplayState}</strong>
+            </p>
             {bootstrap.snapshot ? (
               <p>
                 Bootstrap portfolio value: <strong>{bootstrap.snapshot.totalValue.amount} {bootstrap.snapshot.totalValue.currency.toUpperCase()}</strong>
@@ -115,6 +118,29 @@ export function ConnectedWalletAnalysisView({ sessionId }: ConnectedWalletAnalys
               <p>Bootstrap snapshot not available yet.</p>
             )}
           </div>
+        ) : null}
+
+        {!bootstrap ? (
+          <p>
+            Dashboard display state: <strong>{analysis.dashboardDisplayState}</strong>
+          </p>
+        ) : null}
+
+        {analysis.dashboardDisplayState === "loading" ? (
+          <p className="status">Preparing the first meaningful dashboard view...</p>
+        ) : null}
+
+        {analysis.dashboardDisplayState === "partial" ? (
+          <p className="status warning">Showing trusted partial data while reconstruction or enrichment continues.</p>
+        ) : null}
+
+        {analysis.dashboardDisplayState === "failure" ? (
+          <>
+            <p className="status error">Dashboard read failed before trusted results were available.</p>
+            <button className="button" onClick={analysis.retryAnalysis} type="button">
+              Retry dashboard bootstrap
+            </button>
+          </>
         ) : null}
 
         {analysis.state === "stale_context" ? (
@@ -192,6 +218,92 @@ export function ConnectedWalletAnalysisView({ sessionId }: ConnectedWalletAnalys
             </p>
 
             <ConnectedWalletAccountingPanel accounting={analysis.accounting} projection={projection} />
+
+            {analysis.accountingTimeSeries ? (
+              <div>
+                <h2>Historical Portfolio Series</h2>
+                <p>
+                  Series state: <strong>{analysis.accountingTimeSeries.seriesState}</strong>
+                </p>
+                {analysis.accountingTimeSeries.partialReasonCodes.length > 0 ? (
+                  <p>
+                    Partial reasons: <strong>{analysis.accountingTimeSeries.partialReasonCodes.join(", ")}</strong>
+                  </p>
+                ) : null}
+                <p>
+                  Portfolio points: <strong>{analysis.accountingTimeSeries.portfolioSeries.length}</strong> · Pool series: <strong>{analysis.accountingTimeSeries.poolSeries.length}</strong> · Timeline markers: <strong>{analysis.accountingTimeSeries.eventMarkers.length}</strong>
+                </p>
+
+                {analysis.accountingTimeSeries.portfolioSeries.length > 0 ? (
+                  <div>
+                    <h3>Portfolio Value Points</h3>
+                    <ul>
+                      {analysis.accountingTimeSeries.portfolioSeries.slice(0, 5).map((point) => (
+                        <li key={`portfolio-point:${point.ledgerRecordId}`}>
+                          {point.timestamp}: {point.totalValue.amount} {point.totalValue.currency.toUpperCase()} ({point.coverageStatus})
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+
+                {analysis.accountingTimeSeries.poolSeries.length > 0 ? (
+                  <div>
+                    <h3>Pool Deployed-Capital Series</h3>
+                    <ul>
+                      {analysis.accountingTimeSeries.poolSeries.slice(0, 3).map((pool) => {
+                        const latestPoint = pool.points.at(-1);
+                        return (
+                          <li key={`pool-series:${pool.poolId}`}>
+                            {pool.displayName}: {pool.points.length} points
+                            {latestPoint ? ` · latest ${latestPoint.deployedCapital.amount} ${latestPoint.deployedCapital.currency.toUpperCase()} (${latestPoint.flowDirection})` : ""}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                ) : null}
+
+                {analysis.accountingTimeSeries.eventMarkers.length > 0 ? (
+                  <div>
+                    <h3>Accepted-Run Timeline Markers</h3>
+                    <ul>
+                      {analysis.accountingTimeSeries.eventMarkers.slice(0, 5).map((marker) => (
+                        <li key={`timeline-marker:${marker.ledgerRecordId}:${marker.markerType}`}>
+                          {marker.timestamp}: {marker.markerType} ({marker.label})
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+
+                {analysis.accountingRebalanceFlows?.flows.length ? (
+                  <div>
+                    <h3>Rebalance Flow Links</h3>
+                    <ul>
+                      {analysis.accountingRebalanceFlows.flows.slice(0, 5).map((flow) => (
+                        <li key={`rebalance-flow:${flow.flowId}`}>
+                          {flow.timestamp}: {flow.fromPoolId}{" -> "}{flow.toPoolId} ({flow.confidence}) - {flow.explanation}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+
+                {analysis.accounting?.pools.length ? (
+                  <div>
+                    <h3>Pool Drilldown</h3>
+                    <ul>
+                      {analysis.accounting.pools.map((pool) => (
+                        <li key={`pool-drilldown:${pool.poolId}`}>
+                          {pool.displayName}: {pool.currentValue.amount} {pool.currentValue.currency.toUpperCase()} · strategies {pool.strategies.length}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
 
             {analysis.discardedActivity && analysis.discardedActivity.items.length > 0 ? (
               <div>

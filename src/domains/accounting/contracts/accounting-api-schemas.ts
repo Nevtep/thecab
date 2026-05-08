@@ -5,6 +5,8 @@ const moneyValueSchema = z.object({
   amount: z.string().min(1)
 });
 
+export type DashboardDisplayState = "loading" | "partial" | "empty" | "failure" | "ready";
+
 const coverageSummarySchema = z.object({
   coverageStatus: z.enum(["full", "partial"]),
   pricedValue: moneyValueSchema,
@@ -114,7 +116,7 @@ const accountingEventMarkerSchema = z.object({
   ledgerRecordId: z.string().min(1),
   blockNumber: z.number().int().nonnegative(),
   timestamp: z.string().datetime(),
-  markerType: z.enum(["claim", "lock", "vote", "rebalance", "withdraw", "deposit", "swap", "other"]),
+  markerType: z.enum(["claim", "lock", "vote", "rebalance", "close", "reopen", "other"]),
   label: z.string().min(1)
 });
 
@@ -123,7 +125,8 @@ const accountingPortfolioSeriesPointSchema = z.object({
   blockNumber: z.number().int().nonnegative(),
   timestamp: z.string().datetime(),
   eventType: z.string().min(1),
-  totalValue: moneyValueSchema.nullable()
+  totalValue: moneyValueSchema,
+  coverageStatus: z.enum(["full", "partial"])
 });
 
 const accountingPoolSeriesPointSchema = z.object({
@@ -131,7 +134,8 @@ const accountingPoolSeriesPointSchema = z.object({
   blockNumber: z.number().int().nonnegative(),
   timestamp: z.string().datetime(),
   eventType: z.string().min(1),
-  flowDirection: z.enum(["in", "out", "internal"])
+  flowDirection: z.enum(["in", "out", "internal"]),
+  deployedCapital: moneyValueSchema
 });
 
 const accountingPoolSeriesSchema = z.object({
@@ -145,6 +149,8 @@ export const accountingTimeSeriesResponseSchema = z.object({
   sessionId: z.string().min(1),
   acceptedRunId: z.string().min(1).nullable(),
   quoteCurrency: z.literal("usd"),
+  seriesState: z.enum(["empty", "partial", "ready"]),
+  partialReasonCodes: z.array(z.string().min(1)),
   portfolioSeries: z.array(accountingPortfolioSeriesPointSchema),
   poolSeries: z.array(accountingPoolSeriesSchema),
   eventMarkers: z.array(accountingEventMarkerSchema)
@@ -174,7 +180,28 @@ export const accountingErrorResponseSchema = z.object({
   error: z.string().min(1)
 });
 
+export const poolDashboardListResponseSchema = z.object({
+  sessionId: z.string().min(1),
+  acceptedRunId: z.string().min(1).nullable(),
+  pools: z.array(poolAccountingSummarySchema)
+});
+
+export const poolDashboardDetailResponseSchema = z.object({
+  sessionId: z.string().min(1),
+  acceptedRunId: z.string().min(1).nullable(),
+  pool: poolAccountingSummarySchema.nullable()
+});
+
+export const dashboardTimelineResponseSchema = z.object({
+  sessionId: z.string().min(1),
+  acceptedRunId: z.string().min(1).nullable(),
+  markers: z.array(accountingEventMarkerSchema)
+});
+
 export type AccountingResponse = z.infer<typeof accountingResponseSchema>;
 export type AccountingBootstrapResponse = z.infer<typeof accountingBootstrapResponseSchema>;
 export type AccountingTimeSeriesResponse = z.infer<typeof accountingTimeSeriesResponseSchema>;
 export type AccountingRebalanceFlowsResponse = z.infer<typeof accountingRebalanceFlowsResponseSchema>;
+export type PoolDashboardListResponse = z.infer<typeof poolDashboardListResponseSchema>;
+export type PoolDashboardDetailResponse = z.infer<typeof poolDashboardDetailResponseSchema>;
+export type DashboardTimelineResponse = z.infer<typeof dashboardTimelineResponseSchema>;

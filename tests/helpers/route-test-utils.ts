@@ -9,6 +9,9 @@ import { GET as getAccountingSnapshot } from "@/app/api/analysis-sessions/[sessi
 import { GET as getAccountingBootstrap } from "@/app/api/analysis-sessions/[sessionId]/accounting/bootstrap/route";
 import { GET as getAccountingTimeSeries } from "@/app/api/analysis-sessions/[sessionId]/accounting/time-series/route";
 import { GET as getAccountingRebalanceFlows } from "@/app/api/analysis-sessions/[sessionId]/accounting/rebalance-flows/route";
+import { GET as getDashboardPools } from "@/app/api/analysis-sessions/[sessionId]/dashboard/pools/route";
+import { GET as getDashboardPoolDetail } from "@/app/api/analysis-sessions/[sessionId]/dashboard/pools/[poolId]/route";
+import { GET as getDashboardTimeline } from "@/app/api/analysis-sessions/[sessionId]/dashboard/timeline/route";
 
 const RUN_SETTLED_STATUSES = new Set(["accepted", "failed"]);
 
@@ -199,6 +202,39 @@ export async function fetchAccountingTimeSeries(sessionId: string) {
 
 export async function fetchAccountingRebalanceFlows(sessionId: string) {
   const response = await getAccountingRebalanceFlows(new Request("http://localhost") as never, {
+    params: Promise.resolve({ sessionId })
+  });
+
+  return {
+    response,
+    body: await response.json()
+  };
+}
+
+export async function fetchDashboardPools(sessionId: string) {
+  const response = await getDashboardPools(new Request("http://localhost") as never, {
+    params: Promise.resolve({ sessionId })
+  });
+
+  return {
+    response,
+    body: await response.json()
+  };
+}
+
+export async function fetchDashboardPoolDetail(sessionId: string, poolId: string) {
+  const response = await getDashboardPoolDetail(new Request("http://localhost") as never, {
+    params: Promise.resolve({ sessionId, poolId })
+  });
+
+  return {
+    response,
+    body: await response.json()
+  };
+}
+
+export async function fetchDashboardTimeline(sessionId: string) {
+  const response = await getDashboardTimeline(new Request("http://localhost") as never, {
     params: Promise.resolve({ sessionId })
   });
 

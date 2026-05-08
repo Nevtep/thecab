@@ -10,7 +10,7 @@ Build the first reusable valuation and accounting layer above The Cab's canonica
 ## Technical Context
 
 **Language/Version**: TypeScript 5.7 on Node.js 22 LTS  
-**Primary Dependencies**: Next.js 15 App Router, React 19, Zod, Drizzle ORM, PostgreSQL driver, existing wagmi and viem runtime, HTTP-based external price provider adapter  
+**Primary Dependencies**: Next.js 15 App Router, React 19, Zod, Drizzle ORM, PostgreSQL driver, existing wagmi and viem runtime, Alchemy pricing API adapter  
 **Storage**: PostgreSQL 16 for canonical ledger outputs, normalized historical and current price points, and cached valuation inputs; no separate analytics store  
 **Testing**: Vitest for unit, replay, contract, and integration tests; Playwright for browser validation of connected-wallet accounting states  
 **Target Platform**: Next.js web application on the Node.js runtime for one connected wallet on Base  
@@ -131,7 +131,8 @@ See `/specs/003-pricing-portfolio-accounting/research.md` for the complete decis
 
 ### Design Decisions
 
-- **Pricing provider architecture**: Keep the accounting domain behind a `PriceProvider` interface. The initial adapter should target a single external market-data provider with both historical and current Base token coverage, but all domain services depend only on normalized price-point contracts.
+- **Pricing provider architecture**: Keep the accounting domain behind a `PriceProvider` interface. Use Alchemy as the pricing provider for both historical and current Base token coverage, while domain services continue to depend only on normalized price-point contracts.
+- **Provider policy for related domains**: Wallet recovery discovery uses Moralis as primary with BaseScan fallback. Pricing uses Alchemy only. Any generic or ambiguous provider definition must be treated as `NEEDS CLARIFICATION` before implementation.
 - **Historical vs current storage**: Store both historical and current prices in the same `PricePoint` persistence model, with current quotes keyed by freshness window and `fetchedAt`. This avoids a parallel quote subsystem while still preserving reproducibility.
 - **Valuation timing rules**: Event-time valuation keys off the canonical ledger record timestamp, not raw observation timestamps, using deterministic nearest-valid price selection and explicit confidence downgrades when a fallback window is used.
 - **Fallback routing**: Allow only explicit, versioned normalization fallbacks such as wrapped-asset aliases or approved stablecoin normalization. Do not infer synthetic cross-token routes through arbitrary DEX paths in this feature.
