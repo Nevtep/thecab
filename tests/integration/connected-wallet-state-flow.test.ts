@@ -3,6 +3,7 @@ import {
   deriveConnectedWalletAnalysisState,
   shouldAutoRecoverFailedConnectedWalletReconstruction,
   shouldAutoStartConnectedWalletReconstruction,
+  shouldStartThrottledIncrementalRefresh,
   type ConnectedWalletContext
 } from "@/ui/wallet/use-connected-wallet-analysis";
 
@@ -352,6 +353,103 @@ describe("connected wallet state flow", () => {
           errorSummary: "Refresh failed"
         },
         hasAcceptedProjection: true
+      })
+    ).toBe(false);
+  });
+
+  it("starts throttled incremental refresh only on eligible triggers", () => {
+    const acceptedSessionStatus = {
+      session: {
+        sessionId: "session_accepted",
+        walletAddress: connectedWallet.walletAddress,
+        chainId: 8453,
+        status: "active",
+        reusedSession: true,
+        latestAcceptedRunId: "run_accepted"
+      },
+      latestAcceptedRun: {
+        reconstructionRunId: "run_accepted",
+        sessionId: "session_accepted",
+        runMode: "initial",
+        status: "accepted",
+        classifierVersion: "2026-04-19.1",
+        heuristicsVersion: "2026-04-19.1",
+        fromBlock: 1,
+        toBlock: 2,
+        startedAt: "2026-04-19T17:00:00.000Z",
+        completedAt: "2026-04-19T17:00:10.000Z",
+        errorSummary: null
+      },
+      lastFailure: null,
+      latestRun: {
+        reconstructionRunId: "run_accepted",
+        sessionId: "session_accepted",
+        runMode: "initial",
+        status: "accepted",
+        classifierVersion: "2026-04-19.1",
+        heuristicsVersion: "2026-04-19.1",
+        fromBlock: 1,
+        toBlock: 2,
+        startedAt: "2026-04-19T17:00:00.000Z",
+        completedAt: "2026-04-19T17:00:10.000Z",
+        errorSummary: null
+      },
+      hasAcceptedProjection: true
+    } as const;
+
+    expect(
+      shouldStartThrottledIncrementalRefresh({
+        sessionStatus: acceptedSessionStatus,
+        guard: { isCurrent: true, reason: null },
+        hasAnalysisTestOverride: false,
+        isStartPending: false,
+        triggerType: "visibility",
+        visibilityState: "visible",
+        now: 10_000,
+        lastTriggeredAt: null,
+        cooldownMs: 5_000
+      })
+    ).toBe(true);
+
+    expect(
+      shouldStartThrottledIncrementalRefresh({
+        sessionStatus: acceptedSessionStatus,
+        guard: { isCurrent: true, reason: null },
+        hasAnalysisTestOverride: false,
+        isStartPending: false,
+        triggerType: "visibility",
+        visibilityState: "visible",
+        now: 12_000,
+        lastTriggeredAt: 10_000,
+        cooldownMs: 5_000
+      })
+    ).toBe(false);
+
+    expect(
+      shouldStartThrottledIncrementalRefresh({
+        sessionStatus: acceptedSessionStatus,
+        guard: { isCurrent: true, reason: null },
+        hasAnalysisTestOverride: false,
+        isStartPending: false,
+        triggerType: "visibility",
+        visibilityState: "hidden",
+        now: 20_000,
+        lastTriggeredAt: 10_000,
+        cooldownMs: 5_000
+      })
+    ).toBe(false);
+
+    expect(
+      shouldStartThrottledIncrementalRefresh({
+        sessionStatus: acceptedSessionStatus,
+        guard: { isCurrent: false, reason: "wrong_chain" },
+        hasAnalysisTestOverride: false,
+        isStartPending: false,
+        triggerType: "focus",
+        visibilityState: "visible",
+        now: 20_000,
+        lastTriggeredAt: 10_000,
+        cooldownMs: 5_000
       })
     ).toBe(false);
   });

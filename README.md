@@ -84,9 +84,11 @@ The automated test helpers default to a local database at `postgres://postgres:p
 - Live Mellow detection infers wrapper-style contracts from the wallet's own transaction history instead of requiring manual environment allowlists.
 - Fixture wallets under `tests/fixtures/wallets/` remain the deterministic validation path for automated tests.
 
-The minimal inspection surface is available at `/ledger` and can be queried with a session id after creating an analysis session and running a reconstruction.
+The primary portfolio surface is available at `/portfolio` and can be queried with a session id after creating an analysis session and running a reconstruction. The `/ledger` route remains available as a compatibility alias.
 
-Connected-wallet inspection now distinguishes session loading, live reconstruction, refresh-with-latest, empty, failure, and stale wallet or chain recovery states while keeping discarded activity reviewable from the same ledger flow.
+Connected-wallet inspection now distinguishes session loading, live reconstruction, refresh-with-latest, empty, failure, and stale wallet or chain recovery states while keeping discarded activity reviewable from the same portfolio flow.
+
+Incremental refresh now uses throttled focus and visibility triggers plus explicit manual refresh actions, avoiding continuous fixed-interval run loops.
 
 Connected-wallet dashboard rendering also includes historical portfolio value points, pool deployed-capital series, accepted-run timeline markers, and rebalance flow links with confidence and explanation metadata.
 

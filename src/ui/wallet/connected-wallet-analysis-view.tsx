@@ -71,8 +71,8 @@ export function ConnectedWalletAnalysisView({ sessionId }: ConnectedWalletAnalys
   return (
     <main className="shell">
       <section className="panel">
-        <p className="eyebrow">Ledger Inspection</p>
-        <h1>Connected-wallet analysis</h1>
+        <p className="eyebrow">Portfolio Dashboard</p>
+        <h1>Connected-wallet portfolio analysis</h1>
         <p>Session: <strong>{sessionId}</strong></p>
 
         {analysis.errorMessage ? <p className="status error">{analysis.errorMessage}</p> : null}
@@ -160,7 +160,7 @@ export function ConnectedWalletAnalysisView({ sessionId }: ConnectedWalletAnalys
         ) : null}
 
         {analysis.state === "session_loading" ? (
-          <p className="status">Loading session status and trusted ledger results...</p>
+          <p className="status">Loading session status and trusted portfolio results...</p>
         ) : null}
 
         {analysis.state === "reconstruction_running" ? (
@@ -169,8 +169,8 @@ export function ConnectedWalletAnalysisView({ sessionId }: ConnectedWalletAnalys
 
         {analysis.state === "refreshing_with_latest" ? (
           <>
-            <p className="status success">Latest accepted ledger loaded.</p>
-            <p className="status warning">Refreshing live reconstruction while the latest accepted result remains visible.</p>
+            <p className="status success">Latest accepted portfolio snapshot loaded.</p>
+            <p className="status warning">Refreshing reconstruction on demand while the latest accepted result remains visible.</p>
           </>
         ) : null}
 
@@ -321,7 +321,7 @@ export function ConnectedWalletAnalysisView({ sessionId }: ConnectedWalletAnalys
 
             <div className="wallet-panel__actions">
               <button className="button" disabled={analysis.isRefreshing} onClick={analysis.retryAnalysis} type="button">
-                {analysis.isRefreshing ? "Refreshing ledger..." : "Refresh connected-wallet analysis"}
+                {analysis.isRefreshing ? "Refreshing portfolio snapshot..." : "Refresh connected-wallet portfolio"}
               </button>
             </div>
 

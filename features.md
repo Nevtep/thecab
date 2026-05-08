@@ -102,7 +102,7 @@ Expected behavior:
 - fetch a fast wallet bootstrap snapshot
 - load recent relevant activity
 - show initial portfolio state as soon as possible
-- continue deeper reconstruction in the background when needed
+- continue deeper reconstruction through throttled or user-initiated refresh when needed
 
 This is where indexed providers help.
 

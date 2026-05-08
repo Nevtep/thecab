@@ -1,7 +1,5 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { useConnect, useDisconnect, useSwitchChain } from "wagmi";
 import { base } from "wagmi/chains";
@@ -128,7 +126,6 @@ export function ConnectedWalletAccountingPanel({ projection, accounting }: Conne
 }
 
 export function ConnectedWalletLedger() {
-  const router = useRouter();
   const connectedWallet = useConnectedWalletContext();
   const { connect, connectors, error: connectError, isPending: isConnecting } = useConnect();
   const { disconnect } = useDisconnect();
@@ -190,7 +187,7 @@ export function ConnectedWalletLedger() {
             reusedSession: session.reusedSession
           });
           startNavigationTransition(() => {
-            router.push(`/ledger?sessionId=${session.sessionId}`);
+            window.location.href = `/portfolio?sessionId=${session.sessionId}`;
           });
         }
       }
@@ -201,7 +198,7 @@ export function ConnectedWalletLedger() {
     <section className="wallet-panel">
       <div className="wallet-panel__header">
         <p className="eyebrow">Connected Wallet</p>
-        <h2>Analyze live Base activity</h2>
+        <h2>Load portfolio history on Base</h2>
       </div>
 
       {!hasMounted ? (
@@ -274,9 +271,9 @@ export function ConnectedWalletLedger() {
 
       {hasMounted && openedSession ? (
         <p className="status success">
-          Session {openedSession.reusedSession ? "resumed" : "created"}. Opening the ledger view for{" "}
+          Session {openedSession.reusedSession ? "resumed" : "created"}. Opening the portfolio view for{" "}
           {openedSession.sessionId}. If navigation is blocked, open{" "}
-          <Link href={`/ledger?sessionId=${openedSession.sessionId}`}>the session ledger manually</Link>.
+          <a href={`/portfolio?sessionId=${openedSession.sessionId}`}>the session portfolio manually</a>.
         </p>
       ) : null}
       {hasMounted && activeError ? <p className="status error">{activeError}</p> : null}

@@ -113,7 +113,7 @@ export type SessionBootstrapInput = {
 const CONNECTED_WALLET_TEST_OVERRIDE_EVENT = "thecab:test-wallet-changed";
 const CONNECTED_WALLET_ANALYSIS_TEST_OVERRIDE_EVENT = "thecab:test-analysis-changed";
 const RUNNING_RECONSTRUCTION_STATUSES = ["pending", "ingesting", "normalizing", "projecting"] as const;
-const AUTO_REFRESH_INTERVAL_MS = 15_000;
+const AUTO_INCREMENTAL_REFRESH_COOLDOWN_MS = 300_000;
 
 function mapLedgerStateToDashboardDisplayState(state: LedgerEntryViewState): DashboardDisplayState {
   switch (state) {
@@ -696,6 +696,47 @@ export function shouldAutoRecoverFailedConnectedWalletReconstruction(
   );
 }
 
+export function shouldStartThrottledIncrementalRefresh(input: {
+  sessionStatus: SessionStatusResponse | null;
+  guard: SessionContextGuard;
+  hasAnalysisTestOverride: boolean;
+  isStartPending: boolean;
+  triggerType: "focus" | "visibility";
+  visibilityState: "hidden" | "visible";
+  now: number;
+  lastTriggeredAt: number | null;
+  cooldownMs?: number;
+}) {
+  if (input.hasAnalysisTestOverride || input.isStartPending || !input.guard.isCurrent) {
+    return false;
+  }
+
+  if (input.triggerType === "visibility" && input.visibilityState !== "visible") {
+    return false;
+  }
+
+  const sessionStatus = input.sessionStatus;
+  if (!sessionStatus?.hasAcceptedProjection) {
+    return false;
+  }
+
+  const latestRun = sessionStatus.latestRun;
+  if (!latestRun) {
+    return false;
+  }
+
+  if (isRunningReconstructionStatus(latestRun.status) || latestRun.status === "failed") {
+    return false;
+  }
+
+  const cooldownMs = input.cooldownMs ?? AUTO_INCREMENTAL_REFRESH_COOLDOWN_MS;
+  if (input.lastTriggeredAt != null && input.now - input.lastTriggeredAt < cooldownMs) {
+    return false;
+  }
+
+  return true;
+}
+
 export function useConnectedWalletAnalysis(sessionId: string): ConnectedWalletAnalysisResult {
   const connectedWallet = useConnectedWalletContext();
   const [analysisTestOverride, setAnalysisTestOverride] = useState<ConnectedWalletAnalysisTestOverride | null>(
@@ -757,6 +798,7 @@ export function useConnectedWalletAnalysis(sessionId: string): ConnectedWalletAn
   );
   const [refreshRequestSignature, setRefreshRequestSignature] = useState<string | null>(null);
   const [hasAutoRecoveredFailedRun, setHasAutoRecoveredFailedRun] = useState(false);
+  const [lastIncrementalRefreshTriggeredAt, setLastIncrementalRefreshTriggeredAt] = useState<number | null>(null);
 
   useEffect(() => {
     if (hasAnalysisTestOverride || !sessionStatusQuery.data || !guard.isCurrent || startReconstruction.isPending) {
@@ -789,9 +831,7 @@ export function useConnectedWalletAnalysis(sessionId: string): ConnectedWalletAn
     }
 
     setRefreshRequestSignature(requestedSignature);
-    startReconstruction.mutate(
-      sessionStatusQuery.data.hasAcceptedProjection ? "incremental" : "initial"
-    );
+    startReconstruction.mutate("initial");
   }, [
     guard.isCurrent,
     refreshRequestSignature,
@@ -806,29 +846,46 @@ export function useConnectedWalletAnalysis(sessionId: string): ConnectedWalletAn
       return undefined;
     }
 
-    if (hasAnalysisTestOverride || !sessionStatusQuery.data || !guard.isCurrent || startReconstruction.isPending) {
-      return undefined;
-    }
+    const triggerIncrementalRefresh = (triggerType: "focus" | "visibility") => {
+      const now = Date.now();
+      const shouldStart = shouldStartThrottledIncrementalRefresh({
+        sessionStatus: sessionStatusQuery.data ?? null,
+        guard,
+        hasAnalysisTestOverride,
+        isStartPending: startReconstruction.isPending,
+        triggerType,
+        visibilityState: document.visibilityState === "visible" ? "visible" : "hidden",
+        now,
+        lastTriggeredAt: lastIncrementalRefreshTriggeredAt
+      });
 
-    const latestRun = sessionStatusQuery.data.latestRun;
-    if (!sessionStatusQuery.data.hasAcceptedProjection || !latestRun) {
-      return undefined;
-    }
+      if (!shouldStart) {
+        return;
+      }
 
-    if (isRunningReconstructionStatus(latestRun.status) || latestRun.status === "failed") {
-      return undefined;
-    }
-
-    const timerId = window.setTimeout(() => {
+      setLastIncrementalRefreshTriggeredAt(now);
       startReconstruction.mutate("incremental");
-    }, AUTO_REFRESH_INTERVAL_MS);
+    };
+
+    const onWindowFocus = () => {
+      triggerIncrementalRefresh("focus");
+    };
+
+    const onVisibilityChange = () => {
+      triggerIncrementalRefresh("visibility");
+    };
+
+    window.addEventListener("focus", onWindowFocus);
+    document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
-      window.clearTimeout(timerId);
+      window.removeEventListener("focus", onWindowFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [
-    guard.isCurrent,
+    guard,
     hasAnalysisTestOverride,
+    lastIncrementalRefreshTriggeredAt,
     sessionStatusQuery.data,
     startReconstruction
   ]);
