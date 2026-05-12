@@ -1,8 +1,8 @@
-# The Cab — Product & Technical Specification v1.2.1
+# The Cab — Product & Technical Specification v1.3
 
 ## Version
 
-- **Document version:** v1.2.1
+- **Document version:** v1.3
 - **Product:** The Cab
 - **Scope:** Product technical specification
 - **Primary chain:** Base mainnet
@@ -400,11 +400,16 @@ Rules:
 - Never allow a single pool to absorb more of a swap than the token amount currently attributed to that pool unless explicit user action or higher-confidence evidence supports it.
 
 ## 2.9 Aerodrome and Mellow contract support
+
 ### Aerodrome
 
 Product v1 should avoid maintaining a large hardcoded whitelist.
 
-Instead, use official protocol surfaces, onchain protocol metadata, and deterministic discovery.
+Instead, use official protocol surfaces, onchain protocol metadata, deterministic discovery, and event-based protocol family detection.
+
+The Router is a primary discovery surface for swaps and liquidity add/remove operations, but it is **not** the only Aerodrome protocol surface.
+
+The Cab must not assume that all Aerodrome-related activity passes through the Router.
 
 Known key Aerodrome addresses on Base:
 
@@ -443,25 +448,100 @@ When deriving pool addresses, The Cab may use the Router’s `poolFor(tokenA, to
 
 The Cab must avoid maintaining a long static list of Aerodrome pool or factory addresses. If a factory address is hardcoded temporarily for development, it must be marked as a fallback and validated against `router.defaultFactory()` before production use.
 
-Discovery approach:
+#### Router role
 
-- Identify direct interactions with the Aerodrome Router.
-- Identify AERO token movements.
-- Obtain the active PoolFactory from the Router via `defaultFactory()`.
-- Identify pool interactions derived from the Router/Factory relationship.
-- Discover pools using official factory/router mechanics instead of maintaining a custom pool address list.
-- Use Router `poolFor` behavior where possible to derive pool addresses from:
-  - token A
-  - token B
-  - stable flag
-  - factory address obtained from `router.defaultFactory()`
-- Use official Aerodrome sources as source of truth for core addresses.
+Router-based discovery is useful for:
 
-Important implementation notes:
+- swaps;
+- add liquidity;
+- remove liquidity;
+- deriving pool addresses through `poolFor`;
+- obtaining the active factory through `defaultFactory()`;
+- identifying token pairs and stable/volatile pool intent from routed calls;
+- identifying candidate pool interactions that should be cross-checked against pool events and token transfers.
+
+Router-based discovery is insufficient for:
+
+- staking;
+- unstaking;
+- gauge reward claims;
+- veAERO locks;
+- relocks;
+- governance voting;
+- vote resets;
+- bribes;
+- voting fees;
+- rebase claims;
+- Mellow wrapper/vault/staking activity;
+- Mellow strategy-level accounting.
+
+#### Protocol discovery approach
+
+The Cab must combine multiple discovery surfaces.
+
+Discovery should include:
+
+- direct wallet interactions with the Aerodrome Router;
+- direct wallet interactions with Aerodrome pools;
+- pool events derived from the Router/Factory relationship;
+- LP token mint/burn/transfer events;
+- direct wallet interactions with Gauge contracts;
+- Gauge stake/unstake/reward events;
+- AERO token movements;
+- veAERO / voting escrow events;
+- Voter contract interactions;
+- vote/reset/relay events where available;
+- bribe, fee, and reward distributor events;
+- token transfers surrounding any of the above;
+- Mellow wrapper, vault, staking, and strategy events;
+- Mellow contract addresses and strategy metadata from official Mellow documentation.
+
+Discovery must use official Aerodrome sources as the source of truth for core addresses and contract semantics whenever possible.
+
+#### Discovery by activity family
+
+The Cab should classify Aerodrome activity by protocol family rather than assuming a single Router flow.
+
+| Activity family | Primary discovery surfaces | Notes |
+|---|---|---|
+| Swaps | Router, pool events, token transfers | Usually router-mediated, but must be confirmed with token movements. |
+| Add liquidity / deposit LP | Router, pool events, LP token mint/transfer | May pass through Router, but classification should be confirmed with pool and token events. |
+| Remove liquidity / withdraw LP | Router, pool events, LP token burn/transfer | May pass through Router, but residual attribution is computed from resulting token movements. |
+| Stake LP | Gauge contracts, LP token transfers | Do not assume Router involvement. |
+| Unstake LP | Gauge contracts, LP token transfers | Do not assume Router involvement. |
+| Claim LP/gauge rewards | Gauge/reward contracts, AERO/token transfers | Do not assume Router involvement. |
+| veAERO lock/relock/increase | Voting escrow / veAERO contracts, AERO transfers | Governance surface, not Router surface. |
+| Vote/reset/relay | Voter/governance contracts | Governance surface, not Router surface. |
+| Claim voting fees/bribes/rebases | Bribe/fee/reward distributor contracts, token transfers | Should be grouped by pool where supported. |
+| Mellow deposit/withdraw | Mellow wrapper/vault/staking contracts, token transfers | Do not model as manual Aerodrome NFT unless wallet actually owns the NFT. |
+| Mellow strategy internals | Mellow strategy contracts plus underlying Aerodrome events where visible | Mark partial coverage when only share-level accounting is available. |
+
+#### Pool identity discovery
+
+Pool identity should be discovered from:
+
+1. Router call data where available.
+2. Router `poolFor(tokenA, tokenB, stable, factory)`.
+3. Pool events and pool contract addresses.
+4. LP token movement events.
+5. Gauge-to-pool relationships where available.
+6. Mellow strategy metadata where the strategy maps to an Aerodrome pool.
+
+Rules:
+
+- Do not manually curate a long static list of pools.
+- Do not assume any random token transfer is Aerodrome activity without protocol-surface evidence.
+- Do not assume Router interaction alone is enough to fully classify lifecycle state.
+- Always reconcile routed intent with actual token movements.
+- Prefer onchain reads and official protocol metadata over local hardcoded assumptions.
+
+#### Important implementation notes
 
 - Aerodrome Router’s `poolFor` calculates pool addresses deterministically using clone mechanics.
 - Offchain code may mirror the deterministic derivation or read/call the contract where appropriate.
 - The active factory must be treated as protocol metadata, not as a permanent manually curated constant.
+- Router is an anchor for discovery, not a complete index.
+- The analysis pipeline must discover and classify protocol activity across Router, Pool, Gauge, Reward, veAERO/Voter, and Mellow surfaces.
 - Do not manually curate a long static list of all pools.
 
 
@@ -1819,16 +1899,23 @@ Scope:
 
 Filter for:
 
-- Aerodrome router interactions.
+- Aerodrome Router interactions.
 - Aerodrome pool interactions.
-- Aerodrome position manager interactions.
+- Pool events and LP token mint/burn/transfer events.
 - Gauge/staking interactions.
-- Reward claims.
-- veAERO contract interactions.
-- Voting/relay contracts.
-- Mellow wrapper/staking contracts.
-- Token transfers relevant to these operations.
+- Gauge stake/unstake/reward events.
+- Reward, bribe, fee, and distributor contract interactions.
+- AERO token movements.
+- veAERO / voting escrow contract interactions.
+- Voter, vote, reset, and relay contracts.
+- Mellow wrapper/vault/staking/strategy contracts.
+- Token transfers relevant to any of these operations.
 - Swaps involving pool tokens around residual attribution states.
+
+Important:
+
+- The Router should be treated as a primary discovery anchor, not as the only source of protocol activity.
+- Stake, unstake, claims, veAERO, votes, fees, bribes, and Mellow activity must be detected through their own protocol surfaces, not inferred as Router activity.
 
 Persist raw provider records or raw event envelopes for auditability.
 
@@ -3603,6 +3690,8 @@ The implementation is acceptable when:
 - Product screens do not import third-party UI libraries directly.
 - Swap attribution handles over-consumption by decomposing swaps across residual balances, cash-ins, liquidation-derived inventory, and other residual pools.
 - Pool charts and Activity rows show partial swap attribution when a transaction is larger than one pool's residual amount.
+- Aerodrome discovery does not assume all activity passes through the Router.
+- Protocol activity is discovered across Router, Pool, Gauge, Reward/Bribe/Fee, veAERO/Voter, and Mellow surfaces.
 - Pool analytics preserve capital continuity across withdraw/swap/deposit/rebalance flows.
 - Residual assets are attributed per pool, not globally per token.
 - Residual attribution does not expire.
