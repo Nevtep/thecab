@@ -1,25 +1,40 @@
-# The Cab — Product & Technical Specification v1
+# The Cab — Product & Technical Specification v1.1
 
-## 0. Purpose
+## Version
 
-This document defines the product, UX, technical architecture, domain model, analytics behavior, background analysis process, branding rules, and section-by-section implementation requirements for **The Cab**.
-
-The Cab is a **portfolio command cabin for Aerodrome Finance on Base**. It allows a connected wallet to monitor its current Aerodrome-related portfolio, understand historical capital deployment, analyze pools and positions, inspect rewards and governance activity, and reconstruct meaningful portfolio performance over time.
-
-This specification is written to be consumed by AI-assisted development tools such as Copilot, Cursor, Claude Code, Codex, or similar agents. Its goal is to reduce product drift by making product intent, data boundaries, user flows, analytics semantics, and implementation priorities explicit.
+- **Document version:** v1.1
+- **Product:** The Cab
+- **Scope:** MVP product + technical specification
+- **Primary chain:** Base mainnet
+- **Primary protocol:** Aerodrome Finance
+- **Secondary integration:** Mellow Aerodrome strategies
+- **Framework:** Next.js
+- **Wallet:** WalletConnect + wagmi
+- **Background jobs:** Trigger.dev
+- **Design System:** Internal The Cab DS built on Tamagui wrappers
 
 ---
 
-## 1. Product Overview
+# 0. Purpose
 
-### 1.1 Product definition
+This document defines the product, UX, technical architecture, domain model, analytics behavior, background analysis process, branding rules, Design System boundaries, and section-by-section implementation requirements for **The Cab**.
+
+The Cab is a **portfolio command cabin for Aerodrome Finance on Base**. It allows a connected wallet to monitor its current Aerodrome-related portfolio, understand historical capital deployment, analyze pools and positions, inspect rewards and governance activity, and reconstruct meaningful portfolio performance over time.
+
+This specification is written to be consumed by AI-assisted development tools such as Copilot, Cursor, Claude Code, Codex, or similar agents. Its goal is to reduce product drift by making product intent, data boundaries, user flows, analytics semantics, implementation choices, and library boundaries explicit.
+
+---
+
+# 1. Product Overview
+
+## 1.1 Product definition
 
 **The Cab** is a web analytics application for users participating in **Aerodrome Finance** on Base.
 
 It provides:
 
 - A quick wallet-connected overview using recent wallet and market data.
-- A deeper historical analysis triggered by the user on demand.
+- A deeper historical analysis triggered by the user on demand or automatically when stale.
 - Pool-level analytics.
 - Position-level lifecycle analytics.
 - Rewards and claims analytics.
@@ -29,7 +44,7 @@ It provides:
 
 The product should feel like a **control tower for on-chain capital**: precise, technical, aviation-inspired, dashboard-first, and trustworthy.
 
-### 1.2 Product intent
+## 1.2 Product intent
 
 The Cab is not a trading terminal and not an execution interface. It is an **analytics and monitoring cockpit**.
 
@@ -45,7 +60,7 @@ The user should be able to answer:
 - How much of my return came from rewards versus asset price movement?
 - What is my estimated annualized return overall, per pool, per strategy, and per position?
 
-### 1.3 Product non-goals
+## 1.3 Product non-goals
 
 The Cab must not become:
 
@@ -57,11 +72,443 @@ The Cab must not become:
 - A system requiring manual reconciliation as a core workflow.
 - A retail-trading dashboard with hype-oriented language.
 
-The product’s core promise is **fast portfolio visibility first, deeper historical reconstruction on demand**.
+The product’s core promise is **fast portfolio visibility first, deeper historical reconstruction when needed**.
 
 ---
 
-## 2. User Modes
+# 2. Resolved MVP Decisions
+
+This section resolves the previous open questions and must be treated as product direction for implementation.
+
+## 2.1 Wallet connection library
+
+Use:
+
+- **WalletConnect**
+- **wagmi**
+
+Implementation direction:
+
+- Use `wagmi` as the React/EVM wallet state and connector layer.
+- Use WalletConnect connector for wallet connection.
+- Do not add RainbowKit, Privy, ConnectKit, or another wallet abstraction unless explicitly approved later.
+- The internal app should consume wallet state through a The Cab wallet adapter/hook rather than importing wagmi directly in every screen.
+
+Required internal abstraction:
+
+```ts
+// example API shape
+import { useCabWallet } from "@/design-system/wallet";
+
+const {
+  address,
+  chainId,
+  isConnected,
+  connect,
+  disconnect,
+  connectorName,
+} = useCabWallet();
+```
+
+## 2.2 Supported chain
+
+MVP supports:
+
+- **Base mainnet only**
+
+Rules:
+
+- Base mainnet is the only production-supported chain.
+- Do not support Base Sepolia in MVP product flows.
+- If testing utilities are added for development, they must not appear as user-facing MVP network options unless explicitly approved.
+- Wrong-network state should instruct the user to switch to Base mainnet.
+
+Base chain ID:
+
+```ts
+const SUPPORTED_CHAIN_ID = 8453;
+```
+
+## 2.3 Moralis endpoint strategy
+
+Moralis is the primary provider for wallet and portfolio data.
+
+Use Moralis for:
+
+- Wallet balances.
+- Wallet token transfers.
+- Wallet transaction history.
+- NFT/position-related wallet data when needed.
+- Decoded wallet history/activity.
+- Fast recent Overview data.
+
+Recommended endpoint categories from Moralis Wallet API:
+
+### Wallet token balances
+
+Use Moralis EVM wallet token balances endpoints for ERC-20 balances.
+
+Expected use:
+
+- Current token balances for the connected wallet.
+- Fast Overview allocation.
+- Idle assets and relevant Aerodrome token holdings.
+
+### Wallet net worth / portfolio value
+
+Use Moralis wallet net worth / portfolio endpoints where available.
+
+Expected use:
+
+- Fast net worth approximation.
+- Initial Overview before full analysis.
+
+### Wallet history / decoded transaction history
+
+Use Moralis wallet history endpoints for decoded wallet activity.
+
+Expected use:
+
+- Recent activity list in Overview.
+- Candidate transaction discovery for background analysis.
+- Detection of wallet interactions with Aerodrome, Mellow, AERO, router, pools, gauges, and governance contracts.
+
+### ERC-20 transfers
+
+Use Moralis ERC-20 transfer endpoints for token movement reconstruction.
+
+Expected use:
+
+- Build `AssetMovement` candidates.
+- Identify cash in / cash out.
+- Track residual pool-attributed balances.
+- Detect transfers out to external wallets.
+
+### NFT transfers / NFT ownership
+
+Use Moralis NFT endpoints where needed for Aerodrome position NFTs.
+
+Expected use:
+
+- Detect manual concentrated-liquidity NFT ownership/transfer.
+- Support position identity when NFT token IDs are involved.
+- Cross-check wallet ownership of position NFTs.
+
+### Native transactions / raw transactions
+
+Use Moralis transaction endpoints where decoded activity is insufficient.
+
+Expected use:
+
+- Fallback for raw transaction inspection.
+- Classification support for unsupported/ambiguous events.
+
+Implementation rule:
+
+- Moralis is not the pricing source of truth for The Cab.
+- Moralis may provide USD estimates in fast Overview, but historical valuation and stored `PricePoint` records should use Alchemy.
+
+## 2.4 Alchemy endpoint strategy
+
+Alchemy is the primary provider for pricing and historical pricing.
+
+Use Alchemy Prices API for:
+
+- Current token prices by network/address.
+- Historical token prices by address or symbol.
+- Event-time valuation.
+- Current valuation for snapshots.
+- Price enrichment of token-level asset movements.
+
+Recommended endpoints:
+
+### Current token prices by address
+
+Use:
+
+```http
+POST https://api.g.alchemy.com/prices/v1/{apiKey}/tokens/by-address
+```
+
+Expected use:
+
+- Current price for token balances.
+- Overview asset market values.
+- Current snapshot valuation.
+
+### Historical token prices
+
+Use:
+
+```http
+POST https://api.g.alchemy.com/prices/v1/{apiKey}/tokens/historical
+```
+
+Expected use:
+
+- Event-time valuation for `AssetMovement`.
+- Historical portfolio/pool/position snapshots.
+- Reward valuation at claim time.
+- Capital in/out valuation.
+- Rebalance valuation.
+
+### Token price by symbol fallback
+
+Use symbol-based pricing only as fallback when contract-address pricing is unavailable or when valuing canonical assets.
+
+Rules:
+
+- Address-based pricing is preferred.
+- Symbol fallback must be marked lower confidence.
+- The stored `PricePoint` must record source, resolution, and confidence.
+
+Provider rule:
+
+- Do not introduce CoinGecko or any other pricing provider without explicit approval.
+- If Alchemy cannot price a token, store a missing-price/partial-coverage record instead of silently substituting another source.
+
+## 2.5 Background job provider
+
+Use:
+
+- **Trigger.dev**
+
+Reason:
+
+- Better suited than raw Vercel functions for long-running wallet-history analysis.
+- Integrates with Next.js.
+- Supports background tasks outside normal request/response lifecycle.
+- Has documented Vercel integration for deployments and environment variable syncing.
+
+Architecture:
+
+- Next.js API route starts analysis by triggering a Trigger.dev task.
+- Trigger.dev performs the long-running wallet analysis.
+- The database stores progress and results.
+- The frontend polls `/api/analysis/status`.
+- Vercel serves UI/API.
+- Trigger.dev executes analysis pipeline.
+
+Required components:
+
+```txt
+/apps/web
+  /app
+    /api
+      /analysis
+        /start/route.ts
+        /status/route.ts
+  /trigger
+    analyze-wallet.ts
+```
+
+Example flow:
+
+1. User clicks `Analyze wallet`.
+2. Frontend calls `POST /api/analysis/start`.
+3. Next.js validates wallet and Base mainnet.
+4. Next.js creates an `AnalysisRun` in DB with status `queued`.
+5. Next.js triggers Trigger.dev task with `{ runId, walletAddress, chainId }`.
+6. Trigger.dev runs the analysis pipeline.
+7. Trigger.dev updates `AnalysisRun.stage`, `progressPct`, and normalized entities.
+8. UI polls `GET /api/analysis/status`.
+9. When status is `ready`, sidebar unlocks sections.
+
+## 2.6 Maximum wallet history size
+
+MVP analysis scope:
+
+- **Full wallet history up to one year**
+
+Rules:
+
+- The analysis should inspect Aerodrome/Mellow-relevant wallet history for the previous 365 days.
+- If a wallet has older activity, older activity may be ignored in MVP unless needed to understand an open current position.
+- If an open position appears to predate the one-year window, mark it as `partial history`.
+- Full multi-year reconstruction is out of scope for MVP.
+
+## 2.7 Rebalance inference model
+
+Rebalance inference is **not based on a fixed time window**.
+
+Rebalance is inferred from **remaining pool-attributed balances**.
+
+Example:
+
+1. User had a deposit in `WETH/cbBTC`.
+2. User withdraws from that pool.
+3. Withdrawal gives the user `+0.1 cbBTC`.
+4. The pool now has a residual attributed balance:
+   - pool: `WETH/cbBTC`
+   - token: `cbBTC`
+   - amount: `0.1`
+   - status: `waiting_for_rebalance`
+5. Later, the user swaps `0.04 cbBTC` for `WETH`.
+6. Because `WETH` is the paired token of the original `WETH/cbBTC` pool, this is marked as a rebalance against that pool.
+7. The residual attribution is reduced by `0.04 cbBTC`, and the received `WETH` remains attributed to the same pool unless moved elsewhere.
+
+Rules:
+
+- A swap from one pool token to the other pool token is a rebalance.
+- A swap from a pool token into an unrelated token is a liquidation from the pool.
+- A swap from a pool token into a token belonging to another tracked pool may transfer/reassign attribution to that other pool, depending on context.
+- Rebalance detection is driven by the lifecycle of residual attributed balances, not elapsed time.
+- There is no fixed minutes/hours/same-day inference window.
+
+## 2.8 Residual attribution expiration
+
+Residual attribution **does not expire**.
+
+A residual balance remains tracked until it is resolved by an actual asset movement.
+
+Resolution states:
+
+- `redeployed_same_pool`
+- `rebalanced_same_pool`
+- `transferred_to_other_pool`
+- `liquidated_to_unrelated_asset`
+- `transferred_to_external_wallet`
+- `fully_spent`
+- `still_waiting`
+
+Rules:
+
+- Do not close attribution because time passed.
+- Do not mark residual attribution as expired.
+- Always maintain per-pool residual attribution because multiple pools can share the same token.
+- If the user has residual `cbBTC` attributed to `WETH/cbBTC`, that attribution remains until a matching token movement resolves it.
+- If the token is transferred out of the wallet, classify it as cash out from that pool.
+- If the token is swapped for the paired pool token, classify as rebalance.
+- If the token is swapped for an unrelated token, classify as liquidation from the pool.
+- If the token is swapped for a token of another tracked pool, classify as transfer/reassignment to the other pool where supported.
+
+## 2.9 Aerodrome and Mellow contract support
+
+### Aerodrome
+
+The MVP should avoid maintaining a large hardcoded whitelist.
+
+Instead, use official protocol surfaces and deterministic discovery.
+
+Known key Aerodrome addresses on Base:
+
+```ts
+export const AERODROME_BASE = {
+  router: "0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43",
+  aeroToken: "0x940181a94A35A4569E4529A3CDfB74e38FD98631",
+  factory: "0x420DD381b31aEf6683db6B902084cB0FFECe40Da"
+};
+```
+
+Discovery approach:
+
+- Identify direct interactions with Aerodrome Router.
+- Identify AERO token movements.
+- Identify pool interactions derived from Factory/Router.
+- Discover pools using official factory/router mechanics instead of keeping a custom pool address list.
+- Use Router `poolFor` behavior where possible to derive pool addresses from:
+  - token A
+  - token B
+  - stable flag
+  - factory address
+- Use official Aerodrome sources as source of truth for core addresses.
+
+Important implementation note:
+
+- Aerodrome Router’s `poolFor` calculates pool addresses deterministically using clone mechanics.
+- Offchain code can mirror the deterministic derivation or call/read from contract where appropriate.
+- Do not manually curate a long static list of all pools.
+
+### Mellow
+
+Mellow MVP support should use official Mellow documentation for Aerodrome CL strategies.
+
+Rules:
+
+- Use official Mellow Aerodrome CL strategy contract address docs as the source of truth.
+- Do not maintain our own unverified list when official docs are available.
+- Treat Mellow exposures as strategy-level positions, not as if the user manually owns underlying Aerodrome NFTs.
+- For MVP, account for whatever can be reconstructed from Mellow contract events:
+  - deposits
+  - withdrawals
+  - share movements
+  - staking/unstaking where applicable
+  - reward claims where available
+  - wrapper/staking contract relationships where available
+
+## 2.10 Governance rewards allocation
+
+Governance rewards should be displayed **by pool**, matching the way Aerodrome’s own dashboard presents voting fees/rewards.
+
+Rules:
+
+- If a governance reward is associated with a voted pool, allocate/display it under that pool.
+- Governance section should still show aggregate governance totals.
+- Rewards section should be able to group by reward type and pool.
+- Avoid double-counting governance rewards in both pool rewards and governance rewards.
+- Use shared `RewardEvent` records with scopes/tags to allow multiple views of the same reward.
+
+## 2.11 CSV export
+
+No CSV/export functionality in MVP.
+
+Rules:
+
+- Do not build export buttons.
+- Do not create CSV API endpoints.
+- Keep data tables internal to the app.
+- Revisit export later after analytics semantics stabilize.
+
+## 2.12 Data retention
+
+Store wallet analysis data in DB permanently.
+
+Rules:
+
+- Analysis data persists unless explicitly deleted by an admin/user feature introduced later.
+- Do not auto-expire historical analysis records.
+- Future privacy/data deletion workflows can be added later.
+- Use permanent storage to support incremental updates and avoid repeated full analysis.
+
+## 2.13 Analysis refresh behavior
+
+Analysis should refresh automatically when data is stale.
+
+Rule:
+
+- When the last successful analysis is **more than one week old**, trigger an analysis update.
+
+Behavior:
+
+- If the user connects a wallet and analysis is older than 7 days:
+  - Mark status as `stale`.
+  - Trigger incremental update automatically when appropriate.
+  - Show sidebar status `Updating…` or `Stale — updating`.
+  - Keep existing sections available using last successful data.
+- Do not block user access while refreshing.
+- If auto-refresh fails, preserve existing data and show retry/update CTA.
+
+## 2.14 Mellow share accounting
+
+MVP Mellow accounting should reconstruct whatever can be obtained reliably from Mellow contract events.
+
+MVP target:
+
+- Display Mellow strategies similarly to manual positions when possible.
+- Use contract event data for:
+  - strategy deposits
+  - strategy withdrawals
+  - share balances
+  - wrapper exposure
+  - staking/reward contract activity
+  - reward claims
+- Avoid pretending to have perfect underlying position accounting if Mellow does not expose enough data.
+- Mark Mellow metrics as partial when only share-level accounting is available.
+- Later phases can add deeper strategy-specific valuation if required.
+
+---
+
+# 3. User Modes
 
 The application has two major modes:
 
@@ -72,9 +519,9 @@ Authentication is wallet-based. The initial product supports one connected walle
 
 ---
 
-## 3. Disconnected Experience
+# 4. Disconnected Experience
 
-### 3.1 Layout
+## 4.1 Layout
 
 When no wallet is connected, the application shows a public landing experience.
 
@@ -89,23 +536,23 @@ The disconnected layout must include:
 
 The top menu should remain visible while the user scrolls through the landing page.
 
-### 3.2 Landing purpose
+## 4.2 Landing purpose
 
 The landing page introduces The Cab to new users and should communicate:
 
 - The Cab is a control tower for Aerodrome portfolios.
 - The user connects a wallet to get an immediate dashboard.
 - The app shows quick recent analytics first.
-- A deeper historical analysis can be requested.
+- A deeper historical analysis can be requested or auto-refreshed when stale.
 - Once historical analysis is ready, more sections unlock.
 - The product supports Aerodrome manual activity and Mellow strategies.
 - The app does not require the user to manually reconstruct transactions.
 
 ---
 
-## 4. Connected Application Layout
+# 5. Connected Application Layout
 
-### 4.1 Shell
+## 5.1 Shell
 
 Once a wallet is connected, the user is redirected to the connected app shell.
 
@@ -118,7 +565,7 @@ The connected layout must include:
 - Main content panel.
 - Optional top status bar for sync state, data age, chain, and selected wallet.
 
-### 4.2 Sidebar navigation
+## 5.2 Sidebar navigation
 
 Sidebar sections:
 
@@ -130,20 +577,20 @@ Sidebar sections:
 6. Activity
 7. Settings
 
-The original menu list included Overview, Pools, Positions, Activity, and Settings. This spec makes **Rewards** and **Governance** first-class sections because they are explicit product modules and should not be hidden inside Activity.
+Rewards and Governance are first-class sections because they are explicit product modules and should not be hidden inside Activity.
 
-### 4.3 Section availability states
+## 5.3 Section availability states
 
 Sections are enabled or disabled based on analysis status.
 
 Initial connected state:
 
 - Overview: enabled.
-- Pools: disabled.
-- Positions: disabled.
-- Rewards: disabled.
-- Governance: disabled.
-- Activity: disabled or limited to recent activity preview.
+- Pools: disabled until analysis ready.
+- Positions: disabled until analysis ready.
+- Rewards: disabled until analysis ready.
+- Governance: disabled until analysis ready.
+- Activity: disabled or limited to recent activity preview until analysis ready.
 - Settings: enabled.
 
 Reason:
@@ -151,34 +598,34 @@ Reason:
 - Overview can use recent API data from Moralis and Alchemy.
 - Deep sections require normalized historical analysis.
 
-### 4.4 Analysis CTA states
+## 5.4 Analysis CTA states
 
 The sidebar includes a CTA for starting wallet analysis.
 
 Supported states:
 
-#### Not analyzed
+### Not analyzed
 
 - CTA label: `Analyze wallet`
 - Sections requiring historical analysis are disabled.
 - Disabled sections should show lock/disabled styling and tooltip:
   - “Run historical analysis to unlock this section.”
 
-#### Analysis requested / queued
+### Analysis requested / queued
 
 - CTA label: `Queued`
 - CTA disabled.
 - Show message:
   - “Historical analysis queued. We’ll notify you when it’s ready.”
 
-#### Analysis running
+### Analysis running
 
 - CTA label: `Analyzing…`
 - CTA disabled.
 - Show progress state when available.
 - User can keep navigating Overview and any already available partial surfaces.
 
-#### Analysis ready
+### Analysis ready
 
 - CTA replaced or supplemented by status badge:
   - `Ready`
@@ -186,22 +633,22 @@ Supported states:
 - Sections unlock.
 - User can trigger refresh/update analysis when needed.
 
-#### Analysis failed
+### Analysis stale
+
+- Status badge:
+  - `Stale`
+- If older than 7 days, trigger incremental update automatically.
+- Existing analyzed sections remain available using last successful data.
+- Show update status.
+
+### Analysis failed
 
 - CTA label: `Retry analysis`
 - Show error summary.
 - Preserve all previously available data.
 - Do not block Overview.
 
-#### Analysis stale
-
-- Status badge:
-  - `Stale`
-- CTA label:
-  - `Update analysis`
-- Show last analysis timestamp.
-
-### 4.5 Polling behavior
+## 5.5 Polling behavior
 
 The frontend should poll the backend for wallet analysis status while a run is queued or running.
 
@@ -238,9 +685,9 @@ Polling cadence:
 
 ---
 
-## 5. Technical Architecture
+# 6. Technical Architecture
 
-### 5.1 Framework
+## 6.1 Framework
 
 The application will be developed in **Next.js**.
 
@@ -254,11 +701,43 @@ Next.js responsibilities:
 - Client-side dashboard rendering.
 - Integration with database and third-party APIs.
 
-### 5.2 Third-party APIs
+## 6.2 Wallet architecture
+
+Use:
+
+- wagmi
+- WalletConnect
+
+Architecture rule:
+
+- Screens/components must not call wagmi directly unless they are in the wallet adapter layer.
+- Create a The Cab wallet adapter/hook.
+- The app consumes wallet state from internal abstractions.
+
+Suggested files:
+
+```txt
+src/wallet/createWagmiConfig.ts
+src/wallet/CabWalletProvider.tsx
+src/wallet/useCabWallet.ts
+src/wallet/supportedChains.ts
+```
+
+Supported chain config:
+
+```ts
+export const SUPPORTED_CHAIN = {
+  id: 8453,
+  name: "Base",
+  network: "base"
+};
+```
+
+## 6.3 Third-party APIs
 
 The application integrates with two third-party API providers:
 
-#### Moralis
+### Moralis
 
 Primary use:
 
@@ -268,15 +747,16 @@ Primary use:
 - Token transfers.
 - NFT/position-related data when available.
 - Fast current and recent wallet overview.
+- Candidate historical transaction discovery.
 
-#### Alchemy
+### Alchemy
 
 Primary use:
 
 - Token prices.
 - Historical prices.
 - Price enrichment for event-time valuation.
-- Transaction/history support where useful.
+- Current valuation for snapshots.
 - Base chain data where Alchemy is stronger or more reliable.
 
 Important provider rule:
@@ -285,11 +765,11 @@ Important provider rule:
 - The expected pricing provider is Alchemy.
 - Provider abstractions may exist, but Alchemy must be the configured implementation for pricing in this spec.
 
-### 5.3 Data strategy
+## 6.4 Data strategy
 
 The product has two data layers:
 
-#### Fast recent layer
+### Fast recent layer
 
 Used for Overview before full analysis is complete.
 
@@ -301,22 +781,22 @@ Characteristics:
 - Used to populate current portfolio, recent activity, current balances, and basic charts.
 - Should expose coverage/limitations clearly.
 
-#### Historical analysis layer
+### Historical analysis layer
 
 Used for deep sections.
 
 Characteristics:
 
-- Triggered on demand by the user.
-- Runs asynchronously/non-blocking.
-- Fetches full wallet transaction history relevant to Aerodrome/Mellow.
+- Triggered on demand by the user or automatically when stale.
+- Runs asynchronously/non-blocking in Trigger.dev.
+- Fetches full wallet transaction history relevant to Aerodrome/Mellow up to one year.
 - Classifies transactions into normalized domain events.
 - Enriches events with historical prices.
 - Computes snapshots and metrics.
 - Stores normalized model in database.
 - Unlocks deep sections when complete.
 
-### 5.4 Database
+## 6.5 Database
 
 The product requires persistence for:
 
@@ -332,6 +812,10 @@ The product requires persistence for:
 - Portfolio snapshots.
 - Discarded/unsupported/ambiguous events.
 - Provider request metadata and coverage metadata.
+- Residual attribution states.
+- Raw provider records.
+- Reward events.
+- Governance events.
 
 Recommended database:
 
@@ -342,7 +826,7 @@ Implementation may use:
 - Drizzle ORM for typed schema and migrations.
 - Raw SQL migrations for auditability.
 
-### 5.5 API design
+## 6.6 API design
 
 Initial API surface:
 
@@ -364,27 +848,232 @@ POST /api/settings
 All wallet-specific endpoints must validate:
 
 - Wallet address format.
-- Supported chain.
-- Connected wallet matches requested wallet unless explicit read-only support is added.
+- Chain ID supported.
+- Connected wallet matches requested wallet via signature.
 - Analysis availability for deep routes.
 
 ---
 
-## 6. Design System
+# 7. Design System
 
-### 6.1 Requirement
+## 7.1 Requirement
 
-The Cab must have a coherent design system instead of ad hoc styling.
+The Cab must have a coherent internal Design System instead of ad hoc styling.
 
 The UI must integrate:
 
-- **Tamagui** as the component/styling system.
+- **Tamagui** as the low-level component/styling system.
 - **Google Fonts** for the brand font stack.
+- **Lucide React** as the icon library.
+- **Recharts** as the charting library.
 - Brand tokens derived from The Cab brand specification.
 - Reusable components for dashboard surfaces.
 - Consistent spacing, typography, surfaces, charts, and semantic states.
 
-### 6.2 Font stack
+## 7.2 Third-party library boundary rule
+
+All third-party UI libraries must be wrapped inside the internal The Cab Design System.
+
+The application must consume only internal DS exports.
+
+This means:
+
+- Product screens must not import Tamagui primitives directly.
+- Product screens must not import Lucide icons directly.
+- Product screens must not import Recharts components directly.
+- Product screens must not import raw Google font objects directly.
+- Product screens must not import third-party UI helpers directly.
+
+Instead, product code must import from:
+
+```ts
+import {
+  CabButton,
+  CabCard,
+  CabIcon,
+  CabLineChart,
+  CabAreaChart,
+  CabPoolValueChart,
+  CabRewardsTimelineChart,
+  CabSidebar,
+  CabMetricCard,
+} from "@/design-system";
+```
+
+Rationale:
+
+- If Tamagui, Lucide, Recharts, or another dependency changes later, the change is isolated to the Design System.
+- Product screens remain stable.
+- Brand consistency is enforceable.
+- AI-assisted coding has fewer opportunities to drift into arbitrary third-party usage.
+
+## 7.3 Approved third-party libraries for UI MVP
+
+### Component/styling base
+
+Use:
+
+- `tamagui`
+
+Usage:
+
+- Only inside DS primitives and composed DS components.
+- Product screens use Cab-prefixed components.
+
+### Icons
+
+Use:
+
+- `lucide-react`
+
+Usage:
+
+- Only inside `CabIcon` / icon registry wrappers.
+- Product screens should pass semantic icon names instead of importing icon components.
+
+Example:
+
+```tsx
+<CabIcon name="radar" size="sm" tone="signal" />
+<CabIcon name="wallet" size="md" tone="muted" />
+<CabIcon name="alert-triangle" size="sm" tone="warning" />
+```
+
+### Charts
+
+Use:
+
+- `recharts`
+
+Usage:
+
+- Only inside chart wrappers.
+- Product screens should pass typed chart data and config to DS chart components.
+- Product screens should not construct raw Recharts components.
+
+Example:
+
+```tsx
+<CabPoolValueChart
+  data={poolValueSeries}
+  series={[
+    { key: "deployedValueUsd", label: "Deployed" },
+    { key: "residualValueUsd", label: "Residual" },
+    { key: "rewardValueUsd", label: "Rewards" }
+  ]}
+/>
+```
+
+### Fonts
+
+Use Google Fonts:
+
+- `Orbitron`
+- `Inter`
+- `IBM Plex Mono`
+
+Usage:
+
+- Font loading/config belongs to app root and DS theme/tokens.
+- Product screens should use typography components or text variants.
+
+## 7.4 Suggested DS folder structure
+
+```txt
+src/design-system
+  index.ts
+
+  /tokens
+    colors.ts
+    fonts.ts
+    spacing.ts
+    radius.ts
+    shadows.ts
+    zIndex.ts
+
+  /theme
+    tamagui.config.ts
+    CabThemeProvider.tsx
+
+  /primitives
+    CabBox.tsx
+    CabText.tsx
+    CabStack.tsx
+    CabButton.tsx
+    CabCard.tsx
+    CabInput.tsx
+    CabBadge.tsx
+    CabSeparator.tsx
+    CabTooltip.tsx
+
+  /icons
+    CabIcon.tsx
+    iconRegistry.ts
+
+  /charts
+    CabChartFrame.tsx
+    CabLineChart.tsx
+    CabAreaChart.tsx
+    CabBarChart.tsx
+    CabDonutChart.tsx
+    CabPoolValueChart.tsx
+    CabPortfolioEvolutionChart.tsx
+    CabRewardsTimelineChart.tsx
+    CabRebalanceTimelineChart.tsx
+
+  /layout
+    DisconnectedShell.tsx
+    ConnectedShell.tsx
+    CabSidebar.tsx
+    CabTopNav.tsx
+    CabDashboardGrid.tsx
+    CabSectionHeader.tsx
+
+  /data-display
+    CabMetricCard.tsx
+    CabKpiStrip.tsx
+    CabDataPanel.tsx
+    CabCoverageBadge.tsx
+    CabAnalysisStatusBadge.tsx
+    CabTokenAmount.tsx
+    CabUsdValue.tsx
+    CabWalletAddress.tsx
+    CabTxHash.tsx
+
+  /feedback
+    CabEmptyState.tsx
+    CabPartialCoverageNotice.tsx
+    CabUnsupportedEventNotice.tsx
+    CabLoadingPanel.tsx
+    CabErrorPanel.tsx
+```
+
+## 7.5 Import policy
+
+Allowed in app/product screens:
+
+```ts
+import { CabButton, CabCard, CabText } from "@/design-system";
+import { useCabWallet } from "@/wallet/useCabWallet";
+```
+
+Forbidden in app/product screens:
+
+```ts
+import { Button } from "tamagui";
+import { Radar } from "lucide-react";
+import { LineChart } from "recharts";
+```
+
+Allowed inside Design System only:
+
+```ts
+import { Button, XStack, YStack } from "tamagui";
+import { Radar, Wallet, AlertTriangle } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis } from "recharts";
+```
+
+## 7.6 Font stack
 
 Use Google Fonts:
 
@@ -399,7 +1088,7 @@ Rules:
 - Use IBM Plex Mono only as a technical accent.
 - Apply `font-variant-numeric: tabular-nums` to financial values, balances, timestamps, tables, and KPI values.
 
-### 6.3 Tamagui token requirements
+## 7.7 Tamagui token requirements
 
 Create tokens for:
 
@@ -416,58 +1105,58 @@ Create tokens for:
 
 The implementation must avoid hardcoded colors spread throughout components. Brand values should come from tokens.
 
-### 6.4 Component families
+## 7.8 Component families
 
 Required reusable component groups:
 
-#### Layout
+### Layout
 
 - `DisconnectedShell`
 - `ConnectedShell`
-- `Sidebar`
-- `TopNav`
-- `DashboardGrid`
-- `SectionHeader`
+- `CabSidebar`
+- `CabTopNav`
+- `CabDashboardGrid`
+- `CabSectionHeader`
 
-#### Data display
+### Data display
 
-- `MetricCard`
-- `KpiStrip`
-- `DataPanel`
-- `ChartPanel`
-- `CoverageBadge`
-- `AnalysisStatusBadge`
-- `TokenAmount`
-- `UsdValue`
-- `WalletAddress`
-- `TxHash`
+- `CabMetricCard`
+- `CabKpiStrip`
+- `CabDataPanel`
+- `CabChartPanel`
+- `CabCoverageBadge`
+- `CabAnalysisStatusBadge`
+- `CabTokenAmount`
+- `CabUsdValue`
+- `CabWalletAddress`
+- `CabTxHash`
 
-#### Navigation
+### Navigation
 
-- `SidebarNavItem`
-- `SectionLockState`
-- `AnalysisCta`
-- `RangeSelector`
-- `FilterBar`
+- `CabSidebarNavItem`
+- `CabSectionLockState`
+- `CabAnalysisCta`
+- `CabRangeSelector`
+- `CabFilterBar`
 
-#### Feedback
+### Feedback
 
-- `EmptyState`
-- `PartialCoverageNotice`
-- `UnsupportedEventNotice`
-- `LoadingPanel`
-- `ErrorPanel`
+- `CabEmptyState`
+- `CabPartialCoverageNotice`
+- `CabUnsupportedEventNotice`
+- `CabLoadingPanel`
+- `CabErrorPanel`
 
-#### DeFi analytics
+### DeFi analytics
 
-- `PoolCard`
-- `PositionCard`
-- `RewardTimeline`
-- `ActivityEventRow`
-- `RebalanceMarker`
-- `ResidualAttributionPanel`
+- `CabPoolCard`
+- `CabPositionCard`
+- `CabRewardTimeline`
+- `CabActivityEventRow`
+- `CabRebalanceMarker`
+- `CabResidualAttributionPanel`
 
-### 6.5 Chart styling
+## 7.9 Chart styling
 
 Charts should feel like instrumentation, not retail trading toys.
 
@@ -482,21 +1171,32 @@ Rules:
 - Avoid rainbow palettes.
 - Avoid noisy chart decoration.
 
+## 7.10 DS acceptance criteria
+
+The implementation is not acceptable if:
+
+- Product screens import from `tamagui`.
+- Product screens import from `lucide-react`.
+- Product screens import from `recharts`.
+- Product screens use hardcoded brand colors instead of tokens.
+- Product screens build custom chart primitives directly.
+- Product screens bypass Cab-prefixed DS components for common UI.
+
 ---
 
-## 7. Background Historical Analysis Job
+# 8. Background Historical Analysis Job
 
-### 7.1 Purpose
+## 8.1 Purpose
 
 The background analysis job reconstructs the historical Aerodrome/Mellow activity of a wallet.
 
 It must populate the domain model so each section can display historical data clearly and consistently.
 
-The job is not a general open-ended chain indexer. It is a wallet-scoped, user-requested reconstruction pipeline.
+The job is not a general open-ended chain indexer. It is a wallet-scoped, user-requested or stale-triggered reconstruction pipeline.
 
-### 7.2 Job trigger
+## 8.2 Job trigger
 
-The user starts analysis from the connected sidebar CTA.
+The user starts analysis from the connected sidebar CTA, or the app triggers update when analysis is older than one week.
 
 Frontend call:
 
@@ -510,7 +1210,7 @@ Request:
 {
   "walletAddress": "0x...",
   "chainId": 8453,
-  "mode": "full_history"
+  "mode": "full_history | incremental_update"
 }
 ```
 
@@ -523,45 +1223,52 @@ Response:
 }
 ```
 
-### 7.3 Serverless hosting constraint
+## 8.3 Trigger.dev architecture
 
-The app is expected to run on a serverless host such as Vercel.
+Trigger.dev task:
 
-Vercel serverless functions are not ideal for long-running processes. Therefore, the background job must be designed as one of the following:
+```ts
+export const analyzeWalletTask = task({
+  id: "analyze-wallet",
+  run: async ({ runId, walletAddress, chainId, mode }) => {
+    // run wallet analysis pipeline
+  }
+});
+```
 
-#### Preferred approach: external job runner
+Responsibilities:
 
-Use a durable queue/worker system for long-running analysis.
+- Fetch relevant wallet history.
+- Persist raw provider records.
+- Classify events.
+- Enrich with prices.
+- Build ledger events and asset movements.
+- Track residual attribution.
+- Compute snapshots.
+- Mark analysis ready/failed.
 
-Recommended options:
+Next.js responsibilities:
 
-- Inngest
-- Trigger.dev
-- Upstash QStash + worker endpoint
-- Vercel Cron + resumable chunks
-- A separate worker service
+- Validate wallet/chain.
+- Create/update `AnalysisRun`.
+- Trigger the task.
+- Return immediately.
+- Expose status to UI.
 
-The Next.js API route enqueues the job and returns immediately.
+## 8.4 Serverless hosting constraint
 
-#### Acceptable approach: chunked resumable serverless jobs
+Vercel serverless functions are not ideal for long-running processes. Therefore:
 
-If no external worker is used initially, the analysis must be split into resumable chunks.
+- Do not process full wallet history inside a single Next.js route.
+- Use Trigger.dev for long-running work.
+- Next.js routes should only enqueue and report status.
+- Trigger.dev should own the analysis lifecycle.
 
-Rules:
-
-- Each function invocation processes a bounded slice.
-- Progress is persisted.
-- The next slice is scheduled or triggered.
-- The job can resume after timeout or failure.
-- Idempotency keys prevent duplicate event creation.
-
-Do not attempt to process the entire wallet history in a single Vercel function invocation.
-
-### 7.4 Analysis pipeline stages
+## 8.5 Analysis pipeline stages
 
 The pipeline should be deterministic and restartable.
 
-#### Stage 1 — Initialize run
+### Stage 1 — Initialize run
 
 Create `AnalysisRun`.
 
@@ -581,9 +1288,15 @@ Fields:
 - `errorMessage`
 - `coverageSummary`
 
-#### Stage 2 — Fetch transaction history
+### Stage 2 — Fetch transaction history
 
 Fetch wallet history from Moralis/Alchemy.
+
+Scope:
+
+- Base mainnet.
+- Last 365 days.
+- Include older activity only when needed to understand an open position.
 
 Filter for:
 
@@ -596,11 +1309,11 @@ Filter for:
 - Voting/relay contracts.
 - Mellow wrapper/staking contracts.
 - Token transfers relevant to these operations.
-- Swaps involving pool tokens around withdraw/deposit windows.
+- Swaps involving pool tokens around residual attribution states.
 
 Persist raw provider records or raw event envelopes for auditability.
 
-#### Stage 3 — Identify supported protocol surfaces
+### Stage 3 — Identify supported protocol surfaces
 
 Classify raw transactions into supported interaction families:
 
@@ -613,7 +1326,7 @@ Classify raw transactions into supported interaction families:
 - Unknown/unsupported.
 - Malicious/spam.
 
-#### Stage 4 — Normalize ledger events
+### Stage 4 — Normalize ledger events
 
 Convert raw transactions/logs/transfers into canonical `LedgerEvent` records.
 
@@ -637,7 +1350,7 @@ Examples:
 
 Each event should include confidence metadata.
 
-#### Stage 5 — Build asset movements
+### Stage 5 — Build asset movements
 
 For each ledger event, create token-level `AssetMovement` records.
 
@@ -651,7 +1364,7 @@ Each movement must include:
 - USD value at event time.
 - Price source.
 
-#### Stage 6 — Price enrichment
+### Stage 6 — Price enrichment
 
 Use Alchemy for historical price enrichment.
 
@@ -663,7 +1376,7 @@ Requirements:
 - If exact timestamp pricing is unavailable, use nearest acceptable resolution and mark confidence accordingly.
 - Avoid silently using another provider.
 
-#### Stage 7 — Build pools, strategies, and positions
+### Stage 7 — Build pools, strategies, and positions
 
 Create or update:
 
@@ -686,30 +1399,27 @@ Mellow position identity:
 - Do not treat Mellow as if user directly owns the underlying Aerodrome NFT.
 - Use wrapper/staking/share behavior as the identity basis.
 
-#### Stage 8 — Detect rebalances
+### Stage 8 — Track residual attribution and detect rebalances
 
-A rebalance is not merely any swap.
+Rebalance detection is residual-balance-based.
 
-A rebalance inference should be made when a sequence suggests:
+When a pool withdrawal occurs:
 
-1. Withdraw/decrease exposure from a pool.
-2. Swap one or both pool assets.
-3. Deposit/increase exposure in the same or related pool.
-4. The sequence happens within a bounded time window.
-5. Asset flow supports the interpretation.
+- Create residual attribution for withdrawn pool tokens.
+- Mark attribution state as `waiting_for_rebalance`.
+- Keep attribution open indefinitely until resolved.
 
-Rebalance detection must preserve economic continuity:
+When a later movement uses attributed token balance:
 
-- Pool value must not reset to zero just because a withdraw occurred.
-- Withdrawn pool assets remain attributed to that pool until:
-  - They are transferred away.
-  - They are swapped into unrelated assets.
-  - They are explicitly redeployed elsewhere.
-  - The inference window closes and idle balances are reclassified according to attribution rules.
+- If swapped into the paired token of the same pool: classify as same-pool rebalance.
+- If swapped into an unrelated token: classify as liquidation/cashout from the pool.
+- If swapped into a token associated with another active/tracked pool: classify as transfer/reassignment where supported.
+- If transferred out of the wallet: classify as external cashout.
+- If redeposited into same pool: classify as redeployment.
 
-This is especially important when multiple pools share the same token.
+This avoids misleading pool charts that drop to zero during a rebalance process.
 
-#### Stage 9 — Compute snapshots
+### Stage 9 — Compute snapshots
 
 Compute reusable snapshots for:
 
@@ -728,11 +1438,12 @@ Metrics:
 - Reward realized USD.
 - Asset price effect.
 - Rebalance realized USD.
-- Estimated annualized return.
 - Idle asset value.
+- Residual attributed value.
+- Estimated annualized return.
 - Coverage/confidence.
 
-#### Stage 10 — Mark run complete
+### Stage 10 — Mark run complete
 
 When successful:
 
@@ -749,7 +1460,7 @@ When failed:
 - Preserve partial data if safe.
 - Show retry CTA.
 
-### 7.5 Idempotency
+## 8.6 Idempotency
 
 Every analysis stage must be idempotent.
 
@@ -760,10 +1471,11 @@ Recommended unique keys:
 - `PricePoint`: tokenAddress + timestamp bucket + source + resolution.
 - `PositionInstance`: strategy + tokenId for manual, strategy + wrapper/share identity for Mellow.
 - `AnalysisRun`: runId.
+- `AttributionState`: wallet + poolId + tokenAddress + sourceLedgerEventId.
 
 A repeated run must not duplicate events or inflate metrics.
 
-### 7.6 Incremental updates
+## 8.7 Incremental updates
 
 After an initial full historical run, future updates should be incremental.
 
@@ -775,13 +1487,18 @@ Update behavior:
 - Preserve previous historical data.
 - Mark old snapshots as superseded if snapshot versioning is used.
 
+Auto-update rule:
+
+- If last successful analysis is older than 7 days, trigger incremental update.
+- Keep previous ready data visible while the update runs.
+
 ---
 
-## 8. Domain Model
+# 9. Domain Model
 
-The initial attached data model is a strong base and should be retained as the primary structure, with several additions for this product spec.
+The initial data model remains the primary structure, with additions required for analysis status, raw provider auditability, residual attribution, rewards, governance, and coverage.
 
-### 8.1 Existing core model
+## 9.1 Existing core model
 
 The model includes:
 
@@ -797,7 +1514,7 @@ The model includes:
 - `PortfolioSnapshot`
 - `DiscardedEvent`
 
-The design principles are correct:
+Design principles:
 
 - Pool-first analysis.
 - Strategy isolation.
@@ -805,13 +1522,9 @@ The design principles are correct:
 - Ledger-first truth.
 - Portfolio completeness.
 
-### 8.2 Required additions
+## 9.2 Required additions
 
-The following entities should be added or explicitly modeled.
-
----
-
-### 8.3 AnalysisRun
+### AnalysisRun
 
 Represents one requested wallet analysis process.
 
@@ -846,15 +1559,7 @@ Status candidates:
 - `stale`
 - `cancelled`
 
-Purpose:
-
-- Powers sidebar CTA and polling.
-- Supports resumable jobs.
-- Provides user-facing analysis status.
-
----
-
-### 8.4 RawProviderRecord
+### RawProviderRecord
 
 Stores raw API records used for reconstruction.
 
@@ -872,19 +1577,9 @@ Fields:
 - `payloadJson`
 - `createdAt`
 
-Purpose:
+### GovernanceEvent
 
-- Auditability.
-- Debugging.
-- Reclassification.
-- Provider comparison.
-- Reprocessing without refetching where possible.
-
----
-
-### 8.5 GovernanceEvent
-
-Governance can be represented through `LedgerEvent`, but a dedicated derived entity will make the Governance section easier to query.
+Governance can be represented through `LedgerEvent`, but a dedicated derived entity makes the Governance section easier to query.
 
 Fields:
 
@@ -898,6 +1593,7 @@ Fields:
 - `amountAero`
 - `amountUsdAtEvent`
 - `voteTarget`
+- `poolId`
 - `epoch`
 - `feesClaimedUsd`
 - `rewardTokenAddress`
@@ -917,13 +1613,7 @@ Event types:
 - `claim_bribes`
 - `claim_rebase`
 
-Purpose:
-
-- Supports veAERO and voting analytics without overloading position analytics.
-
----
-
-### 8.6 RewardEvent
+### RewardEvent
 
 Rewards can also be represented through `LedgerEvent`, but a dedicated derived entity helps Rewards analytics.
 
@@ -934,6 +1624,7 @@ Fields:
 - `poolId`
 - `strategyId`
 - `positionInstanceId`
+- `governanceEventId`
 - `rewardType`
 - `txHash`
 - `timestamp`
@@ -953,15 +1644,9 @@ Reward types:
 - `rebase`
 - `unknown_reward`
 
-Purpose:
+### AttributionState
 
-- Enables rewards timeline, totals, distribution, and annualized return.
-
----
-
-### 8.7 AttributionState
-
-Tracks temporarily attributed residual assets after withdraw/rebalance operations.
+Tracks residual pool-attributed assets after withdraw/rebalance operations.
 
 Fields:
 
@@ -979,24 +1664,23 @@ Fields:
 - `closeReason`
 - `confidence`
 
-Status:
+Status candidates:
 
-- `active`
-- `redeployed`
-- `swapped_unrelated`
-- `transferred_out`
-- `expired`
-- `closed`
+- `waiting_for_rebalance`
+- `rebalanced_same_pool`
+- `redeployed_same_pool`
+- `transferred_to_other_pool`
+- `liquidated_to_unrelated_asset`
+- `transferred_to_external_wallet`
+- `fully_spent`
+- `still_waiting`
 
-Purpose:
+Important:
 
-- Solves pool-level continuity when assets are withdrawn but not yet economically exited.
-- Prevents pool value from going to zero during rebalance flows.
-- Handles multiple pools sharing a token by preserving per-pool attribution.
+- There is no expiration status.
+- Attribution does not expire due to elapsed time.
 
----
-
-### 8.8 CoverageReport
+### CoverageReport
 
 Captures completeness and confidence.
 
@@ -1022,16 +1706,11 @@ Coverage statuses:
 - `limited`
 - `failed`
 
-Purpose:
-
-- Prevents false precision.
-- Allows the UI to show “partial coverage” or “unsupported event” warnings.
-
 ---
 
-## 9. Metrics & Financial Semantics
+# 10. Metrics & Financial Semantics
 
-### 9.1 Base valuation
+## 10.1 Base valuation
 
 All primary analytics should be USD/USDC-centric.
 
@@ -1043,7 +1722,7 @@ Rules:
 - Store current USD valuations for open exposure.
 - Never mix nominal token amount returns with USD returns without labeling clearly.
 
-### 9.2 Capital entered
+## 10.2 Capital entered
 
 Capital entered is external value deployed into an Aerodrome/Mellow/governance scope.
 
@@ -1056,7 +1735,7 @@ Examples:
 
 Do not count internal movement twice.
 
-### 9.3 Capital withdrawn
+## 10.3 Capital withdrawn
 
 Capital withdrawn is value leaving a tracked scope.
 
@@ -1068,9 +1747,9 @@ Examples:
 - Swap into unrelated assets after exiting a pool.
 - Unlock/exit governance exposure when applicable.
 
-### 9.4 Residual pool capital
+## 10.4 Residual pool capital
 
-When a user withdraws from a pool but keeps the withdrawn assets in the wallet, those assets may remain economically attributed to the pool during a rebalance window.
+When a user withdraws from a pool but keeps the withdrawn assets in the wallet, those assets remain economically attributed to the pool until resolved by actual movement.
 
 This is required because:
 
@@ -1079,14 +1758,17 @@ This is required because:
 - Multiple pools may share one token.
 - Pool-level charts should show economic continuity.
 
-Residual attribution ends when:
+Residual attribution ends only when:
 
 - The assets are transferred out.
 - The assets are swapped into unrelated assets.
-- The assets are redeployed into another pool and attribution is explicitly moved.
-- The attribution inference expires.
+- The assets are swapped into a same-pool token as rebalance.
+- The assets are redeployed into the same pool.
+- The assets are transferred/reassigned to another pool.
 
-### 9.5 Realized PnL
+Residual attribution does not expire.
+
+## 10.5 Realized PnL
 
 Realized PnL should reflect value made or lost when capital is closed, withdrawn, swapped, claimed, or otherwise crystallized.
 
@@ -1097,7 +1779,7 @@ Examples:
 - Gains/losses from rebalance swaps.
 - Difference between capital entered and capital withdrawn for closed exposure.
 
-### 9.6 Unrealized PnL
+## 10.6 Unrealized PnL
 
 Unrealized PnL reflects current market value change of open exposure.
 
@@ -1108,7 +1790,7 @@ Examples:
 - Idle residual pool assets still attributed to a pool.
 - veAERO lock value where supported.
 
-### 9.7 Asset price effect
+## 10.7 Asset price effect
 
 Asset price effect isolates gains/losses caused by market movement of held assets.
 
@@ -1120,7 +1802,7 @@ This should be separated from:
 - Fresh capital deposits.
 - Withdrawals.
 
-### 9.8 Rewards return
+## 10.8 Rewards return
 
 Rewards return includes realized claimed value from:
 
@@ -1133,7 +1815,7 @@ Rewards return includes realized claimed value from:
 
 Rewards should be shown separately from total PnL and also included in total return when appropriate.
 
-### 9.9 Estimated annualized return
+## 10.9 Estimated annualized return
 
 Annualized return must be labeled as estimated.
 
@@ -1153,11 +1835,9 @@ Requirements:
 
 ---
 
-# 10. Application Sections
+# 11. Application Sections
 
----
-
-## 10.1 Landing
+## 11.1 Landing
 
 ### Purpose
 
@@ -1216,7 +1896,7 @@ Steps:
 3. Start historical analysis.
 4. Continue browsing while analysis runs.
 5. Unlock full analytics when ready.
-6. Refresh analysis later.
+6. Refresh analysis later or let stale data auto-update.
 
 #### Trust and privacy
 
@@ -1240,7 +1920,7 @@ Mention:
 
 ---
 
-## 10.2 Overview
+## 11.2 Overview
 
 ### Purpose
 
@@ -1259,7 +1939,7 @@ It should work even when historical analysis has not been run.
 Initial Overview data should use:
 
 - Moralis wallet/portfolio APIs.
-- Alchemy price/current and historical pricing APIs.
+- Alchemy current and historical pricing APIs.
 - Locally stored snapshots if historical analysis is ready.
 
 Default time range:
@@ -1392,7 +2072,7 @@ If no Aerodrome activity is found:
 
 ---
 
-## 10.3 Pools
+## 11.3 Pools
 
 ### Purpose
 
@@ -1450,8 +2130,6 @@ Filters:
 
 #### Pool detail
 
-For each pool:
-
 ##### Pool header
 
 Display:
@@ -1472,8 +2150,8 @@ Chart pool value over time.
 
 Important rule:
 
-- Pool value must not reset to zero simply because of a withdraw if withdrawn assets remain attributable to that pool during a rebalance window.
-- Residual assets should remain part of pool-level value until attribution closes.
+- Pool value must not reset to zero simply because of a withdraw if withdrawn assets remain attributable to that pool.
+- Residual assets should remain part of pool-level value until attribution resolves.
 
 Series:
 
@@ -1524,8 +2202,7 @@ Fields:
 - Amount.
 - USD value.
 - Source withdraw event.
-- Attribution age.
-- Status.
+- Attribution status.
 - Confidence.
 
 This is necessary because several pools may share the same token, and residual balances must be tracked individually per pool.
@@ -1536,10 +2213,11 @@ When a withdraw occurs:
 
 - Create or update `AttributionState`.
 - Keep withdrawn token amounts attributed to original pool.
-- If matching deposit/rebalance occurs, close or move attribution.
-- If token is transferred away, close attribution as `transferred_out`.
-- If token is swapped into unrelated assets, close as `swapped_unrelated`.
-- If timeout expires, close as `expired` or mark low confidence.
+- If matching same-pool token swap occurs, classify as rebalance.
+- If token is transferred away, close attribution as `transferred_to_external_wallet`.
+- If token is swapped into unrelated assets, close as `liquidated_to_unrelated_asset`.
+- If token moves into another tracked pool, transfer/reassign attribution where supported.
+- Never expire attribution merely because time passed.
 
 ### Acceptance criteria
 
@@ -1553,7 +2231,7 @@ When a withdraw occurs:
 
 ---
 
-## 10.4 Positions
+## 11.4 Positions
 
 ### Purpose
 
@@ -1713,7 +2391,7 @@ Display:
 
 ---
 
-## 10.5 Rewards
+## 11.5 Rewards
 
 ### Purpose
 
@@ -1807,7 +2485,7 @@ Important:
 
 ---
 
-## 10.6 Governance
+## 11.6 Governance
 
 ### Purpose
 
@@ -1889,6 +2567,8 @@ Show:
 - USD value at claim.
 - Source epoch/pool/vote.
 
+Governance rewards should be allocated and displayed by pool where Aerodrome provides that association.
+
 #### Relay participation
 
 Show:
@@ -1904,10 +2584,11 @@ Show:
 - Vote and fee history is grouped by epoch when possible.
 - Relay participation is detected where supported.
 - Unsupported governance actions are surfaced with partial coverage notices.
+- Governance rewards can be displayed by pool.
 
 ---
 
-## 10.7 Activity
+## 11.7 Activity
 
 ### Purpose
 
@@ -1982,9 +2663,9 @@ Clicking an activity item should show:
 For an event classified as `rebalance`, show:
 
 - Related withdraw/decrease event.
+- Related residual attribution state.
 - Related swap(s).
-- Related deposit/increase event.
-- Time window.
+- Related deposit/increase event if applicable.
 - Token flow.
 - Pool attribution effect.
 - Confidence.
@@ -1999,7 +2680,7 @@ For an event classified as `rebalance`, show:
 
 ---
 
-## 10.8 Settings
+## 11.8 Settings
 
 ### Purpose
 
@@ -2026,7 +2707,7 @@ Settings is available after wallet connection.
 - Update incremental analysis.
 - Retry failed analysis.
 - Clear local UI cache.
-- Optional: delete stored wallet analysis data.
+- Optional later: delete stored wallet analysis data.
 
 #### Display
 
@@ -2052,11 +2733,11 @@ Settings is available after wallet connection.
 
 ---
 
-# 11. Branding
+# 12. Branding
 
 The Cab must follow the approved brand specification.
 
-## 11.1 Brand positioning
+## 12.1 Brand positioning
 
 The Cab should feel:
 
@@ -2064,6 +2745,7 @@ The Cab should feel:
 - Futuristic.
 - Precise.
 - Premium.
+- Masculine.
 - Crypto-native.
 - Aviation-inspired.
 - Dashboard-first.
@@ -2078,7 +2760,7 @@ It should not feel:
 - Neon cyberpunk chaos.
 - Retail-trading gimmick.
 
-## 11.2 Core concept
+## 12.2 Core concept
 
 The Cab is a **control tower for on-chain portfolios**.
 
@@ -2093,7 +2775,7 @@ The visual system should communicate:
 
 The UI should feel like a **premium control surface**, not a casual crypto dashboard.
 
-## 11.3 Visual direction
+## 12.3 Visual direction
 
 Chosen direction:
 
@@ -2119,7 +2801,7 @@ Avoid:
 - Cluttered futuristic noise.
 - Sci-fi UI tropes that reduce usability.
 
-## 11.4 Color palette
+## 12.4 Color palette
 
 ### Brand core
 
@@ -2149,7 +2831,7 @@ Avoid:
 - Danger: `#EF4444`
 - Info: `#38BDF8`
 
-## 11.5 Typography
+## 12.5 Typography
 
 Use:
 
@@ -2157,7 +2839,7 @@ Use:
 - Inter for navigation, cards, body copy, labels, tables, controls.
 - IBM Plex Mono for wallet snippets, tx hashes, timestamps, block numbers, diagnostic metadata.
 
-## 11.6 Brand copy tone
+## 12.6 Brand copy tone
 
 Copy should feel:
 
@@ -2187,19 +2869,22 @@ Avoid:
 
 ---
 
-# 12. Implementation Priorities
+# 13. Implementation Priorities
 
 ## Phase 1 — Product shell + landing + connected overview
 
 Deliver:
 
 - Landing page.
-- Wallet connection flow.
+- WalletConnect + wagmi connection flow.
+- Base mainnet enforcement.
 - Connected shell.
 - Sidebar.
 - Analysis CTA states.
 - Overview with recent data from Moralis/Alchemy.
-- Tamagui design system tokens and core components.
+- Tamagui-based internal DS tokens and core components.
+- Lucide wrapped via DS.
+- Recharts wrapped via DS.
 - Settings basics.
 
 Do not require historical analysis for Overview.
@@ -2208,9 +2893,10 @@ Do not require historical analysis for Overview.
 
 Deliver:
 
+- Trigger.dev integration.
 - `AnalysisRun`.
 - Start/status endpoints.
-- Durable or resumable background processing.
+- Durable background processing.
 - Provider fetch pipeline.
 - Raw provider record persistence.
 - Basic event classification.
@@ -2227,8 +2913,8 @@ Deliver:
 - Asset movements.
 - Activity section.
 - Pool list/detail.
-- Basic rebalance detection.
-- Residual attribution state.
+- Residual attribution model.
+- Rebalance detection based on remaining pool-attributed balances.
 
 ## Phase 4 — Positions + rewards
 
@@ -2252,6 +2938,7 @@ Deliver:
 - Voting fees.
 - Bribes/rebases.
 - Governance analytics section.
+- Governance reward display by pool.
 
 ## Phase 6 — Refinement
 
@@ -2261,69 +2948,76 @@ Deliver:
 - Confidence scoring.
 - Improved annualized return formula.
 - More robust Mellow accounting.
-- Better rebalance inference.
+- Better cross-pool attribution.
 - Incremental analysis updates.
 - Performance optimization.
 
 ---
 
-# 13. Acceptance Criteria Summary
+# 14. Acceptance Criteria Summary
 
 The implementation is acceptable when:
 
 - Disconnected users see a branded landing page and can connect wallet.
+- Wallet connection uses WalletConnect + wagmi.
+- MVP supports Base mainnet only.
 - Connected users immediately see Overview without waiting for full historical analysis.
-- Historical analysis runs asynchronously and does not block the UI.
+- Historical analysis runs asynchronously through Trigger.dev and does not block the UI.
 - Sidebar sections unlock based on analysis status.
-- Moralis is used for wallet/portfolio data.
+- Moralis is used for wallet/portfolio/history data.
 - Alchemy is used for pricing and historical pricing.
 - CoinGecko or unapproved providers are not introduced.
-- The app has a Tamagui-based design system using The Cab brand tokens and Google Fonts.
-- Pool analytics preserve capital continuity across withdraw/swap/deposit rebalances.
+- The app has a Tamagui-based internal Design System using The Cab brand tokens and Google Fonts.
+- Lucide React is used only through DS icon wrappers.
+- Recharts is used only through DS chart wrappers.
+- Product screens do not import third-party UI libraries directly.
+- Pool analytics preserve capital continuity across withdraw/swap/deposit/rebalance flows.
 - Residual assets are attributed per pool, not globally per token.
+- Residual attribution does not expire.
 - Manual and Mellow strategies are separated.
 - Positions are lifecycle-based.
+- Mellow accounting uses reliably available contract events and marks partial coverage where needed.
 - Rewards are claim-based, time-valued, and grouped by source.
+- Governance rewards are displayed by pool where supported.
 - Governance is modeled separately from LP positions.
 - Activity provides transaction-level explainability.
 - All metrics expose confidence/coverage when incomplete.
 - Annualized return is labeled as estimated and based on historical capital, not just current portfolio value.
+- Wallet analysis data is stored permanently.
+- Analysis auto-refreshes when older than one week.
+- No CSV/export is implemented in MVP.
 - The product stays analytics-only and never executes user transactions.
 
 ---
 
-# 14. Open Questions
+# 15. External Source References
 
-These questions should be resolved before or during implementation planning:
+Use official sources of truth where possible:
 
-1. Which wallet connection library should be used: RainbowKit, wagmi connectors, Privy, ConnectKit, or another provider?
-2. Should the MVP support only Base mainnet, or also Base Sepolia for testing?
-3. What exact Moralis endpoints will be used for wallet balances, token transfers, NFT positions, and transaction history?
-4. What exact Alchemy endpoints will be used for current and historical token pricing?
-5. What background job provider should be used for Vercel deployment: Inngest, Trigger.dev, QStash, or another worker?
-6. What is the maximum wallet history size expected in MVP?
-7. What is the rebalance inference time window: minutes, hours, or same-day?
-8. How long should residual attribution remain active before expiring?
-9. Which Aerodrome and Mellow contracts are included in MVP support?
-10. How should governance rewards be allocated when voting fees are tied to multiple voted pools?
-11. Should the user be able to export CSV data from Activity, Pools, Rewards, and Positions?
-12. Should The Cab store wallet analysis data permanently, or expire old analysis records?
-13. Should analysis refresh automatically after a ready run, or only on user request?
-14. What level of Mellow share accounting is required for MVP versus later phases?
+- Moralis Wallet API documentation for wallet balances, history, transfers, NFTs, and decoded activity.
+- Alchemy Prices API documentation for current and historical token prices.
+- Trigger.dev Next.js and Vercel integration documentation for background jobs.
+- Aerodrome official contract/address documentation and verified router contract source for Router/Factory/AERO discovery.
+- Mellow official Aerodrome CL strategy contract address documentation.
+
+Do not maintain custom protocol address lists when official discovery or official documentation is available.
+Do not add unapproved providers for pricing or wallet analytics.
 
 ---
 
-# 15. Copilot Implementation Note
+# 16. Copilot Implementation Note
 
 When implementing this spec, prioritize:
 
 1. Fast connected Overview.
 2. Clear async analysis status.
-3. Ledger/event model correctness.
-4. Pool-level continuity and rebalance attribution.
-5. Strategy separation between manual and Mellow.
-6. Readable, trusted dashboard UI.
-7. Strict brand consistency.
-8. No unapproved third-party provider drift.
+3. Correct DS boundaries and no direct third-party UI imports in product screens.
+4. Ledger/event model correctness.
+5. Residual attribution model.
+6. Pool-level continuity and rebalance attribution.
+7. Strategy separation between manual and Mellow.
+8. Readable, trusted dashboard UI.
+9. Strict brand consistency.
+10. No unapproved third-party provider drift.
 
 If a metric cannot be computed confidently, show partial coverage instead of inventing precision.
