@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { useSwitchChain } from "wagmi";
 import { base } from "wagmi/chains";
 
@@ -10,11 +11,29 @@ import {
   switchConnectedWalletTestOverrideToBase,
   useConnectedWalletAnalysis
 } from "@/ui/wallet/use-connected-wallet-analysis";
-import { ConnectedWalletAccountingPanel } from "@/ui/wallet/connected-wallet-ledger";
+import { CashFlowPanel } from "@/ui/wallet/cash-flow-panel";
+import { MigrationFlowPanel } from "@/ui/wallet/migration-flow-panel";
+import { PortfolioHistoryChart } from "@/ui/wallet/portfolio-history-chart";
 
 type ConnectedWalletAnalysisViewProps = {
   sessionId: string;
 };
+
+type ActivityItem = {
+  id: string;
+  timestamp: string;
+  label: string;
+  detail: string;
+  tone: "neutral" | "success" | "warning";
+};
+
+const ALLOCATION_COLORS = ["#00e0e1", "#3b82f6", "#f2c14e", "#22c55e", "#fb7185", "#a78bfa"];
+
+const usdFormatter = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+  maximumFractionDigits: 2
+});
 
 function formatBlockNumber(value: number | null | undefined) {
   if (value == null) {
@@ -22,6 +41,15 @@ function formatBlockNumber(value: number | null | undefined) {
   }
 
   return new Intl.NumberFormat("en-US").format(value);
+}
+
+function formatUsd(value: string | number | null | undefined) {
+  const numeric = typeof value === "number" ? value : Number(value ?? 0);
+  if (!Number.isFinite(numeric)) {
+    return "$0.00";
+  }
+
+  return usdFormatter.format(numeric);
 }
 
 function formatRunProgress(run: NonNullable<ConnectedWalletAnalysisResult["sessionStatus"]>["latestRun"]) {
@@ -33,22 +61,60 @@ function formatRunProgress(run: NonNullable<ConnectedWalletAnalysisResult["sessi
   const fromBlock = run.fromBlock;
   const toBlock = run.toBlock;
   const hasProgressRange = fromBlock != null && toBlock != null && latestProcessedBlock != null;
-  const progressPercent = hasProgressRange && toBlock >= fromBlock
-    ? Math.max(
-        0,
-        Math.min(
-          100,
-          Math.round(
-            ((latestProcessedBlock - fromBlock + 1) / (toBlock - fromBlock + 1)) * 100
-          )
+  const progressPercent =
+    hasProgressRange && toBlock >= fromBlock
+      ? Math.max(
+          0,
+          Math.min(100, Math.round(((latestProcessedBlock - fromBlock + 1) / (toBlock - fromBlock + 1)) * 100))
         )
-      )
-    : null;
+      : null;
 
   return {
     latestProcessedBlock,
     progressPercent
   };
+}
+
+function formatTimestamp(value: string) {
+  const timestamp = new Date(value);
+  if (Number.isNaN(timestamp.getTime())) {
+    return value;
+  }
+
+  return timestamp.toLocaleString();
+}
+
+function buildRecentActivity(analysis: ReturnType<typeof useConnectedWalletAnalysis>): ActivityItem[] {
+  const markerItems = (analysis.accountingTimeSeries?.eventMarkers ?? []).slice(-8).map((marker) => ({
+    id: `marker:${marker.ledgerRecordId}:${marker.markerType}`,
+    timestamp: marker.timestamp,
+    label: marker.label,
+    detail: marker.markerType,
+    tone:
+      marker.markerType === "close" || marker.markerType === "other"
+        ? ("warning" as const)
+        : ("success" as const)
+  }));
+
+  const flowItems = (analysis.accountingRebalanceFlows?.flows ?? []).slice(-5).map((flow) => ({
+    id: `flow:${flow.flowId}`,
+    timestamp: flow.timestamp,
+    label: "Position migration",
+    detail: `${flow.fromPoolId} -> ${flow.toPoolId}`,
+    tone: "neutral" as const
+  }));
+
+  const discardedItems = (analysis.discardedActivity?.items ?? []).slice(0, 4).map((item) => ({
+    id: `discarded:${item.discardedActivityId}`,
+    timestamp: item.timestamp,
+    label: "Discarded activity",
+    detail: item.reasonType,
+    tone: "warning" as const
+  }));
+
+  return [...markerItems, ...flowItems, ...discardedItems]
+    .sort((left, right) => right.timestamp.localeCompare(left.timestamp))
+    .slice(0, 10);
 }
 
 export function ConnectedWalletAnalysisView({ sessionId }: ConnectedWalletAnalysisViewProps) {
@@ -59,6 +125,19 @@ export function ConnectedWalletAnalysisView({ sessionId }: ConnectedWalletAnalys
   const latestRunProgress = formatRunProgress(analysis.sessionStatus?.latestRun ?? null);
   const latestAcceptedRun = analysis.sessionStatus?.latestAcceptedRun ?? null;
   const bootstrap = analysis.accountingBootstrap;
+  const recentActivity = buildRecentActivity(analysis);
+
+  const totalValue = formatUsd(analysis.accounting?.totalValue.amount);
+  const unrealizedPnl = formatUsd(analysis.accounting?.unrealizedPnl.amount);
+  const capitalEntered = formatUsd(analysis.accounting?.capitalEntered.amount);
+  const coverageStatus = analysis.accounting?.coverageSummary.coverageStatus ?? "pending";
+
+  const allocation = (analysis.accounting?.pools ?? [])
+    .map((pool) => ({
+      name: pool.displayName,
+      value: Number(pool.currentValue.amount ?? 0)
+    }))
+    .filter((pool) => Number.isFinite(pool.value) && pool.value > 0);
 
   const switchToBase = async () => {
     if (switchConnectedWalletTestOverrideToBase()) {
@@ -71,60 +150,57 @@ export function ConnectedWalletAnalysisView({ sessionId }: ConnectedWalletAnalys
   return (
     <main className="shell">
       <section className="panel">
-        <p className="eyebrow">Portfolio Dashboard</p>
-        <h1>Connected-wallet portfolio analysis</h1>
-        <p>Session: <strong>{sessionId}</strong></p>
+        <header className="dashboard-topbar">
+          <div className="dashboard-topbar__meta motion-fade-up motion-delay-1">
+            <p className="eyebrow">Portfolio Dashboard</p>
+            <h1 className="dashboard-title">Connected-wallet portfolio analysis</h1>
+            <p className="dashboard-session data-accent">Session: {sessionId}</p>
+          </div>
+          <div className="dashboard-topbar__right motion-fade-up motion-delay-2">
+            <div className="wallet-panel__actions">
+              <button className="button" disabled={analysis.isRefreshing} onClick={analysis.retryAnalysis} type="button">
+                {analysis.isRefreshing ? "Refreshing portfolio snapshot..." : "Refresh connected-wallet portfolio"}
+              </button>
+              <Link className="button button--secondary" href="/">
+                Reconnect wallet
+              </Link>
+            </div>
+          </div>
+        </header>
 
         {analysis.errorMessage ? <p className="status error">{analysis.errorMessage}</p> : null}
 
         {analysis.sessionStatus?.latestRun ? (
-          <div>
-            <p>
-              Current run: <strong>{analysis.sessionStatus.latestRun.status}</strong>
-            </p>
-            <p>
-              Block window: <strong>{formatBlockNumber(analysis.sessionStatus.latestRun.fromBlock)}</strong> to <strong>{formatBlockNumber(analysis.sessionStatus.latestRun.toBlock)}</strong>
-            </p>
-            <p>
-              Latest processed block: <strong>{formatBlockNumber(latestRunProgress?.latestProcessedBlock ?? null)}</strong>
-            </p>
+          <p className="status">
+            Current run <strong>{analysis.sessionStatus.latestRun.status}</strong> | blocks{" "}
+            <strong>{formatBlockNumber(analysis.sessionStatus.latestRun.fromBlock)}</strong> to{" "}
+            <strong>{formatBlockNumber(analysis.sessionStatus.latestRun.toBlock)}</strong> | latest processed{" "}
+            <strong>{formatBlockNumber(latestRunProgress?.latestProcessedBlock ?? null)}</strong>
             {latestRunProgress?.progressPercent != null ? (
-              <p>
-                Ingestion progress: <strong>{latestRunProgress.progressPercent}%</strong>
-              </p>
+              <>
+                {" "}| ingestion <strong>{latestRunProgress.progressPercent}%</strong>
+              </>
             ) : null}
-          </div>
+          </p>
         ) : null}
 
         {latestAcceptedRun ? (
-          <p>
-            Latest indexed snapshot: <strong>{formatBlockNumber(latestAcceptedRun.fromBlock)}</strong> to <strong>{formatBlockNumber(latestAcceptedRun.checkpointBlock ?? latestAcceptedRun.toBlock)}</strong>
+          <p className="status success">
+            Latest indexed snapshot: <strong>{formatBlockNumber(latestAcceptedRun.fromBlock)}</strong> to{" "}
+            <strong>{formatBlockNumber(latestAcceptedRun.checkpointBlock ?? latestAcceptedRun.toBlock)}</strong>
           </p>
         ) : null}
 
         {bootstrap ? (
-          <div>
-            <p>
-              Bootstrap state: <strong>{bootstrap.bootstrapState}</strong>
-            </p>
-            <p>
-              Dashboard display state: <strong>{analysis.dashboardDisplayState}</strong>
-            </p>
-            {bootstrap.snapshot ? (
-              <p>
-                Bootstrap portfolio value: <strong>{bootstrap.snapshot.totalValue.amount} {bootstrap.snapshot.totalValue.currency.toUpperCase()}</strong>
-              </p>
-            ) : (
-              <p>Bootstrap snapshot not available yet.</p>
-            )}
-          </div>
-        ) : null}
-
-        {!bootstrap ? (
-          <p>
+          <p className="status">
+            Bootstrap state: <strong>{bootstrap.bootstrapState}</strong> | dashboard display state{" "}
+            <strong>{analysis.dashboardDisplayState}</strong>
+          </p>
+        ) : (
+          <p className="status">
             Dashboard display state: <strong>{analysis.dashboardDisplayState}</strong>
           </p>
-        ) : null}
+        )}
 
         {analysis.dashboardDisplayState === "loading" ? (
           <p className="status">Preparing the first meaningful dashboard view...</p>
@@ -148,8 +224,8 @@ export function ConnectedWalletAnalysisView({ sessionId }: ConnectedWalletAnalys
             <p className="status warning">{staleRecovery.title}</p>
             <p>{staleRecovery.description}</p>
             <p>
-              <Link href="/">Return to the connected-wallet entry flow</Link> and resume a matching
-              analysis session.
+              <Link href="/">Return to the connected-wallet entry flow</Link> and resume a matching analysis
+              session.
             </p>
             {staleRecovery.primaryAction === "switch_to_base" ? (
               <button className="button" disabled={isSwitching} onClick={() => void switchToBase()} type="button">
@@ -170,7 +246,9 @@ export function ConnectedWalletAnalysisView({ sessionId }: ConnectedWalletAnalys
         {analysis.state === "refreshing_with_latest" ? (
           <>
             <p className="status success">Latest accepted portfolio snapshot loaded.</p>
-            <p className="status warning">Refreshing reconstruction on demand while the latest accepted result remains visible.</p>
+            <p className="status warning">
+              Refreshing reconstruction on demand while the latest accepted result remains visible.
+            </p>
           </>
         ) : null}
 
@@ -211,124 +289,148 @@ export function ConnectedWalletAnalysisView({ sessionId }: ConnectedWalletAnalys
         ) : null}
 
         {projection && analysis.guard.isCurrent ? (
-          <>
-            <p>
-              Pools: {projection.pools.length} · Residual holdings: {projection.residualHoldings.length} ·
-              Discarded items: {projection.discardedSummary.totalCount}
-            </p>
-
-            <ConnectedWalletAccountingPanel accounting={analysis.accounting} projection={projection} />
-
-            {analysis.accountingTimeSeries ? (
-              <div>
-                <h2>Historical Portfolio Series</h2>
-                <p>
-                  Series state: <strong>{analysis.accountingTimeSeries.seriesState}</strong>
-                </p>
-                {analysis.accountingTimeSeries.partialReasonCodes.length > 0 ? (
-                  <p>
-                    Partial reasons: <strong>{analysis.accountingTimeSeries.partialReasonCodes.join(", ")}</strong>
-                  </p>
-                ) : null}
-                <p>
-                  Portfolio points: <strong>{analysis.accountingTimeSeries.portfolioSeries.length}</strong> · Pool series: <strong>{analysis.accountingTimeSeries.poolSeries.length}</strong> · Timeline markers: <strong>{analysis.accountingTimeSeries.eventMarkers.length}</strong>
-                </p>
-
-                {analysis.accountingTimeSeries.portfolioSeries.length > 0 ? (
-                  <div>
-                    <h3>Portfolio Value Points</h3>
-                    <ul>
-                      {analysis.accountingTimeSeries.portfolioSeries.slice(0, 5).map((point) => (
-                        <li key={`portfolio-point:${point.ledgerRecordId}`}>
-                          {point.timestamp}: {point.totalValue.amount} {point.totalValue.currency.toUpperCase()} ({point.coverageStatus})
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-
-                {analysis.accountingTimeSeries.poolSeries.length > 0 ? (
-                  <div>
-                    <h3>Pool Deployed-Capital Series</h3>
-                    <ul>
-                      {analysis.accountingTimeSeries.poolSeries.slice(0, 3).map((pool) => {
-                        const latestPoint = pool.points.at(-1);
-                        return (
-                          <li key={`pool-series:${pool.poolId}`}>
-                            {pool.displayName}: {pool.points.length} points
-                            {latestPoint ? ` · latest ${latestPoint.deployedCapital.amount} ${latestPoint.deployedCapital.currency.toUpperCase()} (${latestPoint.flowDirection})` : ""}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-                ) : null}
-
-                {analysis.accountingTimeSeries.eventMarkers.length > 0 ? (
-                  <div>
-                    <h3>Accepted-Run Timeline Markers</h3>
-                    <ul>
-                      {analysis.accountingTimeSeries.eventMarkers.slice(0, 5).map((marker) => (
-                        <li key={`timeline-marker:${marker.ledgerRecordId}:${marker.markerType}`}>
-                          {marker.timestamp}: {marker.markerType} ({marker.label})
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-
-                {analysis.accountingRebalanceFlows?.flows.length ? (
-                  <div>
-                    <h3>Rebalance Flow Links</h3>
-                    <ul>
-                      {analysis.accountingRebalanceFlows.flows.slice(0, 5).map((flow) => (
-                        <li key={`rebalance-flow:${flow.flowId}`}>
-                          {flow.timestamp}: {flow.fromPoolId}{" -> "}{flow.toPoolId} ({flow.confidence}) - {flow.explanation}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-
-                {analysis.accounting?.pools.length ? (
-                  <div>
-                    <h3>Pool Drilldown</h3>
-                    <ul>
-                      {analysis.accounting.pools.map((pool) => (
-                        <li key={`pool-drilldown:${pool.poolId}`}>
-                          {pool.displayName}: {pool.currentValue.amount} {pool.currentValue.currency.toUpperCase()} · strategies {pool.strategies.length}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
+          <div className="dashboard-grid">
+            <article className="dashboard-card dashboard-card--summary motion-fade-up motion-delay-1">
+              <p className="eyebrow">Portfolio Summary</p>
+              <h2>{totalValue}</h2>
+              <div className="wallet-metrics wallet-metrics--compact">
+                <div className="wallet-metric-card">
+                  <span className="wallet-metric-card__label">Unrealized PnL</span>
+                  <strong className="wallet-metric-card__value">{unrealizedPnl}</strong>
+                </div>
+                <div className="wallet-metric-card">
+                  <span className="wallet-metric-card__label">Capital Entered</span>
+                  <strong className="wallet-metric-card__value">{capitalEntered}</strong>
+                </div>
+                <div className="wallet-metric-card">
+                  <span className="wallet-metric-card__label">Coverage</span>
+                  <strong className="wallet-metric-card__value">{coverageStatus}</strong>
+                </div>
+                <div className="wallet-metric-card">
+                  <span className="wallet-metric-card__label">Pools Tracked</span>
+                  <strong className="wallet-metric-card__value">{projection.pools.length}</strong>
+                </div>
               </div>
-            ) : null}
+            </article>
 
-            {analysis.discardedActivity && analysis.discardedActivity.items.length > 0 ? (
-              <div>
-                <h2>Discarded Activity</h2>
-                <p>Reviewable discarded items remain available without blocking the main flow.</p>
-                <ul>
-                  {analysis.discardedActivity.items.map((item) => (
-                    <li key={item.discardedActivityId}>
-                      {item.reasonType}: {item.reasonMessage}
+            <article className="dashboard-card dashboard-card--history motion-fade-up motion-delay-2">
+              <p className="eyebrow">Portfolio Value Over Time</p>
+              {analysis.accountingTimeSeries ? (
+                <PortfolioHistoryChart
+                  series={analysis.accountingTimeSeries.portfolioSeries}
+                  markers={analysis.accountingTimeSeries.eventMarkers}
+                />
+              ) : (
+                <p className="status">Awaiting historical time series.</p>
+              )}
+            </article>
+
+            <article className="dashboard-card motion-fade-up motion-delay-3">
+              <p className="eyebrow">Allocated By Pool</p>
+              {allocation.length ? (
+                <>
+                  <div className="dashboard-allocation-chart">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          cx="50%"
+                          cy="50%"
+                          data={allocation}
+                          dataKey="value"
+                          innerRadius={58}
+                          outerRadius={82}
+                          paddingAngle={2}
+                        >
+                          {allocation.map((entry, index) => (
+                            <Cell fill={ALLOCATION_COLORS[index % ALLOCATION_COLORS.length]} key={entry.name} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(value: number | string | ReadonlyArray<number | string> | undefined) => {
+                            const normalizedValue = Array.isArray(value)
+                              ? value[0]
+                              : (value as number | string | null | undefined);
+                            return formatUsd(normalizedValue);
+                          }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <ul className="dashboard-allocation-list">
+                    {allocation.map((entry, index) => (
+                      <li key={`allocation:${entry.name}`}>
+                        <span>
+                          <i
+                            style={{ background: ALLOCATION_COLORS[index % ALLOCATION_COLORS.length] }}
+                            className="dashboard-dot"
+                          />
+                          {entry.name}
+                        </span>
+                        <strong className="data-accent">{formatUsd(entry.value)}</strong>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : (
+                <p className="status">Pool allocations are not available yet.</p>
+              )}
+            </article>
+
+            <article className="dashboard-card motion-fade-up motion-delay-4">
+              <p className="eyebrow">Recent Activity</p>
+              {recentActivity.length ? (
+                <ul className="dashboard-activity-list">
+                  {recentActivity.map((item) => (
+                    <li key={item.id}>
+                      <div>
+                        <p className="dashboard-activity-label">{item.label}</p>
+                        <p className="dashboard-activity-detail">{item.detail}</p>
+                      </div>
+                      <span className={`dashboard-activity-time dashboard-activity-time--${item.tone}`}>
+                        {formatTimestamp(item.timestamp)}
+                      </span>
                     </li>
                   ))}
                 </ul>
-              </div>
-            ) : null}
+              ) : (
+                <p className="status">No recent activity markers are available.</p>
+              )}
+            </article>
 
-            <div className="wallet-panel__actions">
-              <button className="button" disabled={analysis.isRefreshing} onClick={analysis.retryAnalysis} type="button">
-                {analysis.isRefreshing ? "Refreshing portfolio snapshot..." : "Refresh connected-wallet portfolio"}
-              </button>
-            </div>
+            <article className="dashboard-card motion-fade-up motion-delay-1">
+              <p className="eyebrow">Market Overview</p>
+              <p>
+                Partial reasons: <strong>{analysis.accountingTimeSeries?.partialReasonCodes.join(", ") || "None"}</strong>
+              </p>
+              {analysis.accounting?.idleBalances.length ? (
+                <ul className="dashboard-market-list">
+                  {analysis.accounting.idleBalances.slice(0, 6).map((holding) => (
+                    <li key={`${holding.tokenAddress}:${holding.reasonCode}:${holding.amountRaw}`}>
+                      <span>{holding.symbol ?? holding.tokenAddress}</span>
+                      <strong className="data-accent">
+                        {holding.currentValue ? formatUsd(holding.currentValue.amount) : "Unpriced"}
+                      </strong>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="status">No idle holdings detected.</p>
+              )}
+            </article>
 
-            <pre style={{ marginTop: "1.5rem", overflowX: "auto", whiteSpace: "pre-wrap" }}>
-              {JSON.stringify(projection, null, 2)}
-            </pre>
-          </>
+            <article className="dashboard-card motion-fade-up motion-delay-2">
+              <p className="eyebrow">Cash In And Cash Out</p>
+              <CashFlowPanel
+                accounting={analysis.accounting}
+                series={analysis.accountingTimeSeries?.portfolioSeries ?? []}
+              />
+            </article>
+
+            <article className="dashboard-card motion-fade-up motion-delay-3">
+              <p className="eyebrow">Position Migrations</p>
+              <MigrationFlowPanel flows={analysis.accountingRebalanceFlows?.flows ?? []} />
+            </article>
+          </div>
         ) : null}
       </section>
     </main>

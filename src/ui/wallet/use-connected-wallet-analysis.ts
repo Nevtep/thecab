@@ -108,12 +108,18 @@ export type SessionBootstrapInput = {
   walletAddress: string;
   chainId: number;
   connectionSource: string;
+  walletProof?: {
+    message: string;
+    signature: string;
+    signedAt: string;
+  };
 };
 
 const CONNECTED_WALLET_TEST_OVERRIDE_EVENT = "thecab:test-wallet-changed";
 const CONNECTED_WALLET_ANALYSIS_TEST_OVERRIDE_EVENT = "thecab:test-analysis-changed";
 const RUNNING_RECONSTRUCTION_STATUSES = ["pending", "ingesting", "normalizing", "projecting"] as const;
 const AUTO_INCREMENTAL_REFRESH_COOLDOWN_MS = 300_000;
+const AUTO_INCREMENTAL_REFRESH_ENABLED = process.env.NEXT_PUBLIC_ENABLE_AUTO_INCREMENTAL_REFRESH === "true";
 
 function mapLedgerStateToDashboardDisplayState(state: LedgerEntryViewState): DashboardDisplayState {
   switch (state) {
@@ -401,6 +407,10 @@ export function useConnectedWalletContext(): ConnectedWalletContext {
   );
 
   useEffect(() => {
+    if (!AUTO_INCREMENTAL_REFRESH_ENABLED) {
+      return undefined;
+    }
+
     if (typeof window === "undefined") {
       return undefined;
     }

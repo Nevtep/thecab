@@ -7,6 +7,7 @@ import {
 import { AccountingTimeSeriesService } from "@/domains/accounting/services/accounting-time-series-service";
 import { LedgerOutputRepository } from "@/domains/ledger/repositories/ledger-output-repository";
 import { ReconstructionRunRepository } from "@/domains/ledger/repositories/reconstruction-run-repository";
+import { PricePointRepository } from "@/domains/pricing/repositories/price-point-repository";
 import { SessionRepository } from "@/domains/wallet-session/repositories/session-repository";
 import { getDb } from "@/infrastructure/db/client";
 
@@ -24,7 +25,8 @@ export async function GET(_request: Request, context: RouteContext) {
     const payload = await new AccountingTimeSeriesService(
       new SessionRepository(db),
       new ReconstructionRunRepository(db),
-      new LedgerOutputRepository(db)
+      new LedgerOutputRepository(db),
+      new PricePointRepository(db)
     ).getTimeSeries(sessionId);
 
     return NextResponse.json(accountingTimeSeriesResponseSchema.parse(payload));

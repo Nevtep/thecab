@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { useConnect, useDisconnect, useSwitchChain } from "wagmi";
+import { useConnect, useDisconnect, useSignMessage, useSwitchChain } from "wagmi";
 import { base } from "wagmi/chains";
 
 import { type AccountingResponse } from "@/domains/accounting/contracts/accounting-api-schemas";
 import { type LedgerProjectionResponse } from "@/domains/ledger/contracts/ledger-api-schemas";
+import { buildWalletOwnershipMessage } from "@/domains/wallet-session/services/wallet-ownership-proof";
 
 import {
   buildConnectedWalletAnalysisState,
@@ -18,6 +19,8 @@ type BootstrappedSession = {
   sessionId: string;
   reusedSession: boolean;
 };
+
+const LAST_SESSION_STORAGE_KEY = "thecab:last-session-id";
 
 function truncateAddress(address: string) {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
@@ -125,10 +128,15 @@ export function ConnectedWalletAccountingPanel({ projection, accounting }: Conne
   );
 }
 
-export function ConnectedWalletLedger() {
+type ConnectedWalletLedgerProps = {
+  layout?: "default" | "hero";
+};
+
+export function ConnectedWalletLedger({ layout = "default" }: ConnectedWalletLedgerProps) {
   const connectedWallet = useConnectedWalletContext();
   const { connect, connectors, error: connectError, isPending: isConnecting } = useConnect();
   const { disconnect } = useDisconnect();
+  const { signMessageAsync, error: signError, isPending: isSigning } = useSignMessage();
   const { switchChainAsync, error: switchError, isPending: isSwitching } = useSwitchChain();
   const bootstrapSession = useBootstrapConnectedWalletSessionMutation();
   const [hasMounted, setHasMounted] = useState(false);
@@ -149,7 +157,13 @@ export function ConnectedWalletLedger() {
     hasProjection: false
   });
   const isOnBase = connectedWallet.chainId === base.id;
-  const activeError = error ?? bootstrapSession.error?.message ?? switchError?.message ?? connectError?.message ?? null;
+  const activeError =
+    error ??
+    bootstrapSession.error?.message ??
+    signError?.message ??
+    switchError?.message ??
+    connectError?.message ??
+    null;
 
   const switchToBase = async () => {
     setError(null);
@@ -161,7 +175,7 @@ export function ConnectedWalletLedger() {
     await switchChainAsync({ chainId: base.id });
   };
 
-  const runAnalysis = () => {
+  const runAnalysis = async () => {
     if (!connectedWallet.walletAddress) {
       setError("Connect a wallet before running reconstruction.");
       return;
@@ -174,14 +188,32 @@ export function ConnectedWalletLedger() {
 
     setError(null);
 
+    const signedAt = new Date().toISOString();
+    const message = buildWalletOwnershipMessage({
+      walletAddress: connectedWallet.walletAddress,
+      chainId: connectedWallet.chainId,
+      signedAt
+    });
+
+    const signature = await signMessageAsync({ message });
+
     bootstrapSession.mutate(
       {
         walletAddress: connectedWallet.walletAddress,
         chainId: connectedWallet.chainId,
-        connectionSource: connectedWallet.connectorId ?? "injected"
+        connectionSource: connectedWallet.connectorId ?? "injected",
+        walletProof: {
+          message,
+          signature,
+          signedAt
+        }
       },
       {
         onSuccess: (session) => {
+          if (typeof window !== "undefined") {
+            window.localStorage.setItem(LAST_SESSION_STORAGE_KEY, session.sessionId);
+          }
+
           setOpenedSession({
             sessionId: session.sessionId,
             reusedSession: session.reusedSession
@@ -195,25 +227,29 @@ export function ConnectedWalletLedger() {
   };
 
   return (
-    <section className="wallet-panel">
-      <div className="wallet-panel__header">
-        <p className="eyebrow">Connected Wallet</p>
-        <h2>Load portfolio history on Base</h2>
-      </div>
+    <section className={layout === "hero" ? "wallet-panel wallet-panel--hero" : "wallet-panel"}>
+      {layout === "hero" ? null : (
+        <div className="wallet-panel__header">
+          <p className="eyebrow">Connected Wallet</p>
+          <h2>Load portfolio history on Base</h2>
+        </div>
+      )}
 
       {!hasMounted ? (
         <p className="wallet-panel__body">Loading wallet connection controls...</p>
       ) : entryState === "not_connected" ? (
         <>
-          <p className="wallet-panel__body">
-            Connect one wallet, validate that it is on Base, and start or resume its analysis
-            session directly from the connected wallet context.
-          </p>
+          {layout === "hero" ? null : (
+            <p className="wallet-panel__body">
+              Connect one wallet, validate that it is on Base, and start or resume its analysis
+              session directly from the connected wallet context.
+            </p>
+          )}
           <div className="wallet-panel__actions">
             {connectors.map((availableConnector) => (
               <button
                 key={availableConnector.uid}
-                className="button"
+                className={layout === "hero" ? "button button--gold" : "button"}
                 disabled={isConnecting}
                 onClick={() => {
                   setError(null);
@@ -243,7 +279,7 @@ export function ConnectedWalletLedger() {
           <div className="wallet-panel__actions">
             {entryState === "wrong_chain" ? (
               <button
-                className="button"
+                className={layout === "hero" ? "button button--gold" : "button"}
                 disabled={isSwitching}
                 onClick={() => void switchToBase()}
                 type="button"
@@ -252,14 +288,18 @@ export function ConnectedWalletLedger() {
               </button>
             ) : (
               <button
-                className="button"
-                disabled={isSessionLoading}
-                onClick={runAnalysis}
+                className={layout === "hero" ? "button button--gold" : "button"}
+                disabled={isSessionLoading || isSigning}
+                onClick={() => {
+                  void runAnalysis();
+                }}
                 type="button"
               >
                 {entryState === "session_loading"
-                  ? "Starting connected-wallet analysis..."
-                  : "Start analysis from connected wallet"}
+                  ? "Opening connected-wallet dashboard..."
+                  : isSigning
+                    ? "Awaiting wallet signature..."
+                  : "Open portfolio dashboard"}
               </button>
             )}
             <button className="button button--secondary" onClick={() => disconnect()} type="button">

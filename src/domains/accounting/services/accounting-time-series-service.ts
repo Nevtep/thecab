@@ -1,5 +1,8 @@
+import Decimal from "decimal.js";
+
 import { LedgerOutputRepository } from "@/domains/ledger/repositories/ledger-output-repository";
 import { ReconstructionRunRepository } from "@/domains/ledger/repositories/reconstruction-run-repository";
+import { PricePointRepository } from "@/domains/pricing/repositories/price-point-repository";
 import { SessionRepository } from "@/domains/wallet-session/repositories/session-repository";
 
 const ACCOUNTING_CONTRACT_VERSION = "1.0.0";
@@ -14,17 +17,14 @@ function usd(amount: number) {
 }
 
 function parseMovementAmount(input: { amountRaw: string; decimals: number }) {
-  const raw = Number.parseFloat(input.amountRaw);
-  if (!Number.isFinite(raw)) {
-    return 0;
+  const raw = new Decimal(input.amountRaw);
+  const divisor = new Decimal(10).pow(input.decimals);
+
+  if (divisor.lte(0)) {
+    return new Decimal(0);
   }
 
-  const divisor = 10 ** input.decimals;
-  if (!Number.isFinite(divisor) || divisor <= 0) {
-    return 0;
-  }
-
-  return raw / divisor;
+  return raw.div(divisor);
 }
 
 function classifyMarkerType(eventType: string): EventMarkerType {
@@ -56,7 +56,8 @@ export class AccountingTimeSeriesService {
   constructor(
     private readonly sessionRepository: SessionRepository,
     private readonly reconstructionRunRepository: ReconstructionRunRepository,
-    private readonly ledgerOutputRepository: LedgerOutputRepository
+    private readonly ledgerOutputRepository: LedgerOutputRepository,
+    private readonly pricePointRepository: PricePointRepository
   ) {}
 
   async getTimeSeries(sessionId: string) {
@@ -115,41 +116,121 @@ export class AccountingTimeSeriesService {
     }> }>();
 
     const partialReasonCodes = new Set<string>();
-    let runningPortfolioValue = 0;
-    const runningPoolCapitalByPool = new Map<string, number>();
+    const runningPoolCapitalByPool = new Map<string, Decimal>();
+    const runningTokenBalances = new Map<string, Decimal>();
+    const historicalPriceCache = new Map<
+      string,
+      {
+        knownAsset: boolean;
+        points: Array<{
+          effectiveAt: Date;
+          priceValue: string;
+          sourceKind: string;
+        }>;
+      }
+    >();
 
-    const portfolioSeries = sortedRecords.map((record) => {
+    const resolveHistoricalPrice = async (tokenAddress: string, timestamp: Date) => {
+      const normalizedToken = tokenAddress.toLowerCase();
+      let cached = historicalPriceCache.get(normalizedToken);
+
+      if (!cached) {
+        const priceAsset = await this.pricePointRepository.findPriceAsset(session.chainId, normalizedToken);
+
+        if (!priceAsset) {
+          historicalPriceCache.set(normalizedToken, {
+            knownAsset: false,
+            points: []
+          });
+          partialReasonCodes.add("missing_price_asset");
+          return null;
+        }
+
+        const points = await this.pricePointRepository.listPricePointsForAsset(priceAsset.priceAssetId);
+        cached = {
+          knownAsset: true,
+          points: points.map((point) => ({
+            effectiveAt: point.effectiveAt,
+            priceValue: point.priceValue,
+            sourceKind: point.sourceKind
+          }))
+        };
+        historicalPriceCache.set(normalizedToken, cached);
+      }
+
+      if (!cached.knownAsset) {
+        return null;
+      }
+
+      const historicalPoint = cached.points.find(
+        (point) => point.sourceKind === "historical" && point.effectiveAt <= timestamp
+      );
+
+      if (!historicalPoint) {
+        partialReasonCodes.add("missing_historical_price_point");
+        return null;
+      }
+
+      return new Decimal(historicalPoint.priceValue);
+    };
+
+    const portfolioSeries = [];
+
+    for (const record of sortedRecords) {
       const perRecordMovements = movementByRecord.get(record.ledgerRecordId) ?? [];
       if (perRecordMovements.length === 0) {
         partialReasonCodes.add("missing_asset_movements");
       }
 
-      const netFlow = perRecordMovements.reduce((sum, movement) => {
+      for (const movement of perRecordMovements) {
         const normalized = parseMovementAmount({
           amountRaw: movement.amountRaw,
           decimals: movement.decimals
         });
+
+        const existing = runningTokenBalances.get(movement.tokenAddress.toLowerCase()) ?? new Decimal(0);
+
         if (movement.direction === "in") {
-          return sum + normalized;
+          runningTokenBalances.set(movement.tokenAddress.toLowerCase(), existing.plus(normalized));
+          continue;
         }
+
         if (movement.direction === "out") {
-          return sum - normalized;
+          runningTokenBalances.set(movement.tokenAddress.toLowerCase(), existing.minus(normalized));
+          continue;
         }
-        partialReasonCodes.add("unknown_movement_direction");
-        return sum;
-      }, 0);
 
-      runningPortfolioValue += netFlow;
+        partialReasonCodes.add("missing_movement_direction");
+      }
 
-      return {
+      let totalValueUsd = new Decimal(0);
+      let isPartial = perRecordMovements.length === 0;
+
+      for (const [tokenAddress, balance] of runningTokenBalances.entries()) {
+        if (balance.abs().lt("0.0000000000001")) {
+          continue;
+        }
+
+        const price = await resolveHistoricalPrice(tokenAddress, record.timestamp);
+        if (!price) {
+          isPartial = true;
+          continue;
+        }
+
+        totalValueUsd = totalValueUsd.plus(balance.mul(price));
+      }
+
+      const clampedPortfolioValueUsd = totalValueUsd.lessThan(0) ? new Decimal(0) : totalValueUsd;
+
+      portfolioSeries.push({
         ledgerRecordId: record.ledgerRecordId,
         blockNumber: Number(record.blockNumber),
         timestamp: record.timestamp.toISOString(),
         eventType: record.eventType,
-        totalValue: usd(Math.max(runningPortfolioValue, 0)),
-        coverageStatus: perRecordMovements.length === 0 ? "partial" as const : "full" as const
-      };
-    });
+        totalValue: usd(clampedPortfolioValueUsd.toNumber()),
+        coverageStatus: isPartial ? "partial" as const : "full" as const
+      });
+    }
 
     const eventMarkers = sortedRecords
       .map((record) => ({
@@ -177,21 +258,30 @@ export class AccountingTimeSeriesService {
         points: []
       };
 
-      const poolNetFlow = perRecordMovements.reduce((sum, movement) => {
+      let poolNetFlowUsd = new Decimal(0);
+      for (const movement of perRecordMovements) {
         const normalized = parseMovementAmount({
           amountRaw: movement.amountRaw,
           decimals: movement.decimals
         });
+
+        const price = await resolveHistoricalPrice(movement.tokenAddress, record.timestamp);
+        if (!price) {
+          continue;
+        }
+
+        const movementValueUsd = normalized.mul(price);
         if (movement.direction === "in") {
-          return sum + normalized;
+          poolNetFlowUsd = poolNetFlowUsd.plus(movementValueUsd);
+          continue;
         }
         if (movement.direction === "out") {
-          return sum - normalized;
+          poolNetFlowUsd = poolNetFlowUsd.minus(movementValueUsd);
+          continue;
         }
-        return sum;
-      }, 0);
+      }
 
-      const runningPoolCapital = (runningPoolCapitalByPool.get(record.poolId) ?? 0) + poolNetFlow;
+      const runningPoolCapital = (runningPoolCapitalByPool.get(record.poolId) ?? new Decimal(0)).plus(poolNetFlowUsd);
       runningPoolCapitalByPool.set(record.poolId, runningPoolCapital);
 
       current.points.push({
@@ -200,7 +290,7 @@ export class AccountingTimeSeriesService {
         timestamp: record.timestamp.toISOString(),
         eventType: record.eventType,
         flowDirection,
-        deployedCapital: usd(Math.max(runningPoolCapital, 0))
+        deployedCapital: usd(runningPoolCapital.lessThan(0) ? 0 : runningPoolCapital.toNumber())
       });
       poolSeriesMap.set(record.poolId, current);
     }

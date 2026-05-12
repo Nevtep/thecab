@@ -3,7 +3,14 @@ import { z } from "zod";
 export const createAnalysisSessionRequestSchema = z.object({
   walletAddress: z.string().min(1),
   chainId: z.literal(8453),
-  connectionSource: z.string().default("walletconnect")
+  connectionSource: z.string().default("walletconnect"),
+  walletProof: z
+    .object({
+      message: z.string().min(1),
+      signature: z.string().min(1),
+      signedAt: z.string().datetime()
+    })
+    .optional()
 });
 
 export const analysisSessionResponseSchema = z.object({
