@@ -1,11 +1,12 @@
-# The Cab — Product & Technical Specification v1.4.1
+# The Cab — Product & Technical Specification v1.4.2
 
 ## Version
 
-- **Document version:** v1.4.1
+- **Document version:** v1.4.2
 - **Product:** The Cab
 - **Scope:** Product technical specification
-- **Primary chain:** Base mainnet
+- **Primary chain:** Base mainnet for Product v1
+- **Multi-chain posture:** chain-aware domain and persistence from day one
 - **Primary protocol:** Aerodrome Finance
 - **Secondary integration:** Mellow Aerodrome strategies
 - **Framework:** Next.js
@@ -74,6 +75,8 @@ The Cab must not become:
 
 The product’s core promise is **fast portfolio visibility first, deeper historical reconstruction when needed**.
 
+The product v1 scope is Base mainnet, but The Cab must be architected as a chain-aware analytics product. This is required because Aero is expected to evolve Aerodrome/Velodrome into a broader multi-chain platform. The Cab must avoid hardcoding Base assumptions outside the chain configuration layer.
+
 ---
 
 # 2. Resolved Product Decisions
@@ -119,15 +122,109 @@ Product v1 supports:
 Rules:
 
 - Base mainnet is the only production-supported chain for product v1.
-- Do not support Base Sepolia in product v1 flows.
-- If testing utilities are added for development, they must not appear as user-facing MVP network options unless explicitly approved.
+- Do not support Base Sepolia in product v1 flows unless explicitly approved as a development/testing mode.
+- If testing utilities are added for development, they must not appear as user-facing product v1 network options unless explicitly approved.
 - Wrong-network state should instruct the user to switch to Base mainnet.
+- All product v1 UI should default to Base mainnet.
 
 Base chain ID:
 
 ```ts
 const SUPPORTED_CHAIN_ID = 8453;
 ```
+
+### Future Aero multi-chain compatibility
+
+Product v1 is Base mainnet only and remains focused on Aerodrome on Base.
+
+However, the domain model, provider architecture, protocol metadata model, query keys, API routes, and persistence layer must remain chain-aware from day one because Aero is expected to unify Aerodrome and Velodrome and expand across multiple EVM networks.
+
+Future chains may include:
+
+- Base;
+- Optimism;
+- Ethereum mainnet;
+- Circle Arc or other EVM-compatible networks;
+- additional Aero-supported networks.
+
+The product must be architected so a future version can evolve from:
+
+```txt
+Aerodrome on Base cockpit
+```
+
+to:
+
+```txt
+Aero multi-chain cockpit
+```
+
+without rewriting the domain model.
+
+### Chain-aware implementation rules
+
+All protocol-specific persisted entities must include `chainId` directly or inherit it unambiguously from a parent scope.
+
+Address-based entities must never be keyed by address alone.
+
+Use:
+
+```txt
+chainId + address
+```
+
+not:
+
+```txt
+address
+```
+
+The product must not assume that any of the following are globally unique across chains:
+
+- wallet address;
+- token address;
+- pool address;
+- strategy address;
+- gauge address;
+- reward contract address;
+- governance contract address;
+- transaction hash;
+- NFT token ID;
+- wrapper/vault address.
+
+All provider clients, API route params, TanStack Query keys, database unique constraints, analysis jobs, protocol metadata sync jobs, and price lookups must accept or derive `chainId`.
+
+Product v1 may default to Base mainnet, but implementation must avoid hardcoding Base assumptions outside the chain configuration layer.
+
+### Chain configuration layer
+
+Create a single chain configuration layer.
+
+Suggested file:
+
+```ts
+src/chains/chains.ts
+```
+
+Suggested shape:
+
+```ts
+export const SUPPORTED_CHAINS = {
+  base: {
+    chainId: 8453,
+    name: "Base",
+    slug: "base",
+    isProductV1Enabled: true,
+    rpcNetwork: "base-mainnet",
+    moralisChain: "base",
+    alchemyNetwork: "base-mainnet",
+    nativeCurrencySymbol: "ETH",
+  },
+} as const;
+```
+
+Future chains must be added through this configuration layer, not by scattering chain-specific constants across features.
+
 
 ## 2.3 Moralis endpoint strategy
 
@@ -1333,6 +1430,36 @@ export const SUPPORTED_CHAIN = {
 };
 ```
 
+## 6.2.1 Chain configuration architecture
+
+Product v1 is Base-only, but chain support must be centralized.
+
+The implementation must include a chain configuration module and must not scatter chain-specific constants across features.
+
+Required responsibilities:
+
+- map `chainId` to provider network names;
+- map `chainId` to Moralis chain params;
+- map `chainId` to Alchemy RPC endpoints;
+- define enabled product chains;
+- define development/test chains separately from product chains;
+- provide chain-aware provider factories;
+- provide chain-aware query key helpers.
+
+Suggested helpers:
+
+```ts
+getSupportedChain(chainId)
+assertSupportedChain(chainId)
+getMoralisChain(chainId)
+getAlchemyNetwork(chainId)
+getRpcClient(chainId)
+getExplorerBaseUrl(chainId)
+```
+
+Product features should receive or derive `chainId` and pass it through to query hooks, API routes, provider calls, and database queries.
+
+
 ## 6.3 Third-party APIs
 
 The application integrates with two third-party API providers:
@@ -1398,6 +1525,8 @@ Characteristics:
 
 ## 6.5 Database
 
+The database schema must be chain-aware. All protocol-specific tables must include `chainId`, and unique constraints involving addresses or transaction hashes must include `chainId`.
+
 The product requires persistence for:
 
 - Wallet contexts.
@@ -1431,26 +1560,26 @@ Implementation may use:
 Initial API surface:
 
 ```http
-GET  /api/wallet/overview
+GET  /api/wallet/overview?chainId=8453
 POST /api/analysis/start
 GET  /api/analysis/status
-GET  /api/pools
-GET  /api/pools/:poolId
-GET  /api/deposits
-GET  /api/deposits/:depositId
-GET  /api/strategies
-GET  /api/strategies/:strategyId
-GET  /api/rewards
-GET  /api/governance
-GET  /api/activity
-GET  /api/settings
+GET  /api/pools?chainId=8453
+GET  /api/pools/:poolId?chainId=8453
+GET  /api/deposits?chainId=8453
+GET  /api/deposits/:depositId?chainId=8453
+GET  /api/strategies?chainId=8453
+GET  /api/strategies/:strategyId?chainId=8453
+GET  /api/rewards?chainId=8453
+GET  /api/governance?chainId=8453
+GET  /api/activity?chainId=8453
+GET  /api/settings?chainId=8453
 POST /api/settings
 ```
 
 All wallet-specific endpoints must validate:
 
 - Wallet address format.
-- Chain ID supported.
+- Chain ID supported and scoped to Product v1 allowed chains.
 - Connected wallet matches requested wallet via signature.
 - Analysis availability for deep routes.
 
@@ -1621,6 +1750,7 @@ Rules:
 
 - Query hooks must be typed.
 - Query keys must be centralized or generated consistently.
+- Query keys must include `chainId` for all wallet/protocol data.
 - Polling behavior belongs in query hooks or container-level query options, not in components.
 - Query hooks must not import visual components.
 
@@ -2222,6 +2352,10 @@ Vercel serverless functions are not ideal for long-running processes. Therefore:
 
 The pipeline should be deterministic and restartable.
 
+The pipeline must be chain-aware. Every analysis run is scoped to a single `walletAddress + chainId` pair. Product v1 defaults to Base mainnet, but no analysis stage may assume address uniqueness without `chainId`.
+
+
+
 ### Stage 1 — Initialize run
 
 Create `AnalysisRun`.
@@ -2463,7 +2597,12 @@ Recommended unique keys:
 - `PricePoint`: tokenAddress + timestamp bucket + source + resolution.
 - `PositionInstance`: strategy + tokenId for manual, strategy + wrapper/share identity for Mellow.
 - `AnalysisRun`: runId.
-- `AttributionState`: wallet + poolId + tokenAddress + sourceLedgerEventId.
+- `ProtocolContract`: chainId + address.
+- `Pool`: chainId + poolAddress.
+- `Strategy`: chainId + wrapperAddress or chainId + strategyContractAddress.
+- `PricePoint`: chainId + tokenAddress + timestamp bucket + source + resolution.
+
+- `AttributionState`: chainId + wallet + poolId + tokenAddress + sourceLedgerEventId.
 
 A repeated run must not duplicate events or inflate metrics.
 
@@ -2547,7 +2686,35 @@ The domain model follows these principles:
 
 ---
 
-## 9.2 Entity overview
+## 9.2 Chain-aware domain requirement
+
+Product v1 is Base mainnet only, but the domain model must be chain-aware from day one.
+
+Every entity that represents protocol state, protocol metadata, wallet activity, token balances, prices, pool exposure, strategy exposure, rewards, governance, or analytics snapshots must either include `chainId` directly or inherit it unambiguously from a parent scope.
+
+Reason:
+
+- Aero is expected to evolve Aerodrome/Velodrome toward a multi-chain platform.
+- The same wallet address can exist on multiple chains.
+- Token addresses are chain-scoped.
+- Pool addresses are chain-scoped.
+- Strategy, wrapper, vault, and gauge addresses are chain-scoped.
+- Governance and reward contracts are chain-scoped.
+- Transaction hashes should not be treated as globally unique for application-level identity.
+- Historical prices must be resolved by `chainId + tokenAddress + timestamp`.
+- Protocol metadata must be versioned and scoped by chain.
+
+Implementation rule:
+
+```txt
+Never key protocol entities by address alone.
+Always key them by chainId + address.
+```
+
+All database indexes and unique constraints involving addresses, transaction hashes, token IDs, protocol contracts, pools, deposits, strategies, rewards, governance events, and price points must include `chainId` where applicable.
+
+
+## 9.3 Entity overview
 
 Core entities:
 
@@ -2673,6 +2840,7 @@ Stores raw external API records used for reconstruction.
 - `rawProviderRecordId`
 - `analysisRunId`
 - `walletAddress`
+- `chainId`
 - `provider`
 - `sourceType`
 - `externalId`
@@ -2862,6 +3030,7 @@ This is the user-facing replacement for the old “Position” concept.
 
 - `depositId`
 - `walletAddress`
+- `chainId`
 - `poolId`
 - `protocolId`
 - `depositType`
@@ -2954,6 +3123,7 @@ A Strategy may be associated with one or more Aerodrome pools, but it has its ow
 
 - `strategyId`
 - `protocolId`
+- `chainId`
 - `strategyType`
 - `label`
 - `status`
@@ -3026,6 +3196,7 @@ A Strategy is the product/integration definition. A StrategyExposure is the user
 
 - `strategyExposureId`
 - `walletAddress`
+- `chainId`
 - `strategyId`
 - `poolId`
 - `status`
@@ -3196,6 +3367,7 @@ Represents token-level deltas caused by a LedgerEvent.
 - `assetMovementId`
 - `ledgerEventId`
 - `walletAddress`
+- `chainId`
 - `tokenAddress`
 - `symbol`
 - `amountRaw`
@@ -3292,6 +3464,7 @@ Tracks residual pool-attributed assets after withdraw/rebalance operations.
 
 - `attributionStateId`
 - `walletAddress`
+- `chainId`
 - `poolId`
 - `depositId`
 - `strategyId`
@@ -3347,6 +3520,7 @@ This entity is required to disambiguate swaps that exceed a pool’s residual ba
 
 - `attributionSourceLotId`
 - `walletAddress`
+- `chainId`
 - `tokenAddress`
 - `amountNormalized`
 - `usdValueAtAcquisition`
@@ -3455,6 +3629,7 @@ Represents veAERO and governance-specific behavior.
 
 - `governanceEventId`
 - `walletAddress`
+- `chainId`
 - `eventType`
 - `txHash`
 - `blockNumber`
@@ -3508,6 +3683,7 @@ Represents a computed performance state for a chosen analytical scope.
 
 - `performanceSnapshotId`
 - `walletAddress`
+- `chainId`
 - `scopeType`
 - `scopeId`
 - `timestamp`
@@ -3556,6 +3732,7 @@ Represents current or historical overall portfolio state.
 
 - `portfolioSnapshotId`
 - `walletAddress`
+- `chainId`
 - `timestamp`
 - `totalValueUsd`
 - `openDepositsValueUsd`
@@ -3594,6 +3771,7 @@ Captures completeness and confidence for a scope.
 - `coverageReportId`
 - `analysisRunId`
 - `walletAddress`
+- `chainId`
 - `scopeType`
 - `scopeId`
 - `coverageStatus`
@@ -3645,6 +3823,7 @@ Represents detected events intentionally excluded from sensitive analytics.
 - `discardedEventId`
 - `analysisRunId`
 - `walletAddress`
+- `chainId`
 - `txHash`
 - `reasonType`
 - `reasonMessage`
@@ -3737,6 +3916,40 @@ Relational rules:
 - One reward may be visible in multiple UI views but must be counted once.
 
 ---
+
+## 9.25 Chain-aware identity rules
+
+All address-based entities must be keyed by `chainId + address`.
+
+Examples:
+
+- `ProtocolContract`: `chainId + address`
+- `Pool`: `chainId + poolAddress`
+- `Deposit`: `chainId + walletAddress + deposit identity`
+- `Strategy`: `chainId + wrapperAddress` or `chainId + strategyContractAddress`
+- `StrategyExposure`: `chainId + walletAddress + strategyId`
+- `LedgerEvent`: `chainId + txHash + logIndex + eventType`
+- `AssetMovement`: `chainId + ledgerEventId + movementIndex`
+- `PricePoint`: `chainId + tokenAddress + timestamp + source + resolution`
+- `RewardEvent`: `chainId + txHash + logIndex/movementIndex + rewardType`
+- `GovernanceEvent`: `chainId + txHash + logIndex/eventType`
+- `AttributionState`: `chainId + walletAddress + poolId + tokenAddress + sourceLedgerEventId`
+- `AttributionSourceLot`: `chainId + walletAddress + tokenAddress + sourceType + sourceLedgerEventId`
+
+Address-only keys are forbidden for protocol entities.
+
+Token ID-only keys are forbidden for NFTs. Use:
+
+```txt
+chainId + contractAddress + tokenId
+```
+
+Transaction hash-only keys are forbidden. Use:
+
+```txt
+chainId + txHash
+```
+
 
 ## 9.24 Identity rules
 
@@ -5542,6 +5755,10 @@ Deliver:
 
 # 15. Acceptance Criteria Summary
 
+- Product v1 remains Base mainnet only, but the domain and persistence model are chain-aware from day one.
+- Address-based protocol entities are keyed by `chainId + address`, never address alone.
+- Provider clients, API routes, query keys, analysis jobs, and database unique constraints include or derive `chainId`.
+
 The implementation is acceptable when:
 
 - Disconnected users see a branded landing page and can connect wallet.
@@ -5612,7 +5829,8 @@ Do not add unapproved providers for pricing or wallet analytics.
 
 When implementing this spec, prioritize:
 
-1. Fast connected Overview.
+1. Chain-aware domain and provider boundaries despite Product v1 being Base-only.
+2. Fast connected Overview.
 2. Clear async analysis status.
 3. Correct DS boundaries and no direct third-party UI imports in product screens.
 4. Correct state-management boundaries using TanStack Query, Zustand, local hooks, and wallet wrappers.

@@ -1,8 +1,8 @@
-# The Cab — Feature Feasibility & Implementation Architecture v1.0
+# The Cab — Feature Feasibility & Implementation Architecture v1.1
 
 ## Document role
 
-This document complements **The Cab Product & Technical Specification v1.4.1**.
+This document complements **The Cab Product & Technical Specification v1.4.2 Multi-chain**.
 
 It translates the product spec into an implementation-oriented feasibility plan.
 
@@ -12,18 +12,27 @@ For each feature, it defines:
 - what data is obtainable from Moralis;
 - what data is obtainable from Alchemy;
 - what must be extended through RPC / contract reads / event logs;
-- what data must be persisted;
+- how data must be persisted;
 - how raw data maps into the domain model;
 - how the UI should display the result;
-- implementation risks and confidence/coverage rules.
+- implementation risks;
+- confidence and coverage rules;
+- chain-aware implementation requirements.
 
-This document is intended to guide AI-assisted coding by preventing provider drift, unclear data ownership, and incorrect assumptions about what public APIs can reconstruct.
+This document is intended to guide AI-assisted coding by preventing:
+
+- provider drift;
+- unclear data ownership;
+- incorrect assumptions about public APIs;
+- Base-only assumptions leaking into the domain model;
+- address-only database identities;
+- UI sections consuming provider data directly instead of normalized domain data.
 
 ---
 
-## 0. Executive summary
+# 0. Executive summary
 
-The Cab is feasible, but the implementation must be split into two layers:
+The Cab is feasible as a product, but the implementation must be split into two layers:
 
 ```txt
 Fast API layer
@@ -31,34 +40,255 @@ Fast API layer
   -> powers quick Overview and candidate activity discovery
 
 Protocol reconstruction layer
-  -> uses RPC, event logs, contract reads, ABIs, protocol metadata
+  -> uses RPC, event logs, contract reads, ABIs, official protocol metadata
   -> powers Pools, Deposits, Strategies, Rewards, Governance, Activity
+```
+
+Product v1 remains **Base mainnet only**, but the implementation must be **chain-aware from day one**.
+
+This means:
+
+```txt
+Product scope v1: Base mainnet
+Architecture: chain-aware
+Domain identity: chainId + address
+Provider calls: chainId-derived
+Query keys: chainId-scoped
+API routes: chainId-aware
+DB constraints: chainId-aware
 ```
 
 The APIs are useful, but they are not sufficient for full Aerodrome/Mellow analytics.
 
-### High-level feasibility
+---
 
-| Feature | Feasibility | Moralis / Alchemy enough? | RPC required? | Notes |
+# 1. High-level feasibility
+
+| Feature | Feasibility | Moralis / Alchemy enough? | RPC required? | Chain-aware requirement |
 |---|---:|---:|---:|---|
-| Landing | High | N/A | No | Static/product feature. |
-| Wallet connection | High | N/A | No | wagmi + WalletConnect. |
-| Overview recent dashboard | High | Mostly yes | Optional | Moralis wallet data + Alchemy prices. |
-| Analysis status | High | N/A | No | Internal DB + Trigger.dev. |
-| Pools | Medium | No | Yes | Need protocol events, pool/gauge/strategy mapping. |
-| Deposits | Medium | No | Yes | Need NFT/tokenId, mint vs increase semantics, events. |
-| Strategies / Mellow | Medium-Low | No | Yes | Need official Mellow metadata + wrapper/staking events + share accounting. |
-| Rewards | Medium | Partially | Yes | Claims/transfers via APIs, attribution via events/contracts. |
-| Governance | Medium | Partially | Yes | veAERO/Voter/bribe/fee contracts need RPC/event decoding. |
-| Activity | High for raw, Medium for enriched | Partially | Yes | Moralis seeds activity; enrichment needs RPC/decoding. |
-| Settings | High | N/A | No | Internal app state/DB. |
-| Background analysis | Medium | Partially | Yes | APIs seed; RPC makes it correct. |
+| Landing | High | N/A | No | No chain state beyond copy. |
+| Wallet connection | High | N/A | No | Enforce Base for v1; preserve chain state. |
+| Overview recent dashboard | High | Mostly yes | Optional | Query and prices scoped by `chainId`. |
+| Analysis status | High | N/A | No | `AnalysisRun = walletAddress + chainId`. |
+| Pools | Medium | No | Yes | `Pool = chainId + poolAddress`. |
+| Deposits | Medium | No | Yes | NFT identity requires `chainId + contract + tokenId`. |
+| Strategies / Mellow | Medium-Low initially | No | Yes | `Strategy = chainId + wrapper/vault/strategy address`. |
+| Rewards | Medium | Partially | Yes | Reward scope must include `chainId`. |
+| Governance | Medium | Partially | Yes | veAERO/Voter/fees/bribes are chain-scoped. |
+| Activity raw | High | Partially | Optional | `Activity = chainId + txHash + logIndex/event`. |
+| Activity enriched | Medium | Partially | Yes | Requires chain-scoped decoding. |
+| Settings | High | N/A | No | Settings may default by chain. |
+| Background analysis | Medium | Partially | Yes | Every run scoped to wallet + chain. |
 
 ---
 
-## 1. Provider strategy
+# 2. Chain-aware architecture
 
-## 1.1 Moralis
+## 2.1 Product v1 scope
+
+Product v1 supports:
+
+```txt
+Base mainnet only
+chainId = 8453
+```
+
+However, the implementation must prepare for future Aero multi-chain expansion.
+
+Future chains may include:
+
+- Base;
+- Optimism;
+- Ethereum mainnet;
+- Circle Arc or another EVM-compatible network;
+- additional Aero-supported networks.
+
+## 2.2 Chain configuration layer
+
+All chain-specific values must live in one configuration layer.
+
+Suggested file:
+
+```txt
+src/chains/chains.ts
+```
+
+Suggested shape:
+
+```ts
+export const SUPPORTED_CHAINS = {
+  base: {
+    chainId: 8453,
+    name: "Base",
+    slug: "base",
+    isProductV1Enabled: true,
+    moralisChain: "base",
+    alchemyNetwork: "base-mainnet",
+    nativeCurrencySymbol: "ETH",
+    explorerBaseUrl: "https://basescan.org",
+  },
+} as const;
+```
+
+Required helpers:
+
+```ts
+getSupportedChain(chainId)
+assertSupportedChain(chainId)
+getMoralisChain(chainId)
+getAlchemyNetwork(chainId)
+getRpcClient(chainId)
+getAlchemyClient(chainId)
+getExplorerBaseUrl(chainId)
+```
+
+Rules:
+
+- Do not scatter `"base"`, `"base-mainnet"`, or `8453` across feature code.
+- Product v1 can default to Base.
+- Every feature query, API call, provider client, and DB query must still accept or derive `chainId`.
+
+## 2.3 Database identity rules
+
+Never key protocol entities by address alone.
+
+Use:
+
+```txt
+chainId + address
+```
+
+Examples:
+
+| Entity | Identity rule |
+|---|---|
+| `ProtocolContract` | `chainId + address` |
+| `Pool` | `chainId + poolAddress` |
+| `Deposit` | `chainId + walletAddress + deposit identity` |
+| `Strategy` | `chainId + wrapperAddress` or `chainId + strategyContractAddress` |
+| `StrategyExposure` | `chainId + walletAddress + strategyId` |
+| `LedgerEvent` | `chainId + txHash + logIndex + eventType` |
+| `AssetMovement` | `chainId + ledgerEventId + movementIndex` |
+| `PricePoint` | `chainId + tokenAddress + timestamp + source + resolution` |
+| `RewardEvent` | `chainId + txHash + logIndex/movementIndex + rewardType` |
+| `GovernanceEvent` | `chainId + txHash + logIndex/eventType` |
+| `AttributionState` | `chainId + walletAddress + poolId + tokenAddress + sourceLedgerEventId` |
+| `AttributionSourceLot` | `chainId + walletAddress + tokenAddress + sourceType + sourceLedgerEventId` |
+
+NFT identity must use:
+
+```txt
+chainId + contractAddress + tokenId
+```
+
+Transaction identity must use:
+
+```txt
+chainId + txHash
+```
+
+## 2.4 Provider call rules
+
+Every provider call must be chain-aware.
+
+### Moralis
+
+Moralis calls must derive `chain` from `chainId`.
+
+Product v1:
+
+```txt
+chainId = 8453
+moralisChain = base
+```
+
+### Alchemy Prices
+
+Alchemy price calls must use token address + chain/network.
+
+Product v1:
+
+```txt
+chainId = 8453
+alchemyNetwork = base-mainnet
+```
+
+### Alchemy RPC
+
+RPC endpoints must be selected by `chainId`.
+
+Product v1:
+
+```txt
+https://base-mainnet.g.alchemy.com/v2/{apiKey}
+```
+
+Future chains must be added in the chain config, not hardcoded inside provider modules.
+
+## 2.5 API route rules
+
+All feature APIs should accept or derive `chainId`.
+
+Examples:
+
+```http
+GET /api/wallet/overview?chainId=8453
+GET /api/pools?chainId=8453
+GET /api/pools/:poolId?chainId=8453
+GET /api/deposits?chainId=8453
+GET /api/deposits/:depositId?chainId=8453
+GET /api/strategies?chainId=8453
+GET /api/strategies/:strategyId?chainId=8453
+GET /api/rewards?chainId=8453
+GET /api/governance?chainId=8453
+GET /api/activity?chainId=8453
+GET /api/settings?chainId=8453
+POST /api/analysis/start
+```
+
+`POST /api/analysis/start` request:
+
+```json
+{
+  "walletAddress": "0x...",
+  "chainId": 8453,
+  "mode": "full_history"
+}
+```
+
+## 2.6 TanStack Query key rules
+
+All query keys for wallet/protocol data must include `chainId`.
+
+Examples:
+
+```ts
+["overview", chainId, walletAddress]
+["analysis-status", chainId, walletAddress]
+["pools", chainId, walletAddress, filters]
+["pool", chainId, poolId]
+["deposits", chainId, walletAddress, filters]
+["deposit", chainId, depositId]
+["strategies", chainId, walletAddress, filters]
+["strategy", chainId, strategyId]
+["rewards", chainId, walletAddress, filters]
+["governance", chainId, walletAddress, filters]
+["activity", chainId, walletAddress, filters]
+```
+
+Do not create query keys such as:
+
+```ts
+["pools", walletAddress]
+```
+
+because they will break in a future multi-chain version.
+
+---
+
+# 3. Provider strategy
+
+## 3.1 Moralis
 
 Use Moralis primarily for wallet-centric data and fast discovery.
 
@@ -80,6 +310,12 @@ Use Moralis primarily for wallet-centric data and fast discovery.
 GET https://api.moralis.com/v1/wallets/{walletAddressOrPublicKey}/tokens?chains=base
 ```
 
+Chain-aware implementation:
+
+```ts
+const moralisChain = getMoralisChain(chainId);
+```
+
 Use for:
 
 - current wallet token balances;
@@ -91,7 +327,8 @@ Use for:
 Persist into:
 
 - `RawProviderRecord`
-- optionally `CurrentWalletTokenBalance` or computed `PortfolioSnapshot`
+- `PortfolioSnapshot`
+- current wallet balance cache if implemented
 
 #### Wallet history
 
@@ -109,7 +346,8 @@ Use for:
 Persist into:
 
 - `RawProviderRecord`
-- candidate `LedgerEvent` queue
+- candidate event queue
+- normalized `LedgerEvent` only after classification
 
 #### DeFi positions
 
@@ -127,7 +365,7 @@ Use for:
 Persist into:
 
 - `RawProviderRecord`
-- `CoverageReport` notes if Moralis detects unsupported/partial protocol support.
+- `CoverageReport` notes if Moralis detects unsupported or partial protocol support
 
 #### Detailed DeFi positions by protocol
 
@@ -148,7 +386,7 @@ Important:
 
 ---
 
-## 1.2 Alchemy
+## 3.2 Alchemy
 
 Use Alchemy primarily for pricing and RPC-backed reconstruction.
 
@@ -182,6 +420,12 @@ Persist into:
 
 - `PricePoint`
 
+Identity:
+
+```txt
+chainId + tokenAddress + timestamp + source + resolution
+```
+
 #### Historical token prices
 
 ```http
@@ -203,8 +447,14 @@ Persist into:
 #### Asset transfers
 
 ```http
-POST https://base-mainnet.g.alchemy.com/v2/{apiKey}
+POST https://{network}.g.alchemy.com/v2/{apiKey}
 method: alchemy_getAssetTransfers
+```
+
+Product v1 network:
+
+```txt
+base-mainnet
 ```
 
 Use for:
@@ -223,7 +473,7 @@ Persist into:
 #### RPC logs
 
 ```http
-POST https://base-mainnet.g.alchemy.com/v2/{apiKey}
+POST https://{network}.g.alchemy.com/v2/{apiKey}
 method: eth_getLogs
 ```
 
@@ -245,7 +495,7 @@ Persist into:
 #### Contract reads
 
 ```http
-POST https://base-mainnet.g.alchemy.com/v2/{apiKey}
+POST https://{network}.g.alchemy.com/v2/{apiKey}
 method: eth_call
 ```
 
@@ -270,7 +520,7 @@ Persist into:
 
 ---
 
-## 1.3 Data source hierarchy
+## 3.3 Data source hierarchy
 
 The implementation should use this source hierarchy:
 
@@ -297,30 +547,32 @@ Rules:
 - Do not use Moralis prices for canonical historical valuation.
 - Do not treat Moralis decoded labels as final classification for Aerodrome/Mellow lifecycle.
 - Do not assume Router interaction covers all protocol activity.
+- Do not key any provider result without `chainId`.
 
 ---
 
-# 2. Shared ingestion architecture
+# 4. Shared ingestion architecture
 
-## 2.1 Background analysis flow
+## 4.1 Background analysis flow
 
 ```txt
 POST /api/analysis/start
+  -> validate walletAddress + chainId
   -> create AnalysisRun
   -> enqueue Trigger.dev analyze-wallet task
   -> return runId
 
 Trigger.dev analyze-wallet
-  -> fetch Moralis wallet history
-  -> fetch Moralis balances
-  -> fetch Moralis DeFi positions
-  -> fetch Alchemy transfers if needed
-  -> sync protocol metadata
-  -> fetch RPC logs for relevant contract families
+  -> fetch Moralis wallet history for chainId
+  -> fetch Moralis balances for chainId
+  -> fetch Moralis DeFi positions for chainId
+  -> fetch Alchemy transfers if needed for chainId
+  -> sync protocol metadata for chainId
+  -> fetch RPC logs for relevant contract families on chainId
   -> decode transactions/logs
   -> normalize LedgerEvents
   -> build AssetMovements
-  -> enrich PricePoints with Alchemy
+  -> enrich PricePoints with Alchemy for chainId
   -> build Pools, Deposits, Strategies, StrategyExposures
   -> build RewardEvents and GovernanceEvents
   -> build AttributionStates and AttributionSourceLots
@@ -329,7 +581,7 @@ Trigger.dev analyze-wallet
   -> mark AnalysisRun ready/failed
 ```
 
-## 2.2 Required ingestion modules
+## 4.2 Required ingestion modules
 
 ```txt
 src/server/providers/moralis/
@@ -345,6 +597,11 @@ src/server/providers/alchemy/
   rpcClient.ts
   getLogs.ts
   contractRead.ts
+
+src/server/chains/
+  getSupportedChain.ts
+  providerNetworkMap.ts
+  explorerMap.ts
 
 src/server/protocols/aerodrome/
   syncAerodromeMetadata.ts
@@ -376,37 +633,37 @@ src/server/analysis/
   computeSnapshots.ts
 ```
 
-## 2.3 Persistence flow
+## 4.3 Persistence flow
 
 Raw data is persisted first, domain entities second.
 
 ```txt
-RawProviderRecord
-  -> LedgerEvent
-    -> AssetMovement
-      -> PricePoint
-    -> RewardEvent
-    -> GovernanceEvent
-    -> AttributionState
-    -> AttributionSourceLot
-  -> Pool
-  -> Deposit
-  -> Strategy
-  -> StrategyExposure
-  -> PerformanceSnapshot
-  -> PortfolioSnapshot
-  -> CoverageReport
+RawProviderRecord(chainId)
+  -> LedgerEvent(chainId)
+    -> AssetMovement(chainId)
+      -> PricePoint(chainId)
+    -> RewardEvent(chainId)
+    -> GovernanceEvent(chainId)
+    -> AttributionState(chainId)
+    -> AttributionSourceLot(chainId)
+  -> Pool(chainId)
+  -> Deposit(chainId)
+  -> Strategy(chainId)
+  -> StrategyExposure(chainId)
+  -> PerformanceSnapshot(chainId)
+  -> PortfolioSnapshot(chainId)
+  -> CoverageReport(chainId)
 ```
 
 Do not skip `RawProviderRecord`: it is required for debugging, reclassification, and explainability.
 
 ---
 
-# 3. Feature feasibility and implementation
+# 5. Feature feasibility and implementation
 
 ---
 
-## 3.1 Landing
+## 5.1 Landing
 
 ### Feasibility
 
@@ -414,17 +671,15 @@ Do not skip `RawProviderRecord`: it is required for debugging, reclassification,
 
 No external data required.
 
-### Data sources
+### Chain-aware requirements
 
-None.
+- Product v1 copy may mention Base.
+- Future copy should be adaptable to Aero multi-chain.
+- No chain state is required in static landing content.
 
 ### Implementation
 
 Use static content and internal Design System components.
-
-### Storage
-
-None.
 
 ### Display
 
@@ -440,7 +695,7 @@ Low.
 
 ---
 
-## 3.2 Wallet connection
+## 5.2 Wallet connection
 
 ### Feasibility
 
@@ -455,6 +710,13 @@ Low.
 
 No Moralis/Alchemy required for connection itself.
 
+### Chain-aware requirements
+
+- Wallet connection must expose `chainId`.
+- Product v1 must enforce Base mainnet.
+- Wrong-network state should instruct the user to switch to Base.
+- The wallet adapter should not hide `chainId`.
+
 ### Implementation
 
 Use:
@@ -465,9 +727,17 @@ WalletConnect connector
 useCabWallet wrapper
 ```
 
-### Storage
+`useCabWallet` should expose:
 
-Persist only non-sensitive UI state if needed.
+```ts
+address
+chainId
+isConnected
+isSupportedChain
+connect()
+disconnect()
+switchToSupportedChain()
+```
 
 ### Display
 
@@ -483,7 +753,7 @@ Persist only non-sensitive UI state if needed.
 
 ---
 
-## 3.3 Overview
+## 5.3 Overview
 
 ### Feasibility
 
@@ -503,8 +773,8 @@ Use Moralis for:
 Endpoints:
 
 ```http
-GET /v1/wallets/{walletAddressOrPublicKey}/tokens?chains=base
-GET /api/v2.2/wallets/{address}/history?chain=base
+GET /v1/wallets/{walletAddressOrPublicKey}/tokens?chains={moralisChain}
+GET /api/v2.2/wallets/{address}/history?chain={moralisChain}
 GET /v1/wallets/{walletAddress}/defi/positions
 ```
 
@@ -528,6 +798,13 @@ POST /prices/v1/{apiKey}/tokens/historical
 Optional for the quick Overview.
 
 Required only when showing analyzed data from the historical layer.
+
+### Chain-aware requirements
+
+- Query key: `["overview", chainId, walletAddress]`.
+- API route: `/api/wallet/overview?chainId=8453`.
+- Prices keyed by `chainId + tokenAddress`.
+- Portfolio snapshot keyed by `walletAddress + chainId + timestamp`.
 
 ### Persisted data
 
@@ -564,7 +841,8 @@ Overview should show:
 - residual attributed value;
 - governance value;
 - recent activity;
-- analysis status.
+- analysis status;
+- chain indicator.
 
 ### Coverage behavior
 
@@ -587,7 +865,7 @@ After full analysis:
 
 ---
 
-## 3.4 Pools
+## 5.4 Pools
 
 ### Feasibility
 
@@ -632,6 +910,14 @@ Required RPC/log sources:
 - Router `defaultFactory()`;
 - Router `poolFor(...)`.
 
+### Chain-aware requirements
+
+- Pool identity: `chainId + poolAddress`.
+- Factory metadata: `chainId + factoryAddress`.
+- Router metadata: `chainId + routerAddress`.
+- Query key: `["pools", chainId, walletAddress, filters]`.
+- API route: `/api/pools?chainId=8453`.
+
 ### Persisted data
 
 - `ProtocolContract`
@@ -675,6 +961,7 @@ Rewards
 Pools list:
 
 - pool name;
+- chain;
 - total attributed value;
 - manual deposit value;
 - automated strategy value;
@@ -721,7 +1008,7 @@ Each automated strategy row should show:
 
 ---
 
-## 3.5 Deposits
+## 5.5 Deposits
 
 ### Feasibility
 
@@ -767,6 +1054,13 @@ Required:
 - tokenId extraction;
 - collect/decrease/increase events;
 - gauge stake/unstake events if staked.
+
+### Chain-aware requirements
+
+- Deposit identity must include `chainId`.
+- NFT identity must be `chainId + contractAddress + tokenId`.
+- Query key: `["deposits", chainId, walletAddress, filters]`.
+- API route: `/api/deposits?chainId=8453`.
 
 ### Persisted data
 
@@ -835,7 +1129,7 @@ Deposit detail:
 
 ---
 
-## 3.6 Strategies
+## 5.6 Strategies
 
 ### Feasibility
 
@@ -884,6 +1178,14 @@ Required:
 - deposit/withdraw event decoding;
 - reward claim event decoding;
 - optional TVL/share price reads if available.
+
+### Chain-aware requirements
+
+- Strategy identity includes `chainId`.
+- StrategyExposure identity includes `chainId`.
+- Official Mellow metadata must be stored per chain.
+- Query key: `["strategies", chainId, walletAddress, filters]`.
+- API route: `/api/strategies?chainId=8453`.
 
 ### Persisted data
 
@@ -985,7 +1287,7 @@ Default to `share_level` when:
 
 ---
 
-## 3.7 Rewards
+## 5.7 Rewards
 
 ### Feasibility
 
@@ -1023,6 +1325,13 @@ Required for:
 - voting fees;
 - rebases;
 - pool attribution.
+
+### Chain-aware requirements
+
+- RewardEvent identity includes `chainId`.
+- Reward token pricing uses `chainId + tokenAddress + timestamp`.
+- Query key: `["rewards", chainId, walletAddress, filters]`.
+- API route: `/api/rewards?chainId=8453`.
 
 ### Persisted data
 
@@ -1075,7 +1384,7 @@ Rewards should show:
 
 ---
 
-## 3.8 Governance
+## 5.8 Governance
 
 ### Feasibility
 
@@ -1112,6 +1421,13 @@ Required surfaces:
 - bribe contracts;
 - fee distributor contracts;
 - managed rewards where applicable.
+
+### Chain-aware requirements
+
+- GovernanceEvent identity includes `chainId`.
+- Governance contract metadata is chain-scoped.
+- Query key: `["governance", chainId, walletAddress, filters]`.
+- API route: `/api/governance?chainId=8453`.
 
 ### Persisted data
 
@@ -1158,7 +1474,7 @@ Governance should show:
 
 ---
 
-## 3.9 Activity
+## 5.9 Activity
 
 ### Feasibility
 
@@ -1197,6 +1513,13 @@ Required for:
 - strategy internal activity;
 - residual attribution.
 
+### Chain-aware requirements
+
+- LedgerEvent identity includes `chainId`.
+- Activity query keys include `chainId`.
+- Explorer links use `getExplorerBaseUrl(chainId)`.
+- API route: `/api/activity?chainId=8453`.
+
 ### Persisted data
 
 - `RawProviderRecord`
@@ -1231,6 +1554,7 @@ Activity rows should show:
 
 - timestamp;
 - tx hash;
+- chain;
 - event type;
 - protocol;
 - pool;
@@ -1264,7 +1588,7 @@ Activity must include:
 
 ---
 
-## 3.10 Settings
+## 5.10 Settings
 
 ### Feasibility
 
@@ -1278,6 +1602,13 @@ Internal DB.
 
 No, except for diagnostics display.
 
+### Chain-aware requirements
+
+- Settings may display active chain.
+- Diagnostics should be chain-scoped.
+- Analysis status should be wallet + chain scoped.
+- Future multi-chain settings should be added through chain config.
+
 ### Persisted data
 
 - wallet analysis status;
@@ -1290,8 +1621,9 @@ No, except for diagnostics display.
 Settings should show:
 
 - connected wallet;
-- chain;
-- last analysis timestamp;
+- active chain;
+- supported chain state;
+- last analysis timestamp for chain;
 - trigger/retry update;
 - display preferences;
 - diagnostics.
@@ -1302,35 +1634,38 @@ Low.
 
 ---
 
-# 4. Cross-feature implementation details
+# 6. Cross-feature implementation details
 
-## 4.1 Analysis modes
+## 6.1 Analysis modes
 
 ### Full history
 
 Scope:
 
 - last 365 days;
+- one wallet;
+- one chain;
 - older events only if needed to understand current open positions.
 
 ### Incremental update
 
 Scope:
 
+- same wallet + same chain;
 - from last indexed block/cursor to current head;
 - recompute affected snapshots.
 
-## 4.2 Price enrichment
+## 6.2 Price enrichment
 
 Use Alchemy historical prices for every valued event.
 
 Process:
 
 ```txt
-AssetMovement
-  -> tokenAddress + timestamp
+AssetMovement(chainId)
+  -> tokenAddress + timestamp + chainId
   -> Alchemy historical price
-  -> PricePoint
+  -> PricePoint(chainId)
   -> usdValueAtEvent
 ```
 
@@ -1339,17 +1674,18 @@ Rules:
 - address-based pricing preferred;
 - symbol fallback only if needed and lower confidence;
 - missing price should create CoverageReport entry;
-- do not silently use another provider.
+- do not silently use another provider;
+- token address without `chainId` is invalid.
 
-## 4.3 Contract metadata sync
+## 6.3 Contract metadata sync
 
-Before analysis, sync:
+Before analysis, sync for the target `chainId`:
 
 - Aerodrome AERO token;
 - Aerodrome Router;
 - Aerodrome default factory from `router.defaultFactory()`;
-- Mellow official strategy metadata;
-- Mellow lpWrapper/StakingRewards pairs.
+- Mellow official strategy metadata for that chain;
+- Mellow lpWrapper/StakingRewards pairs for that chain.
 
 Persist into:
 
@@ -1357,7 +1693,7 @@ Persist into:
 - `Strategy`
 - `Pool` when known.
 
-## 4.4 Event decoding requirements
+## 6.4 Event decoding requirements
 
 Create ABI registry:
 
@@ -1384,7 +1720,9 @@ Use ABI decoding for:
 - share event extraction;
 - reward event extraction.
 
-## 4.5 Confidence model
+ABI usage must be chain-aware when contract versions differ by chain.
+
+## 6.5 Confidence model
 
 ### High confidence
 
@@ -1392,7 +1730,8 @@ Use ABI decoding for:
 - decoded event + matching token transfer;
 - known ABI;
 - known pool/strategy mapping;
-- priced by address.
+- priced by address;
+- chain-scoped identity confirmed.
 
 ### Medium confidence
 
@@ -1407,7 +1746,8 @@ Use ABI decoding for:
 - missing ABI;
 - inferred event without confirming transfers;
 - missing price;
-- unknown strategy internals.
+- unknown strategy internals;
+- provider record without chain-specific validation.
 
 Persist confidence on:
 
@@ -1418,24 +1758,24 @@ Persist confidence on:
 - `AttributionState`
 - `CoverageReport`
 
-## 4.6 API route implementation
+## 6.6 API route implementation
 
 Recommended Next.js API routes:
 
 ```http
-GET  /api/wallet/overview
+GET  /api/wallet/overview?chainId=8453
 POST /api/analysis/start
-GET  /api/analysis/status
-GET  /api/pools
-GET  /api/pools/:poolId
-GET  /api/deposits
-GET  /api/deposits/:depositId
-GET  /api/strategies
-GET  /api/strategies/:strategyId
-GET  /api/rewards
-GET  /api/governance
-GET  /api/activity
-GET  /api/settings
+GET  /api/analysis/status?chainId=8453
+GET  /api/pools?chainId=8453
+GET  /api/pools/:poolId?chainId=8453
+GET  /api/deposits?chainId=8453
+GET  /api/deposits/:depositId?chainId=8453
+GET  /api/strategies?chainId=8453
+GET  /api/strategies/:strategyId?chainId=8453
+GET  /api/rewards?chainId=8453
+GET  /api/governance?chainId=8453
+GET  /api/activity?chainId=8453
+GET  /api/settings?chainId=8453
 POST /api/settings
 ```
 
@@ -1446,55 +1786,59 @@ Rules:
 - Analysis runs in Trigger.dev.
 - Provider calls should be centralized in provider modules.
 - Feature containers call typed query hooks, not raw fetch.
+- Every route either accepts `chainId` or derives Base mainnet default for product v1.
+- Backend validation must reject unsupported chains.
 
 ---
 
-# 5. Feature-to-storage mapping
+# 7. Feature-to-storage mapping
 
-| Feature | Reads from | Writes through analysis |
-|---|---|---|
-| Overview | PortfolioSnapshot, PerformanceSnapshot, PricePoint, CoverageReport | PortfolioSnapshot, PricePoint |
-| Pools | Pool, Deposit, Strategy, StrategyExposure, AttributionState, RewardEvent, PerformanceSnapshot | Pool, PerformanceSnapshot |
-| Deposits | Deposit, LedgerEvent, AssetMovement, RewardEvent, PerformanceSnapshot | Deposit, LedgerEvent, AssetMovement |
-| Strategies | Strategy, StrategyExposure, RewardEvent, PerformanceSnapshot, CoverageReport | Strategy, StrategyExposure |
-| Rewards | RewardEvent, PricePoint, LedgerEvent | RewardEvent |
-| Governance | GovernanceEvent, RewardEvent, PerformanceSnapshot | GovernanceEvent |
-| Activity | LedgerEvent, AssetMovement, RawProviderRecord | LedgerEvent, AssetMovement |
-| Settings | WalletContext, AnalysisRun | WalletContext |
+| Feature | Reads from | Writes through analysis | Chain key |
+|---|---|---|---|
+| Overview | PortfolioSnapshot, PerformanceSnapshot, PricePoint, CoverageReport | PortfolioSnapshot, PricePoint | wallet + chain |
+| Pools | Pool, Deposit, Strategy, StrategyExposure, AttributionState, RewardEvent, PerformanceSnapshot | Pool, PerformanceSnapshot | pool + chain |
+| Deposits | Deposit, LedgerEvent, AssetMovement, RewardEvent, PerformanceSnapshot | Deposit, LedgerEvent, AssetMovement | deposit + chain |
+| Strategies | Strategy, StrategyExposure, RewardEvent, PerformanceSnapshot, CoverageReport | Strategy, StrategyExposure | strategy + chain |
+| Rewards | RewardEvent, PricePoint, LedgerEvent | RewardEvent | reward + chain |
+| Governance | GovernanceEvent, RewardEvent, PerformanceSnapshot | GovernanceEvent | governance + chain |
+| Activity | LedgerEvent, AssetMovement, RawProviderRecord | LedgerEvent, AssetMovement | tx/log + chain |
+| Settings | WalletContext, AnalysisRun | WalletContext | wallet + chain |
 
 ---
 
-# 6. Implementation order
+# 8. Implementation order
 
-## Phase A — API provider foundation
+## Phase A — Chain-aware provider foundation
 
-- Moralis client.
-- Alchemy price client.
-- Alchemy RPC client.
-- RawProviderRecord persistence.
+- Chain config layer.
+- Moralis client keyed by `chainId`.
+- Alchemy price client keyed by `chainId`.
+- Alchemy RPC client keyed by `chainId`.
+- Query key helpers with `chainId`.
+- RawProviderRecord persistence with `chainId`.
 - Provider error handling.
 - Rate limit handling.
 
 ## Phase B — Fast Overview
 
-- Fetch Moralis balances.
-- Fetch Alchemy current prices.
-- Fetch Moralis recent wallet history.
+- Fetch Moralis balances for chain.
+- Fetch Alchemy current prices for chain.
+- Fetch Moralis recent wallet history for chain.
 - Display recent Overview.
 - Show analysis CTA.
 
 ## Phase C — Analysis pipeline skeleton
 
 - Trigger.dev task.
-- AnalysisRun.
-- Status polling.
-- Raw data fetch/persist.
-- Protocol metadata sync.
+- AnalysisRun with `chainId`.
+- Status polling with `chainId`.
+- Raw data fetch/persist with `chainId`.
+- Protocol metadata sync with `chainId`.
 
 ## Phase D — Aerodrome reconstruction
 
-- Router/defaultFactory sync.
-- Pool discovery.
+- Router/defaultFactory sync by chain.
+- Pool discovery by chain.
 - Deposit reconstruction.
 - Gauge/reward reconstruction.
 - AssetMovement generation.
@@ -1509,7 +1853,7 @@ Rules:
 
 ## Phase F — Mellow strategies
 
-- Sync official Mellow strategy metadata.
+- Sync official Mellow strategy metadata by chain.
 - Decode lpWrapper/StakingRewards activity.
 - Build Strategy/StrategyExposure.
 - Share-level accounting.
@@ -1533,7 +1877,7 @@ Rules:
 
 ---
 
-# 7. Feasibility conclusions
+# 9. Feasibility conclusions
 
 ## What APIs can handle well
 
@@ -1561,6 +1905,20 @@ The Cab must implement custom RPC/log decoding for:
 - governance rewards;
 - high-confidence activity classification.
 
+## What multi-chain readiness changes
+
+Multi-chain readiness does not change Product v1 scope.
+
+It changes implementation discipline:
+
+```txt
+Do not hardcode Base everywhere.
+Do not key by address alone.
+Do not create provider clients without chain context.
+Do not create query keys without chainId.
+Do not create database constraints that assume global address uniqueness.
+```
+
 ## Final architecture rule
 
 The product should not be built as:
@@ -1573,13 +1931,13 @@ It should be built as:
 
 ```txt
 Moralis / Alchemy / RPC / official metadata
-  -> RawProviderRecord
-  -> normalized domain model
-  -> snapshots
-  -> typed feature APIs
-  -> TanStack Query
+  -> RawProviderRecord(chainId)
+  -> normalized domain model(chainId)
+  -> snapshots(chainId)
+  -> typed feature APIs(chainId)
+  -> TanStack Query(chainId keys)
   -> containers
   -> pure components
 ```
 
-This is the only path that keeps The Cab’s analytics reliable, explainable, and extensible.
+This is the only path that keeps The Cab’s analytics reliable, explainable, extensible, and ready for a future Aero multi-chain cockpit.
