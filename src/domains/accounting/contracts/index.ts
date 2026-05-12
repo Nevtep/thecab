@@ -1,1 +1,0 @@
-export * from "@/domains/accounting/contracts/accounting-api-schemas";
