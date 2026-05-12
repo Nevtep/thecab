@@ -1,8 +1,8 @@
-# The Cab — Product & Technical Specification v1.3
+# The Cab — Product & Technical Specification v1.4
 
 ## Version
 
-- **Document version:** v1.3
+- **Document version:** v1.4
 - **Product:** The Cab
 - **Scope:** Product technical specification
 - **Primary chain:** Base mainnet
@@ -2120,39 +2120,136 @@ Auto-update rule:
 
 # 9. Domain Model
 
-The initial data model remains the primary structure, with additions required for analysis status, raw provider auditability, residual attribution, rewards, governance, and coverage.
+This section defines the complete domain model for The Cab.
 
-## 9.1 Existing core model
+The model must be consistent with the product terminology:
 
-The model includes:
+- **Pool**: the venue/base market, such as `WETH/cbBTC` or `AERO/USDC`.
+- **Deposit**: a direct user-owned/manual exposure lifecycle inside an Aerodrome pool.
+- **Strategy**: an automated strategy layer, initially focused on Mellow, with its own wrapper/vault/share/reward accounting.
+- **Residual attribution**: token inventory that remains economically attributed to a pool after a withdrawal until it is resolved by an actual token movement.
+- **Ledger events**: the normalized source of truth for all analytics.
+- **Asset movements**: token-level deltas caused by ledger events.
+- **Snapshots**: computed analytics states for portfolio, pools, deposits, strategies, and governance scopes.
+
+The model is designed for:
+
+- one connected wallet at a time;
+- Base mainnet;
+- Aerodrome Finance;
+- Mellow Aerodrome strategies;
+- USD/USDC-centric valuation;
+- deterministic onchain reconstruction;
+- pool-level aggregation;
+- direct deposit lifecycle analytics;
+- automated strategy analytics;
+- historical performance reconstruction;
+- transaction-level explainability;
+- permanent analysis storage.
+
+---
+
+## 9.1 Design principles
+
+The domain model follows these principles:
+
+1. **Pool-first aggregation**  
+   Pools are the main market-level aggregation unit.
+
+2. **Deposit/strategy separation**  
+   Manual deposits and automated strategies must remain separate analytical concepts.
+
+3. **Lifecycle integrity**  
+   Deposits and strategies must have explicit lifecycle events from opening through closing.
+
+4. **Ledger-first truth**  
+   All analytics must derive from normalized `LedgerEvent` and `AssetMovement` records.
+
+5. **Portfolio completeness**  
+   Open deposits, automated strategies, idle assets, residual attributed assets, rewards, and governance exposure all contribute to portfolio understanding.
+
+6. **Explainability**  
+   Every metric should be traceable back to transactions, ledger events, asset movements, price points, and attribution decisions.
+
+7. **Confidence and coverage**  
+   The system must expose when data is complete, partial, inferred, unsupported, or ambiguous.
+
+8. **No silent over-attribution**  
+   A pool must not absorb more of a token movement than its residual attribution can support. Excess token movement must follow the source-priority waterfall.
+
+---
+
+## 9.2 Entity overview
+
+Core entities:
 
 - `WalletContext`
+- `AnalysisRun`
+- `RawProviderRecord`
 - `Protocol`
+- `ProtocolContract`
 - `Pool`
+- `Deposit`
 - `Strategy`
-- `PositionInstance`
+- `StrategyExposure`
 - `LedgerEvent`
 - `AssetMovement`
 - `PricePoint`
+- `AttributionState`
+- `AttributionSourceLot`
+- `RewardEvent`
+- `GovernanceEvent`
 - `PerformanceSnapshot`
 - `PortfolioSnapshot`
+- `CoverageReport`
 - `DiscardedEvent`
 
-Design principles:
+---
 
-- Pool-first analysis.
-- Strategy isolation.
-- Position lifecycle integrity.
-- Ledger-first truth.
-- Portfolio completeness.
+## 9.3 WalletContext
 
-## 9.2 Required additions
+Represents the connected wallet being analyzed.
 
-### AnalysisRun
+### Fields
 
-Represents one requested wallet analysis process.
+- `walletContextId`
+- `address`
+- `chainId`
+- `connectedAt`
+- `lastAnalyzedAt`
+- `lastIndexedBlock`
+- `analysisStatus`
+- `createdAt`
+- `updatedAt`
 
-Fields:
+### Status candidates
+
+- `not_started`
+- `queued`
+- `running`
+- `ready`
+- `stale`
+- `failed`
+
+### Purpose
+
+- Identifies the wallet context for all analysis.
+- Powers connected app state.
+- Stores analysis freshness.
+- Provides the parent scope for portfolio-level analytics.
+
+### Notes
+
+- The product supports one active wallet at a time in the connected UI.
+- Historical analysis data is stored permanently unless a future deletion workflow is added.
+
+---
+
+## 9.4 AnalysisRun
+
+Represents one wallet analysis execution.
+
+### Fields
 
 - `analysisRunId`
 - `walletAddress`
@@ -2173,7 +2270,13 @@ Fields:
 - `createdAt`
 - `updatedAt`
 
-Status candidates:
+### Mode candidates
+
+- `full_history`
+- `incremental_update`
+- `retry`
+
+### Status candidates
 
 - `not_started`
 - `queued`
@@ -2183,11 +2286,21 @@ Status candidates:
 - `stale`
 - `cancelled`
 
-### RawProviderRecord
+### Purpose
 
-Stores raw API records used for reconstruction.
+- Powers background analysis status.
+- Supports Trigger.dev job orchestration.
+- Enables polling from the connected UI.
+- Tracks progress and failure state.
+- Enables incremental updates after the initial full analysis.
 
-Fields:
+---
+
+## 9.5 RawProviderRecord
+
+Stores raw external API records used for reconstruction.
+
+### Fields
 
 - `rawProviderRecordId`
 - `analysisRunId`
@@ -2201,11 +2314,771 @@ Fields:
 - `payloadJson`
 - `createdAt`
 
-### GovernanceEvent
+### Provider candidates
 
-Governance can be represented through `LedgerEvent`, but a dedicated derived entity makes the Governance section easier to query.
+- `moralis`
+- `alchemy`
+- `onchain_rpc`
+- `manual_protocol_metadata_sync`
 
-Fields:
+### Source type candidates
+
+- `wallet_history`
+- `erc20_transfer`
+- `nft_transfer`
+- `transaction`
+- `decoded_transaction`
+- `token_price`
+- `contract_read`
+- `protocol_metadata`
+
+### Purpose
+
+- Provides auditability.
+- Allows reclassification without refetching where possible.
+- Supports debugging and provider comparison.
+- Makes analysis explainable.
+
+---
+
+## 9.6 Protocol
+
+Represents a supported DeFi protocol or protocol family.
+
+### Fields
+
+- `protocolId`
+- `name`
+- `slug`
+- `chainId`
+- `status`
+- `createdAt`
+- `updatedAt`
+
+### Initial protocol values
+
+- `aerodrome`
+- `mellow_aerodrome`
+
+### Purpose
+
+- Groups protocol-specific interpretation.
+- Allows manual Aerodrome and Mellow strategy behavior to remain distinct.
+- Supports future extension to additional strategy providers.
+
+---
+
+## 9.7 ProtocolContract
+
+Represents an official or discovered contract used for protocol discovery.
+
+### Fields
+
+- `protocolContractId`
+- `protocolId`
+- `chainId`
+- `address`
+- `contractType`
+- `label`
+- `source`
+- `sourceReference`
+- `discoveredAtBlock`
+- `discoveredAtTimestamp`
+- `confidence`
+- `metadataJson`
+- `createdAt`
+- `updatedAt`
+
+### Contract type candidates
+
+- `router`
+- `factory`
+- `pool`
+- `gauge`
+- `reward_distributor`
+- `bribe`
+- `fee_distributor`
+- `voter`
+- `voting_escrow`
+- `aero_token`
+- `mellow_wrapper`
+- `mellow_vault`
+- `mellow_strategy`
+- `mellow_staking_rewards`
+
+### Source candidates
+
+- `official_docs`
+- `router_default_factory`
+- `router_pool_for`
+- `contract_event`
+- `onchain_read`
+- `provider_detection`
+- `manual_fallback`
+
+### Purpose
+
+- Stores Router, AERO token, active factory, discovered pools, gauges, and Mellow strategy contracts.
+- Prevents long hardcoded whitelists.
+- Records provenance and confidence for protocol metadata.
+
+### Important rules
+
+- The Aerodrome PoolFactory should be read from the Router via `defaultFactory()` and stored here as protocol metadata.
+- Hardcoded factory addresses are fallback only and must be validated against the Router before production use.
+- Router is an anchor for discovery, not a complete index.
+
+---
+
+## 9.8 Pool
+
+Represents an Aerodrome market/venue.
+
+A Pool is the market-level aggregation layer.
+
+Examples:
+
+- `WETH/cbBTC`
+- `AERO/USDC`
+- `wstETH/WETH`
+
+### Fields
+
+- `poolId`
+- `protocolId`
+- `chainId`
+- `poolAddress`
+- `factoryAddress`
+- `token0Address`
+- `token1Address`
+- `token0Symbol`
+- `token1Symbol`
+- `stable`
+- `feeTier`
+- `displayName`
+- `isActive`
+- `discoverySource`
+- `confidence`
+- `metadataJson`
+- `createdAt`
+- `updatedAt`
+
+### Purpose
+
+A pool aggregates:
+
+- manual deposits;
+- automated strategies;
+- residual attributed balances;
+- pool-level rewards;
+- rebalances;
+- activity;
+- performance snapshots.
+
+### Rules
+
+- A Pool must not be treated as a Deposit.
+- A Pool must not be treated as a Strategy.
+- Pool-level analytics aggregate manual and automated exposure while preserving the distinction between them.
+- A Mellow strategy may contribute to pool-level aggregate value, but detailed strategy accounting belongs in `Strategy`.
+
+---
+
+## 9.9 Deposit
+
+Represents a direct user-owned/manual exposure lifecycle inside an Aerodrome pool.
+
+This is the user-facing replacement for the old “Position” concept.
+
+### Fields
+
+- `depositId`
+- `walletAddress`
+- `poolId`
+- `protocolId`
+- `depositType`
+- `status`
+- `openedAt`
+- `closedAt`
+- `openTxHash`
+- `closeTxHash`
+- `openedValueUsd`
+- `closedValueUsd`
+- `currentValueUsd`
+- `realizedPnlUsd`
+- `unrealizedPnlUsd`
+- `rewardRealizedUsd`
+- `confidence`
+- `coverageStatus`
+- `metadataJson`
+- `createdAt`
+- `updatedAt`
+
+### Deposit type candidates
+
+- `manual_aerodrome_lp`
+- `manual_aerodrome_cl`
+- `manual_staked_lp`
+- `automated_strategy_reference`
+
+### Status candidates
+
+- `open`
+- `partially_reduced`
+- `staked`
+- `unstaked`
+- `closed`
+- `burned`
+- `archived`
+- `partial_history`
+
+### Manual Aerodrome-specific fields
+
+These may be columns or stored under `metadataJson`, depending on implementation preference:
+
+- `tokenId`
+- `tickLower`
+- `tickUpper`
+- `initialLiquidity`
+- `currentLiquidity`
+- `gaugeAddress`
+- `stakedAt`
+- `unstakedAt`
+
+### Purpose
+
+Deposits power the `Deposits` section.
+
+They answer:
+
+- What manual deposits did the user open?
+- What was the entry value?
+- What changes occurred over time?
+- Was the deposit staked?
+- What was claimed?
+- What was withdrawn?
+- What is the current or closed value?
+- What was the return?
+
+### Rules
+
+- Manual Aerodrome deposits are user-owned lifecycle entities.
+- If an Aerodrome NFT token ID exists, it is the primary identity for the deposit.
+- `increaseLiquidity(existing tokenId)` updates the same deposit.
+- `decreaseLiquidity`, `collect`, `stake`, `unstake`, and `withdraw` affect the same deposit lifecycle where identity can be established.
+- Mellow exposure should not be modeled as a manual deposit unless the wallet actually owns the relevant manual Aerodrome position.
+- Automated strategies are represented in `Strategy` and `StrategyExposure`.
+- If the UI needs to reference automated exposure from Deposits, use `depositType = automated_strategy_reference` as a cross-link, not as the canonical strategy model.
+
+---
+
+## 9.10 Strategy
+
+Represents an automated strategy layer.
+
+Initial focus:
+
+- Mellow Aerodrome strategies.
+
+A Strategy may be associated with one or more Aerodrome pools, but it has its own accounting model.
+
+### Fields
+
+- `strategyId`
+- `protocolId`
+- `strategyType`
+- `label`
+- `status`
+- `primaryPoolId`
+- `sourceContractAddress`
+- `wrapperAddress`
+- `vaultAddress`
+- `stakingRewardsAddress`
+- `strategyContractAddress`
+- `shareTokenAddress`
+- `underlyingToken0Address`
+- `underlyingToken1Address`
+- `discoverySource`
+- `confidence`
+- `coverageStatus`
+- `metadataJson`
+- `createdAt`
+- `updatedAt`
+
+### Strategy type candidates
+
+- `mellow_auto`
+- `managed_lp`
+- `vault_strategy`
+- `unknown_automated_strategy`
+
+### Status candidates
+
+- `active`
+- `inactive`
+- `deprecated`
+- `unsupported`
+- `partial`
+
+### Purpose
+
+Strategies power the `Strategies` section.
+
+They answer:
+
+- Which automated strategies has the wallet used?
+- Which pool or pools does the strategy map to?
+- What contracts define the strategy?
+- What share accounting is available?
+- What value was deposited?
+- What was withdrawn?
+- What rewards were claimed?
+- What is the current value?
+- What is the coverage/confidence level?
+
+### Rules
+
+- Strategy is not the same as Pool.
+- Strategy is not the same as Deposit.
+- Mellow strategy exposure should be modeled here, not collapsed into manual Deposits.
+- Strategy value may contribute to Pool aggregate analytics when the underlying pool is known.
+- If only share-level accounting is available, coverage must be marked as `share_level` or `partial`.
+
+---
+
+## 9.11 StrategyExposure
+
+Represents the wallet’s lifecycle within a Strategy.
+
+A Strategy is the product/integration definition. A StrategyExposure is the user wallet’s actual participation in that strategy.
+
+### Fields
+
+- `strategyExposureId`
+- `walletAddress`
+- `strategyId`
+- `poolId`
+- `status`
+- `openedAt`
+- `closedAt`
+- `openTxHash`
+- `closeTxHash`
+- `shareBalance`
+- `sharesReceived`
+- `sharesRedeemed`
+- `openedValueUsd`
+- `closedValueUsd`
+- `currentValueUsd`
+- `realizedPnlUsd`
+- `unrealizedPnlUsd`
+- `rewardRealizedUsd`
+- `confidence`
+- `coverageStatus`
+- `metadataJson`
+- `createdAt`
+- `updatedAt`
+
+### Status candidates
+
+- `open`
+- `partially_reduced`
+- `closed`
+- `share_level_only`
+- `partial_history`
+- `unsupported`
+
+### Purpose
+
+- Tracks a wallet’s deposits, withdrawals, shares, and rewards inside an automated strategy.
+- Allows Mellow to have its own lifecycle without pretending it is a manual Aerodrome deposit.
+- Supports strategy-level performance snapshots.
+
+### Rules
+
+- If the strategy maps to a pool, `poolId` should be set.
+- If the pool relationship is inferred rather than official, confidence must reflect that.
+- StrategyExposure is the canonical user-level lifecycle for automated strategies.
+- Deposit may cross-link to StrategyExposure, but should not duplicate it.
+
+---
+
+## 9.12 LedgerEvent
+
+Represents a normalized event derived from one or more onchain actions.
+
+LedgerEvent is the canonical event-level source of truth.
+
+### Fields
+
+- `ledgerEventId`
+- `analysisRunId`
+- `walletAddress`
+- `chainId`
+- `protocolId`
+- `poolId`
+- `depositId`
+- `strategyId`
+- `strategyExposureId`
+- `governanceEventId`
+- `eventType`
+- `txHash`
+- `logIndex`
+- `blockNumber`
+- `timestamp`
+- `confidence`
+- `rawSource`
+- `isDiscarded`
+- `metadataJson`
+- `createdAt`
+
+### Event type candidates
+
+#### Wallet and capital flow
+
+- `cash_in`
+- `cash_out`
+- `external_deposit`
+- `external_withdrawal`
+- `idle_balance_change`
+
+#### Pool/deposit lifecycle
+
+- `mint_deposit`
+- `increase_liquidity`
+- `decrease_liquidity`
+- `collect_fees`
+- `stake`
+- `unstake`
+- `withdraw`
+- `burn`
+- `close_deposit`
+
+#### Strategy lifecycle
+
+- `strategy_deposit`
+- `strategy_withdraw`
+- `strategy_stake`
+- `strategy_unstake`
+- `strategy_claim`
+- `strategy_share_mint`
+- `strategy_share_burn`
+
+#### Swaps and attribution
+
+- `swap`
+- `rebalance`
+- `liquidation`
+- `residual_attribution_opened`
+- `residual_attribution_consumed`
+- `source_lot_consumed`
+
+#### Rewards
+
+- `claim_reward`
+- `claim_fees`
+- `claim_bribe`
+- `claim_rebase`
+
+#### Governance
+
+- `lock_aero`
+- `increase_lock_amount`
+- `extend_lock_time`
+- `relock_aero`
+- `vote`
+- `reset_vote`
+- `relay_join`
+- `relay_exit`
+- `claim_voting_fees`
+
+#### Classification states
+
+- `unsupported`
+- `malicious`
+- `ambiguous`
+- `discarded`
+
+### Purpose
+
+- Provides the canonical timeline for Activity.
+- Links raw provider records to domain entities.
+- Allows every metric to be traced back to one or more events.
+- Supports partial and inferred classification through confidence.
+
+### Rules
+
+- A LedgerEvent may be linked to a Pool, Deposit, Strategy, StrategyExposure, GovernanceEvent, or none depending on context.
+- A single transaction may produce multiple LedgerEvents.
+- A single LedgerEvent may produce multiple AssetMovements.
+- Inferred events such as `rebalance` must preserve links to the underlying raw swap/withdraw/deposit events.
+
+---
+
+## 9.13 AssetMovement
+
+Represents token-level deltas caused by a LedgerEvent.
+
+### Fields
+
+- `assetMovementId`
+- `ledgerEventId`
+- `walletAddress`
+- `tokenAddress`
+- `symbol`
+- `amountRaw`
+- `amountNormalized`
+- `direction`
+- `usdValueAtEvent`
+- `pricePointId`
+- `priceSource`
+- `movementIndex`
+- `metadataJson`
+- `createdAt`
+
+### Direction candidates
+
+- `in`
+- `out`
+- `internal`
+- `mint`
+- `burn`
+- `claim`
+- `fee`
+- `unknown`
+
+### Purpose
+
+AssetMovement allows exact decomposition of:
+
+- what moved;
+- how much moved;
+- in which direction;
+- what it was worth at the event time;
+- which event caused it.
+
+### Rules
+
+- All financial analytics should derive from AssetMovement records.
+- Token movements used in residual attribution must reference their source LedgerEvent.
+- A single swap should have separate outbound and inbound AssetMovement records.
+- Every valued movement should link to a PricePoint when possible.
+
+---
+
+## 9.14 PricePoint
+
+Represents a historical or current price used for valuation.
+
+### Fields
+
+- `pricePointId`
+- `tokenAddress`
+- `symbol`
+- `chainId`
+- `timestamp`
+- `priceUsd`
+- `source`
+- `resolution`
+- `confidence`
+- `metadataJson`
+- `createdAt`
+
+### Source candidates
+
+- `alchemy_address_price`
+- `alchemy_historical_price`
+- `alchemy_symbol_fallback`
+- `manual_missing_price`
+- `unknown`
+
+### Purpose
+
+Supports:
+
+- event-time valuation;
+- current valuation;
+- realized and unrealized PnL attribution;
+- rewards valuation;
+- capital in/out valuation;
+- rebalance valuation.
+
+### Rules
+
+- Alchemy is the pricing source of truth.
+- Address-based pricing is preferred.
+- Symbol fallback must be marked lower confidence.
+- If price is unavailable, store coverage/partial data rather than silently substituting another provider.
+
+---
+
+## 9.15 AttributionState
+
+Tracks residual pool-attributed assets after withdraw/rebalance operations.
+
+### Fields
+
+- `attributionStateId`
+- `walletAddress`
+- `poolId`
+- `depositId`
+- `strategyId`
+- `strategyExposureId`
+- `tokenAddress`
+- `amountNormalized`
+- `usdValueAtLastUpdate`
+- `sourceLedgerEventId`
+- `status`
+- `openedAt`
+- `closedAt`
+- `closeReason`
+- `confidence`
+- `metadataJson`
+- `createdAt`
+- `updatedAt`
+
+### Status candidates
+
+- `waiting_for_rebalance`
+- `rebalanced_same_pool`
+- `redeployed_same_pool`
+- `transferred_to_other_pool`
+- `liquidated_to_unrelated_asset`
+- `transferred_to_external_wallet`
+- `fully_spent`
+- `still_waiting`
+
+### Purpose
+
+- Preserves pool-level continuity after withdrawal.
+- Prevents pool charts from falsely dropping to zero during rebalance flows.
+- Allows residual balances to remain attributed until actual asset movement resolves them.
+- Supports multiple pools sharing the same token.
+
+### Rules
+
+- Attribution does not expire due to elapsed time.
+- There is no expiration status.
+- Attribution must never become negative.
+- If a movement exceeds one attribution state, excess must be assigned through the source-priority waterfall.
+- Pool attribution is per pool and per token, not global per token.
+
+---
+
+## 9.16 AttributionSourceLot
+
+Tracks non-pool-residual token inventory that may later be consumed by swaps or transfers.
+
+This entity is required to disambiguate swaps that exceed a pool’s residual balance.
+
+### Fields
+
+- `attributionSourceLotId`
+- `walletAddress`
+- `tokenAddress`
+- `amountNormalized`
+- `usdValueAtAcquisition`
+- `sourceType`
+- `sourceLedgerEventId`
+- `openedAt`
+- `closedAt`
+- `status`
+- `confidence`
+- `metadataJson`
+- `createdAt`
+- `updatedAt`
+
+### Source type candidates
+
+- `cash_in`
+- `liquidation_derived_inventory`
+- `reward_conversion_inventory`
+- `unknown_wallet_inventory`
+
+### Status candidates
+
+- `available`
+- `partially_consumed`
+- `fully_consumed`
+- `transferred_out`
+- `reassigned`
+
+### Purpose
+
+- Represents wallet inventory not directly attributed to a pool residual.
+- Supports the attribution waterfall when swap amounts exceed a candidate pool residual.
+- Prevents over-attribution of large swaps to a single pool.
+- Allows reward conversions, such as `AERO -> cbBTC`, to become liquidation-derived inventory rather than pool residual.
+
+### Consumption priority
+
+1. Specific pool residual attribution.
+2. Matching-token `cash_in` source lots.
+3. Matching-token `liquidation_derived_inventory` or `reward_conversion_inventory` source lots.
+4. Other same-token pool residual attribution states pro rata.
+5. Unknown wallet inventory only if no other source can explain the movement, marked low confidence.
+
+---
+
+## 9.17 RewardEvent
+
+Represents a reward or claim event in a query-friendly form.
+
+Rewards may also be represented as LedgerEvents, but RewardEvent provides a derived analytics surface.
+
+### Fields
+
+- `rewardEventId`
+- `walletAddress`
+- `poolId`
+- `depositId`
+- `strategyId`
+- `strategyExposureId`
+- `governanceEventId`
+- `rewardType`
+- `txHash`
+- `blockNumber`
+- `timestamp`
+- `tokenAddress`
+- `symbol`
+- `amountNormalized`
+- `usdValueAtClaim`
+- `pricePointId`
+- `sourceLedgerEventId`
+- `source`
+- `metadataJson`
+- `createdAt`
+
+### Reward type candidates
+
+- `lp_fee`
+- `gauge_reward`
+- `strategy_reward`
+- `mellow_reward`
+- `voting_fee`
+- `bribe`
+- `rebase`
+- `unknown_reward`
+
+### Purpose
+
+- Powers the Rewards section.
+- Allows grouping by pool, deposit, strategy, token, governance source, and reward type.
+- Prevents double counting across Pool, Strategy, Governance, and Rewards views.
+
+### Rules
+
+- Rewards should be valued at claim time.
+- Governance rewards should be displayed by pool where supported.
+- A reward may appear in multiple views but must only be counted once in totals.
+- Reward source and scope must be explicit.
+
+---
+
+## 9.18 GovernanceEvent
+
+Represents veAERO and governance-specific behavior.
+
+### Fields
 
 - `governanceEventId`
 - `walletAddress`
@@ -2221,9 +3094,11 @@ Fields:
 - `epoch`
 - `feesClaimedUsd`
 - `rewardTokenAddress`
+- `sourceLedgerEventId`
 - `metadataJson`
+- `createdAt`
 
-Event types:
+### Event type candidates
 
 - `create_lock`
 - `increase_lock_amount`
@@ -2237,131 +3112,111 @@ Event types:
 - `claim_bribes`
 - `claim_rebase`
 
-### RewardEvent
+### Purpose
 
-Rewards can also be represented through `LedgerEvent`, but a dedicated derived entity helps Rewards analytics.
+- Powers Governance.
+- Separates veAERO and voting behavior from deposits.
+- Allows governance rewards to be grouped by pool where Aerodrome supports that association.
 
-Fields:
+### Rules
 
-- `rewardEventId`
+- Governance events are not deposit events.
+- Governance rewards may be linked to RewardEvent.
+- Governance rewards should be displayed by pool when possible.
+- Unsupported governance behavior should be surfaced through CoverageReport.
+
+---
+
+## 9.19 PerformanceSnapshot
+
+Represents a computed performance state for a chosen analytical scope.
+
+### Fields
+
+- `performanceSnapshotId`
 - `walletAddress`
-- `poolId`
-- `strategyId`
-- `positionInstanceId`
-- `governanceEventId`
-- `rewardType`
-- `txHash`
+- `scopeType`
+- `scopeId`
 - `timestamp`
-- `tokenAddress`
-- `symbol`
-- `amountNormalized`
-- `usdValueAtClaim`
-- `source`
-
-Reward types:
-
-- `lp_fee`
-- `gauge_reward`
-- `mellow_reward`
-- `voting_fee`
-- `bribe`
-- `rebase`
-- `unknown_reward`
-
-### AttributionState
-
-Tracks residual pool-attributed assets after withdraw/rebalance operations.
-
-Fields:
-
-- `attributionStateId`
-- `walletAddress`
-- `poolId`
-- `strategyId`
-- `tokenAddress`
-- `amountNormalized`
-- `usdValueAtLastUpdate`
-- `sourceLedgerEventId`
-- `status`
-- `openedAt`
-- `closedAt`
-- `closeReason`
-- `confidence`
-
-Status candidates:
-
-- `waiting_for_rebalance`
-- `rebalanced_same_pool`
-- `redeployed_same_pool`
-- `transferred_to_other_pool`
-- `liquidated_to_unrelated_asset`
-- `transferred_to_external_wallet`
-- `fully_spent`
-- `still_waiting`
-
-Important:
-
-- There is no expiration status.
-- Attribution does not expire due to elapsed time.
-- Attribution must never become negative.
-- If a token movement exceeds one attribution state, the excess must be assigned through the source-priority waterfall.
-
-### AttributionSourceLot
-
-Tracks non-pool-residual token sources that may later be consumed by swaps or transfers.
-
-This entity is required to disambiguate swaps that exceed a pool's residual balance.
-
-Fields:
-
-- `attributionSourceLotId`
-- `walletAddress`
-- `tokenAddress`
-- `amountNormalized`
-- `usdValueAtAcquisition`
-- `sourceType`
-- `sourceLedgerEventId`
-- `openedAt`
-- `closedAt`
-- `status`
+- `capitalInUsd`
+- `capitalOutUsd`
+- `realizedPnlUsd`
+- `unrealizedPnlUsd`
+- `rewardRealizedUsd`
+- `assetPriceEffectUsd`
+- `rebalanceRealizedUsd`
+- `currentValueUsd`
+- `estimatedAnnualizedReturnPct`
+- `coverageStatus`
 - `confidence`
 - `metadataJson`
+- `createdAt`
 
-Source types:
+### Scope type candidates
 
-- `cash_in`
-- `liquidation_derived_inventory`
-- `reward_conversion_inventory`
-- `unknown_wallet_inventory`
+- `portfolio`
+- `pool`
+- `deposit`
+- `strategy`
+- `strategy_exposure`
+- `governance`
 
-Status candidates:
+### Purpose
 
-- `available`
-- `partially_consumed`
-- `fully_consumed`
-- `transferred_out`
-- `reassigned`
+- Provides reusable metrics for dashboards and reports.
+- Powers Pools, Deposits, Strategies, Rewards, Governance, and Overview.
 
-Purpose:
+### Rules
 
-- Represents wallet inventory not directly attributed to a pool residual.
-- Supports attribution waterfall when swap amounts exceed a candidate pool residual.
-- Prevents over-attribution of large swaps to a single pool.
-- Allows reward conversions, such as AERO -> cbBTC, to become liquidation-derived inventory rather than pool residual.
+- Snapshot scope must be explicit.
+- Strategy snapshots must not be merged into deposit snapshots.
+- Pool snapshots may aggregate deposits, strategies, rewards, and residual attribution.
+- All annualized return values must be labeled estimated.
 
-Consumption priority:
+---
 
-1. Specific pool residual attribution.
-2. Matching-token `cash_in` source lots.
-3. Matching-token `liquidation_derived_inventory` or `reward_conversion_inventory` source lots.
-4. Other same-token pool residual attribution states pro rata.
-5. Unknown wallet inventory only if no other source can explain the movement, marked low confidence.
+## 9.20 PortfolioSnapshot
 
-### CoverageReport
+Represents current or historical overall portfolio state.
 
-Captures completeness and confidence.
+### Fields
 
-Fields:
+- `portfolioSnapshotId`
+- `walletAddress`
+- `timestamp`
+- `totalValueUsd`
+- `openDepositsValueUsd`
+- `strategyExposureValueUsd`
+- `idleAssetsValueUsd`
+- `residualAttributedValueUsd`
+- `governanceValueUsd`
+- `realizedPnlUsd`
+- `unrealizedPnlUsd`
+- `capitalInUsd`
+- `capitalOutUsd`
+- `coverageStatus`
+- `confidence`
+- `metadataJson`
+- `createdAt`
+
+### Purpose
+
+- Powers the Overview portfolio chart.
+- Gives portfolio-level accounting across deposits, strategies, idle assets, residual balances, rewards, and governance.
+
+### Rules
+
+- Portfolio value should include open deposits, strategy exposure, idle assets, and residual attributed balances.
+- Values must avoid double-counting strategy exposure inside both Strategy and Pool aggregates.
+- Pool aggregation and portfolio aggregation must preserve source scopes.
+
+---
+
+## 9.21 CoverageReport
+
+Captures completeness and confidence for a scope.
+
+### Fields
 
 - `coverageReportId`
 - `analysisRunId`
@@ -2375,15 +3230,283 @@ Fields:
 - `providerErrorsCount`
 - `confidence`
 - `notes`
+- `createdAt`
+- `updatedAt`
 
-Coverage statuses:
+### Scope type candidates
+
+- `portfolio`
+- `pool`
+- `deposit`
+- `strategy`
+- `strategy_exposure`
+- `governance`
+- `activity`
+- `price`
+- `provider`
+
+### Coverage statuses
 
 - `complete`
 - `partial`
 - `limited`
 - `failed`
+- `share_level`
+- `unknown`
+
+### Purpose
+
+- Prevents false precision.
+- Allows UI to show partial coverage.
+- Makes Mellow/share-level accounting explicit.
+- Supports diagnostics and analysis confidence.
 
 ---
+
+## 9.22 DiscardedEvent
+
+Represents detected events intentionally excluded from sensitive analytics.
+
+### Fields
+
+- `discardedEventId`
+- `analysisRunId`
+- `walletAddress`
+- `txHash`
+- `reasonType`
+- `reasonMessage`
+- `rawClassification`
+- `timestamp`
+- `metadataJson`
+- `createdAt`
+
+### Reason type candidates
+
+- `malicious`
+- `unsupported`
+- `ambiguous`
+- `invalid`
+- `spam`
+- `irrelevant`
+
+### Purpose
+
+- Prevents spam or malicious events from corrupting analytics.
+- Makes exclusions auditable.
+- Supports the rule that The Cab should not require manual reconciliation as a core workflow.
+
+---
+
+## 9.23 Relationships
+
+High-level relationships:
+
+```txt
+WalletContext
+  -> AnalysisRun
+  -> PortfolioSnapshot
+  -> CoverageReport
+
+Protocol
+  -> ProtocolContract
+
+Pool
+  -> Deposit
+  -> Strategy
+  -> StrategyExposure
+  -> AttributionState
+  -> RewardEvent
+  -> PerformanceSnapshot
+
+Deposit
+  -> LedgerEvent
+  -> AssetMovement
+  -> RewardEvent
+  -> PerformanceSnapshot
+
+Strategy
+  -> StrategyExposure
+  -> RewardEvent
+  -> PerformanceSnapshot
+
+StrategyExposure
+  -> LedgerEvent
+  -> AssetMovement
+  -> RewardEvent
+  -> PerformanceSnapshot
+
+LedgerEvent
+  -> AssetMovement
+  -> RewardEvent
+  -> GovernanceEvent
+  -> AttributionState
+  -> AttributionSourceLot
+
+AssetMovement
+  -> PricePoint
+
+GovernanceEvent
+  -> RewardEvent
+  -> PerformanceSnapshot
+```
+
+Relational rules:
+
+- One wallet can have many analysis runs.
+- One pool can have many deposits.
+- One pool can have many strategies.
+- One strategy can have many wallet-level strategy exposures.
+- One deposit can have many ledger events.
+- One strategy exposure can have many ledger events.
+- One ledger event can have many asset movements.
+- One asset movement should link to a price point when valued.
+- One pool/deposit/strategy/strategy exposure/governance scope can have many performance snapshots.
+- One reward may be visible in multiple UI views but must be counted once.
+
+---
+
+## 9.24 Identity rules
+
+### Pool identity
+
+A Pool is identified by:
+
+- chain ID;
+- pool address;
+- token pair;
+- stable/volatile flag where applicable;
+- factory/router-derived discovery.
+
+### Deposit identity
+
+A manual Aerodrome Deposit is identified by:
+
+- wallet address;
+- pool ID;
+- token ID where available;
+- open transaction;
+- direct lifecycle evidence.
+
+Rules:
+
+- `mint` creates a deposit.
+- `increaseLiquidity(existing tokenId)` updates the same deposit.
+- `stake` links the deposit to a gauge.
+- `unstake` updates the same deposit.
+- `decreaseLiquidity`, `collect`, `withdraw`, and `burn` update the same deposit where identity is established.
+
+### Strategy identity
+
+A Strategy is identified by:
+
+- strategy type;
+- protocol;
+- wrapper/vault/strategy contract;
+- official metadata;
+- underlying pool relationship where known.
+
+### StrategyExposure identity
+
+A StrategyExposure is identified by:
+
+- wallet address;
+- strategy ID;
+- share token or share balance lifecycle;
+- deposit/withdraw/share mint/share burn evidence.
+
+### Reward identity
+
+A RewardEvent is identified by:
+
+- wallet address;
+- transaction hash;
+- log index or movement index;
+- reward token;
+- reward type;
+- source scope.
+
+### Attribution identity
+
+An AttributionState is identified by:
+
+- wallet address;
+- pool ID;
+- token address;
+- source ledger event.
+
+An AttributionSourceLot is identified by:
+
+- wallet address;
+- token address;
+- source type;
+- source ledger event.
+
+---
+
+## 9.25 Metric decomposition requirements
+
+The model must support:
+
+- capital entered;
+- capital withdrawn;
+- realized PnL;
+- unrealized PnL;
+- estimated annualized return;
+- asset price movement effect;
+- reward/claim gains;
+- realized rebalance effects;
+- residual attributed value;
+- idle wallet asset value;
+- strategy share-level accounting;
+- pool-level aggregation;
+- deposit-level lifecycle analytics;
+- strategy-level lifecycle analytics;
+- governance reward analytics;
+- full activity explainability.
+
+---
+
+## 9.26 Naming rules
+
+User-facing UI naming:
+
+- Use `Pools` for market-level aggregation.
+- Use `Deposits` for manual/user-owned deposit lifecycle analytics.
+- Use `Strategies` for automated strategy analytics.
+- Use `Activity` for transaction-level ledger.
+- Avoid using `Positions` as the primary user-facing term.
+
+Internal/backend naming:
+
+- `PositionInstance` may remain as a legacy/internal implementation concept only if needed.
+- New implementation should prefer `Deposit` for manual exposure lifecycle.
+- If `PositionInstance` is retained, it must be explicitly mapped to `Deposit` in the product layer and must not be exposed as a menu label.
+
+---
+
+## 9.27 Summary
+
+The domain model supports The Cab’s current product architecture:
+
+```txt
+Portfolio
+  ├── Pools
+  │   ├── Manual Deposits
+  │   ├── Automated Strategies
+  │   └── Residual Attribution
+  ├── Rewards
+  ├── Governance
+  ├── Activity
+  └── Coverage / Confidence
+```
+
+The key modeling requirement is that **Pools, Deposits, and Strategies remain distinct but connected**:
+
+- Pools aggregate market exposure.
+- Deposits track direct/manual user exposure.
+- Strategies track automated strategy exposure.
+- Rewards and governance can be viewed independently while remaining linkable to pools, deposits, strategies, and activity.
+- Ledger events and asset movements remain the source of truth.
 
 # 10. Metrics & Financial Semantics
 
