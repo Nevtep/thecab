@@ -1,10 +1,10 @@
-# The Cab — Product & Technical Specification v1.1
+# The Cab — Product & Technical Specification v1.2.1
 
 ## Version
 
-- **Document version:** v1.1
+- **Document version:** v1.2.1
 - **Product:** The Cab
-- **Scope:** MVP product + technical specification
+- **Scope:** Product technical specification
 - **Primary chain:** Base mainnet
 - **Primary protocol:** Aerodrome Finance
 - **Secondary integration:** Mellow Aerodrome strategies
@@ -76,7 +76,7 @@ The product’s core promise is **fast portfolio visibility first, deeper histor
 
 ---
 
-# 2. Resolved MVP Decisions
+# 2. Resolved Product Decisions
 
 This section resolves the previous open questions and must be treated as product direction for implementation.
 
@@ -112,14 +112,14 @@ const {
 
 ## 2.2 Supported chain
 
-MVP supports:
+Product v1 supports:
 
 - **Base mainnet only**
 
 Rules:
 
-- Base mainnet is the only production-supported chain.
-- Do not support Base Sepolia in MVP product flows.
+- Base mainnet is the only production-supported chain for product v1.
+- Do not support Base Sepolia in product v1 flows.
 - If testing utilities are added for development, they must not appear as user-facing MVP network options unless explicitly approved.
 - Wrong-network state should instruct the user to switch to Base mainnet.
 
@@ -316,7 +316,7 @@ Example flow:
 
 ## 2.6 Maximum wallet history size
 
-MVP analysis scope:
+Product v1 analysis scope:
 
 - **Full wallet history up to one year**
 
@@ -346,6 +346,12 @@ Example:
 5. Later, the user swaps `0.04 cbBTC` for `WETH`.
 6. Because `WETH` is the paired token of the original `WETH/cbBTC` pool, this is marked as a rebalance against that pool.
 7. The residual attribution is reduced by `0.04 cbBTC`, and the received `WETH` remains attributed to the same pool unless moved elsewhere.
+8. If the user swaps an amount higher than the residual amount attributed to the pool, only the attributed portion is assigned to that pool first. The excess amount must be allocated according to the source-priority waterfall:
+   1. first from matching-token cash-ins;
+   2. then from balances currently marked as liquidation-derived inventory;
+   3. finally, pro rata across other open residual attribution states for the same token.
+9. Example: if the `WETH/cbBTC` pool has `0.1 cbBTC` residual attribution and the user swaps `0.14 cbBTC` into `WETH`, then `0.1 cbBTC` is classified as a rebalance for `WETH/cbBTC`. The remaining `0.04 cbBTC` is not assigned to that pool unless no higher-priority source exists. The system first checks cash-ins of `cbBTC`, then liquidation-derived `cbBTC`, and only then other pool residuals.
+10. Liquidation-derived inventory includes balances obtained from prior liquidations or unrelated reward conversions. For example, if the user claims AERO and swaps it for `cbBTC`, that `cbBTC` should be marked as liquidation-derived inventory, not as residual balance from a pool.
 
 Rules:
 
@@ -354,6 +360,10 @@ Rules:
 - A swap from a pool token into a token belonging to another tracked pool may transfer/reassign attribution to that other pool, depending on context.
 - Rebalance detection is driven by the lifecycle of residual attributed balances, not elapsed time.
 - There is no fixed minutes/hours/same-day inference window.
+- When a swap consumes more of a token than the residual attributed amount for a specific pool, attribution must be split rather than forcing the entire swap into that pool.
+- Excess swap amount must follow the allocation waterfall: matching-token cash-ins first, liquidation-derived inventory second, and pro-rata allocation across other residual attribution states last.
+- Pro-rata allocation across other residual attribution states should only be used when no cash-in or liquidation-derived balance can explain the excess.
+- This waterfall prevents over-attributing a large swap to the most recently active pool when the wallet has multiple possible sources for the same token.
 
 ## 2.8 Residual attribution expiration
 
@@ -381,47 +391,83 @@ Rules:
 - If the token is swapped for the paired pool token, classify as rebalance.
 - If the token is swapped for an unrelated token, classify as liquidation from the pool.
 - If the token is swapped for a token of another tracked pool, classify as transfer/reassignment to the other pool where supported.
+- If a swap amount exceeds the residual amount attributed to a pool, reduce that pool attribution only up to its available residual amount.
+- Allocate the excess using the source-priority waterfall:
+  1. matching-token cash-ins;
+  2. liquidation-derived inventory;
+  3. pro-rata split across other residual attribution states for the same token.
+- Never create negative residual attribution.
+- Never allow a single pool to absorb more of a swap than the token amount currently attributed to that pool unless explicit user action or higher-confidence evidence supports it.
 
 ## 2.9 Aerodrome and Mellow contract support
-
 ### Aerodrome
 
-The MVP should avoid maintaining a large hardcoded whitelist.
+Product v1 should avoid maintaining a large hardcoded whitelist.
 
-Instead, use official protocol surfaces and deterministic discovery.
+Instead, use official protocol surfaces, onchain protocol metadata, and deterministic discovery.
 
 Known key Aerodrome addresses on Base:
 
 ```ts
 export const AERODROME_BASE = {
-  router: "0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43",
+  // AERO token address.
+  // Must be verified against Aerodrome official deployment/security references.
   aeroToken: "0x940181a94A35A4569E4529A3CDfB74e38FD98631",
-  factory: "0x420DD381b31aEf6683db6B902084cB0FFECe40Da"
+
+  // Aerodrome Router address.
+  // Must be verified against official Aerodrome deployment references and/or Basescan labels.
+  router: "0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43",
 };
 ```
 
+The PoolFactory address should **not** be treated as a manually maintained hardcoded constant in product logic.
+
+Instead, The Cab should obtain the active factory from the Aerodrome Router contract at runtime or during protocol metadata sync:
+
+```ts
+const factoryAddress = await router.defaultFactory();
+```
+
+This factory address should then be stored as protocol metadata with:
+
+- `source`: `router.defaultFactory()`
+- `routerAddress`: address of the Router contract used for the read
+- `chainId`: Base mainnet chain ID
+- `blockNumber`: block number at which the factory was read
+- `timestamp`: timestamp at which the metadata sync occurred
+- `confidence`: `high`
+
+Pool discovery should use the factory obtained from the Router as the source of truth.
+
+When deriving pool addresses, The Cab may use the Router’s `poolFor(tokenA, tokenB, stable, factory)` behavior or an equivalent offchain derivation, but the factory input should come from `router.defaultFactory()` unless a specific non-default factory is explicitly discovered from the transaction or contract call being analyzed.
+
+The Cab must avoid maintaining a long static list of Aerodrome pool or factory addresses. If a factory address is hardcoded temporarily for development, it must be marked as a fallback and validated against `router.defaultFactory()` before production use.
+
 Discovery approach:
 
-- Identify direct interactions with Aerodrome Router.
+- Identify direct interactions with the Aerodrome Router.
 - Identify AERO token movements.
-- Identify pool interactions derived from Factory/Router.
-- Discover pools using official factory/router mechanics instead of keeping a custom pool address list.
+- Obtain the active PoolFactory from the Router via `defaultFactory()`.
+- Identify pool interactions derived from the Router/Factory relationship.
+- Discover pools using official factory/router mechanics instead of maintaining a custom pool address list.
 - Use Router `poolFor` behavior where possible to derive pool addresses from:
   - token A
   - token B
   - stable flag
-  - factory address
+  - factory address obtained from `router.defaultFactory()`
 - Use official Aerodrome sources as source of truth for core addresses.
 
-Important implementation note:
+Important implementation notes:
 
 - Aerodrome Router’s `poolFor` calculates pool addresses deterministically using clone mechanics.
-- Offchain code can mirror the deterministic derivation or call/read from contract where appropriate.
+- Offchain code may mirror the deterministic derivation or read/call the contract where appropriate.
+- The active factory must be treated as protocol metadata, not as a permanent manually curated constant.
 - Do not manually curate a long static list of all pools.
+
 
 ### Mellow
 
-Mellow MVP support should use official Mellow documentation for Aerodrome CL strategies.
+Mellow product v1 support should use official Mellow documentation for Aerodrome CL strategies.
 
 Rules:
 
@@ -450,12 +496,12 @@ Rules:
 
 ## 2.11 CSV export
 
-No CSV/export functionality in MVP.
+No CSV/export functionality in product v1.
 
 Rules:
 
-- Do not build export buttons.
-- Do not create CSV API endpoints.
+- Do not build export buttons in product v1.
+- Do not create CSV API endpoints in product v1.
 - Keep data tables internal to the app.
 - Revisit export later after analytics semantics stabilize.
 
@@ -490,9 +536,9 @@ Behavior:
 
 ## 2.14 Mellow share accounting
 
-MVP Mellow accounting should reconstruct whatever can be obtained reliably from Mellow contract events.
+Product v1 Mellow accounting should reconstruct whatever can be obtained reliably from Mellow contract events.
 
-MVP target:
+Product v1 target:
 
 - Display Mellow strategies similarly to manual positions when possible.
 - Use contract event data for:
@@ -505,6 +551,146 @@ MVP target:
 - Avoid pretending to have perfect underlying position accounting if Mellow does not expose enough data.
 - Mark Mellow metrics as partial when only share-level accounting is available.
 - Later phases can add deeper strategy-specific valuation if required.
+
+## 2.15 State management and frontend architecture
+
+The Cab is a production product, not a prototype. State management must be explicit, layered, and predictable for both human developers and AI-assisted development.
+
+Use:
+
+- **TanStack Query** for server state, API cache, async backend synchronization, polling, refetching, mutations, stale data handling, and background analysis status.
+- **Zustand** for lightweight shared client UI state.
+- **React local hooks** only for ephemeral component-local state.
+- **wagmi** for wallet state, wrapped behind `useCabWallet`.
+- **React Hook Form + Zod** for complex forms when needed.
+- **URL search params** for shareable filters, ranges, and table views where appropriate.
+
+Do not use Redux Toolkit unless a future requirement introduces complex client-side state machines that justify it.
+
+### State ownership rules
+
+#### TanStack Query owns server state
+
+Use TanStack Query for:
+
+- Overview data.
+- Analysis status polling.
+- Pools list and detail.
+- Positions list and detail.
+- Rewards data.
+- Governance data.
+- Activity data.
+- Settings loaded from backend.
+- Mutations such as `startAnalysis`, `refreshAnalysis`, and settings updates.
+
+Product screens must not call raw `fetch` directly. Data access should go through typed query and mutation hooks.
+
+Required query/mutation hooks:
+
+```ts
+useOverviewQuery()
+useAnalysisStatusQuery()
+useStartAnalysisMutation()
+usePoolsQuery()
+usePoolDetailQuery()
+usePositionsQuery()
+usePositionDetailQuery()
+useRewardsQuery()
+useGovernanceQuery()
+useActivityQuery()
+useSettingsQuery()
+useUpdateSettingsMutation()
+```
+
+#### Zustand owns shared client UI state
+
+Use Zustand for lightweight state that is local to the browser but shared across sections.
+
+Examples:
+
+- Sidebar collapsed/expanded.
+- Selected global time range.
+- Dashboard layout preferences.
+- Selected filters that do not need to be URL-shareable.
+- Analysis notification/toast state.
+- User UI preferences that are not backend-persisted.
+
+Recommended stores:
+
+```ts
+useCabUiStore()
+useDashboardFiltersStore()
+useAnalysisNotificationStore()
+```
+
+Avoid one large global store. Prefer small, focused stores.
+
+#### React hooks own ephemeral local state
+
+Use `useState`, `useMemo`, `useReducer`, and related React hooks only for state that does not need to be shared outside the component.
+
+Examples:
+
+- Dropdown open state.
+- Modal open state.
+- Local hover/selection state.
+- Temporary form field UI state before submit.
+- Local chart tooltip interaction state.
+
+#### URL search params own shareable state
+
+Use URL search params for state that should survive reloads or be shareable.
+
+Examples:
+
+- Date range.
+- Selected pool filter.
+- Activity type filter.
+- Table pagination.
+- Sort direction.
+
+#### Wallet state is wrapped
+
+The underlying wallet state comes from wagmi, but product code must consume it through the internal wallet adapter.
+
+Use:
+
+```ts
+import { useCabWallet } from "@/wallet/useCabWallet";
+```
+
+Do not import wagmi directly in product feature files.
+
+### Next.js and Vercel compatibility
+
+TanStack Query is compatible with Next.js and Vercel when used with a proper provider and hydration strategy.
+
+Implementation requirements:
+
+- Create a `QueryProvider` client component.
+- Configure a `QueryClient` with sensible defaults.
+- Use client components for interactive query-driven dashboard surfaces.
+- Use server components for static shells and non-interactive layout where appropriate.
+- Avoid using TanStack Query inside server-only modules.
+- For App Router, keep query hooks inside client components or containers marked with `"use client"`.
+
+Suggested provider structure:
+
+```tsx
+// src/app/providers.tsx
+"use client";
+
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+export function AppProviders({ children }: { children: React.ReactNode }) {
+  return (
+    <QueryClientProvider client={queryClient}>
+      {children}
+    </QueryClientProvider>
+  );
+}
+```
+
 
 ---
 
@@ -852,6 +1038,293 @@ All wallet-specific endpoints must validate:
 - Connected wallet matches requested wallet via signature.
 - Analysis availability for deep routes.
 
+
+## 6.7 Frontend state architecture
+
+The frontend must follow a layered state architecture.
+
+```txt
+Server/API state:      TanStack Query
+Global UI state:       Zustand
+Wallet state:          wagmi behind useCabWallet
+Local UI state:        React hooks
+Forms:                 React Hook Form + Zod
+URL state:             search params
+Visual rendering:      *.component.tsx
+State orchestration:   *.container.tsx
+```
+
+### Core rule
+
+Containers think. Components show.
+
+A `.container` file owns state orchestration, data access, view-model preparation, and callbacks.
+
+A `.component` file owns visual rendering and conditional display based only on props.
+
+### `.container` files
+
+Container files own state, data fetching, mutations, routing awareness, query params, derived view models, and event handlers.
+
+Responsibilities:
+
+- Call TanStack Query hooks.
+- Call Zustand stores.
+- Call wallet hooks.
+- Read/write URL search params.
+- Prepare component props.
+- Handle user actions.
+- Trigger mutations.
+- Map API/domain data into view models.
+- Decide loading/error/empty states.
+- Render the corresponding `.component` file.
+
+Containers may import:
+
+- typed query hooks
+- mutation hooks
+- Zustand stores
+- wallet hooks
+- route/search-param utilities
+- domain/view-model mappers
+- `.component` files
+
+Containers must not contain complex visual markup. They may compose a single top-level component and pass props.
+
+Filename convention:
+
+```txt
+Overview.container.tsx
+Pools.container.tsx
+PoolDetail.container.tsx
+Positions.container.tsx
+Rewards.container.tsx
+Governance.container.tsx
+Activity.container.tsx
+Settings.container.tsx
+```
+
+### `.component` files
+
+Component files are presentational components.
+
+Responsibilities:
+
+- Receive props.
+- Render UI based on props.
+- Select visual states based on props.
+- Emit callbacks passed by containers.
+- Use only Design System components.
+- Avoid any direct knowledge of API fetching, query caches, wallet clients, stores, or backend persistence.
+
+Components must not:
+
+- Call TanStack Query directly.
+- Call Zustand stores directly.
+- Call wagmi directly.
+- Fetch data directly.
+- Read/write URL state directly.
+- Access backend clients directly.
+- Access database clients directly.
+- Contain business data fetching logic.
+- Import third-party UI libraries directly.
+
+Filename convention:
+
+```txt
+Overview.component.tsx
+Pools.component.tsx
+PoolDetail.component.tsx
+Positions.component.tsx
+Rewards.component.tsx
+Governance.component.tsx
+Activity.component.tsx
+Settings.component.tsx
+```
+
+### Feature folder pattern
+
+Each product section should follow this structure:
+
+```txt
+src/features/overview/
+  Overview.container.tsx
+  Overview.component.tsx
+  overview.queries.ts
+  overview.mappers.ts
+  overview.types.ts
+
+src/features/pools/
+  Pools.container.tsx
+  Pools.component.tsx
+  PoolDetail.container.tsx
+  PoolDetail.component.tsx
+  pools.queries.ts
+  pools.mappers.ts
+  pools.types.ts
+
+src/features/activity/
+  Activity.container.tsx
+  Activity.component.tsx
+  activity.queries.ts
+  activity.mappers.ts
+  activity.types.ts
+```
+
+### Query files
+
+`*.queries.ts` files define typed TanStack Query hooks and mutations.
+
+Examples:
+
+```ts
+export function useOverviewQuery(params: OverviewQueryParams) {}
+export function useAnalysisStatusQuery(params: AnalysisStatusQueryParams) {}
+export function useStartAnalysisMutation() {}
+```
+
+Rules:
+
+- Query hooks must be typed.
+- Query keys must be centralized or generated consistently.
+- Polling behavior belongs in query hooks or container-level query options, not in components.
+- Query hooks must not import visual components.
+
+### Mapper files
+
+`*.mappers.ts` files transform API/domain responses into view models for presentational components.
+
+Rules:
+
+- Components receive display-ready view models.
+- Components should not perform domain-heavy calculations.
+- Currency formatting helpers may be used before props are passed, unless the DS component owns formatting.
+
+Example:
+
+```ts
+export function mapOverviewToViewModel(data: OverviewApiResponse): OverviewViewModel {
+  return {
+    netPortfolioValue: {
+      raw: data.totalValueUsd,
+      formatted: formatUsd(data.totalValueUsd),
+    },
+    portfolioSeries: data.snapshots.map(mapSnapshotToChartPoint),
+  };
+}
+```
+
+### Type files
+
+`*.types.ts` files define API params, view models, and component prop types when shared.
+
+Rules:
+
+- Prefer explicit view-model types over passing raw API responses into components.
+- Component props should be stable and intentionally designed.
+- Do not leak provider-specific API response shapes into visual components.
+
+### Example
+
+```tsx
+// Overview.container.tsx
+"use client";
+
+import { useCabWallet } from "@/wallet/useCabWallet";
+import { OverviewComponent } from "./Overview.component";
+import { useOverviewQuery } from "./overview.queries";
+import { mapOverviewToViewModel } from "./overview.mappers";
+
+export function OverviewContainer() {
+  const { address, chainId } = useCabWallet();
+
+  const overviewQuery = useOverviewQuery({
+    walletAddress: address,
+    chainId,
+  });
+
+  const viewModel = overviewQuery.data
+    ? mapOverviewToViewModel(overviewQuery.data)
+    : null;
+
+  return (
+    <OverviewComponent
+      data={viewModel}
+      isLoading={overviewQuery.isLoading}
+      isError={overviewQuery.isError}
+      errorMessage={overviewQuery.error?.message}
+      onRefresh={() => overviewQuery.refetch()}
+    />
+  );
+}
+```
+
+```tsx
+// Overview.component.tsx
+import {
+  CabDashboardGrid,
+  CabMetricCard,
+  CabPortfolioEvolutionChart,
+  CabEmptyState,
+  CabLoadingPanel,
+  CabErrorPanel,
+} from "@/design-system";
+import type { OverviewViewModel } from "./overview.types";
+
+type Props = {
+  data: OverviewViewModel | null;
+  isLoading: boolean;
+  isError: boolean;
+  errorMessage?: string;
+  onRefresh: () => void;
+};
+
+export function OverviewComponent({
+  data,
+  isLoading,
+  isError,
+  errorMessage,
+  onRefresh,
+}: Props) {
+  if (isLoading) return <CabLoadingPanel label="Loading cockpit data..." />;
+
+  if (isError) {
+    return (
+      <CabErrorPanel
+        title="Overview unavailable"
+        message={errorMessage}
+        onRetry={onRefresh}
+      />
+    );
+  }
+
+  if (!data) {
+    return <CabEmptyState title="No Aerodrome activity detected" />;
+  }
+
+  return (
+    <CabDashboardGrid>
+      <CabMetricCard
+        label="Net Portfolio Value"
+        value={data.netPortfolioValue.formatted}
+        delta={data.netPortfolioDelta}
+      />
+
+      <CabPortfolioEvolutionChart data={data.portfolioSeries} />
+    </CabDashboardGrid>
+  );
+}
+```
+
+### Replaceability rule
+
+A `.component` file should be replaceable in isolation without touching data fetching, cache, wallet, backend, or business state.
+
+A `.container` file should be replaceable in isolation without rewriting visual layout.
+
+This rule exists to make The Cab easier to maintain, easier to refactor, and safer for AI-assisted development.
+
+
 ---
 
 # 7. Design System
@@ -1072,6 +1545,52 @@ import { Button, XStack, YStack } from "tamagui";
 import { Radar, Wallet, AlertTriangle } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis } from "recharts";
 ```
+
+
+## 7.5.1 Component/container import policy
+
+The component/container separation is part of the Design System boundary.
+
+### Product `.component` files may import only:
+
+- `@/design-system`
+- local type definitions
+- local presentational helpers
+- other presentational components
+
+### Product `.container` files may import:
+
+- typed query hooks
+- mutation hooks
+- Zustand stores
+- wallet adapters
+- view-model mappers
+- `.component` files
+- route/search-param utilities
+
+### Forbidden in `.component` files:
+
+```ts
+import { useQuery } from "@tanstack/react-query";
+import { create } from "zustand";
+import { useAccount } from "wagmi";
+import { Button } from "tamagui";
+import { Radar } from "lucide-react";
+import { LineChart } from "recharts";
+```
+
+### Forbidden in `.component` files conceptually:
+
+- raw `fetch`
+- direct API clients
+- database clients
+- Trigger.dev clients
+- provider SDK clients
+- wallet SDK calls
+- query cache access
+- mutation calls
+- route mutation side effects
+
 
 ## 7.6 Font stack
 
@@ -1417,7 +1936,25 @@ When a later movement uses attributed token balance:
 - If transferred out of the wallet: classify as external cashout.
 - If redeposited into same pool: classify as redeployment.
 
-This avoids misleading pool charts that drop to zero during a rebalance process.
+When a swap consumes more of a token than the residual amount attributed to the candidate pool, the swap must be decomposed into source allocations.
+
+Source allocation priority:
+
+1. Consume the candidate pool residual attribution up to the available amount.
+2. Consume matching-token cash-ins.
+3. Consume liquidation-derived inventory.
+4. Consume remaining same-token residual attribution from other pools pro rata.
+
+This means a single swap may produce multiple analytical allocations:
+
+- one portion classified as same-pool rebalance;
+- one portion classified as cash-in-funded swap;
+- one portion classified as liquidation-inventory swap;
+- one or more portions allocated against other pool residual states.
+
+The analysis job must not force the full swap amount into the candidate pool if the pool residual does not cover the full token input.
+
+This avoids misleading pool charts that drop to zero during a rebalance process, and also avoids over-attributing unrelated wallet inventory to the wrong pool.
 
 ### Stage 9 — Compute snapshots
 
@@ -1679,6 +2216,59 @@ Important:
 
 - There is no expiration status.
 - Attribution does not expire due to elapsed time.
+- Attribution must never become negative.
+- If a token movement exceeds one attribution state, the excess must be assigned through the source-priority waterfall.
+
+### AttributionSourceLot
+
+Tracks non-pool-residual token sources that may later be consumed by swaps or transfers.
+
+This entity is required to disambiguate swaps that exceed a pool's residual balance.
+
+Fields:
+
+- `attributionSourceLotId`
+- `walletAddress`
+- `tokenAddress`
+- `amountNormalized`
+- `usdValueAtAcquisition`
+- `sourceType`
+- `sourceLedgerEventId`
+- `openedAt`
+- `closedAt`
+- `status`
+- `confidence`
+- `metadataJson`
+
+Source types:
+
+- `cash_in`
+- `liquidation_derived_inventory`
+- `reward_conversion_inventory`
+- `unknown_wallet_inventory`
+
+Status candidates:
+
+- `available`
+- `partially_consumed`
+- `fully_consumed`
+- `transferred_out`
+- `reassigned`
+
+Purpose:
+
+- Represents wallet inventory not directly attributed to a pool residual.
+- Supports attribution waterfall when swap amounts exceed a candidate pool residual.
+- Prevents over-attribution of large swaps to a single pool.
+- Allows reward conversions, such as AERO -> cbBTC, to become liquidation-derived inventory rather than pool residual.
+
+Consumption priority:
+
+1. Specific pool residual attribution.
+2. Matching-token `cash_in` source lots.
+3. Matching-token `liquidation_derived_inventory` or `reward_conversion_inventory` source lots.
+4. Other same-token pool residual attribution states pro rata.
+5. Unknown wallet inventory only if no other source can explain the movement, marked low confidence.
 
 ### CoverageReport
 
@@ -1767,6 +2357,27 @@ Residual attribution ends only when:
 - The assets are transferred/reassigned to another pool.
 
 Residual attribution does not expire.
+
+### Residual over-consumption rule
+
+If a swap, transfer, or redeployment uses more of a token than the amount currently attributed to one pool, the system must not assign the full movement to that pool.
+
+Instead, attribution is consumed in this order:
+
+1. The candidate pool residual attribution, up to its available amount.
+2. Matching-token cash-ins.
+3. Matching-token liquidation-derived inventory.
+4. Other same-token residual attribution states, split pro rata.
+5. Unknown wallet inventory only as a low-confidence fallback.
+
+Example:
+
+- Pool `WETH/cbBTC` has `0.1 cbBTC` residual attribution.
+- Wallet also has `0.04 cbBTC` from a previous AERO -> cbBTC reward conversion.
+- User swaps `0.14 cbBTC` into WETH.
+- The first `0.1 cbBTC` is attributed as a `WETH/cbBTC` rebalance.
+- The remaining `0.04 cbBTC` is attributed to liquidation-derived inventory, not to the pool residual.
+
 
 ## 10.5 Realized PnL
 
@@ -2218,6 +2829,10 @@ When a withdraw occurs:
 - If token is swapped into unrelated assets, close as `liquidated_to_unrelated_asset`.
 - If token moves into another tracked pool, transfer/reassign attribution where supported.
 - Never expire attribution merely because time passed.
+- If a swap amount is greater than the pool's residual amount, assign only the covered amount to that pool.
+- Allocate the excess through the source-priority waterfall: cash-ins, liquidation-derived inventory, then pro-rata other pool residuals.
+- In Pool detail, display only the portion of a swap attributed to that pool; do not show the full swap as a pool rebalance when part of it came from other wallet inventory.
+- If the pool received only a partial attribution from a larger swap, the Rebalance timeline should indicate `partial swap attribution` and show the allocated amount.
 
 ### Acceptance criteria
 
@@ -2669,6 +3284,12 @@ For an event classified as `rebalance`, show:
 - Token flow.
 - Pool attribution effect.
 - Confidence.
+- Source allocation breakdown when the transaction consumed more token amount than one pool residual could cover.
+- Amount attributed to candidate pool residual.
+- Amount attributed to cash-ins.
+- Amount attributed to liquidation-derived inventory.
+- Amount attributed pro rata to other residual pools.
+- Whether the event is a full-pool rebalance or partial swap attribution.
 
 ### Acceptance criteria
 
@@ -2886,6 +3507,9 @@ Deliver:
 - Lucide wrapped via DS.
 - Recharts wrapped via DS.
 - Settings basics.
+- TanStack Query provider and typed query hook pattern.
+- Zustand store pattern for shared UI state.
+- `.container.tsx` / `.component.tsx` separation for all product sections.
 
 Do not require historical analysis for Overview.
 
@@ -2970,7 +3594,15 @@ The implementation is acceptable when:
 - The app has a Tamagui-based internal Design System using The Cab brand tokens and Google Fonts.
 - Lucide React is used only through DS icon wrappers.
 - Recharts is used only through DS chart wrappers.
+- TanStack Query is used for server state, API cache, polling, mutations, and stale data handling.
+- Zustand is used only for lightweight shared client UI state.
+- React local hooks are limited to ephemeral component-local state.
+- Product sections follow `.container.tsx` / `.component.tsx` separation.
+- `.container` files own state orchestration and pass props to `.component` files.
+- `.component` files receive props only and do not call TanStack Query, Zustand, wagmi, fetch, or backend clients.
 - Product screens do not import third-party UI libraries directly.
+- Swap attribution handles over-consumption by decomposing swaps across residual balances, cash-ins, liquidation-derived inventory, and other residual pools.
+- Pool charts and Activity rows show partial swap attribution when a transaction is larger than one pool's residual amount.
 - Pool analytics preserve capital continuity across withdraw/swap/deposit/rebalance flows.
 - Residual assets are attributed per pool, not globally per token.
 - Residual attribution does not expire.
@@ -3012,12 +3644,15 @@ When implementing this spec, prioritize:
 1. Fast connected Overview.
 2. Clear async analysis status.
 3. Correct DS boundaries and no direct third-party UI imports in product screens.
-4. Ledger/event model correctness.
-5. Residual attribution model.
-6. Pool-level continuity and rebalance attribution.
-7. Strategy separation between manual and Mellow.
-8. Readable, trusted dashboard UI.
-9. Strict brand consistency.
-10. No unapproved third-party provider drift.
+4. Correct state-management boundaries using TanStack Query, Zustand, local hooks, and wallet wrappers.
+5. Strict `.container.tsx` / `.component.tsx` separation.
+6. Ledger/event model correctness.
+7. Residual attribution model.
+8. Source-priority waterfall for swaps that exceed a pool's residual balance.
+9. Pool-level continuity and rebalance attribution.
+9. Strategy separation between manual and Mellow.
+10. Readable, trusted dashboard UI.
+11. Strict brand consistency.
+12. No unapproved third-party provider drift.
 
 If a metric cannot be computed confidently, show partial coverage instead of inventing precision.
