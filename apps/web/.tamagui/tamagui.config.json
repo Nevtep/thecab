@@ -25411,11 +25411,39 @@
           "val": "#040F1C",
           "variable": ""
         },
-        "backgroundElevated": {
+        "deepSpace": {
           "isVar": true,
-          "key": "$backgroundElevated",
-          "name": "c-backgroundElevated",
+          "key": "$deepSpace",
+          "name": "c-deepSpace",
           "val": "#0F1826",
+          "variable": ""
+        },
+        "controlBlue": {
+          "isVar": true,
+          "key": "$controlBlue",
+          "name": "c-controlBlue",
+          "val": "#15233A",
+          "variable": ""
+        },
+        "surface": {
+          "isVar": true,
+          "key": "$surface",
+          "name": "c-surface",
+          "val": "#111A27",
+          "variable": ""
+        },
+        "surfaceElevated": {
+          "isVar": true,
+          "key": "$surfaceElevated",
+          "name": "c-surfaceElevated",
+          "val": "#1A2233",
+          "variable": ""
+        },
+        "border": {
+          "isVar": true,
+          "key": "$border",
+          "name": "c-border",
+          "val": "#2A3347",
           "variable": ""
         },
         "foreground": {
@@ -25425,11 +25453,18 @@
           "val": "#EAF1FF",
           "variable": ""
         },
+        "secondary": {
+          "isVar": true,
+          "key": "$secondary",
+          "name": "c-secondary",
+          "val": "#B8C7E6",
+          "variable": ""
+        },
         "muted": {
           "isVar": true,
           "key": "$muted",
           "name": "c-muted",
-          "val": "#B8C7E6",
+          "val": "#6B7A98",
           "variable": ""
         },
         "accent": {
@@ -25439,11 +25474,46 @@
           "val": "#00E0E1",
           "variable": ""
         },
+        "electricBlue": {
+          "isVar": true,
+          "key": "$electricBlue",
+          "name": "c-electricBlue",
+          "val": "#3B82F6",
+          "variable": ""
+        },
         "gold": {
           "isVar": true,
           "key": "$gold",
           "name": "c-gold",
           "val": "#F2C14E",
+          "variable": ""
+        },
+        "success": {
+          "isVar": true,
+          "key": "$success",
+          "name": "c-success",
+          "val": "#22C55E",
+          "variable": ""
+        },
+        "warning": {
+          "isVar": true,
+          "key": "$warning",
+          "name": "c-warning",
+          "val": "#FBBF24",
+          "variable": ""
+        },
+        "danger": {
+          "isVar": true,
+          "key": "$danger",
+          "name": "c-danger",
+          "val": "#EF4444",
+          "variable": ""
+        },
+        "info": {
+          "isVar": true,
+          "key": "$info",
+          "name": "c-info",
+          "val": "#38BDF8",
           "variable": ""
         }
       },
@@ -25669,11 +25739,21 @@
     "themes": {
       "dark": {
         "background": "#040F1C",
-        "backgroundElevated": "#0F1826",
+        "deepSpace": "#0F1826",
+        "controlBlue": "#15233A",
+        "surface": "#111A27",
+        "surfaceElevated": "#1A2233",
+        "border": "#2A3347",
         "foreground": "#EAF1FF",
-        "muted": "#B8C7E6",
+        "secondary": "#B8C7E6",
+        "muted": "#6B7A98",
         "accent": "#00E0E1",
+        "electricBlue": "#3B82F6",
         "gold": "#F2C14E",
+        "success": "#22C55E",
+        "warning": "#FBBF24",
+        "danger": "#EF4444",
+        "info": "#38BDF8",
         "color": "#EAF1FF",
         "borderColor": "#2A3347",
         "accentColor": "#00E0E1",
@@ -25760,11 +25840,39 @@
         "val": "#040F1C",
         "variable": ""
       },
-      "$color.backgroundElevated": {
+      "$color.border": {
         "isVar": true,
-        "key": "$backgroundElevated",
-        "name": "c-backgroundElevated",
+        "key": "$border",
+        "name": "c-border",
+        "val": "#2A3347",
+        "variable": ""
+      },
+      "$color.controlBlue": {
+        "isVar": true,
+        "key": "$controlBlue",
+        "name": "c-controlBlue",
+        "val": "#15233A",
+        "variable": ""
+      },
+      "$color.danger": {
+        "isVar": true,
+        "key": "$danger",
+        "name": "c-danger",
+        "val": "#EF4444",
+        "variable": ""
+      },
+      "$color.deepSpace": {
+        "isVar": true,
+        "key": "$deepSpace",
+        "name": "c-deepSpace",
         "val": "#0F1826",
+        "variable": ""
+      },
+      "$color.electricBlue": {
+        "isVar": true,
+        "key": "$electricBlue",
+        "name": "c-electricBlue",
+        "val": "#3B82F6",
         "variable": ""
       },
       "$color.foreground": {
@@ -25781,11 +25889,53 @@
         "val": "#F2C14E",
         "variable": ""
       },
+      "$color.info": {
+        "isVar": true,
+        "key": "$info",
+        "name": "c-info",
+        "val": "#38BDF8",
+        "variable": ""
+      },
       "$color.muted": {
         "isVar": true,
         "key": "$muted",
         "name": "c-muted",
+        "val": "#6B7A98",
+        "variable": ""
+      },
+      "$color.secondary": {
+        "isVar": true,
+        "key": "$secondary",
+        "name": "c-secondary",
         "val": "#B8C7E6",
+        "variable": ""
+      },
+      "$color.success": {
+        "isVar": true,
+        "key": "$success",
+        "name": "c-success",
+        "val": "#22C55E",
+        "variable": ""
+      },
+      "$color.surface": {
+        "isVar": true,
+        "key": "$surface",
+        "name": "c-surface",
+        "val": "#111A27",
+        "variable": ""
+      },
+      "$color.surfaceElevated": {
+        "isVar": true,
+        "key": "$surfaceElevated",
+        "name": "c-surfaceElevated",
+        "val": "#1A2233",
+        "variable": ""
+      },
+      "$color.warning": {
+        "isVar": true,
+        "key": "$warning",
+        "name": "c-warning",
+        "val": "#FBBF24",
         "variable": ""
       },
       "$radius.0": {

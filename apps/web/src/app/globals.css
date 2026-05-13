@@ -1,6 +1,11 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&family=Orbitron:wght@500;600;700&display=swap");
+
 :root {
   --background: #040f1c;
   --foreground: #eaf1ff;
+  --font-orbitron: "Orbitron";
+  --font-inter: "Inter";
+  --font-ibm-plex-mono: "IBM Plex Mono";
 }
 
 html {
@@ -17,9 +22,19 @@ body {
   min-height: 100vh;
   color: var(--foreground);
   background: var(--background);
-  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-family: var(--font-inter), "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+.font-brand,
+.font-heading {
+  font-family: var(--font-orbitron), sans-serif;
+}
+
+.font-data {
+  font-family: var(--font-ibm-plex-mono), monospace;
+  font-variant-numeric: tabular-nums;
 }
 
 * {

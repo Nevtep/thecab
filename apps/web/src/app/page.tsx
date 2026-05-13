@@ -1,8 +1,15 @@
 "use client";
 
-import Image from "next/image";
 import { useTranslation } from "react-i18next";
-import { Button, Text, YStack } from "tamagui";
+
+import {
+  CabButton,
+  CabStack,
+  CabText,
+  CabWalletAddress,
+  DisconnectedShell,
+  cabColors,
+} from "@/design-system";
 
 import { useCabWallet } from "@/wallet/useCabWallet";
 
@@ -22,94 +29,70 @@ export default function Home() {
     process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID !== "your_walletconnect_project_id";
 
   return (
-    <main
-      style={{
-        position: "relative",
-        minHeight: "100vh",
-        width: "100%",
-        overflow: "hidden",
-      }}
-    >
-      <Image
-        src="/LandingBackground.png"
-        alt="The Cab background"
-        fill
-        priority
-        style={{ objectFit: "cover", objectPosition: "center" }}
-      />
-
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          background:
-            "linear-gradient(160deg, rgba(4,15,28,0.55) 0%, rgba(4,15,28,0.8) 70%, rgba(4,15,28,0.9) 100%)",
-        }}
-      />
-
-      <YStack
+    <DisconnectedShell>
+      <CabStack
         alignItems="center"
         justifyContent="center"
         gap="$3"
         padding="$6"
         style={{
-          position: "relative",
-          zIndex: 1,
-          minHeight: "100vh",
+          width: "100%",
+          maxWidth: 920,
           textAlign: "center",
         }}
       >
-        <Text
+        <CabText
+          variant="display"
           fontSize="$8"
           fontWeight="800"
-          style={{ color: "#EAF1FF", maxWidth: 920, lineHeight: 1.1 }}
+          style={{ color: cabColors.text.primary, lineHeight: 1.1 }}
         >
           {t("landing:title")}
-        </Text>
+        </CabText>
 
-        <Text fontSize="$4" style={{ color: "#B8C7E6", maxWidth: 760 }}>
+        <CabText fontSize="$4" style={{ color: cabColors.text.secondary, maxWidth: 760 }}>
           {t("landing:subtitle")}
-        </Text>
+        </CabText>
 
-        <Text fontSize="$3" style={{ color: "#00E0E1" }}>
+        <CabText fontSize="$3" style={{ color: cabColors.brand.signalTeal }}>
           {isConnected ? t("wallet:connected") : t("wallet:disconnected")}
-          {isConnected && address ? ` · ${address.slice(0, 6)}...${address.slice(-4)}` : ""}
-        </Text>
+        </CabText>
+        {isConnected && address ? <CabWalletAddress address={address} /> : null}
 
         {!isSupportedChain && isConnected ? (
-          <Button
+          <CabButton
             onPress={() => {
               void switchToSupportedChain();
             }}
-            backgroundColor="#F2C14E"
+            tone="warning"
           >
             {t("wallet:unsupported")}
-          </Button>
+          </CabButton>
         ) : null}
 
         {!isConnected ? (
-          <Button
+          <CabButton
             onPress={() => {
               void connect();
             }}
             disabled={!walletConnectConfigured}
-            backgroundColor="#00E0E1"
+            tone="primary"
           >
             {walletConnectConfigured
               ? t("wallet:actions.connect")
               : t("wallet:actions.configureWalletConnect")}
-          </Button>
+          </CabButton>
         ) : (
-          <Button
+          <CabButton
             onPress={() => {
               disconnect();
             }}
-            backgroundColor="#15233A"
+            tone="secondary"
           >
             {t("wallet:actions.disconnect")}
-          </Button>
+          </CabButton>
         )}
-      </YStack>
-    </main>
+      </CabStack>
+    </DisconnectedShell>
   );
 }
