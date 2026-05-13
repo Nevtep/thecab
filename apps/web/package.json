@@ -18,7 +18,6 @@
   "dependencies": {
     "@coinbase/wallet-sdk": "^4.3.7",
     "@metamask/connect-evm": "^1.2.0",
-    "@tamagui/babel-plugin": "2.0.0-rc.42",
     "@tamagui/config": "2.0.0-rc.42",
     "@tamagui/core": "2.0.0-rc.42",
     "@tamagui/next-plugin": "2.0.0-rc.42",

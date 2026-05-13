@@ -5,7 +5,7 @@ const tamaguiPlugin = withTamagui({
   config: "./tamagui.config.ts",
   components: ["tamagui"],
   appDir: true,
-  disableExtraction: process.env.NODE_ENV === "development",
+  disableExtraction: true,
 });
 
 const nextConfig: NextConfig = {
