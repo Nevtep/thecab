@@ -1,0 +1,11 @@
+{
+  "title": "Wallet",
+  "connected": "Wallet connected",
+  "disconnected": "Wallet disconnected",
+  "unsupported": "Unsupported network",
+  "actions": {
+    "connect": "Connect wallet",
+    "disconnect": "Disconnect",
+    "configureWalletConnect": "Set WalletConnect project id"
+  }
+}

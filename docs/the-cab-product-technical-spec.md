@@ -1438,7 +1438,7 @@ Authentication is wallet-based. The initial product supports one connected walle
 
 # 5. Disconnected Experience
 
-## 4.1 Layout
+## 5.1 Layout
 
 When no wallet is connected, the application shows a public landing experience.
 
@@ -1453,7 +1453,7 @@ The disconnected layout must include:
 
 The top menu should remain visible while the user scrolls through the landing page.
 
-## 4.2 Landing purpose
+## 5.2 Landing purpose
 
 The landing page introduces The Cab to new users and should communicate:
 
@@ -1469,7 +1469,7 @@ The landing page introduces The Cab to new users and should communicate:
 
 # 6. Connected Application Layout
 
-## 5.1 Shell
+## 6.1 Shell
 
 Once a wallet is connected, the user is redirected to the connected app shell.
 
@@ -1482,7 +1482,7 @@ The connected layout must include:
 - Main content panel.
 - Optional top status bar for sync state, data age, chain, and selected wallet.
 
-## 5.2 Sidebar navigation
+## 6.2 Sidebar navigation
 
 Sidebar sections:
 
@@ -1508,7 +1508,7 @@ Navigation semantics:
 - `Activity` shows the transaction-level interpreted ledger.
 - `Settings` shows wallet, analysis, display, and diagnostics settings.
 
-## 5.3 Section availability states
+## 6.3 Section availability states
 
 Sections are enabled or disabled based on analysis status.
 
@@ -1528,7 +1528,7 @@ Reason:
 - Overview can use recent API data from Moralis and Alchemy.
 - Deep sections require normalized historical analysis.
 
-## 5.4 Analysis CTA states
+## 6.4 Analysis CTA states
 
 The sidebar includes a CTA for starting wallet analysis.
 
@@ -1578,7 +1578,7 @@ Supported states:
 - Preserve all previously available data.
 - Do not block Overview.
 
-## 5.5 Polling behavior
+## 6.5 Polling behavior
 
 The frontend should poll the backend for wallet analysis status while a run is queued or running.
 
@@ -1617,7 +1617,7 @@ Polling cadence:
 
 # 7. Technical Architecture
 
-## 6.1 Framework
+## 7.1 Framework
 
 The application will be developed in **Next.js**.
 
@@ -1631,7 +1631,7 @@ Next.js responsibilities:
 - Client-side dashboard rendering.
 - Integration with database and third-party APIs.
 
-## 6.2 Wallet architecture
+## 7.2 Wallet architecture
 
 Use:
 
@@ -1663,7 +1663,7 @@ export const SUPPORTED_CHAIN = {
 };
 ```
 
-## 6.2.1 Chain configuration architecture
+## 7.2.1 Chain configuration architecture
 
 Product v1 is Base-only, but chain support must be centralized.
 
@@ -1693,7 +1693,7 @@ getExplorerBaseUrl(chainId)
 Product features should receive or derive `chainId` and pass it through to query hooks, API routes, provider calls, and database queries.
 
 
-## 6.3 Third-party APIs
+## 7.3 Third-party APIs
 
 The application integrates with two third-party API providers:
 
@@ -1725,7 +1725,7 @@ Important provider rule:
 - The expected pricing provider is Alchemy.
 - Provider abstractions may exist, but Alchemy must be the configured implementation for pricing in this spec.
 
-## 6.4 Data strategy
+## 7.4 Data strategy
 
 The product has two data layers:
 
@@ -1756,7 +1756,7 @@ Characteristics:
 - Stores normalized model in database.
 - Unlocks deep sections when complete.
 
-## 6.5 Database
+## 7.5 Database
 
 The database schema must be chain-aware. All protocol-specific tables must include `chainId`, and unique constraints involving addresses or transaction hashes must include `chainId`.
 
@@ -1788,7 +1788,7 @@ Implementation may use:
 - Drizzle ORM for typed schema and migrations.
 - Raw SQL migrations for auditability.
 
-## 6.6 API design
+## 7.6 API design
 
 Initial API surface:
 
@@ -1817,7 +1817,7 @@ All wallet-specific endpoints must validate:
 - Analysis availability for deep routes.
 
 
-## 6.x Internationalization architecture
+## 7.7 Internationalization architecture
 
 The app must use `i18next` and `react-i18next` for internationalization.
 
@@ -1880,7 +1880,7 @@ useTranslation("activity")
 Shared UI terms should live in `common` or `navigation`.
 
 
-## 6.7 Frontend state architecture
+## 7.8 Frontend state architecture
 
 The frontend must follow a layered state architecture.
 
@@ -2193,7 +2193,7 @@ Translation resources are the only allowed source of user-facing copy.
 
 # 8. Design System
 
-## 7.1 Requirement
+## 8.1 Requirement
 
 The Cab must have a coherent internal Design System instead of ad hoc styling.
 
@@ -2208,7 +2208,7 @@ The UI must integrate:
 - Reusable components for dashboard surfaces.
 - Consistent spacing, typography, surfaces, charts, and semantic states.
 
-## 7.2 Third-party library boundary rule
+## 8.2 Third-party library boundary rule
 
 All third-party UI libraries must be wrapped inside the internal The Cab Design System.
 
@@ -2245,7 +2245,7 @@ Rationale:
 - Brand consistency is enforceable.
 - AI-assisted coding has fewer opportunities to drift into arbitrary third-party usage.
 
-## 7.3 Approved third-party libraries for UI MVP
+## 8.3 Approved third-party libraries for UI MVP
 
 ### Component/styling base
 
@@ -2315,7 +2315,7 @@ Usage:
 - Font loading/config belongs to app root and DS theme/tokens.
 - Product screens should use typography components or text variants.
 
-## 7.4 Suggested DS folder structure
+## 8.4 Suggested DS folder structure
 
 ```txt
 src/design-system
@@ -2386,7 +2386,7 @@ src/design-system
     CabErrorPanel.tsx
 ```
 
-## 7.5 Import policy
+## 8.5 Import policy
 
 Allowed in app/product screens:
 
@@ -2412,7 +2412,7 @@ import { LineChart, Line, XAxis, YAxis } from "recharts";
 ```
 
 
-## 7.5.1 Component/container import policy
+## 8.5.1 Component/container import policy
 
 The component/container separation is part of the Design System boundary.
 
@@ -2457,7 +2457,7 @@ import { LineChart } from "recharts";
 - route mutation side effects
 
 
-## 7.6 Font stack
+## 8.6 Font stack
 
 Use Google Fonts:
 
@@ -2472,7 +2472,7 @@ Rules:
 - Use IBM Plex Mono only as a technical accent.
 - Apply `font-variant-numeric: tabular-nums` to financial values, balances, timestamps, tables, and KPI values.
 
-## 7.7 Tamagui token requirements
+## 8.7 Tamagui token requirements
 
 Create tokens for:
 
@@ -2489,7 +2489,7 @@ Create tokens for:
 
 The implementation must avoid hardcoded colors spread throughout components. Brand values should come from tokens.
 
-## 7.8 Component families
+## 8.8 Component families
 
 Required reusable component groups:
 
@@ -2541,7 +2541,7 @@ Required reusable component groups:
 - `CabRebalanceMarker`
 - `CabResidualAttributionPanel`
 
-## 7.9 Chart styling
+## 8.9 Chart styling
 
 Charts should feel like instrumentation, not retail trading toys.
 
@@ -2556,7 +2556,7 @@ Rules:
 - Avoid rainbow palettes.
 - Avoid noisy chart decoration.
 
-## 7.10 DS acceptance criteria
+## 8.10 DS acceptance criteria
 
 The implementation is not acceptable if:
 
@@ -2571,7 +2571,7 @@ The implementation is not acceptable if:
 
 # 9. Background Historical Analysis Job
 
-## 8.1 Purpose
+## 9.1 Purpose
 
 The background analysis job reconstructs the historical Aerodrome/Mellow activity of a wallet.
 
@@ -2579,7 +2579,7 @@ It must populate the domain model so each section can display historical data cl
 
 The job is not a general open-ended chain indexer. It is a wallet-scoped, user-requested or stale-triggered reconstruction pipeline.
 
-## 8.2 Job trigger
+## 9.2 Job trigger
 
 The user starts analysis from the connected sidebar CTA, or the app triggers update when analysis is older than one week.
 
@@ -2608,7 +2608,7 @@ Response:
 }
 ```
 
-## 8.3 Trigger.dev architecture
+## 9.3 Trigger.dev architecture
 
 Trigger.dev task:
 
@@ -2640,7 +2640,7 @@ Next.js responsibilities:
 - Return immediately.
 - Expose status to UI.
 
-## 8.4 Serverless hosting constraint
+## 9.4 Serverless hosting constraint
 
 Vercel serverless functions are not ideal for long-running processes. Therefore:
 
@@ -2649,7 +2649,7 @@ Vercel serverless functions are not ideal for long-running processes. Therefore:
 - Next.js routes should only enqueue and report status.
 - Trigger.dev should own the analysis lifecycle.
 
-## 8.5 Analysis pipeline stages
+## 9.5 Analysis pipeline stages
 
 The pipeline should be deterministic and restartable.
 
@@ -2887,7 +2887,7 @@ When failed:
 - Preserve partial data if safe.
 - Show retry CTA.
 
-## 8.6 Idempotency
+## 9.6 Idempotency
 
 Every analysis stage must be idempotent.
 
@@ -2907,7 +2907,7 @@ Recommended unique keys:
 
 A repeated run must not duplicate events or inflate metrics.
 
-## 8.7 Incremental updates
+## 9.7 Incremental updates
 
 After an initial full historical run, future updates should be incremental.
 
@@ -2957,7 +2957,7 @@ The model is designed for:
 
 ---
 
-## 9.1 Design principles
+## 10.1 Design principles
 
 The domain model follows these principles:
 
@@ -2987,7 +2987,7 @@ The domain model follows these principles:
 
 ---
 
-## 9.2 Chain-aware domain requirement
+## 10.2 Chain-aware domain requirement
 
 Product v1 is Base mainnet only, but the domain model must be chain-aware from day one.
 
@@ -3015,7 +3015,7 @@ Always key them by chainId + address.
 All database indexes and unique constraints involving addresses, transaction hashes, token IDs, protocol contracts, pools, deposits, strategies, rewards, governance events, and price points must include `chainId` where applicable.
 
 
-## 9.3 Entity overview
+## 10.3 Entity overview
 
 Core entities:
 
@@ -3042,7 +3042,7 @@ Core entities:
 
 ---
 
-## 9.3 WalletContext
+## 10.3 WalletContext
 
 Represents the connected wallet being analyzed.
 
@@ -3081,7 +3081,7 @@ Represents the connected wallet being analyzed.
 
 ---
 
-## 9.4 AnalysisRun
+## 10.4 AnalysisRun
 
 Represents one wallet analysis execution.
 
@@ -3132,7 +3132,7 @@ Represents one wallet analysis execution.
 
 ---
 
-## 9.5 RawProviderRecord
+## 10.5 RawProviderRecord
 
 Stores raw external API records used for reconstruction.
 
@@ -3178,7 +3178,7 @@ Stores raw external API records used for reconstruction.
 
 ---
 
-## 9.6 Protocol
+## 10.6 Protocol
 
 Represents a supported DeFi protocol or protocol family.
 
@@ -3205,7 +3205,7 @@ Represents a supported DeFi protocol or protocol family.
 
 ---
 
-## 9.7 ProtocolContract
+## 10.7 ProtocolContract
 
 Represents an official or discovered contract used for protocol discovery.
 
@@ -3267,7 +3267,7 @@ Represents an official or discovered contract used for protocol discovery.
 
 ---
 
-## 9.8 Pool
+## 10.8 Pool
 
 Represents an Aerodrome market/venue.
 
@@ -3321,7 +3321,7 @@ A pool aggregates:
 
 ---
 
-## 9.9 Deposit
+## 10.9 Deposit
 
 Represents a direct user-owned/manual exposure lifecycle inside an Aerodrome pool.
 
@@ -3410,7 +3410,7 @@ They answer:
 
 ---
 
-## 9.10 Strategy
+## 10.10 Strategy
 
 Represents an automated strategy layer.
 
@@ -3487,7 +3487,7 @@ They answer:
 
 ---
 
-## 9.11 StrategyExposure
+## 10.11 StrategyExposure
 
 Represents the wallet’s lifecycle within a Strategy.
 
@@ -3547,7 +3547,7 @@ A Strategy is the product/integration definition. A StrategyExposure is the user
 
 ---
 
-## 9.12 LedgerEvent
+## 10.12 LedgerEvent
 
 Represents a normalized event derived from one or more onchain actions.
 
@@ -3659,7 +3659,7 @@ LedgerEvent is the canonical event-level source of truth.
 
 ---
 
-## 9.13 AssetMovement
+## 10.13 AssetMovement
 
 Represents token-level deltas caused by a LedgerEvent.
 
@@ -3711,7 +3711,7 @@ AssetMovement allows exact decomposition of:
 
 ---
 
-## 9.14 PricePoint
+## 10.14 PricePoint
 
 Represents a historical or current price used for valuation.
 
@@ -3757,7 +3757,7 @@ Supports:
 
 ---
 
-## 9.15 AttributionState
+## 10.15 AttributionState
 
 Tracks residual pool-attributed assets after withdraw/rebalance operations.
 
@@ -3811,7 +3811,7 @@ Tracks residual pool-attributed assets after withdraw/rebalance operations.
 
 ---
 
-## 9.16 AttributionSourceLot
+## 10.16 AttributionSourceLot
 
 Tracks non-pool-residual token inventory that may later be consumed by swaps or transfers.
 
@@ -3867,7 +3867,7 @@ This entity is required to disambiguate swaps that exceed a pool’s residual ba
 
 ---
 
-## 9.17 RewardEvent
+## 10.17 RewardEvent
 
 Represents a reward or claim event in a query-friendly form.
 
@@ -3922,7 +3922,7 @@ Rewards may also be represented as LedgerEvents, but RewardEvent provides a deri
 
 ---
 
-## 9.18 GovernanceEvent
+## 10.18 GovernanceEvent
 
 Represents veAERO and governance-specific behavior.
 
@@ -3976,7 +3976,7 @@ Represents veAERO and governance-specific behavior.
 
 ---
 
-## 9.19 PerformanceSnapshot
+## 10.19 PerformanceSnapshot
 
 Represents a computed performance state for a chosen analytical scope.
 
@@ -4025,7 +4025,7 @@ Represents a computed performance state for a chosen analytical scope.
 
 ---
 
-## 9.20 PortfolioSnapshot
+## 10.20 PortfolioSnapshot
 
 Represents current or historical overall portfolio state.
 
@@ -4063,7 +4063,7 @@ Represents current or historical overall portfolio state.
 
 ---
 
-## 9.21 CoverageReport
+## 10.21 CoverageReport
 
 Captures completeness and confidence for a scope.
 
@@ -4115,7 +4115,7 @@ Captures completeness and confidence for a scope.
 
 ---
 
-## 9.22 DiscardedEvent
+## 10.22 DiscardedEvent
 
 Represents detected events intentionally excluded from sensitive analytics.
 
@@ -4150,7 +4150,7 @@ Represents detected events intentionally excluded from sensitive analytics.
 
 ---
 
-## 9.23 Relationships
+## 10.23 Relationships
 
 High-level relationships:
 
@@ -4218,7 +4218,7 @@ Relational rules:
 
 ---
 
-## 9.25 Chain-aware identity rules
+## 10.25 Chain-aware identity rules
 
 All address-based entities must be keyed by `chainId + address`.
 
@@ -4252,7 +4252,7 @@ chainId + txHash
 ```
 
 
-## 9.24 Identity rules
+## 10.24 Identity rules
 
 ### Pool identity
 
@@ -4330,7 +4330,7 @@ An AttributionSourceLot is identified by:
 
 ---
 
-## 9.25 Metric decomposition requirements
+## 10.25 Metric decomposition requirements
 
 The model must support:
 
@@ -4353,7 +4353,7 @@ The model must support:
 
 ---
 
-## 9.26 Naming rules
+## 10.26 Naming rules
 
 User-facing UI naming:
 
@@ -4371,7 +4371,7 @@ Internal/backend naming:
 
 ---
 
-## 9.27 Summary
+## 10.27 Summary
 
 The domain model supports The Cab’s current product architecture:
 
@@ -4397,7 +4397,7 @@ The key modeling requirement is that **Pools, Deposits, and Strategies remain di
 
 # 11. Metrics & Financial Semantics
 
-## 10.1 Base valuation
+## 11.1 Base valuation
 
 All primary analytics should be USD/USDC-centric.
 
@@ -4409,7 +4409,7 @@ Rules:
 - Store current USD valuations for open exposure.
 - Never mix nominal token amount returns with USD returns without labeling clearly.
 
-## 10.2 Capital entered
+## 11.2 Capital entered
 
 Capital entered is external value deployed into an Aerodrome/Mellow/governance scope.
 
@@ -4422,7 +4422,7 @@ Examples:
 
 Do not count internal movement twice.
 
-## 10.3 Capital withdrawn
+## 11.3 Capital withdrawn
 
 Capital withdrawn is value leaving a tracked scope.
 
@@ -4434,7 +4434,7 @@ Examples:
 - Swap into unrelated assets after exiting a pool.
 - Unlock/exit governance exposure when applicable.
 
-## 10.4 Residual pool capital
+## 11.4 Residual pool capital
 
 When a user withdraws from a pool but keeps the withdrawn assets in the wallet, those assets remain economically attributed to the pool until resolved by actual movement.
 
@@ -4476,7 +4476,7 @@ Example:
 - The remaining `0.04 cbBTC` is attributed to liquidation-derived inventory, not to the pool residual.
 
 
-## 10.5 Realized PnL
+## 11.5 Realized PnL
 
 Realized PnL should reflect value made or lost when capital is closed, withdrawn, swapped, claimed, or otherwise crystallized.
 
@@ -4487,7 +4487,7 @@ Examples:
 - Gains/losses from rebalance swaps.
 - Difference between capital entered and capital withdrawn for closed exposure.
 
-## 10.6 Unrealized PnL
+## 11.6 Unrealized PnL
 
 Unrealized PnL reflects current market value change of open exposure.
 
@@ -4498,7 +4498,7 @@ Examples:
 - Idle residual pool assets still attributed to a pool.
 - veAERO lock value where supported.
 
-## 10.7 Asset price effect
+## 11.7 Asset price effect
 
 Asset price effect isolates gains/losses caused by market movement of held assets.
 
@@ -4510,7 +4510,7 @@ This should be separated from:
 - Fresh capital deposits.
 - Withdrawals.
 
-## 10.8 Rewards return
+## 11.8 Rewards return
 
 Rewards return includes realized claimed value from:
 
@@ -4523,7 +4523,7 @@ Rewards return includes realized claimed value from:
 
 Rewards should be shown separately from total PnL and also included in total return when appropriate.
 
-## 10.9 Estimated annualized return
+## 11.9 Estimated annualized return
 
 Annualized return must be labeled as estimated.
 
@@ -4545,7 +4545,7 @@ Requirements:
 
 # 12. Application Sections
 
-## 11.1 Landing
+## 12.1 Landing
 
 ### Purpose
 
@@ -4628,7 +4628,7 @@ Mention:
 
 ---
 
-## 11.2 Overview
+## 12.2 Overview
 
 ### Purpose
 
@@ -4780,7 +4780,7 @@ If no Aerodrome activity is found:
 
 ---
 
-## 11.3 Pools
+## 12.3 Pools
 
 ### Purpose
 
@@ -5538,7 +5538,7 @@ They must only be counted once in portfolio totals.
 
 ---
 
-## 11.6 Governance
+## 12.6 Governance
 
 ### Purpose
 
@@ -5641,7 +5641,7 @@ Show:
 
 ---
 
-## 11.7 Activity
+## 12.7 Activity
 
 ### Purpose
 
@@ -5773,7 +5773,7 @@ For an event classified as `rebalance`, show:
 
 ---
 
-## 11.8 Settings
+## 12.8 Settings
 
 ### Purpose
 
@@ -5830,7 +5830,7 @@ Settings is available after wallet connection.
 
 The Cab must follow the approved brand specification.
 
-## 12.1 Brand positioning
+## 13.1 Brand positioning
 
 The Cab should feel:
 
@@ -5853,7 +5853,7 @@ It should not feel:
 - Neon cyberpunk chaos.
 - Retail-trading gimmick.
 
-## 12.2 Core concept
+## 13.2 Core concept
 
 The Cab is a **control tower for on-chain portfolios**.
 
@@ -5868,7 +5868,7 @@ The visual system should communicate:
 
 The UI should feel like a **premium control surface**, not a casual crypto dashboard.
 
-## 12.3 Visual direction
+## 13.3 Visual direction
 
 Chosen direction:
 
@@ -5894,7 +5894,7 @@ Avoid:
 - Cluttered futuristic noise.
 - Sci-fi UI tropes that reduce usability.
 
-## 12.4 Color palette
+## 13.4 Color palette
 
 ### Brand core
 
@@ -5924,7 +5924,7 @@ Avoid:
 - Danger: `#EF4444`
 - Info: `#38BDF8`
 
-## 12.5 Typography
+## 13.5 Typography
 
 Use:
 
@@ -5932,7 +5932,7 @@ Use:
 - Inter for navigation, cards, body copy, labels, tables, controls.
 - IBM Plex Mono for wallet snippets, tx hashes, timestamps, block numbers, diagnostic metadata.
 
-## 12.6 Brand copy tone
+## 13.6 Brand copy tone
 
 Copy should feel:
 

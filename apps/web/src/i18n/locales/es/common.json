@@ -1,0 +1,11 @@
+{
+  "landing": {
+    "title": "Una torre de control para tu capital on-chain.",
+    "subtitle": "Providers cargados: Tamagui, Wallet, Query, i18n"
+  },
+  "wallet": {
+    "connected": "Wallet conectada",
+    "disconnected": "Wallet desconectada",
+    "unsupported": "Red no soportada"
+  }
+}
