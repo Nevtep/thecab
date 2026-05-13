@@ -21,19 +21,19 @@ export function CabErrorPanel({
   onRetry,
 }: CabErrorPanelProps) {
   return (
-    <CabCard>
-      <CabStack alignItems="center" justifyContent="center" gap="$2">
+    <CabCard density="spacious">
+      <CabStack alignItems="center" justifyContent="center" gap="$3">
         <CabIcon name="warning" tone="danger" size="lg" />
-        <CabText variant="heading" color={cabColors.semantic.danger} textAlign="center">
+        <CabText variant="label" fontSize={13} color={cabColors.semantic.danger} textAlign="center">
           {title}
         </CabText>
         {description ? (
-          <CabText color={cabColors.text.secondary} textAlign="center">
+          <CabText variant="caption" fontSize={12} color={cabColors.text.secondary} textAlign="center">
             {description}
           </CabText>
         ) : null}
         {retryLabel && onRetry ? (
-          <CabButton tone="secondary" onPress={onRetry}>
+          <CabButton tone="secondary" controlSize="md" onPress={onRetry}>
             {retryLabel}
           </CabButton>
         ) : null}

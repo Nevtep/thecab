@@ -1,4 +1,94 @@
-import { createTamagui, createTokens } from "@tamagui/core";
+import { createFont, createTamagui, createTokens } from "@tamagui/core";
+
+const interFont = createFont({
+  family: "var(--cab-font-ui), Inter, system-ui, -apple-system, sans-serif",
+  size: {
+    1: 11,
+    2: 12,
+    3: 13,
+    4: 15,
+    5: 17,
+    6: 20,
+    7: 24,
+    8: 30,
+    true: 15,
+  },
+  lineHeight: {
+    1: 14,
+    2: 16,
+    3: 18,
+    4: 21,
+    5: 24,
+    6: 28,
+    7: 32,
+    8: 38,
+    true: 21,
+  },
+  weight: {
+    4: "400",
+    5: "500",
+    6: "600",
+    7: "700",
+  },
+});
+
+const orbitronFont = createFont({
+  family: "var(--cab-font-display), Orbitron, sans-serif",
+  size: {
+    1: 12,
+    2: 13,
+    3: 15,
+    4: 17,
+    5: 20,
+    6: 24,
+    7: 30,
+    8: 36,
+    true: 17,
+  },
+  lineHeight: {
+    1: 16,
+    2: 18,
+    3: 20,
+    4: 23,
+    5: 27,
+    6: 31,
+    7: 37,
+    8: 44,
+    true: 23,
+  },
+  weight: {
+    5: "500",
+    6: "600",
+    7: "700",
+  },
+});
+
+const monoFont = createFont({
+  family: "var(--cab-font-data), 'IBM Plex Mono', ui-monospace, monospace",
+  size: {
+    1: 10,
+    2: 11,
+    3: 12,
+    4: 13,
+    5: 14,
+    6: 16,
+    true: 12,
+  },
+  lineHeight: {
+    1: 13,
+    2: 14,
+    3: 16,
+    4: 18,
+    5: 19,
+    6: 22,
+    true: 16,
+  },
+  weight: {
+    4: "400",
+    5: "500",
+    6: "600",
+  },
+});
 
 const tokens = createTokens({
   color: {
@@ -12,8 +102,23 @@ const tokens = createTokens({
     secondary: "#B8C7E6",
     muted: "#6B7A98",
     accent: "#00E0E1",
+    signalTealUi: "#2EC5C9",
+    signalTealMuted: "#1A8F98",
+    signalTealGlow: "rgba(0, 224, 225, 0.22)",
     electricBlue: "#3B82F6",
     gold: "#F2C14E",
+    primaryActionBg: "#F2C14E",
+    primaryActionText: "#040F1C",
+    primaryActionBorder: "#F2C14E",
+    primaryActionHoverBg: "#F6CF6A",
+    secondaryActionBg: "transparent",
+    secondaryActionText: "#EAF1FF",
+    secondaryActionBorder: "#2A3347",
+    secondaryActionHoverBorder: "#2EC5C9",
+    technicalActionText: "#2EC5C9",
+    technicalActionBorder: "#1A8F98",
+    technicalActionHoverBorder: "#2EC5C9",
+    technicalActionGlow: "rgba(0, 224, 225, 0.22)",
     success: "#22C55E",
     warning: "#FBBF24",
     danger: "#EF4444",
@@ -42,12 +147,20 @@ const tokens = createTokens({
     true: 16,
   },
   radius: {
+    xs: 2,
+    sm: 4,
+    md: 6,
+    lg: 10,
+    panel: 12,
+    xl: 16,
+    pill: 999,
     0: 0,
-    1: 6,
-    2: 10,
-    3: 14,
-    4: 18,
-    true: 10,
+    1: 4,
+    2: 6,
+    3: 10,
+    4: 12,
+    5: 16,
+    true: 6,
   },
   zIndex: {
     0: 0,
@@ -61,6 +174,11 @@ const tokens = createTokens({
 
 const config = createTamagui({
   tokens,
+  fonts: {
+    body: interFont,
+    heading: orbitronFont,
+    mono: monoFont,
+  },
   themes: {
     dark: {
       background: tokens.color.background,
@@ -70,6 +188,7 @@ const config = createTamagui({
     },
   },
   defaultTheme: "dark",
+  defaultFont: "body",
 });
 
 export type AppTamaguiConfig = typeof config;

@@ -143,7 +143,7 @@ Secondary dark blue for depth and gradients.
 - `#15233A`
 
 #### Signal Teal
-Primary interactive accent and chart highlight.
+Primary signal/data accent and chart highlight.
 
 - `#00E0E1`
 
@@ -248,6 +248,26 @@ Informational state, sync, neutral technical notice.
     "warning": "#FBBF24",
     "danger": "#EF4444",
     "info": "#38BDF8"
+  },
+  "brandExtended": {
+    "signalTealRaw": "#00E0E1",
+    "signalTealUi": "#2EC5C9",
+    "signalTealMuted": "#1A8F98",
+    "signalTealGlow": "rgba(0, 224, 225, 0.22)"
+  },
+  "action": {
+    "primaryBg": "#F2C14E",
+    "primaryText": "#040F1C",
+    "primaryBorder": "#F2C14E",
+    "primaryHoverBg": "#F6CF6A",
+    "secondaryBg": "transparent",
+    "secondaryText": "#EAF1FF",
+    "secondaryBorder": "#2A3347",
+    "secondaryHoverBorder": "#2EC5C9",
+    "technicalText": "#2EC5C9",
+    "technicalBorder": "#1A8F98",
+    "technicalHoverBorder": "#2EC5C9",
+    "technicalGlow": "rgba(0, 224, 225, 0.22)"
   }
 }
 ```
@@ -274,8 +294,10 @@ Use bright cool tones for:
 - chart emphasis
 - key technical indicators
 
+Do not use Signal Teal as the default filled primary CTA background.
+
 ### Use gold sparingly
-Gold is the **identity accent**, not the default interaction color.
+Gold is the **identity accent** and the primary hero/brand CTA fill.
 
 Use gold for:
 - logo
@@ -284,7 +306,7 @@ Use gold for:
 - section anchors
 - select hero accents
 
-Do **not** use gold as the main chart palette or all-purpose CTA color.
+Do **not** use gold as the main chart palette.
 
 ### Preserve contrast
 All dashboard text and metrics should remain highly legible on dark surfaces.
@@ -311,6 +333,8 @@ Why:
 - avionics / cockpit feel
 - strong crypto/product identity
 
+Do not apply Orbitron globally. Orbitron is a display/brand font only.
+
 ### UI / Product / Body
 **Inter**
 
@@ -328,6 +352,8 @@ Why:
 - extremely legible
 - excellent for dense product surfaces
 - clean contrast against Orbitron
+
+Inter is the default UI/body font across navigation, cards, labels, controls, and dense dashboard content.
 - stable in small sizes
 
 ### Data / Technical Accent
@@ -345,6 +371,8 @@ Why:
 - reinforces technical tooling feel
 - improves differentiation for machine-like data
 - useful in portfolio analytics contexts
+
+IBM Plex Mono is reserved for technical/data accents (hashes, addresses, timestamps, IDs, diagnostics).
 
 ---
 
@@ -533,14 +561,44 @@ Charts should feel like instrumentation, not like retail trading toys.
 
 ### Buttons
 Primary:
-- dark surface + cyan border/accent
-- cyan hover emphasis
+- Cab Gold fill with Cab Night text
+- compact, angular/slightly rounded geometry
+- restrained hover lift only (no neon glow)
 
 Secondary:
 - dark surface + muted border
+- restrained cyan border/text hover only when needed
 
 Premium/brand CTA:
-- selective gold usage only where brand moment matters
+- use Cab Gold fill with dark text
+
+Technical action button:
+- dark or transparent surface
+- restrained cyan border/text/hover states
+- subtle cyan glow only when technically justified
+
+## CTA and accent usage clarification
+
+- Signal Teal is a signal/data/accent color.
+- Signal Teal should be used for chart lines, active states, links, HUD/radar lines, technical highlights, selected states, subtle borders, and small status accents.
+- Signal Teal must not be used as a large filled primary button background.
+- Cyan glow must be restrained and must never dominate the UI.
+- Cab Gold is the primary hero/brand CTA fill.
+- Primary hero/brand CTA buttons use Cab Gold background with Cab Night / dark text.
+- Secondary buttons use dark or transparent surfaces with muted borders.
+- Technical buttons may use restrained cyan border/text/hover states.
+- Buttons should feel like cockpit/control-surface hardware, not soft SaaS buttons.
+- Button geometry should be angular/slightly rounded:
+  - primary/secondary buttons: 4-6px radius
+  - inputs: 6px radius
+  - cards/panels: 10-12px radius
+  - large dashboard panels: 12-16px radius
+  - pill radius only for tiny badges/status chips
+- Avoid oversized rounded/2xl/pill primary buttons.
+- Do not use Signal Teal as the default `primaryBg` token.
+- Do not use strong cyan-filled buttons unless a very specific technical state requires it and it is not the main CTA.
+- Orbitron is a display/brand font only. Inter is the default UI/body font. IBM Plex Mono is for technical data accents.
+- Signal Teal is a signal/data/accent color, not a default filled CTA background. Cab Gold is the primary hero/brand CTA fill.
 
 ### Navigation
 - dark background

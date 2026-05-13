@@ -14,12 +14,14 @@ export type CabMetricCardProps = {
 
 export function CabMetricCard({ label, value, delta }: CabMetricCardProps) {
   return (
-    <CabCard>
-      <CabStack gap="$2">
-        <CabText color={cabColors.text.secondary}>{label}</CabText>
+    <CabCard density="spacious">
+      <CabStack gap="$3">
+        <CabText variant="caption" fontSize={12} color={cabColors.text.secondary}>
+          {label}
+        </CabText>
         <CabText
-          variant="data"
-          fontSize="$6"
+          variant="kpi"
+          fontSize={26}
           fontWeight="700"
           color={cabColors.text.primary}
           style={{ fontVariantNumeric: "tabular-nums" }}
@@ -27,7 +29,7 @@ export function CabMetricCard({ label, value, delta }: CabMetricCardProps) {
           {value}
         </CabText>
         {typeof delta === "number" ? (
-          <CabBadge tone={delta >= 0 ? "success" : "danger"}>
+          <CabBadge tone={delta >= 0 ? "success" : "danger"} size="md">
             {delta >= 0 ? "+" : ""}
             {delta.toFixed(2)}%
           </CabBadge>

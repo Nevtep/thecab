@@ -23,11 +23,20 @@ export function CabDonutChart({ data, title, subtitle, height }: CabDonutChartPr
             {data.map((entry, index) => (
               <Cell
                 key={`${entry.label}-${index}`}
-                fill={entry.color ?? (index % 2 === 0 ? cabColors.brand.signalTeal : cabColors.brand.electricBlue)}
+                fill={entry.color ?? (index % 2 === 0 ? cabColors.brandExtended.signalTealUi : cabColors.brand.electricBlue)}
               />
             ))}
           </Pie>
-          <Tooltip />
+          <Tooltip
+            contentStyle={{
+              backgroundColor: cabColors.surface.elevatedSurface,
+              border: `1px solid ${cabColors.surface.border}`,
+              borderRadius: 8,
+              boxShadow: "0 8px 24px rgba(0, 0, 0, 0.35)",
+            }}
+            labelStyle={{ color: cabColors.text.secondary, fontSize: 12, fontWeight: 500 }}
+            itemStyle={{ color: cabColors.text.primary, fontSize: 13 }}
+          />
         </PieChart>
       </ResponsiveContainer>
     </CabChartFrame>

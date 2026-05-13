@@ -1,17 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
+import { useMemo, useState } from "react";
+import type { CabBarChartProps } from "@/design-system/charts/CabBarChart";
+import type { CabLineChartProps } from "@/design-system/charts/CabLineChart";
 
 import {
   CabAnalysisStatusBadge,
-  CabBarChart,
   CabButton,
   CabCard,
   CabCoverageBadge,
   CabEmptyState,
   CabErrorPanel,
   CabInput,
-  CabLineChart,
   CabLoadingPanel,
   CabMetricCard,
   CabPartialCoverageNotice,
@@ -22,6 +23,28 @@ import {
   CabUnsupportedEventNotice,
   cabColors,
 } from "@/design-system";
+
+type ShowcaseChartDatum = {
+  day: string;
+  value: number;
+  rewards: number;
+};
+
+const ClientCabLineChart = dynamic<CabLineChartProps<ShowcaseChartDatum>>(
+  () => import("@/design-system/charts/CabLineChart").then((module) => module.CabLineChart),
+  {
+    ssr: false,
+    loading: () => <CabLoadingPanel label="Preparing chart previews..." />,
+  },
+);
+
+const ClientCabBarChart = dynamic<CabBarChartProps<ShowcaseChartDatum>>(
+  () => import("@/design-system/charts/CabBarChart").then((module) => module.CabBarChart),
+  {
+    ssr: false,
+    loading: () => <CabLoadingPanel label="Preparing chart previews..." />,
+  },
+);
 
 type ColorGroup = {
   group: string;
@@ -35,7 +58,7 @@ const colorGroups: ColorGroup[] = [
   { group: "Semantic", colors: cabColors.semantic },
 ];
 
-const chartData = [
+const chartData: ShowcaseChartDatum[] = [
   { day: "Mon", value: 124000, rewards: 120 },
   { day: "Tue", value: 128500, rewards: 160 },
   { day: "Wed", value: 126300, rewards: 135 },
@@ -47,20 +70,20 @@ const chartData = [
 
 function ColorSwatch({ name, value }: { name: string; value: string }) {
   return (
-    <CabCard padding="$3" gap="$2">
+    <CabCard padding="$4" gap="$3" density="default">
       <div
         style={{
           width: "100%",
-          height: 56,
+          height: 72,
           borderRadius: 10,
           backgroundColor: value,
           border: `1px solid ${cabColors.surface.border}`,
         }}
       />
-      <CabText variant="heading" fontSize="$2">
+      <CabText variant="label" fontSize={12} color={cabColors.text.primary}>
         {name}
       </CabText>
-      <CabText variant="data" fontSize="$2" color={cabColors.text.secondary}>
+      <CabText variant="mono" fontSize={11} color={cabColors.text.secondary}>
         {value}
       </CabText>
     </CabCard>
@@ -69,11 +92,6 @@ function ColorSwatch({ name, value }: { name: string; value: string }) {
 
 export default function DesignSystemShowcasePage() {
   const [range, setRange] = useState("7d");
-  const [chartsReady, setChartsReady] = useState(false);
-
-  useEffect(() => {
-    setChartsReady(true);
-  }, []);
 
   const rangeOptions = useMemo(
     () => [
@@ -92,31 +110,31 @@ export default function DesignSystemShowcasePage() {
         background:
           "radial-gradient(1200px 700px at 100% -10%, rgba(0,224,225,0.10), transparent 50%), radial-gradient(1000px 600px at -10% -10%, rgba(59,130,246,0.10), transparent 55%), #040F1C",
         color: cabColors.text.primary,
-        padding: "32px 24px 56px",
+        padding: "40px 28px 64px",
       }}
     >
-      <div style={{ maxWidth: 1240, margin: "0 auto", display: "grid", gap: 24 }}>
+      <div style={{ maxWidth: 1280, margin: "0 auto", display: "grid", gap: 28 }}>
         <CabSectionHeader
           title="Design System Showcase"
-          subtitle="Storybook-style visual surface for palette and component validation"
+          subtitle="Aviation-inspired control surface validation for palette, typography, controls, and status components"
           actions={<CabAnalysisStatusBadge status="ready" label="palette ready" />}
         />
 
-        <CabCard>
-          <CabStack gap="$3">
-            <CabText variant="heading" fontSize="$6">
+        <CabCard density="spacious">
+          <CabStack gap="$4">
+            <CabText variant="heading" fontSize={17}>
               Color Palette
             </CabText>
             {colorGroups.map((section) => (
-              <CabStack key={section.group} gap="$2">
-                <CabText variant="heading" fontSize="$4" color={cabColors.text.secondary}>
+              <CabStack key={section.group} gap="$3">
+                <CabText variant="label" fontSize={13} color={cabColors.text.secondary}>
                   {section.group}
                 </CabText>
                 <div
                   style={{
                     display: "grid",
-                    gap: 12,
-                    gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+                    gap: 16,
+                    gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
                   }}
                 >
                   {Object.entries(section.colors).map(([name, value]) => (
@@ -131,43 +149,63 @@ export default function DesignSystemShowcasePage() {
         <div
           style={{
             display: "grid",
-            gap: 16,
-            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+            gap: 20,
+            gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))",
           }}
         >
-          <CabCard>
-            <CabStack gap="$3">
-              <CabText variant="heading" fontSize="$5">
+          <CabCard density="spacious">
+            <CabStack gap="$4">
+              <CabText variant="heading" fontSize={16}>
                 Typography
               </CabText>
-              <CabText variant="display" fontSize="$8">
+              <CabText variant="display" fontSize={30}>
                 Orbitron Display / Brand
               </CabText>
-              <CabText variant="heading" fontSize="$5">
-                Orbitron Heading / Section Label
+              <CabText variant="heading" fontSize={17}>
+                Orbitron Heading / Major Section Anchor
               </CabText>
-              <CabText variant="body" fontSize="$4">
+              <CabText variant="body" fontSize={13}>
                 Inter Body / Navigation / Product copy for dense readable dashboards.
               </CabText>
-              <CabText variant="data" fontSize="$4">
+              <CabText variant="mono" fontSize={11}>
                 IBM Plex Mono Data / 0x8Ae2...3f19 / $136,100.42 / 2026-05-13
               </CabText>
             </CabStack>
           </CabCard>
 
-          <CabCard>
-            <CabStack gap="$3">
-              <CabText variant="heading" fontSize="$5">
+          <CabCard density="spacious">
+            <CabStack gap="$4">
+              <CabText variant="heading" fontSize={16}>
                 Primitives
               </CabText>
-              <CabStack row gap="$2" flexWrap="wrap">
-                <CabButton tone="primary">Primary</CabButton>
-                <CabButton tone="secondary">Secondary</CabButton>
-                <CabButton tone="ghost">Ghost</CabButton>
-                <CabButton tone="warning">Warning</CabButton>
+              <CabText variant="caption" fontSize={12} color={cabColors.text.muted}>
+                Default-size controls (md) for realistic dashboard interaction states.
+              </CabText>
+              <CabStack row gap="$3" flexWrap="wrap">
+                <CabButton tone="primary" controlSize="md">
+                  Primary
+                </CabButton>
+                <CabButton tone="secondary" controlSize="md">
+                  Secondary
+                </CabButton>
+                <CabButton tone="technical" controlSize="md">
+                  Technical
+                </CabButton>
+                <CabButton tone="ghost" controlSize="md">
+                  Ghost
+                </CabButton>
+                <CabButton tone="warning" controlSize="md">
+                  Warning
+                </CabButton>
               </CabStack>
-              <CabInput placeholder="CabInput tokenized background and border" />
-              <CabStack row gap="$2" flexWrap="wrap">
+              <CabInput
+                controlSize="md"
+                placeholder="CabInput with readable padding, subtle border, restrained teal focus"
+              />
+              <CabText variant="caption" fontSize={12} color={cabColors.text.muted}>
+                Compact status chips are separate from action buttons.
+              </CabText>
+              <CabStack row gap="$3" flexWrap="wrap">
                 <CabCoverageBadge state="full" label="full" />
                 <CabCoverageBadge state="share_level" label="share level" />
                 <CabCoverageBadge state="partial" label="partial" />
@@ -177,11 +215,11 @@ export default function DesignSystemShowcasePage() {
           </CabCard>
         </div>
 
-        <CabCard>
-          <CabStack gap="$3">
+        <CabCard density="spacious">
+          <CabStack gap="$4">
             <CabSectionHeader
               title="Metrics and Controls"
-              subtitle="Color contrast check across primary informational surfaces"
+              subtitle="Readable KPI density with filter controls that remain compact but usable"
               actions={
                 <CabRangeSelector
                   options={rangeOptions}
@@ -193,8 +231,8 @@ export default function DesignSystemShowcasePage() {
             <div
               style={{
                 display: "grid",
-                gap: 16,
-                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: 20,
+                gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
               }}
             >
               <CabMetricCard label="Net Portfolio" value="$136,100.42" delta={3.24} />
@@ -207,43 +245,34 @@ export default function DesignSystemShowcasePage() {
         <div
           style={{
             display: "grid",
-            gap: 16,
-            gridTemplateColumns: "repeat(auto-fit, minmax(380px, 1fr))",
+            gap: 20,
+            gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))",
           }}
         >
-          {chartsReady ? (
-            <>
-              <CabLineChart
-                title="Portfolio Value"
-                subtitle="Signal teal and electric blue over dark grid"
-                data={chartData}
-                xKey="day"
-                series={[
-                  { key: "value", label: "Portfolio Value" },
-                  { key: "rewards", label: "Rewards", color: cabColors.brand.cabGold },
-                ]}
-              />
-              <CabBarChart
-                title="Rewards by Day"
-                subtitle="Bar palette validation"
-                data={chartData}
-                xKey="day"
-                series={[{ key: "rewards", label: "Rewards" }]}
-              />
-            </>
-          ) : (
-            <>
-              <CabLoadingPanel label="Preparing chart previews..." />
-              <CabLoadingPanel label="Preparing chart previews..." />
-            </>
-          )}
+          <ClientCabLineChart
+            title="Portfolio Value"
+            subtitle="Signal teal and electric blue over dark grid"
+            data={chartData}
+            xKey="day"
+            series={[
+              { key: "value", label: "Portfolio Value" },
+              { key: "rewards", label: "Rewards", color: cabColors.brand.cabGold },
+            ]}
+          />
+          <ClientCabBarChart
+            title="Rewards by Day"
+            subtitle="Bar palette validation"
+            data={chartData}
+            xKey="day"
+            series={[{ key: "rewards", label: "Rewards" }]}
+          />
         </div>
 
         <div
           style={{
             display: "grid",
-            gap: 16,
-            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+            gap: 20,
+            gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))",
           }}
         >
           <CabEmptyState

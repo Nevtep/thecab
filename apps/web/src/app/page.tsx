@@ -64,7 +64,7 @@ export default function Home() {
             onPress={() => {
               void switchToSupportedChain();
             }}
-            tone="primary"
+            tone="warning"
           >
             {t("wallet:unsupported")}
           </CabButton>

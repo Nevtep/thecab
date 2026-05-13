@@ -14,12 +14,16 @@ export type CabSectionHeaderProps = {
 
 export function CabSectionHeader({ title, subtitle, actions }: CabSectionHeaderProps) {
   return (
-    <CabStack row justifyContent="space-between" alignItems="center">
-      <CabStack>
-        <CabText variant="heading" fontSize="$5" color={cabColors.text.primary}>
+    <CabStack row justifyContent="space-between" alignItems="flex-start" gap="$3" flexWrap="wrap">
+      <CabStack gap="$2">
+        <CabText variant="heading" fontSize={16} color={cabColors.text.primary}>
           {title}
         </CabText>
-        {subtitle ? <CabText color={cabColors.text.muted}>{subtitle}</CabText> : null}
+        {subtitle ? (
+          <CabText variant="caption" fontSize={12} color={cabColors.text.muted}>
+            {subtitle}
+          </CabText>
+        ) : null}
       </CabStack>
       {actions}
     </CabStack>

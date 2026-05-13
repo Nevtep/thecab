@@ -1,9 +1,12 @@
 export const cabFonts = {
-  brand: "var(--font-orbitron)",
-  heading: "var(--font-orbitron)",
-  body: "var(--font-inter)",
-  ui: "var(--font-inter)",
-  dataAccent: "var(--font-ibm-plex-mono)",
+  display: "$heading",
+  heading: "$heading",
+  body: "$body",
+  ui: "$body",
+  data: "$mono",
+  mono: "$mono",
+  brand: "$heading",
+  dataAccent: "$mono",
 } as const;
 
 export const cabFontWeights = {

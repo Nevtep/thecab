@@ -15,11 +15,15 @@ export function CabUnsupportedEventNotice({
   description,
 }: CabUnsupportedEventNoticeProps) {
   return (
-    <CabCard>
-      <CabStack>
+    <CabCard density="spacious">
+      <CabStack gap="$3">
         <CabBadge tone="danger">unsupported</CabBadge>
-        <CabText variant="heading">{title}</CabText>
-        <CabText>{description}</CabText>
+        <CabText variant="label" fontSize={13}>
+          {title}
+        </CabText>
+        <CabText variant="caption" fontSize={12}>
+          {description}
+        </CabText>
       </CabStack>
     </CabCard>
   );

@@ -32215,7 +32215,110 @@
   ],
   "nameToPaths": {},
   "tamaguiConfig": {
-    "fonts": {},
+    "fonts": {
+      "body": {
+        "family": "var(--cab-font-ui), Inter, system-ui, -apple-system, sans-serif",
+        "size": {
+          "1": 11,
+          "2": 12,
+          "3": 13,
+          "4": 15,
+          "5": 17,
+          "6": 20,
+          "7": 24,
+          "8": 30,
+          "true": 15
+        },
+        "lineHeight": {
+          "1": 14,
+          "2": 16,
+          "3": 18,
+          "4": 21,
+          "5": 24,
+          "6": 28,
+          "7": 32,
+          "8": 38,
+          "true": 21
+        },
+        "weight": {
+          "1": "400",
+          "2": "400",
+          "3": "400",
+          "4": "400",
+          "5": "500",
+          "6": "600",
+          "7": "700",
+          "8": "700",
+          "true": "700"
+        }
+      },
+      "heading": {
+        "family": "var(--cab-font-display), Orbitron, sans-serif",
+        "size": {
+          "1": 12,
+          "2": 13,
+          "3": 15,
+          "4": 17,
+          "5": 20,
+          "6": 24,
+          "7": 30,
+          "8": 36,
+          "true": 17
+        },
+        "lineHeight": {
+          "1": 16,
+          "2": 18,
+          "3": 20,
+          "4": 23,
+          "5": 27,
+          "6": 31,
+          "7": 37,
+          "8": 44,
+          "true": 23
+        },
+        "weight": {
+          "1": "500",
+          "2": "500",
+          "3": "500",
+          "4": "500",
+          "5": "500",
+          "6": "600",
+          "7": "700",
+          "8": "700",
+          "true": "700"
+        }
+      },
+      "mono": {
+        "family": "var(--cab-font-data), 'IBM Plex Mono', ui-monospace, monospace",
+        "size": {
+          "1": 10,
+          "2": 11,
+          "3": 12,
+          "4": 13,
+          "5": 14,
+          "6": 16,
+          "true": 12
+        },
+        "lineHeight": {
+          "1": 13,
+          "2": 14,
+          "3": 16,
+          "4": 18,
+          "5": 19,
+          "6": 22,
+          "true": 16
+        },
+        "weight": {
+          "1": "400",
+          "2": "400",
+          "3": "400",
+          "4": "400",
+          "5": "500",
+          "6": "600",
+          "true": "600"
+        }
+      }
+    },
     "onlyAllowShorthands": false,
     "fontLanguages": [],
     "media": {},
@@ -32291,6 +32394,27 @@
           "val": "#00E0E1",
           "variable": "var(--c-accent)"
         },
+        "signalTealUi": {
+          "isVar": true,
+          "key": "$signalTealUi",
+          "name": "c-signalTealUi",
+          "val": "#2EC5C9",
+          "variable": "var(--c-signalTealUi)"
+        },
+        "signalTealMuted": {
+          "isVar": true,
+          "key": "$signalTealMuted",
+          "name": "c-signalTealMuted",
+          "val": "#1A8F98",
+          "variable": "var(--c-signalTealMuted)"
+        },
+        "signalTealGlow": {
+          "isVar": true,
+          "key": "$signalTealGlow",
+          "name": "c-signalTealGlow",
+          "val": "rgba(0, 224, 225, 0.22)",
+          "variable": "var(--c-signalTealGlow)"
+        },
         "electricBlue": {
           "isVar": true,
           "key": "$electricBlue",
@@ -32304,6 +32428,90 @@
           "name": "c-gold",
           "val": "#F2C14E",
           "variable": "var(--c-gold)"
+        },
+        "primaryActionBg": {
+          "isVar": true,
+          "key": "$primaryActionBg",
+          "name": "c-primaryActionBg",
+          "val": "#F2C14E",
+          "variable": "var(--c-primaryActionBg)"
+        },
+        "primaryActionText": {
+          "isVar": true,
+          "key": "$primaryActionText",
+          "name": "c-primaryActionText",
+          "val": "#040F1C",
+          "variable": "var(--c-primaryActionText)"
+        },
+        "primaryActionBorder": {
+          "isVar": true,
+          "key": "$primaryActionBorder",
+          "name": "c-primaryActionBorder",
+          "val": "#F2C14E",
+          "variable": "var(--c-primaryActionBorder)"
+        },
+        "primaryActionHoverBg": {
+          "isVar": true,
+          "key": "$primaryActionHoverBg",
+          "name": "c-primaryActionHoverBg",
+          "val": "#F6CF6A",
+          "variable": "var(--c-primaryActionHoverBg)"
+        },
+        "secondaryActionBg": {
+          "isVar": true,
+          "key": "$secondaryActionBg",
+          "name": "c-secondaryActionBg",
+          "val": "transparent",
+          "variable": "var(--c-secondaryActionBg)"
+        },
+        "secondaryActionText": {
+          "isVar": true,
+          "key": "$secondaryActionText",
+          "name": "c-secondaryActionText",
+          "val": "#EAF1FF",
+          "variable": "var(--c-secondaryActionText)"
+        },
+        "secondaryActionBorder": {
+          "isVar": true,
+          "key": "$secondaryActionBorder",
+          "name": "c-secondaryActionBorder",
+          "val": "#2A3347",
+          "variable": "var(--c-secondaryActionBorder)"
+        },
+        "secondaryActionHoverBorder": {
+          "isVar": true,
+          "key": "$secondaryActionHoverBorder",
+          "name": "c-secondaryActionHoverBorder",
+          "val": "#2EC5C9",
+          "variable": "var(--c-secondaryActionHoverBorder)"
+        },
+        "technicalActionText": {
+          "isVar": true,
+          "key": "$technicalActionText",
+          "name": "c-technicalActionText",
+          "val": "#2EC5C9",
+          "variable": "var(--c-technicalActionText)"
+        },
+        "technicalActionBorder": {
+          "isVar": true,
+          "key": "$technicalActionBorder",
+          "name": "c-technicalActionBorder",
+          "val": "#1A8F98",
+          "variable": "var(--c-technicalActionBorder)"
+        },
+        "technicalActionHoverBorder": {
+          "isVar": true,
+          "key": "$technicalActionHoverBorder",
+          "name": "c-technicalActionHoverBorder",
+          "val": "#2EC5C9",
+          "variable": "var(--c-technicalActionHoverBorder)"
+        },
+        "technicalActionGlow": {
+          "isVar": true,
+          "key": "$technicalActionGlow",
+          "name": "c-technicalActionGlow",
+          "val": "rgba(0, 224, 225, 0.22)",
+          "variable": "var(--c-technicalActionGlow)"
         },
         "success": {
           "isVar": true,
@@ -32476,35 +32684,91 @@
           "isVar": true,
           "key": "$1",
           "name": "t-radius-1",
-          "val": 6,
+          "val": 4,
           "variable": "var(--t-radius-1)"
         },
         "2": {
           "isVar": true,
           "key": "$2",
           "name": "t-radius-2",
-          "val": 10,
+          "val": 6,
           "variable": "var(--t-radius-2)"
         },
         "3": {
           "isVar": true,
           "key": "$3",
           "name": "t-radius-3",
-          "val": 14,
+          "val": 10,
           "variable": "var(--t-radius-3)"
         },
         "4": {
           "isVar": true,
           "key": "$4",
           "name": "t-radius-4",
-          "val": 18,
+          "val": 12,
           "variable": "var(--t-radius-4)"
+        },
+        "5": {
+          "isVar": true,
+          "key": "$5",
+          "name": "t-radius-5",
+          "val": 16,
+          "variable": "var(--t-radius-5)"
+        },
+        "xs": {
+          "isVar": true,
+          "key": "$xs",
+          "name": "t-radius-xs",
+          "val": 2,
+          "variable": "var(--t-radius-xs)"
+        },
+        "sm": {
+          "isVar": true,
+          "key": "$sm",
+          "name": "t-radius-sm",
+          "val": 4,
+          "variable": "var(--t-radius-sm)"
+        },
+        "md": {
+          "isVar": true,
+          "key": "$md",
+          "name": "t-radius-md",
+          "val": 6,
+          "variable": "var(--t-radius-md)"
+        },
+        "lg": {
+          "isVar": true,
+          "key": "$lg",
+          "name": "t-radius-lg",
+          "val": 10,
+          "variable": "var(--t-radius-lg)"
+        },
+        "panel": {
+          "isVar": true,
+          "key": "$panel",
+          "name": "t-radius-panel",
+          "val": 12,
+          "variable": "var(--t-radius-panel)"
+        },
+        "xl": {
+          "isVar": true,
+          "key": "$xl",
+          "name": "t-radius-xl",
+          "val": 16,
+          "variable": "var(--t-radius-xl)"
+        },
+        "pill": {
+          "isVar": true,
+          "key": "$pill",
+          "name": "t-radius-pill",
+          "val": 999,
+          "variable": "var(--t-radius-pill)"
         },
         "true": {
           "isVar": true,
           "key": "$true",
           "name": "t-radius-true",
-          "val": 10,
+          "val": 6,
           "variable": "var(--t-radius-true)"
         }
       },
@@ -32565,8 +32829,23 @@
         "secondary": "#B8C7E6",
         "muted": "#6B7A98",
         "accent": "#00E0E1",
+        "signalTealUi": "#2EC5C9",
+        "signalTealMuted": "#1A8F98",
+        "signalTealGlow": "rgba(0, 224, 225, 0.22)",
         "electricBlue": "#3B82F6",
         "gold": "#F2C14E",
+        "primaryActionBg": "#F2C14E",
+        "primaryActionText": "#040F1C",
+        "primaryActionBorder": "#F2C14E",
+        "primaryActionHoverBg": "#F6CF6A",
+        "secondaryActionBg": "transparent",
+        "secondaryActionText": "#EAF1FF",
+        "secondaryActionBorder": "#2A3347",
+        "secondaryActionHoverBorder": "#2EC5C9",
+        "technicalActionText": "#2EC5C9",
+        "technicalActionBorder": "#1A8F98",
+        "technicalActionHoverBorder": "#2EC5C9",
+        "technicalActionGlow": "rgba(0, 224, 225, 0.22)",
         "success": "#22C55E",
         "warning": "#FBBF24",
         "danger": "#EF4444",
@@ -32720,12 +32999,89 @@
         "val": "#6B7A98",
         "variable": "var(--c-muted)"
       },
+      "$color.primaryActionBg": {
+        "isVar": true,
+        "key": "$primaryActionBg",
+        "name": "c-primaryActionBg",
+        "val": "#F2C14E",
+        "variable": "var(--c-primaryActionBg)"
+      },
+      "$color.primaryActionBorder": {
+        "isVar": true,
+        "key": "$primaryActionBorder",
+        "name": "c-primaryActionBorder",
+        "val": "#F2C14E",
+        "variable": "var(--c-primaryActionBorder)"
+      },
+      "$color.primaryActionHoverBg": {
+        "isVar": true,
+        "key": "$primaryActionHoverBg",
+        "name": "c-primaryActionHoverBg",
+        "val": "#F6CF6A",
+        "variable": "var(--c-primaryActionHoverBg)"
+      },
+      "$color.primaryActionText": {
+        "isVar": true,
+        "key": "$primaryActionText",
+        "name": "c-primaryActionText",
+        "val": "#040F1C",
+        "variable": "var(--c-primaryActionText)"
+      },
       "$color.secondary": {
         "isVar": true,
         "key": "$secondary",
         "name": "c-secondary",
         "val": "#B8C7E6",
         "variable": "var(--c-secondary)"
+      },
+      "$color.secondaryActionBg": {
+        "isVar": true,
+        "key": "$secondaryActionBg",
+        "name": "c-secondaryActionBg",
+        "val": "transparent",
+        "variable": "var(--c-secondaryActionBg)"
+      },
+      "$color.secondaryActionBorder": {
+        "isVar": true,
+        "key": "$secondaryActionBorder",
+        "name": "c-secondaryActionBorder",
+        "val": "#2A3347",
+        "variable": "var(--c-secondaryActionBorder)"
+      },
+      "$color.secondaryActionHoverBorder": {
+        "isVar": true,
+        "key": "$secondaryActionHoverBorder",
+        "name": "c-secondaryActionHoverBorder",
+        "val": "#2EC5C9",
+        "variable": "var(--c-secondaryActionHoverBorder)"
+      },
+      "$color.secondaryActionText": {
+        "isVar": true,
+        "key": "$secondaryActionText",
+        "name": "c-secondaryActionText",
+        "val": "#EAF1FF",
+        "variable": "var(--c-secondaryActionText)"
+      },
+      "$color.signalTealGlow": {
+        "isVar": true,
+        "key": "$signalTealGlow",
+        "name": "c-signalTealGlow",
+        "val": "rgba(0, 224, 225, 0.22)",
+        "variable": "var(--c-signalTealGlow)"
+      },
+      "$color.signalTealMuted": {
+        "isVar": true,
+        "key": "$signalTealMuted",
+        "name": "c-signalTealMuted",
+        "val": "#1A8F98",
+        "variable": "var(--c-signalTealMuted)"
+      },
+      "$color.signalTealUi": {
+        "isVar": true,
+        "key": "$signalTealUi",
+        "name": "c-signalTealUi",
+        "val": "#2EC5C9",
+        "variable": "var(--c-signalTealUi)"
       },
       "$color.success": {
         "isVar": true,
@@ -32748,6 +33104,34 @@
         "val": "#1A2233",
         "variable": "var(--c-surfaceElevated)"
       },
+      "$color.technicalActionBorder": {
+        "isVar": true,
+        "key": "$technicalActionBorder",
+        "name": "c-technicalActionBorder",
+        "val": "#1A8F98",
+        "variable": "var(--c-technicalActionBorder)"
+      },
+      "$color.technicalActionGlow": {
+        "isVar": true,
+        "key": "$technicalActionGlow",
+        "name": "c-technicalActionGlow",
+        "val": "rgba(0, 224, 225, 0.22)",
+        "variable": "var(--c-technicalActionGlow)"
+      },
+      "$color.technicalActionHoverBorder": {
+        "isVar": true,
+        "key": "$technicalActionHoverBorder",
+        "name": "c-technicalActionHoverBorder",
+        "val": "#2EC5C9",
+        "variable": "var(--c-technicalActionHoverBorder)"
+      },
+      "$color.technicalActionText": {
+        "isVar": true,
+        "key": "$technicalActionText",
+        "name": "c-technicalActionText",
+        "val": "#2EC5C9",
+        "variable": "var(--c-technicalActionText)"
+      },
       "$color.warning": {
         "isVar": true,
         "key": "$warning",
@@ -32766,36 +33150,92 @@
         "isVar": true,
         "key": "$1",
         "name": "t-radius-1",
-        "val": 6,
+        "val": 4,
         "variable": "var(--t-radius-1)"
       },
       "$radius.2": {
         "isVar": true,
         "key": "$2",
         "name": "t-radius-2",
-        "val": 10,
+        "val": 6,
         "variable": "var(--t-radius-2)"
       },
       "$radius.3": {
         "isVar": true,
         "key": "$3",
         "name": "t-radius-3",
-        "val": 14,
+        "val": 10,
         "variable": "var(--t-radius-3)"
       },
       "$radius.4": {
         "isVar": true,
         "key": "$4",
         "name": "t-radius-4",
-        "val": 18,
+        "val": 12,
         "variable": "var(--t-radius-4)"
+      },
+      "$radius.5": {
+        "isVar": true,
+        "key": "$5",
+        "name": "t-radius-5",
+        "val": 16,
+        "variable": "var(--t-radius-5)"
+      },
+      "$radius.lg": {
+        "isVar": true,
+        "key": "$lg",
+        "name": "t-radius-lg",
+        "val": 10,
+        "variable": "var(--t-radius-lg)"
+      },
+      "$radius.md": {
+        "isVar": true,
+        "key": "$md",
+        "name": "t-radius-md",
+        "val": 6,
+        "variable": "var(--t-radius-md)"
+      },
+      "$radius.panel": {
+        "isVar": true,
+        "key": "$panel",
+        "name": "t-radius-panel",
+        "val": 12,
+        "variable": "var(--t-radius-panel)"
+      },
+      "$radius.pill": {
+        "isVar": true,
+        "key": "$pill",
+        "name": "t-radius-pill",
+        "val": 999,
+        "variable": "var(--t-radius-pill)"
+      },
+      "$radius.sm": {
+        "isVar": true,
+        "key": "$sm",
+        "name": "t-radius-sm",
+        "val": 4,
+        "variable": "var(--t-radius-sm)"
       },
       "$radius.true": {
         "isVar": true,
         "key": "$true",
         "name": "t-radius-true",
-        "val": 10,
+        "val": 6,
         "variable": "var(--t-radius-true)"
+      },
+      "$radius.xl": {
+        "isVar": true,
+        "key": "$xl",
+        "name": "t-radius-xl",
+        "val": 16,
+        "variable": "var(--t-radius-xl)"
+      },
+      "$radius.xs": {
+        "isVar": true,
+        "key": "$xs",
+        "name": "t-radius-xs",
+        "val": 2,
+        "variable": "var(--t-radius-xs)"
       },
       "$size.0": {
         "isVar": true,

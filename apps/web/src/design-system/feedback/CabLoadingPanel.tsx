@@ -13,10 +13,12 @@ export type CabLoadingPanelProps = {
 
 export function CabLoadingPanel({ label }: CabLoadingPanelProps) {
   return (
-    <CabCard>
-      <CabStack alignItems="center" justifyContent="center" gap="$2">
+    <CabCard density="spacious">
+      <CabStack alignItems="center" justifyContent="center" gap="$3">
         <Spinner color={cabColors.brand.signalTeal} />
-        <CabText color={cabColors.text.secondary}>{label}</CabText>
+        <CabText variant="caption" fontSize={12} color={cabColors.text.secondary}>
+          {label}
+        </CabText>
       </CabStack>
     </CabCard>
   );

@@ -8,9 +8,11 @@ Define DS as the only UI import surface for product screens.
 Adopt strict rule: no direct Tamagui, Lucide, Recharts imports outside DS internals.
 2. Expand design tokens to full brand system:
 Implement full brand, surface, text, semantic, spacing, radius, shadow, and z-index tokens.
+Separate raw brand palette from action semantics so Cab Gold is the primary hero/brand CTA fill and Signal Teal remains a signal/data accent.
 3. Integrate font requirements:
 Wire Orbitron for display, Inter for UI/body, IBM Plex Mono for technical data.
 Ensure tabular numerals for financial and technical values.
+Do not apply Orbitron globally; Inter remains the default UI/body font and IBM Plex Mono remains technical-accent only.
 4. Add DS runtime dependencies and lock versions:
 Install and pin icon/chart dependencies and verify compatibility with current stack.
 

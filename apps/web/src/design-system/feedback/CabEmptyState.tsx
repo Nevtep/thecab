@@ -19,19 +19,19 @@ export type CabEmptyStateProps = {
 
 export function CabEmptyState({ title, description, actionLabel, onAction, icon }: CabEmptyStateProps) {
   return (
-    <CabCard>
-      <CabStack alignItems="center" justifyContent="center" gap="$2">
+    <CabCard density="spacious">
+      <CabStack alignItems="center" justifyContent="center" gap="$3">
         {icon ?? <CabIcon name="info" tone="muted" size="lg" />}
-        <CabText variant="heading" color={cabColors.text.primary} textAlign="center">
+        <CabText variant="label" fontSize={13} color={cabColors.text.primary} textAlign="center">
           {title}
         </CabText>
         {description ? (
-          <CabText color={cabColors.text.secondary} textAlign="center">
+          <CabText variant="caption" fontSize={12} color={cabColors.text.secondary} textAlign="center">
             {description}
           </CabText>
         ) : null}
         {actionLabel && onAction ? (
-          <CabButton tone="secondary" onPress={onAction}>
+          <CabButton tone="secondary" controlSize="md" onPress={onAction}>
             {actionLabel}
           </CabButton>
         ) : null}

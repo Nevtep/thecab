@@ -18,21 +18,40 @@ const toneColors: Record<CabBadgeTone, string> = {
 
 export type CabBadgeProps = PropsWithChildren<{
   tone?: CabBadgeTone;
+  size?: "sm" | "md";
 }>;
 
-export function CabBadge({ tone = "neutral", children }: CabBadgeProps) {
+const badgeSizeStyles = {
+  sm: {
+    minHeight: 18,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    fontSize: 10,
+  },
+  md: {
+    minHeight: 22,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    fontSize: 11,
+  },
+} as const;
+
+export function CabBadge({ tone = "neutral", size = "md", children }: CabBadgeProps) {
+  const sizeStyle = badgeSizeStyles[size];
+
   return (
     <XStack
       alignItems="center"
       justifyContent="center"
+      minHeight={sizeStyle.minHeight}
       borderWidth={1}
       borderColor={toneColors[tone]}
-      borderRadius="$2"
-      paddingHorizontal="$2"
-      paddingVertical="$1"
+      borderRadius="$pill"
+      paddingHorizontal={sizeStyle.paddingHorizontal}
+      paddingVertical={sizeStyle.paddingVertical}
       backgroundColor="rgba(255,255,255,0.02)"
     >
-      <CabText variant="body" fontSize="$2" color={cabColors.text.primary}>
+      <CabText variant="label" fontSize={sizeStyle.fontSize} color={cabColors.text.primary}>
         {children}
       </CabText>
     </XStack>

@@ -12,5 +12,9 @@ const toneByCoverage: Record<CabCoverageState, "success" | "info" | "warning" | 
 };
 
 export function CabCoverageBadge({ state, label }: { state: CabCoverageState; label: string }) {
-  return <CabBadge tone={toneByCoverage[state]}>{label}</CabBadge>;
+  return (
+    <CabBadge tone={toneByCoverage[state]} size="sm">
+      {label}
+    </CabBadge>
+  );
 }

@@ -34,9 +34,11 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const fontVariables = `${orbitron.variable} ${inter.variable} ${ibmPlexMono.variable}`;
+
   return (
-    <html lang="en">
-      <body className={`${orbitron.variable} ${inter.variable} ${ibmPlexMono.variable}`}>
+    <html lang="en" className={fontVariables}>
+      <body className={fontVariables}>
         <AppProviders>{children}</AppProviders>
       </body>
     </html>

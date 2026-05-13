@@ -16,11 +16,12 @@ export type CabRangeSelectorProps = {
 
 export function CabRangeSelector({ options, selectedKey, onSelect }: CabRangeSelectorProps) {
   return (
-    <CabStack row gap="$2">
+    <CabStack row gap="$2" flexWrap="wrap">
       {options.map((option) => (
         <CabButton
           key={option.key}
           tone={selectedKey === option.key ? "primary" : "secondary"}
+          controlSize="md"
           onPress={() => onSelect(option.key)}
         >
           {option.label}

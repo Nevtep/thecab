@@ -3,20 +3,47 @@
 import type { ComponentProps } from "react";
 import { Text } from "tamagui";
 
-import { cabFonts } from "@/design-system/tokens";
+import { cabFonts, cabFontWeights } from "@/design-system/tokens";
 
-type CabTextVariant = "display" | "heading" | "body" | "data";
+type CabTextVariant =
+  | "display"
+  | "heading"
+  | "body"
+  | "label"
+  | "caption"
+  | "kpi"
+  | "data"
+  | "mono";
 
 export type CabTextProps = ComponentProps<typeof Text> & {
   variant?: CabTextVariant;
 };
 
 const variantStyles: Record<CabTextVariant, ComponentProps<typeof Text>> = {
-  display: { fontFamily: cabFonts.brand, letterSpacing: 0.2 },
-  heading: { fontFamily: cabFonts.heading, letterSpacing: 0.1 },
-  body: { fontFamily: cabFonts.body },
+  display: {
+    fontFamily: cabFonts.display,
+    letterSpacing: 0.2,
+    fontWeight: cabFontWeights.bold,
+  },
+  heading: {
+    fontFamily: cabFonts.heading,
+    letterSpacing: 0.1,
+    fontWeight: cabFontWeights.semibold,
+  },
+  body: { fontFamily: cabFonts.body, fontWeight: cabFontWeights.regular },
+  label: { fontFamily: cabFonts.ui, fontWeight: cabFontWeights.medium },
+  caption: { fontFamily: cabFonts.ui, fontWeight: cabFontWeights.regular },
+  kpi: {
+    fontFamily: cabFonts.ui,
+    fontWeight: cabFontWeights.semibold,
+    fontVariant: ["tabular-nums"],
+  },
   data: {
-    fontFamily: cabFonts.dataAccent,
+    fontFamily: cabFonts.data,
+    fontVariant: ["tabular-nums"],
+  },
+  mono: {
+    fontFamily: cabFonts.mono,
     fontVariant: ["tabular-nums"],
   },
 };

@@ -8,7 +8,7 @@ export function CabStrategyCard({ title, value }: { title: string; value: string
   return (
     <CabCard>
       <CabStack>
-        <CabText variant="heading">{title}</CabText>
+        <CabText variant="label">{title}</CabText>
         <CabText variant="data">{value}</CabText>
       </CabStack>
     </CabCard>

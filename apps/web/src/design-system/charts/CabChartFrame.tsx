@@ -15,15 +15,15 @@ export type CabChartFrameProps = PropsWithChildren<{
 
 export function CabChartFrame({ title, subtitle, height = 280, children }: CabChartFrameProps) {
   return (
-    <CabCard>
-      <CabStack gap="$2">
+    <CabCard density="default">
+      <CabStack gap="$3">
         {title ? (
-          <CabText variant="heading" color={cabColors.text.primary} fontSize="$4">
+          <CabText variant="label" color={cabColors.text.primary} fontSize={15}>
             {title}
           </CabText>
         ) : null}
         {subtitle ? (
-          <CabText color={cabColors.text.muted} fontSize="$2">
+          <CabText variant="caption" color={cabColors.text.muted} fontSize={12}>
             {subtitle}
           </CabText>
         ) : null}

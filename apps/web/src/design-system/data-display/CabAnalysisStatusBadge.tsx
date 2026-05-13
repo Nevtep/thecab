@@ -14,5 +14,9 @@ const toneByStatus: Record<CabAnalysisStatus, "neutral" | "info" | "success" | "
 };
 
 export function CabAnalysisStatusBadge({ status, label }: { status: CabAnalysisStatus; label: string }) {
-  return <CabBadge tone={toneByStatus[status]}>{label}</CabBadge>;
+  return (
+    <CabBadge tone={toneByStatus[status]} size="sm">
+      {label}
+    </CabBadge>
+  );
 }
