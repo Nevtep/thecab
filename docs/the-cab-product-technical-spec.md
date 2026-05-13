@@ -1,8 +1,8 @@
-# The Cab — Product & Technical Specification v1.4.2
+# The Cab — Product & Technical Specification v1.4.3
 
 ## Version
 
-- **Document version:** v1.4.2
+- **Document version:** v1.4.3
 - **Product:** The Cab
 - **Scope:** Product technical specification
 - **Primary chain:** Base mainnet for Product v1
@@ -13,6 +13,7 @@
 - **Wallet:** WalletConnect + wagmi
 - **Background jobs:** Trigger.dev
 - **Design System:** Internal The Cab DS built on Tamagui wrappers
+- **Localization:** i18next; English default; Spanish secondary; browser language detection
 
 ---
 
@@ -1090,6 +1091,238 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
 ---
 
 
+## 2.17 Internationalization and localization
+
+The Cab must support internationalization from the beginning.
+
+Product v1 languages:
+
+- English: default/base language.
+- Spanish: secondary supported language.
+
+The app should display in the browser language when supported.
+
+Language resolution priority:
+
+1. Explicit user-selected language, if a language selector/user preference is added.
+2. Browser language / locale detection.
+3. English fallback.
+
+Use:
+
+- `i18next`
+- `react-i18next`
+- browser language detection
+
+Recommended packages:
+
+```txt
+i18next
+react-i18next
+i18next-browser-languagedetector
+```
+
+### No hardcoded product copy
+
+Product copy must not be hardcoded in components, containers, API-facing UI errors, empty states, chart labels, sidebar labels, tooltips, table headers, filters, buttons, badges, toasts, or validation messages.
+
+All user-facing copy must come from translation resources.
+
+Forbidden:
+
+```tsx
+<CabButton>Analyze wallet</CabButton>
+<CabEmptyState title="No Aerodrome activity detected" />
+```
+
+Required:
+
+```tsx
+const { t } = useTranslation("analysis");
+
+<CabButton>{t("cta.analyzeWallet")}</CabButton>
+<CabEmptyState title={t("empty.noAerodromeActivity")} />
+```
+
+### Supported locale codes
+
+Use:
+
+```txt
+en
+es
+```
+
+English is the canonical source language.
+
+Spanish translations should be complete enough that the product can be used comfortably by Spanish-speaking users.
+
+### Translation namespaces
+
+Use namespaces by product area to avoid one giant translation file.
+
+Required namespaces:
+
+```txt
+common
+navigation
+landing
+wallet
+overview
+analysis
+pools
+deposits
+strategies
+rewards
+governance
+activity
+settings
+errors
+validation
+coverage
+charts
+```
+
+Suggested structure:
+
+```txt
+src/i18n/
+  index.ts
+  config.ts
+  resources/
+    en/
+      common.json
+      navigation.json
+      landing.json
+      wallet.json
+      overview.json
+      analysis.json
+      pools.json
+      deposits.json
+      strategies.json
+      rewards.json
+      governance.json
+      activity.json
+      settings.json
+      errors.json
+      validation.json
+      coverage.json
+      charts.json
+    es/
+      common.json
+      navigation.json
+      landing.json
+      wallet.json
+      overview.json
+      analysis.json
+      pools.json
+      deposits.json
+      strategies.json
+      rewards.json
+      governance.json
+      activity.json
+      settings.json
+      errors.json
+      validation.json
+      coverage.json
+      charts.json
+```
+
+### Browser localization
+
+The app should detect browser language and choose the best supported language.
+
+Rules:
+
+- If browser locale starts with `es`, use Spanish.
+- If browser locale starts with `en`, use English.
+- If browser locale is unsupported, fallback to English.
+- Locale detection must run on the client without causing hydration instability.
+- If SSR/server rendering is used for localized content, the selected locale must be resolved consistently between server and client.
+
+### Formatting localization
+
+Numbers, currency, percentages, and dates must use locale-aware formatting.
+
+Use `Intl.NumberFormat` and `Intl.DateTimeFormat` through internal formatting helpers.
+
+Required helpers:
+
+```ts
+formatUsd(value, locale)
+formatTokenAmount(value, locale)
+formatPercent(value, locale)
+formatDateTime(value, locale)
+formatRelativeTime(value, locale)
+```
+
+Rules:
+
+- Do not hardcode comma/period number formatting.
+- Financial values should use tabular numerals in UI.
+- USD remains the main valuation currency, but formatting should respect locale.
+- Dates/times should respect browser/user locale where appropriate.
+
+### i18n in Design System
+
+Design System primitives should not own product copy.
+
+DS components may receive translated strings as props:
+
+```tsx
+<CabMetricCard label={t("metrics.netPortfolioValue")} />
+```
+
+DS components may own generic accessibility labels only if they are passed through i18n-aware props or centralized common translations.
+
+### i18n in containers/components
+
+Containers may call `useTranslation` and pass translated copy to `.component` files.
+
+Presentational `.component` files may also call `useTranslation` only for local display strings if this does not mix state/data logic into the component.
+
+Preferred pattern:
+
+- containers prepare data and event handlers;
+- components render translated labels using namespace keys or receive translated labels as props;
+- no component should contain hardcoded user-facing English copy.
+
+### Translation key rules
+
+Translation keys should be semantic, not full English phrases.
+
+Preferred:
+
+```json
+{
+  "cta": {
+    "analyzeWallet": "Analyze wallet"
+  }
+}
+```
+
+Avoid:
+
+```json
+{
+  "Analyze wallet": "Analyze wallet"
+}
+```
+
+### Acceptance criteria
+
+The implementation is not acceptable if:
+
+- product UI contains hardcoded user-facing copy;
+- sidebar labels are hardcoded;
+- chart labels are hardcoded;
+- table headers are hardcoded;
+- error/empty/loading states are hardcoded;
+- English and Spanish resource files do not share the same key structure;
+- browser locale is ignored;
+- unsupported locales do not fallback to English.
+
+
 # 3. Core Product Terminology
 
 The Cab must use precise terminology to avoid mixing different analytical units.
@@ -1584,6 +1817,69 @@ All wallet-specific endpoints must validate:
 - Analysis availability for deep routes.
 
 
+## 6.x Internationalization architecture
+
+The app must use `i18next` and `react-i18next` for internationalization.
+
+English is the base language. Spanish is the second supported language.
+
+### Required files
+
+```txt
+src/i18n/config.ts
+src/i18n/index.ts
+src/i18n/resources/en/*.json
+src/i18n/resources/es/*.json
+src/i18n/useAppLocale.ts
+src/i18n/formatters.ts
+```
+
+### App provider
+
+The app must initialize i18next in a provider included in the app root.
+
+Suggested structure:
+
+```tsx
+// src/app/providers.tsx
+"use client";
+
+export function AppProviders({ children }: { children: React.ReactNode }) {
+  return (
+    <I18nProvider>
+      <QueryClientProvider client={queryClient}>
+        {children}
+      </QueryClientProvider>
+    </I18nProvider>
+  );
+}
+```
+
+### Locale storage
+
+If language switching is added, persist the selected language in local storage or user settings.
+
+Resolution priority:
+
+```txt
+user preference -> browser locale -> English fallback
+```
+
+### Namespace loading
+
+Use namespace-based resources.
+
+Feature code should load/use the namespace for its section:
+
+```ts
+useTranslation("pools")
+useTranslation("strategies")
+useTranslation("activity")
+```
+
+Shared UI terms should live in `common` or `navigation`.
+
+
 ## 6.7 Frontend state architecture
 
 The frontend must follow a layered state architecture.
@@ -1664,6 +1960,8 @@ Responsibilities:
 
 Components must not:
 
+- Contain hardcoded user-facing copy.
+- Bypass translation resources for labels, buttons, empty states, errors, or chart text.
 - Call TanStack Query directly.
 - Call Zustand stores directly.
 - Call wagmi directly.
@@ -1888,6 +2186,8 @@ A `.container` file should be replaceable in isolation without rewriting visual 
 
 This rule exists to make The Cab easier to maintain, easier to refactor, and safer for AI-assisted development.
 
+Translation resources are the only allowed source of user-facing copy.
+
 
 ---
 
@@ -1903,6 +2203,7 @@ The UI must integrate:
 - **Google Fonts** for the brand font stack.
 - **Lucide React** as the icon library.
 - **Recharts** as the charting library.
+- **i18next/react-i18next** for localized user-facing copy.
 - Brand tokens derived from The Cab brand specification.
 - Reusable components for dashboard surfaces.
 - Consistent spacing, typography, surfaces, charts, and semantic states.
@@ -5755,6 +6056,13 @@ Deliver:
 
 # 15. Acceptance Criteria Summary
 
+- i18n is implemented with i18next/react-i18next.
+- English is the default/base language and Spanish is the secondary supported language.
+- Browser locale detection selects Spanish for `es*` locales and English for `en*` or unsupported locales.
+- No user-facing product copy is hardcoded in components, containers, charts, sidebar labels, empty states, errors, or validation messages.
+- English and Spanish translation resources share the same key structure.
+- Numbers, dates, currency, percentages, and token amounts use locale-aware formatting helpers.
+
 - Product v1 remains Base mainnet only, but the domain and persistence model are chain-aware from day one.
 - Address-based protocol entities are keyed by `chainId + address`, never address alone.
 - Provider clients, API routes, query keys, analysis jobs, and database unique constraints include or derive `chainId`.
@@ -5830,6 +6138,7 @@ Do not add unapproved providers for pricing or wallet analytics.
 When implementing this spec, prioritize:
 
 1. Chain-aware domain and provider boundaries despite Product v1 being Base-only.
+2. Internationalization resources and no hardcoded product copy.
 2. Fast connected Overview.
 2. Clear async analysis status.
 3. Correct DS boundaries and no direct third-party UI imports in product screens.

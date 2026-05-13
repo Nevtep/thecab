@@ -1,8 +1,8 @@
-# The Cab — Feature Feasibility & Implementation Architecture v1.1
+# The Cab — Feature Feasibility & Implementation Architecture v1.2
 
 ## Document role
 
-This document complements **The Cab Product & Technical Specification v1.4.2 Multi-chain**.
+This document complements **The Cab Product & Technical Specification v1.4.3**.
 
 It translates the product spec into an implementation-oriented feasibility plan.
 
@@ -17,7 +17,8 @@ For each feature, it defines:
 - how the UI should display the result;
 - implementation risks;
 - confidence and coverage rules;
-- chain-aware implementation requirements.
+- chain-aware implementation requirements;
+- internationalization/localization implementation requirements.
 
 This document is intended to guide AI-assisted coding by preventing:
 
@@ -26,13 +27,15 @@ This document is intended to guide AI-assisted coding by preventing:
 - incorrect assumptions about public APIs;
 - Base-only assumptions leaking into the domain model;
 - address-only database identities;
-- UI sections consuming provider data directly instead of normalized domain data.
+- UI sections consuming provider data directly instead of normalized domain data;
+- hardcoded user-facing copy;
+- inconsistent English/Spanish translation resources.
 
 ---
 
 # 0. Executive summary
 
-The Cab is feasible as a product, but the implementation must be split into two layers:
+The Cab is feasible as a product, but the implementation must be split into these layers:
 
 ```txt
 Fast API layer
@@ -42,43 +45,54 @@ Fast API layer
 Protocol reconstruction layer
   -> uses RPC, event logs, contract reads, ABIs, official protocol metadata
   -> powers Pools, Deposits, Strategies, Rewards, Governance, Activity
+
+Localization layer
+  -> uses i18next + react-i18next + browser language detection
+  -> powers all user-facing copy, labels, tooltips, empty states, errors, charts, and formatting
 ```
 
 Product v1 remains **Base mainnet only**, but the implementation must be **chain-aware from day one**.
 
-This means:
+Product v1 languages:
 
 ```txt
-Product scope v1: Base mainnet
-Architecture: chain-aware
-Domain identity: chainId + address
-Provider calls: chainId-derived
-Query keys: chainId-scoped
-API routes: chainId-aware
-DB constraints: chainId-aware
+Default/base language: English
+Secondary language:    Spanish
+Locale selection:      browser language detection
+Fallback:              English
 ```
 
-The APIs are useful, but they are not sufficient for full Aerodrome/Mellow analytics.
+The app must not be built as:
+
+```txt
+hardcoded English copy -> UI
+```
+
+It must be built as:
+
+```txt
+translation keys -> i18next resources -> localized UI
+```
 
 ---
 
 # 1. High-level feasibility
 
-| Feature | Feasibility | Moralis / Alchemy enough? | RPC required? | Chain-aware requirement |
-|---|---:|---:|---:|---|
-| Landing | High | N/A | No | No chain state beyond copy. |
-| Wallet connection | High | N/A | No | Enforce Base for v1; preserve chain state. |
-| Overview recent dashboard | High | Mostly yes | Optional | Query and prices scoped by `chainId`. |
-| Analysis status | High | N/A | No | `AnalysisRun = walletAddress + chainId`. |
-| Pools | Medium | No | Yes | `Pool = chainId + poolAddress`. |
-| Deposits | Medium | No | Yes | NFT identity requires `chainId + contract + tokenId`. |
-| Strategies / Mellow | Medium-Low initially | No | Yes | `Strategy = chainId + wrapper/vault/strategy address`. |
-| Rewards | Medium | Partially | Yes | Reward scope must include `chainId`. |
-| Governance | Medium | Partially | Yes | veAERO/Voter/fees/bribes are chain-scoped. |
-| Activity raw | High | Partially | Optional | `Activity = chainId + txHash + logIndex/event`. |
-| Activity enriched | Medium | Partially | Yes | Requires chain-scoped decoding. |
-| Settings | High | N/A | No | Settings may default by chain. |
-| Background analysis | Medium | Partially | Yes | Every run scoped to wallet + chain. |
+| Feature | Feasibility | Moralis / Alchemy enough? | RPC required? | Chain-aware requirement | i18n requirement |
+|---|---:|---:|---:|---|---|
+| Landing | High | N/A | No | No chain state beyond copy | Fully localized EN/ES |
+| Wallet connection | High | N/A | No | Enforce Base for v1; preserve chain state | Localized wallet states/errors |
+| Overview recent dashboard | High | Mostly yes | Optional | Query and prices scoped by `chainId` | Localized labels/charts/formatting |
+| Analysis status | High | N/A | No | `AnalysisRun = walletAddress + chainId` | Localized statuses/toasts |
+| Pools | Medium | No | Yes | `Pool = chainId + poolAddress` | Localized table headers, filters, empty states |
+| Deposits | Medium | No | Yes | NFT identity requires `chainId + contract + tokenId` | Localized lifecycle labels |
+| Strategies / Mellow | Medium-Low initially | No | Yes | `Strategy = chainId + wrapper/vault/strategy address` | Localized coverage and strategy labels |
+| Rewards | Medium | Partially | Yes | Reward scope must include `chainId` | Localized reward sources and metrics |
+| Governance | Medium | Partially | Yes | veAERO/Voter/fees/bribes are chain-scoped | Localized governance events |
+| Activity raw | High | Partially | Optional | `Activity = chainId + txHash + logIndex/event` | Localized event type display |
+| Activity enriched | Medium | Partially | Yes | Requires chain-scoped decoding | Localized classification labels |
+| Settings | High | N/A | No | Settings may default by chain | Localized language settings |
+| Background analysis | Medium | Partially | Yes | Every run scoped to wallet + chain | Localized run stages/errors in UI |
 
 ---
 
@@ -286,9 +300,482 @@ because they will break in a future multi-chain version.
 
 ---
 
-# 3. Provider strategy
+# 3. Internationalization and localization architecture
 
-## 3.1 Moralis
+## 3.1 Product language requirements
+
+Product v1 supported languages:
+
+```txt
+en = English, default/base language
+es = Spanish, secondary language
+```
+
+Locale resolution priority:
+
+```txt
+explicit user preference -> browser locale -> English fallback
+```
+
+The app should display in the browser language when supported:
+
+- `es*` browser locales should use Spanish.
+- `en*` browser locales should use English.
+- unsupported locales should fallback to English.
+
+## 3.2 Required libraries
+
+Use:
+
+```txt
+i18next
+react-i18next
+i18next-browser-languagedetector
+```
+
+Recommended optional helper:
+
+```txt
+i18next-resources-to-backend
+```
+
+Only add the optional helper if dynamic namespace loading is needed.
+
+Do not introduce another localization framework unless explicitly approved.
+
+## 3.3 Required file structure
+
+```txt
+src/i18n/
+  config.ts
+  index.ts
+  I18nProvider.tsx
+  useAppLocale.ts
+  formatters.ts
+  resources/
+    en/
+      common.json
+      navigation.json
+      landing.json
+      wallet.json
+      overview.json
+      analysis.json
+      pools.json
+      deposits.json
+      strategies.json
+      rewards.json
+      governance.json
+      activity.json
+      settings.json
+      errors.json
+      validation.json
+      coverage.json
+      charts.json
+    es/
+      common.json
+      navigation.json
+      landing.json
+      wallet.json
+      overview.json
+      analysis.json
+      pools.json
+      deposits.json
+      strategies.json
+      rewards.json
+      governance.json
+      activity.json
+      settings.json
+      errors.json
+      validation.json
+      coverage.json
+      charts.json
+```
+
+## 3.4 i18next configuration
+
+Suggested config responsibilities:
+
+- set fallback language to `en`;
+- support `en` and `es`;
+- detect browser language;
+- normalize locales to base language codes;
+- avoid hydration mismatches;
+- load all required namespaces for product v1 or lazy-load by route if implemented carefully.
+
+Suggested config shape:
+
+```ts
+export const SUPPORTED_LOCALES = ["en", "es"] as const;
+export const DEFAULT_LOCALE = "en";
+
+export function normalizeLocale(input?: string): "en" | "es" {
+  if (!input) return "en";
+  if (input.toLowerCase().startsWith("es")) return "es";
+  if (input.toLowerCase().startsWith("en")) return "en";
+  return "en";
+}
+```
+
+Browser detector settings should map regional variants:
+
+```txt
+es-AR -> es
+es-ES -> es
+en-US -> en
+en-GB -> en
+```
+
+## 3.5 App provider
+
+The app root provider should compose i18n with the existing app providers.
+
+Suggested structure:
+
+```tsx
+// src/app/providers.tsx
+"use client";
+
+export function AppProviders({ children }: { children: React.ReactNode }) {
+  return (
+    <I18nProvider>
+      <QueryClientProvider client={queryClient}>
+        {children}
+      </QueryClientProvider>
+    </I18nProvider>
+  );
+}
+```
+
+If wallet providers or theme providers are also used, the final composition should keep i18n available to all visual surfaces:
+
+```tsx
+<I18nProvider>
+  <CabThemeProvider>
+    <CabWalletProvider>
+      <QueryClientProvider client={queryClient}>
+        {children}
+      </QueryClientProvider>
+    </CabWalletProvider>
+  </CabThemeProvider>
+</I18nProvider>
+```
+
+## 3.6 No hardcoded copy rule
+
+No user-facing product copy may be hardcoded.
+
+This applies to:
+
+- page titles;
+- sidebar labels;
+- button labels;
+- tabs;
+- breadcrumbs;
+- cards;
+- metric labels;
+- chart labels;
+- chart tooltips;
+- table headers;
+- filters;
+- badges;
+- empty states;
+- loading states;
+- error states;
+- toast messages;
+- analysis stages;
+- coverage labels;
+- event type labels;
+- validation messages;
+- accessibility labels where user-facing.
+
+Forbidden:
+
+```tsx
+<CabButton>Analyze wallet</CabButton>
+<CabEmptyState title="No Aerodrome activity detected" />
+<CabMetricCard label="Net Portfolio Value" />
+```
+
+Required:
+
+```tsx
+const { t } = useTranslation("analysis");
+
+<CabButton>{t("cta.analyzeWallet")}</CabButton>
+<CabEmptyState title={t("empty.noAerodromeActivity")} />
+<CabMetricCard label={t("metrics.netPortfolioValue")} />
+```
+
+## 3.7 Translation namespaces
+
+Use namespaces by product area.
+
+Required namespaces:
+
+| Namespace | Responsibility |
+|---|---|
+| `common` | shared labels, actions, generic UI |
+| `navigation` | sidebar, top nav, route labels |
+| `landing` | public landing content |
+| `wallet` | connect/disconnect/network states |
+| `overview` | dashboard overview |
+| `analysis` | analysis CTA/status/stages |
+| `pools` | pool list/detail |
+| `deposits` | deposit list/detail/lifecycle |
+| `strategies` | Mellow/strategy UI |
+| `rewards` | rewards/claims |
+| `governance` | veAERO/votes/fees/bribes |
+| `activity` | transaction ledger/event labels |
+| `settings` | settings/diagnostics |
+| `errors` | app/provider/domain errors |
+| `validation` | form validation |
+| `coverage` | confidence/coverage states |
+| `charts` | chart labels/tooltips/legends |
+
+## 3.8 Translation key rules
+
+Keys must be semantic, not full English phrases.
+
+Preferred:
+
+```json
+{
+  "cta": {
+    "analyzeWallet": "Analyze wallet"
+  }
+}
+```
+
+Avoid:
+
+```json
+{
+  "Analyze wallet": "Analyze wallet"
+}
+```
+
+Key naming rules:
+
+- use camelCase;
+- group by UI role;
+- avoid protocol addresses in keys;
+- avoid dynamic data inside keys;
+- interpolate variables using i18next interpolation.
+
+Example:
+
+```json
+{
+  "analysis": {
+    "status": {
+      "running": "Analyzing {{walletShort}}…",
+      "ready": "Analysis ready"
+    }
+  }
+}
+```
+
+## 3.9 Namespace implementation by feature
+
+### Navigation
+
+```ts
+useTranslation("navigation")
+```
+
+Example keys:
+
+```json
+{
+  "items": {
+    "overview": "Overview",
+    "pools": "Pools",
+    "deposits": "Deposits",
+    "strategies": "Strategies",
+    "rewards": "Rewards",
+    "governance": "Governance",
+    "activity": "Activity",
+    "settings": "Settings"
+  }
+}
+```
+
+### Analysis
+
+```ts
+useTranslation("analysis")
+```
+
+Use for:
+
+- CTA labels;
+- status badges;
+- polling labels;
+- run stages;
+- stale/failed/ready states.
+
+### Coverage
+
+```ts
+useTranslation("coverage")
+```
+
+Use for:
+
+- `full`;
+- `share_level`;
+- `partial`;
+- `unknown`;
+- confidence labels;
+- partial data warnings.
+
+### Activity
+
+```ts
+useTranslation("activity")
+```
+
+Use for event labels such as:
+
+- `strategy_deposit`;
+- `strategy_withdraw`;
+- `strategy_share_mint`;
+- `strategy_internal_rebalance`;
+- `rebalance`;
+- `claim_reward`;
+- `lock_aero`.
+
+## 3.10 Locale-aware formatting
+
+All numbers, currency, percentages, token amounts, and dates must use locale-aware helpers.
+
+Required file:
+
+```txt
+src/i18n/formatters.ts
+```
+
+Required helpers:
+
+```ts
+formatUsd(value: number, locale: string): string
+formatTokenAmount(value: number, locale: string, options?: TokenFormatOptions): string
+formatPercent(value: number, locale: string): string
+formatDateTime(value: Date | string, locale: string): string
+formatRelativeTime(value: Date | string, locale: string): string
+formatCompactNumber(value: number, locale: string): string
+```
+
+Use:
+
+- `Intl.NumberFormat`
+- `Intl.DateTimeFormat`
+- `Intl.RelativeTimeFormat`
+
+Rules:
+
+- Do not hardcode comma/period formatting.
+- Do not use `toFixed()` directly in UI components.
+- USD remains the main valuation currency.
+- Token amounts may need precision control but must still respect locale.
+- Financial values should use tabular numerals in UI.
+
+## 3.11 Design System integration
+
+Design System primitives should not own product-specific copy.
+
+DS components should receive localized strings as props:
+
+```tsx
+<CabMetricCard label={t("metrics.netPortfolioValue")} />
+```
+
+Acceptable DS-owned generic labels must come from:
+
+- props; or
+- centralized `common` translations passed from wrappers.
+
+DS components must not hardcode product terms such as:
+
+- Overview;
+- Pools;
+- Deposits;
+- Strategies;
+- Analyze wallet;
+- No activity;
+- Ready;
+- Partial coverage.
+
+## 3.12 Container/component pattern with i18n
+
+The app uses `.container.tsx` for state orchestration and `.component.tsx` for presentational rendering.
+
+i18n rule:
+
+- Containers may call `useTranslation` and pass translated strings to components.
+- Components may call `useTranslation` for local display strings if they remain presentational.
+- Neither containers nor components may hardcode user-facing copy.
+
+Preferred for complex pages:
+
+```txt
+Container:
+  - fetch data
+  - prepare callbacks
+  - prepare view model
+  - optionally prepare translated labels
+
+Component:
+  - render UI from props
+  - use DS components
+  - no data fetching
+  - no hardcoded copy
+```
+
+## 3.13 Testing and linting for i18n
+
+Add checks to prevent hardcoded copy.
+
+Recommended checks:
+
+- ESLint rule or custom script scanning `.tsx` for string literals in JSX.
+- Translation key parity check between `en` and `es`.
+- Unit tests for `normalizeLocale`.
+- Unit tests for formatters.
+- Storybook/visual QA in both `en` and `es` if Storybook is added.
+
+Suggested script:
+
+```txt
+pnpm i18n:check
+```
+
+Responsibilities:
+
+- ensure every English namespace file has matching Spanish file;
+- ensure key structure parity;
+- report missing translations;
+- optionally report unused keys.
+
+## 3.14 i18n acceptance criteria
+
+The implementation is not acceptable if:
+
+- product UI contains hardcoded user-facing copy;
+- sidebar labels are hardcoded;
+- chart labels are hardcoded;
+- table headers are hardcoded;
+- empty/error/loading states are hardcoded;
+- English and Spanish resource files do not share the same key structure;
+- browser locale is ignored;
+- unsupported locales do not fallback to English;
+- numbers, dates, currencies, percentages, or token amounts are formatted manually in UI components.
+
+---
+
+# 4. Provider strategy
+
+## 4.1 Moralis
 
 Use Moralis primarily for wallet-centric data and fast discovery.
 
@@ -386,7 +873,7 @@ Important:
 
 ---
 
-## 3.2 Alchemy
+## 4.2 Alchemy
 
 Use Alchemy primarily for pricing and RPC-backed reconstruction.
 
@@ -520,7 +1007,7 @@ Persist into:
 
 ---
 
-## 3.3 Data source hierarchy
+## 4.3 Data source hierarchy
 
 The implementation should use this source hierarchy:
 
@@ -551,9 +1038,9 @@ Rules:
 
 ---
 
-# 4. Shared ingestion architecture
+# 5. Shared ingestion architecture
 
-## 4.1 Background analysis flow
+## 5.1 Background analysis flow
 
 ```txt
 POST /api/analysis/start
@@ -581,7 +1068,7 @@ Trigger.dev analyze-wallet
   -> mark AnalysisRun ready/failed
 ```
 
-## 4.2 Required ingestion modules
+## 5.2 Required ingestion modules
 
 ```txt
 src/server/providers/moralis/
@@ -633,7 +1120,7 @@ src/server/analysis/
   computeSnapshots.ts
 ```
 
-## 4.3 Persistence flow
+## 5.3 Persistence flow
 
 Raw data is persisted first, domain entities second.
 
@@ -659,11 +1146,11 @@ Do not skip `RawProviderRecord`: it is required for debugging, reclassification,
 
 ---
 
-# 5. Feature feasibility and implementation
+# 6. Feature feasibility and implementation
 
 ---
 
-## 5.1 Landing
+## 6.1 Landing
 
 ### Feasibility
 
@@ -677,9 +1164,31 @@ No external data required.
 - Future copy should be adaptable to Aero multi-chain.
 - No chain state is required in static landing content.
 
+### i18n requirements
+
+Landing must be fully localized.
+
+Namespace:
+
+```txt
+landing
+```
+
+Required localized content:
+
+- hero headline;
+- hero body;
+- CTA labels;
+- feature cards;
+- how analysis works;
+- trust/privacy copy;
+- footer text.
+
+No landing copy may be hardcoded in page components.
+
 ### Implementation
 
-Use static content and internal Design System components.
+Use static content, translation resources, and internal Design System components.
 
 ### Display
 
@@ -695,7 +1204,7 @@ Low.
 
 ---
 
-## 5.2 Wallet connection
+## 6.2 Wallet connection
 
 ### Feasibility
 
@@ -716,6 +1225,25 @@ No Moralis/Alchemy required for connection itself.
 - Product v1 must enforce Base mainnet.
 - Wrong-network state should instruct the user to switch to Base.
 - The wallet adapter should not hide `chainId`.
+
+### i18n requirements
+
+Namespaces:
+
+```txt
+wallet
+errors
+```
+
+Localized content:
+
+- connect wallet;
+- disconnect;
+- wrong network;
+- switch to Base;
+- connection failed;
+- wallet unsupported;
+- connected wallet label.
 
 ### Implementation
 
@@ -750,10 +1278,11 @@ switchToSupportedChain()
 
 - Wrong network handling.
 - Wallet state must not leak raw wagmi usage into feature components.
+- Wallet errors must be localized.
 
 ---
 
-## 5.3 Overview
+## 6.3 Overview
 
 ### Feasibility
 
@@ -805,6 +1334,35 @@ Required only when showing analyzed data from the historical layer.
 - API route: `/api/wallet/overview?chainId=8453`.
 - Prices keyed by `chainId + tokenAddress`.
 - Portfolio snapshot keyed by `walletAddress + chainId + timestamp`.
+
+### i18n requirements
+
+Namespace:
+
+```txt
+overview
+charts
+common
+coverage
+```
+
+Localized content:
+
+- metric labels;
+- chart labels;
+- chart legends;
+- chart tooltips;
+- empty states;
+- loading states;
+- coverage badges;
+- recent/analyzed view labels.
+
+Formatting:
+
+- USD values through `formatUsd`;
+- percentages through `formatPercent`;
+- dates through `formatDateTime`;
+- token balances through `formatTokenAmount`.
 
 ### Persisted data
 
@@ -862,10 +1420,11 @@ After full analysis:
 - Moralis portfolio values may include non-Aerodrome assets; filter relevant assets clearly.
 - Moralis DeFi positions may not support every Aerodrome/Mellow surface.
 - Avoid presenting recent API data as final PnL.
+- Chart labels/tooltips often get hardcoded by AI; enforce translation resources.
 
 ---
 
-## 5.4 Pools
+## 6.4 Pools
 
 ### Feasibility
 
@@ -917,6 +1476,29 @@ Required RPC/log sources:
 - Router metadata: `chainId + routerAddress`.
 - Query key: `["pools", chainId, walletAddress, filters]`.
 - API route: `/api/pools?chainId=8453`.
+
+### i18n requirements
+
+Namespace:
+
+```txt
+pools
+coverage
+charts
+common
+```
+
+Localized content:
+
+- pool list title;
+- detail page labels;
+- table headers;
+- filters;
+- manual deposits group;
+- automated strategies group;
+- residual attribution group;
+- rebalance timeline labels;
+- coverage states.
 
 ### Persisted data
 
@@ -1005,10 +1587,11 @@ Each automated strategy row should show:
 - Gauge-to-pool and reward-to-pool mapping need contract reads/events.
 - Mellow pool association should prefer official Mellow metadata.
 - Residual attribution must avoid over-consuming balances.
+- Pool labels and fallback names must be localized where possible, but protocol symbols remain raw.
 
 ---
 
-## 5.5 Deposits
+## 6.5 Deposits
 
 ### Feasibility
 
@@ -1061,6 +1644,27 @@ Required:
 - NFT identity must be `chainId + contractAddress + tokenId`.
 - Query key: `["deposits", chainId, walletAddress, filters]`.
 - API route: `/api/deposits?chainId=8453`.
+
+### i18n requirements
+
+Namespace:
+
+```txt
+deposits
+activity
+coverage
+common
+```
+
+Localized content:
+
+- lifecycle event labels;
+- deposit status labels;
+- table headers;
+- filters;
+- empty states;
+- action labels;
+- partial history warnings.
 
 ### Persisted data
 
@@ -1126,10 +1730,11 @@ Deposit detail:
 - Missing decoded input may require selector/ABI decoding.
 - Partial history if deposit existed before one-year window.
 - Do not create Deposit from Mellow activity unless wallet owns underlying NFT.
+- Lifecycle labels must be translated from event type keys, not hardcoded.
 
 ---
 
-## 5.6 Strategies
+## 6.6 Strategies
 
 ### Feasibility
 
@@ -1186,6 +1791,29 @@ Required:
 - Official Mellow metadata must be stored per chain.
 - Query key: `["strategies", chainId, walletAddress, filters]`.
 - API route: `/api/strategies?chainId=8453`.
+
+### i18n requirements
+
+Namespace:
+
+```txt
+strategies
+coverage
+activity
+charts
+common
+```
+
+Localized content:
+
+- strategy list labels;
+- strategy detail sections;
+- user exposure labels;
+- lifecycle timeline labels;
+- internal strategy activity labels;
+- coverage explanations;
+- `share_level`, `partial`, `unknown`, `full` labels;
+- Mellow-specific warnings.
 
 ### Persisted data
 
@@ -1284,10 +1912,11 @@ Default to `share_level` when:
 - Share valuation may require vault TVL and total supply.
 - Internal rebalances may not be user-facing and should not be treated as manual rebalances.
 - Fee dilution may be hard to compute accurately.
+- Coverage labels are product-critical and must be localized consistently.
 
 ---
 
-## 5.7 Rewards
+## 6.7 Rewards
 
 ### Feasibility
 
@@ -1332,6 +1961,27 @@ Required for:
 - Reward token pricing uses `chainId + tokenAddress + timestamp`.
 - Query key: `["rewards", chainId, walletAddress, filters]`.
 - API route: `/api/rewards?chainId=8453`.
+
+### i18n requirements
+
+Namespace:
+
+```txt
+rewards
+charts
+coverage
+common
+```
+
+Localized content:
+
+- reward source labels;
+- reward type labels;
+- claim timeline labels;
+- chart legends;
+- table headers;
+- APR/annualized return explanations;
+- no rewards empty state.
 
 ### Persisted data
 
@@ -1381,10 +2031,11 @@ Rewards should show:
 - Reward-to-pool mapping may be unavailable for some governance rewards.
 - Claimed tokens may later be swapped; the claim value must be fixed at claim time.
 - Avoid double counting rewards in Pools, Strategies, Governance, and Rewards.
+- Reward source labels must come from translation keys.
 
 ---
 
-## 5.8 Governance
+## 6.8 Governance
 
 ### Feasibility
 
@@ -1429,6 +2080,29 @@ Required surfaces:
 - Query key: `["governance", chainId, walletAddress, filters]`.
 - API route: `/api/governance?chainId=8453`.
 
+### i18n requirements
+
+Namespace:
+
+```txt
+governance
+rewards
+coverage
+common
+```
+
+Localized content:
+
+- lock labels;
+- vote labels;
+- relay labels;
+- voting fees;
+- bribes;
+- rebases;
+- governance reward explanations;
+- epoch labels;
+- coverage states.
+
 ### Persisted data
 
 - `GovernanceEvent`
@@ -1471,10 +2145,11 @@ Governance should show:
 - Pool allocation for voting rewards requires reliable event/contract mapping.
 - Managed/rebase rewards may have special semantics.
 - Avoid mixing governance returns with LP deposit returns unless explicitly labeled.
+- Governance terminology must be translated carefully without corrupting protocol terms like `veAERO`.
 
 ---
 
-## 5.9 Activity
+## 6.9 Activity
 
 ### Feasibility
 
@@ -1519,6 +2194,43 @@ Required for:
 - Activity query keys include `chainId`.
 - Explorer links use `getExplorerBaseUrl(chainId)`.
 - API route: `/api/activity?chainId=8453`.
+
+### i18n requirements
+
+Namespace:
+
+```txt
+activity
+coverage
+common
+```
+
+Localized content:
+
+- event type labels;
+- classification labels;
+- confidence labels;
+- filters;
+- table headers;
+- transaction detail headings;
+- source allocation labels;
+- rebalance explanation labels.
+
+Event types must be translated from enum keys.
+
+Example:
+
+```json
+{
+  "eventTypes": {
+    "strategyDeposit": "Strategy deposit",
+    "strategyWithdraw": "Strategy withdrawal",
+    "strategyInternalRebalance": "Strategy internal rebalance",
+    "rebalance": "Rebalance",
+    "claimReward": "Claim reward"
+  }
+}
+```
 
 ### Persisted data
 
@@ -1585,10 +2297,11 @@ Activity must include:
 - One transaction may produce multiple events.
 - Moralis decoded labels may be too broad.
 - Internal Mellow activity must not be treated as user manual activity.
+- Event labels and explanation copy are likely to be hardcoded by AI unless enforced.
 
 ---
 
-## 5.10 Settings
+## 6.10 Settings
 
 ### Feasibility
 
@@ -1609,10 +2322,36 @@ No, except for diagnostics display.
 - Analysis status should be wallet + chain scoped.
 - Future multi-chain settings should be added through chain config.
 
+### i18n requirements
+
+Namespace:
+
+```txt
+settings
+wallet
+common
+```
+
+Localized content:
+
+- language selector if added;
+- active chain;
+- diagnostics;
+- analysis state;
+- refresh/retry labels;
+- display preferences;
+- data freshness labels.
+
+If a language selector is implemented, persist preference either:
+
+- locally for v1; or
+- in user settings if authenticated user persistence is added later.
+
 ### Persisted data
 
 - wallet analysis status;
 - display preferences;
+- language preference if implemented;
 - diagnostics state;
 - provider health metadata.
 
@@ -1623,6 +2362,7 @@ Settings should show:
 - connected wallet;
 - active chain;
 - supported chain state;
+- language preference if implemented;
 - last analysis timestamp for chain;
 - trigger/retry update;
 - display preferences;
@@ -1634,9 +2374,9 @@ Low.
 
 ---
 
-# 6. Cross-feature implementation details
+# 7. Cross-feature implementation details
 
-## 6.1 Analysis modes
+## 7.1 Analysis modes
 
 ### Full history
 
@@ -1655,7 +2395,7 @@ Scope:
 - from last indexed block/cursor to current head;
 - recompute affected snapshots.
 
-## 6.2 Price enrichment
+## 7.2 Price enrichment
 
 Use Alchemy historical prices for every valued event.
 
@@ -1677,7 +2417,7 @@ Rules:
 - do not silently use another provider;
 - token address without `chainId` is invalid.
 
-## 6.3 Contract metadata sync
+## 7.3 Contract metadata sync
 
 Before analysis, sync for the target `chainId`:
 
@@ -1693,7 +2433,7 @@ Persist into:
 - `Strategy`
 - `Pool` when known.
 
-## 6.4 Event decoding requirements
+## 7.4 Event decoding requirements
 
 Create ABI registry:
 
@@ -1722,7 +2462,7 @@ Use ABI decoding for:
 
 ABI usage must be chain-aware when contract versions differ by chain.
 
-## 6.5 Confidence model
+## 7.5 Confidence model
 
 ### High confidence
 
@@ -1758,7 +2498,7 @@ Persist confidence on:
 - `AttributionState`
 - `CoverageReport`
 
-## 6.6 API route implementation
+## 7.6 API route implementation
 
 Recommended Next.js API routes:
 
@@ -1789,24 +2529,54 @@ Rules:
 - Every route either accepts `chainId` or derives Base mainnet default for product v1.
 - Backend validation must reject unsupported chains.
 
+## 7.7 Localized API/domain errors
+
+Backend errors should return stable error codes, not localized strings.
+
+Example:
+
+```json
+{
+  "code": "UNSUPPORTED_CHAIN",
+  "message": "Unsupported chain",
+  "details": {
+    "chainId": 1
+  }
+}
+```
+
+Frontend maps `code` to localized strings:
+
+```ts
+t(`errors:${error.code}`)
+```
+
+Rules:
+
+- Backend may include developer-readable English messages for logs.
+- UI must display localized error text from translation resources.
+- Error codes must be stable and documented.
+
 ---
 
-# 7. Feature-to-storage mapping
+# 8. Feature-to-storage mapping
 
-| Feature | Reads from | Writes through analysis | Chain key |
-|---|---|---|---|
-| Overview | PortfolioSnapshot, PerformanceSnapshot, PricePoint, CoverageReport | PortfolioSnapshot, PricePoint | wallet + chain |
-| Pools | Pool, Deposit, Strategy, StrategyExposure, AttributionState, RewardEvent, PerformanceSnapshot | Pool, PerformanceSnapshot | pool + chain |
-| Deposits | Deposit, LedgerEvent, AssetMovement, RewardEvent, PerformanceSnapshot | Deposit, LedgerEvent, AssetMovement | deposit + chain |
-| Strategies | Strategy, StrategyExposure, RewardEvent, PerformanceSnapshot, CoverageReport | Strategy, StrategyExposure | strategy + chain |
-| Rewards | RewardEvent, PricePoint, LedgerEvent | RewardEvent | reward + chain |
-| Governance | GovernanceEvent, RewardEvent, PerformanceSnapshot | GovernanceEvent | governance + chain |
-| Activity | LedgerEvent, AssetMovement, RawProviderRecord | LedgerEvent, AssetMovement | tx/log + chain |
-| Settings | WalletContext, AnalysisRun | WalletContext | wallet + chain |
+| Feature | Reads from | Writes through analysis | Chain key | i18n namespaces |
+|---|---|---|---|---|
+| Overview | PortfolioSnapshot, PerformanceSnapshot, PricePoint, CoverageReport | PortfolioSnapshot, PricePoint | wallet + chain | overview, charts, coverage |
+| Pools | Pool, Deposit, Strategy, StrategyExposure, AttributionState, RewardEvent, PerformanceSnapshot | Pool, PerformanceSnapshot | pool + chain | pools, charts, coverage |
+| Deposits | Deposit, LedgerEvent, AssetMovement, RewardEvent, PerformanceSnapshot | Deposit, LedgerEvent, AssetMovement | deposit + chain | deposits, activity, coverage |
+| Strategies | Strategy, StrategyExposure, RewardEvent, PerformanceSnapshot, CoverageReport | Strategy, StrategyExposure | strategy + chain | strategies, activity, coverage |
+| Rewards | RewardEvent, PricePoint, LedgerEvent | RewardEvent | reward + chain | rewards, charts |
+| Governance | GovernanceEvent, RewardEvent, PerformanceSnapshot | GovernanceEvent | governance + chain | governance, rewards |
+| Activity | LedgerEvent, AssetMovement, RawProviderRecord | LedgerEvent, AssetMovement | tx/log + chain | activity, coverage |
+| Settings | WalletContext, AnalysisRun | WalletContext | wallet + chain | settings, wallet |
+| Landing | Translation resources | none | none | landing, common |
+| Navigation | Translation resources | none | none | navigation |
 
 ---
 
-# 8. Implementation order
+# 9. Implementation order
 
 ## Phase A — Chain-aware provider foundation
 
@@ -1819,23 +2589,36 @@ Rules:
 - Provider error handling.
 - Rate limit handling.
 
-## Phase B — Fast Overview
+## Phase B — i18n foundation
+
+- Install and configure `i18next`, `react-i18next`, `i18next-browser-languagedetector`.
+- Create `src/i18n` structure.
+- Create EN/ES resource files.
+- Add `I18nProvider`.
+- Add `normalizeLocale`.
+- Add locale-aware formatters.
+- Add namespace parity check script.
+- Replace all navigation and shell copy with translation keys.
+
+## Phase C — Fast Overview
 
 - Fetch Moralis balances for chain.
 - Fetch Alchemy current prices for chain.
 - Fetch Moralis recent wallet history for chain.
 - Display recent Overview.
 - Show analysis CTA.
+- Ensure all Overview labels/charts/empty states are localized.
 
-## Phase C — Analysis pipeline skeleton
+## Phase D — Analysis pipeline skeleton
 
 - Trigger.dev task.
 - AnalysisRun with `chainId`.
 - Status polling with `chainId`.
 - Raw data fetch/persist with `chainId`.
 - Protocol metadata sync with `chainId`.
+- Localized UI states for queued/running/ready/stale/failed.
 
-## Phase D — Aerodrome reconstruction
+## Phase E — Aerodrome reconstruction
 
 - Router/defaultFactory sync by chain.
 - Pool discovery by chain.
@@ -1844,28 +2627,31 @@ Rules:
 - AssetMovement generation.
 - Price enrichment.
 
-## Phase E — Residual attribution
+## Phase F — Residual attribution
 
 - AttributionState.
 - AttributionSourceLot.
 - Waterfall consumption.
 - Pool residual charts.
+- Localized residual/rebalance explanations.
 
-## Phase F — Mellow strategies
+## Phase G — Mellow strategies
 
 - Sync official Mellow strategy metadata by chain.
 - Decode lpWrapper/StakingRewards activity.
 - Build Strategy/StrategyExposure.
 - Share-level accounting.
 - Coverage model.
+- Localized strategy coverage warnings.
 
-## Phase G — Governance
+## Phase H — Governance
 
 - veAERO/Voter events.
 - Bribes/fees/rebases.
 - Reward allocation by pool where possible.
+- Localized governance labels.
 
-## Phase H — Final UI surfaces
+## Phase I — Final UI surfaces
 
 - Pools.
 - Deposits.
@@ -1874,10 +2660,11 @@ Rules:
 - Governance.
 - Activity.
 - Settings diagnostics.
+- Validate all hardcoded copy removed.
 
 ---
 
-# 9. Feasibility conclusions
+# 10. Feasibility conclusions
 
 ## What APIs can handle well
 
@@ -1919,12 +2706,32 @@ Do not create query keys without chainId.
 Do not create database constraints that assume global address uniqueness.
 ```
 
+## What i18n readiness changes
+
+i18n readiness does not change product analytics scope.
+
+It changes implementation discipline:
+
+```txt
+Do not hardcode user-facing copy.
+Do not format numbers/dates manually.
+Do not hardcode chart labels or event labels.
+Do not return localized backend errors directly.
+Do not let EN/ES resource keys drift.
+```
+
 ## Final architecture rule
 
 The product should not be built as:
 
 ```txt
 Moralis response -> UI
+```
+
+or:
+
+```txt
+hardcoded English copy -> UI
 ```
 
 It should be built as:
@@ -1938,6 +2745,7 @@ Moralis / Alchemy / RPC / official metadata
   -> TanStack Query(chainId keys)
   -> containers
   -> pure components
+  -> i18next localized copy
 ```
 
-This is the only path that keeps The Cab’s analytics reliable, explainable, extensible, and ready for a future Aero multi-chain cockpit.
+This is the only path that keeps The Cab’s analytics reliable, explainable, extensible, localized, and ready for a future Aero multi-chain cockpit.
