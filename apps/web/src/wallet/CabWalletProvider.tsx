@@ -28,8 +28,21 @@ function CabWalletStateProvider({ children }: PropsWithChildren) {
   const connect = useCallback(async () => {
     if (isConnected) return;
 
+    const injectedConnector = connectors.find((candidate) => candidate.id === "injected");
+  let injectedProvider: unknown;
+
+    if (injectedConnector) {
+      try {
+        injectedProvider = await injectedConnector.getProvider();
+      } catch {
+        injectedProvider = undefined;
+      }
+    }
+
     const preferredConnector =
-      connectors.find((candidate) => candidate.id === "walletConnect") ?? connectors[0];
+      (injectedProvider ? injectedConnector : undefined) ??
+      connectors.find((candidate) => candidate.id === "walletConnect") ??
+      connectors[0];
 
     if (!preferredConnector) {
       throw new Error("NO_WALLET_CONNECTOR_AVAILABLE");

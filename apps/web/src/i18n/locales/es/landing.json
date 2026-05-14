@@ -87,32 +87,34 @@
   },
   "howItWorks": {
     "eyebrow": "Flujo de análisis",
-    "heading": "Primero una vista rápida. Después, análisis profundo cuando lo necesitás.",
+    "title": "Primero una vista rápida. Después, análisis profundo cuando lo necesitás.",
     "body": "The Cab empieza con un overview rápido de la wallet y luego ejecuta un análisis histórico no bloqueante cuando pedís métricas más profundas. Podés seguir usando el dashboard mientras el análisis corre en segundo plano.",
-    "step01": {
-      "label": "01",
-      "title": "Conectá tu wallet",
-      "body": "Conectá con WalletConnect. Product v1 soporta Base mainnet y usa la wallet conectada como alcance del análisis."
-    },
-    "step02": {
-      "label": "02",
-      "title": "Obtené el overview rápido",
-      "body": "The Cab usa balances, historial reciente y precios de mercado para mostrar una cabina inicial mientras el análisis profundo sigue siendo opcional."
-    },
-    "step03": {
-      "label": "03",
-      "title": "Ejecutá el análisis histórico",
-      "body": "Dispará un análisis en segundo plano que reconstruye actividad en Aerodrome y Mellow: pools, depósitos, estrategias, rewards, governance y movimientos de wallet."
-    },
-    "step04": {
-      "label": "04",
-      "title": "Desbloqueá las secciones profundas",
-      "body": "Cuando el análisis está listo, la app conectada habilita Pools, Depósitos, Estrategias, Rewards, Governance y Actividad con datos normalizados e indicadores de cobertura."
-    },
-    "step05": {
-      "label": "05",
-      "title": "Actualizá cuando los datos estén viejos",
-      "body": "Si el último análisis tiene más de una semana, The Cab puede actualizarlo en segundo plano preservando los últimos datos válidos."
+    "steps": {
+      "connectWallet": {
+        "label": "01",
+        "title": "Conectá tu wallet",
+        "body": "Conectá con WalletConnect. Product v1 soporta Base mainnet y usa la wallet conectada como alcance del análisis."
+      },
+      "quickOverview": {
+        "label": "02",
+        "title": "Obtené el overview rápido",
+        "body": "The Cab usa balances, historial reciente y precios de mercado para mostrar una cabina inicial mientras el análisis profundo sigue siendo opcional."
+      },
+      "historicalAnalysis": {
+        "label": "03",
+        "title": "Ejecutá el análisis histórico",
+        "body": "Dispará un análisis en segundo plano que reconstruye actividad en Aerodrome y Mellow: pools, depósitos, estrategias, rewards, governance y movimientos de wallet."
+      },
+      "unlockSections": {
+        "label": "04",
+        "title": "Desbloqueá las secciones profundas",
+        "body": "Cuando el análisis está listo, la app conectada habilita Pools, Depósitos, Estrategias, Rewards, Governance y Actividad con datos normalizados e indicadores de cobertura."
+      },
+      "refreshStale": {
+        "label": "05",
+        "title": "Actualizá cuando los datos estén viejos",
+        "body": "Si el último análisis tiene más de una semana, The Cab puede actualizarlo en segundo plano preservando los últimos datos válidos."
+      }
     }
   },
   "modelClarity": {

@@ -87,32 +87,34 @@
   },
   "howItWorks": {
     "eyebrow": "Analysis flow",
-    "heading": "Fast first. Deep when requested.",
+    "title": "Fast first. Deep when requested.",
     "body": "The Cab starts with a quick wallet overview, then runs a non-blocking historical analysis when you request deeper analytics. You can keep using the dashboard while the analysis runs.",
-    "step01": {
-      "label": "01",
-      "title": "Connect wallet",
-      "body": "Connect with WalletConnect. Product v1 supports Base mainnet and uses your connected wallet as the analysis scope."
-    },
-    "step02": {
-      "label": "02",
-      "title": "Get the quick overview",
-      "body": "The Cab uses wallet balances, recent history, and market prices to show an immediate portfolio cockpit while deeper analysis remains optional."
-    },
-    "step03": {
-      "label": "03",
-      "title": "Run historical analysis",
-      "body": "Trigger a background analysis that reconstructs Aerodrome and Mellow activity across pools, deposits, strategies, rewards, governance, and wallet movements."
-    },
-    "step04": {
-      "label": "04",
-      "title": "Unlock deep sections",
-      "body": "When the run is ready, the connected app unlocks Pools, Deposits, Strategies, Rewards, Governance, and Activity with normalized data and coverage indicators."
-    },
-    "step05": {
-      "label": "05",
-      "title": "Refresh when stale",
-      "body": "If the last analysis is more than a week old, The Cab can refresh in the background while preserving the last successful data."
+    "steps": {
+      "connectWallet": {
+        "label": "01",
+        "title": "Connect wallet",
+        "body": "Connect with WalletConnect. Product v1 supports Base mainnet and uses your connected wallet as the analysis scope."
+      },
+      "quickOverview": {
+        "label": "02",
+        "title": "Get the quick overview",
+        "body": "The Cab uses wallet balances, recent history, and market prices to show an immediate portfolio cockpit while deeper analysis remains optional."
+      },
+      "historicalAnalysis": {
+        "label": "03",
+        "title": "Run historical analysis",
+        "body": "Trigger a background analysis that reconstructs Aerodrome and Mellow activity across pools, deposits, strategies, rewards, governance, and wallet movements."
+      },
+      "unlockSections": {
+        "label": "04",
+        "title": "Unlock deep sections",
+        "body": "When the run is ready, the connected app unlocks Pools, Deposits, Strategies, Rewards, Governance, and Activity with normalized data and coverage indicators."
+      },
+      "refreshStale": {
+        "label": "05",
+        "title": "Refresh when stale",
+        "body": "If the last analysis is more than a week old, The Cab can refresh in the background while preserving the last successful data."
+      }
     }
   },
   "modelClarity": {

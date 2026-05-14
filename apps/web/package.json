@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@coinbase/wallet-sdk": "^4.3.7",
+    "@gsap/react": "^2.1.2",
     "@metamask/connect-evm": "^1.2.0",
     "@tamagui/config": "2.0.0-rc.42",
     "@tamagui/core": "2.0.0-rc.42",
@@ -29,6 +30,7 @@
     "@walletconnect/ethereum-provider": "^2.23.9",
     "accounts": "^0.10.6",
     "drizzle-orm": "^0.45.2",
+    "gsap": "^3.15.0",
     "i18next": "^26.1.0",
     "i18next-browser-languagedetector": "^8.2.1",
     "lucide-react": "^0.543.0",
