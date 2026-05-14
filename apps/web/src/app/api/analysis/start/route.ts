@@ -10,7 +10,7 @@ import { runAnalyzeWalletTask } from "@/server/analysis/analyzeWalletTask";
 import { triggerAnalyzeWalletTask } from "@/server/trigger/client";
 
 const startAnalysisSchema = z.object({
-  walletAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
+  walletAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/).transform((value) => value.toLowerCase()),
   chainId: z.number().int().positive().default(SUPPORTED_CHAIN_ID),
   mode: z.enum(["full_history", "incremental"]).default("full_history"),
 });
@@ -57,6 +57,9 @@ export async function POST(request: Request) {
         status: run.status,
         stage: run.stage,
         progressPct: run.progressPct,
+        lastSuccessfulRunAt: null,
+        lastUpdatedAt: run.updatedAt.toISOString(),
+        lastError: run.lastError,
       },
       { status: 202 },
     );
@@ -77,9 +80,8 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         code,
-        message,
       },
-      { status: 500 },
+      { status: code === "UNSUPPORTED_CHAIN" ? 400 : 500 },
     );
   }
 }

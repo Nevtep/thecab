@@ -1,3 +1,28 @@
 {
-  "title": "TODO"
+  "title": "Analysis status",
+  "status": {
+    "not_analyzed": "Not analyzed",
+    "queued": "Queued",
+    "running": "Running",
+    "ready": "Ready",
+    "stale": "Stale",
+    "failed": "Failed"
+  },
+  "lastSuccessfulRunAt": "Last successful analysis: {{value}}",
+  "actions": {
+    "start": "Start analysis",
+    "starting": "Starting analysis...",
+    "retry": "Retry analysis"
+  },
+  "messages": {
+    "not_analyzed": "Run a manual analysis to unlock the canonical historical state later. Recent provider data remains available now.",
+    "queued": "Analysis has been queued. Recent Overview remains available while the run starts.",
+    "running": "Analysis is running. Recent Overview remains visible while progress updates arrive.",
+    "ready": "Analysis metadata is up to date for this wallet.",
+    "stale": "The last successful analysis is older than seven days. Start a fresh run when you need current reconstructed history.",
+    "failed": "The last analysis run failed. You can retry without losing the recent Overview data already on screen."
+  },
+  "fallback": {
+    "recentViewAvailable": "Recent provider data is still available while analysis is unavailable."
+  }
 }

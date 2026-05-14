@@ -4,6 +4,32 @@
 
 Implement the first connected full-stack dashboard stage for The Cab using the existing DS, provider modules, and background-analysis skeleton. This quickstart is intentionally limited to recent Overview delivery plus analysis start/status scaffolding; analyzed-history rendering and stale auto-refresh are deferred.
 
+## Current Status
+
+This Stage 1 scope is now implemented and validated for the recent Overview path.
+
+Delivered in the current stage:
+
+- Connected landing entry now redirects supported connected wallets into `/overview`.
+- `/overview` renders the connected shell with Overview active, range switching, manual refresh, summary, metrics, chart, distribution, assets, recent activity, and analysis prompt/status panels.
+- The Overview API aggregates Moralis balances/history and Alchemy prices on the server only, persists recent-view artifacts, and returns sanitized provider failure codes.
+- Analysis start/status routes expose canonical payloads for `not_analyzed | queued | running | ready | stale | failed`.
+- EN/ES resources now cover Overview, Navigation, Analysis, Coverage, and Charts with parity checks passing.
+
+Validated commands:
+
+- `cd apps/web && pnpm provider:smoke`
+- `cd apps/web && pnpm i18n:check`
+- `cd apps/web && pnpm typecheck`
+- `cd apps/web && pnpm lint`
+- `cd apps/web && pnpm build`
+
+Validation notes:
+
+- `pnpm build` completes successfully for the current stage.
+- The build still emits existing non-fatal upstream warnings from the wagmi/viem dependency chain, including a transient `indexedDB is not defined` build-time trace during static generation. That warning did not fail the build in the current environment.
+- The provider smoke script now loads `apps/web/.env.local` itself and uses a Moralis-accepted sample wallet so the package command validates provider connectivity directly.
+
 ## Prerequisites
 
 - Workspace root: `/Users/core/Code/The Cab`
@@ -89,3 +115,9 @@ Final verification commands:
 - Do not add frontend third-party provider integrations.
 - Do not implement analyzed-history rendering, automatic transition into analyzed widgets, or stale auto-refresh in this stage.
 - Do not treat Moralis as the canonical pricing source.
+
+## Deferred Follow-Up Scope
+
+- Historical analyzed-history rendering and protocol reconstruction remain a later stage.
+- Automatic stale refresh and automatic transition from recent view into analyzed-history widgets remain deferred.
+- Pools, Deposits, Strategies, Rewards, Governance, Activity, and Settings stay present only as connected-navigation lock states in this stage; their destination pages are not part of the current delivery.

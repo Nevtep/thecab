@@ -1,3 +1,119 @@
 {
-  "title": "TODO"
+  "title": "Overview",
+  "mode": {
+    "recentView": "Recent view",
+    "analyzedHistory": "Analyzed history"
+  },
+  "summary": {
+    "title": "Wallet summary",
+    "wallet": "Wallet",
+    "chain": "Chain",
+    "lastRefreshed": "Last refreshed"
+  },
+  "sidebar": {
+    "overview": "Overview"
+  },
+  "metrics": {
+    "netPortfolioValue": "Net portfolio value",
+    "deployedValue": "Deployed value",
+    "idleValue": "Idle value",
+    "change": "Change",
+    "estimatedRealizedRewards": "Estimated realized rewards",
+    "manualDeposits": "Manual deposits",
+    "automatedStrategies": "Automated strategies",
+    "residualAttributed": "Residual attributed",
+    "governanceValue": "Governance value"
+  },
+  "ranges": {
+    "24h": "24h",
+    "7d": "7d",
+    "30d": "30d"
+  },
+  "sections": {
+    "chart": "Portfolio evolution",
+    "distribution": "Capital distribution",
+    "assets": "Assets",
+    "activity": "Recent activity"
+  },
+  "sources": {
+    "recent_provider_data": "Recent provider data",
+    "partial_fallback": "Partial fallback"
+  },
+  "status": {
+    "not_analyzed": "Not analyzed",
+    "queued": "Queued",
+    "running": "Running",
+    "ready": "Ready",
+    "stale": "Stale",
+    "failed": "Failed"
+  },
+  "analysis": {
+    "title": "Analysis status",
+    "lastSuccessfulRunAt": "Last successful analysis: {{value}}",
+    "actions": {
+      "start": "Start analysis",
+      "starting": "Starting analysis...",
+      "retry": "Retry analysis"
+    },
+    "messages": {
+      "not_analyzed": "Run a manual analysis to unlock the canonical historical state later. Recent provider data remains available now.",
+      "queued": "Analysis has been queued. Recent Overview remains available while the run starts.",
+      "running": "Analysis is running. Recent Overview remains visible while progress updates arrive.",
+      "ready": "Analysis metadata is up to date for this wallet.",
+      "stale": "The last successful analysis is older than seven days. Start a fresh run when you need current reconstructed history.",
+      "failed": "The last analysis run failed. You can retry without losing the recent Overview data already on screen."
+    }
+  },
+  "coverage": {
+    "noticeTitle": "Partial coverage",
+    "status": {
+      "recent": "Recent coverage",
+      "partial": "Partial coverage",
+      "unknown": "Unknown coverage"
+    },
+    "reasons": {
+      "analysisPending": "Historical analysis is still pending",
+      "providerPartial": "One or more providers returned partial data",
+      "missingPrices": "Some assets do not have current prices",
+      "noRecentActivity": "No recent on-chain activity was found"
+    }
+  },
+  "activity": {
+    "unclassified": "Unclassified activity"
+  },
+  "assets": {
+    "positionValue": "Position value: {{value}}",
+    "change24h": "24h: {{value}}",
+    "change7d": "7d: {{value}}",
+    "priceUnavailable": "Spot price unavailable"
+  },
+  "actions": {
+    "refresh": "Refresh",
+    "refreshing": "Refreshing...",
+    "connectWallet": "Connect wallet",
+    "switchNetwork": "Switch to Base"
+  },
+  "states": {
+    "emptyTitle": "No overview data yet",
+    "loadingTitle": "Loading overview",
+    "providerFailureTitle": "Overview is temporarily unavailable",
+    "emptyDescription": "Connect a supported wallet or refresh to load the recent Overview.",
+    "providerFailureDescription": "Provider data could not be loaded right now. Try again in a moment.",
+    "disconnectedTitle": "Connect a wallet to open Overview",
+    "disconnectedDescription": "Overview is only available for connected wallets on the supported network.",
+    "unsupportedChainTitle": "Switch to Base to continue",
+    "unsupportedChainDescription": "This stage of Overview only supports Base mainnet.",
+    "emptyDistributionTitle": "No capital distribution yet",
+    "emptyDistributionDescription": "Distribution will appear once recent provider data is available.",
+    "emptyAssetsTitle": "No priced assets found",
+    "emptyAssetsDescription": "Recent balances will appear here after provider data is loaded.",
+    "emptyActivityTitle": "No recent activity found",
+    "emptyActivityDescription": "Recent transfers and wallet activity will appear here when available.",
+    "unavailableValue": "Unavailable",
+    "errors": {
+      "PROVIDER_REQUEST_FAILED": "Providers rejected the recent Overview request.",
+      "UNSUPPORTED_CHAIN": "This chain is not supported for Overview yet.",
+      "OVERVIEW_FAILED": "Overview could not be rendered right now."
+    }
+  }
 }

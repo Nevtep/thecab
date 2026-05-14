@@ -1,3 +1,119 @@
 {
-  "title": "PENDIENTE"
+  "title": "Resumen",
+  "mode": {
+    "recentView": "Vista reciente",
+    "analyzedHistory": "Historial analizado"
+  },
+  "summary": {
+    "title": "Resumen de cartera",
+    "wallet": "Wallet",
+    "chain": "Cadena",
+    "lastRefreshed": "Última actualización"
+  },
+  "sidebar": {
+    "overview": "Resumen"
+  },
+  "metrics": {
+    "netPortfolioValue": "Valor neto de la cartera",
+    "deployedValue": "Valor desplegado",
+    "idleValue": "Valor idle",
+    "change": "Cambio",
+    "estimatedRealizedRewards": "Recompensas realizadas estimadas",
+    "manualDeposits": "Depósitos manuales",
+    "automatedStrategies": "Estrategias automatizadas",
+    "residualAttributed": "Residual atribuido",
+    "governanceValue": "Valor de gobernanza"
+  },
+  "ranges": {
+    "24h": "24h",
+    "7d": "7d",
+    "30d": "30d"
+  },
+  "sections": {
+    "chart": "Evolución de la cartera",
+    "distribution": "Distribución de capital",
+    "assets": "Activos",
+    "activity": "Actividad reciente"
+  },
+  "sources": {
+    "recent_provider_data": "Datos recientes de proveedores",
+    "partial_fallback": "Fallback parcial"
+  },
+  "status": {
+    "not_analyzed": "Sin analizar",
+    "queued": "En cola",
+    "running": "En curso",
+    "ready": "Listo",
+    "stale": "Desactualizado",
+    "failed": "Fallido"
+  },
+  "analysis": {
+    "title": "Estado del análisis",
+    "lastSuccessfulRunAt": "Último análisis exitoso: {{value}}",
+    "actions": {
+      "start": "Iniciar análisis",
+      "starting": "Iniciando análisis...",
+      "retry": "Reintentar análisis"
+    },
+    "messages": {
+      "not_analyzed": "Ejecuta un análisis manual para desbloquear más adelante el estado histórico canónico. Los datos recientes del proveedor siguen disponibles ahora.",
+      "queued": "El análisis se puso en cola. El resumen reciente sigue disponible mientras comienza la ejecución.",
+      "running": "El análisis está en curso. El resumen reciente sigue visible mientras llegan actualizaciones de progreso.",
+      "ready": "Los metadatos del análisis están actualizados para esta wallet.",
+      "stale": "El último análisis exitoso tiene más de siete días. Inicia una nueva ejecución cuando necesites el historial reconstruido actualizado.",
+      "failed": "La última ejecución del análisis falló. Puedes reintentarlo sin perder los datos del resumen reciente que ya están visibles."
+    }
+  },
+  "coverage": {
+    "noticeTitle": "Cobertura parcial",
+    "status": {
+      "recent": "Cobertura reciente",
+      "partial": "Cobertura parcial",
+      "unknown": "Cobertura desconocida"
+    },
+    "reasons": {
+      "analysisPending": "El análisis histórico todavía está pendiente",
+      "providerPartial": "Uno o más proveedores devolvieron datos parciales",
+      "missingPrices": "Algunos activos no tienen precios actuales",
+      "noRecentActivity": "No se encontró actividad on-chain reciente"
+    }
+  },
+  "activity": {
+    "unclassified": "Actividad sin clasificar"
+  },
+  "assets": {
+    "positionValue": "Valor de la posición: {{value}}",
+    "change24h": "24h: {{value}}",
+    "change7d": "7d: {{value}}",
+    "priceUnavailable": "Precio spot no disponible"
+  },
+  "actions": {
+    "refresh": "Actualizar",
+    "refreshing": "Actualizando...",
+    "connectWallet": "Conectar wallet",
+    "switchNetwork": "Cambiar a Base"
+  },
+  "states": {
+    "emptyTitle": "Todavía no hay datos del resumen",
+    "loadingTitle": "Cargando resumen",
+    "providerFailureTitle": "El resumen no está disponible temporalmente",
+    "emptyDescription": "Conecta una wallet compatible o actualiza para cargar el resumen reciente.",
+    "providerFailureDescription": "No se pudieron cargar los datos de proveedores ahora mismo. Inténtalo de nuevo en un momento.",
+    "disconnectedTitle": "Conecta una wallet para abrir Resumen",
+    "disconnectedDescription": "Resumen solo está disponible para wallets conectadas en la red compatible.",
+    "unsupportedChainTitle": "Cambia a Base para continuar",
+    "unsupportedChainDescription": "Esta etapa de Resumen solo admite Base mainnet.",
+    "emptyDistributionTitle": "Todavía no hay distribución de capital",
+    "emptyDistributionDescription": "La distribución aparecerá cuando haya datos recientes disponibles.",
+    "emptyAssetsTitle": "No se encontraron activos con precio",
+    "emptyAssetsDescription": "Los balances recientes aparecerán aquí cuando se carguen los datos del proveedor.",
+    "emptyActivityTitle": "No se encontró actividad reciente",
+    "emptyActivityDescription": "Las transferencias y la actividad reciente de la wallet aparecerán aquí cuando estén disponibles.",
+    "unavailableValue": "No disponible",
+    "errors": {
+      "PROVIDER_REQUEST_FAILED": "Los proveedores rechazaron la solicitud del resumen reciente.",
+      "UNSUPPORTED_CHAIN": "Esta cadena todavía no es compatible con Resumen.",
+      "OVERVIEW_FAILED": "No se pudo renderizar el resumen en este momento."
+    }
+  }
 }

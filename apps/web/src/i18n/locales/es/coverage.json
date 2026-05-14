@@ -1,3 +1,14 @@
 {
-  "title": "PENDIENTE"
+  "noticeTitle": "Cobertura parcial",
+  "status": {
+    "recent": "Cobertura reciente",
+    "partial": "Cobertura parcial",
+    "unknown": "Cobertura desconocida"
+  },
+  "reasons": {
+    "analysisPending": "El análisis histórico todavía está pendiente",
+    "providerPartial": "Uno o más proveedores devolvieron datos parciales",
+    "missingPrices": "Algunos activos no tienen precios actuales",
+    "noRecentActivity": "No se encontró actividad on-chain reciente"
+  }
 }

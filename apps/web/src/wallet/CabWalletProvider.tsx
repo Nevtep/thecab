@@ -11,6 +11,7 @@ import { isSupportedChain, SUPPORTED_CHAIN_ID } from "@/wallet/supportedChains";
 type CabWalletContextValue = {
   address?: string;
   chainId?: number;
+  status: "connected" | "connecting" | "reconnecting" | "disconnected";
   isConnected: boolean;
   isSupportedChain: boolean;
   connectorName: string | null;
@@ -30,7 +31,7 @@ export const CabWalletContext = createContext<CabWalletContextValue | undefined>
 
 function CabWalletStateProvider({ children }: PropsWithChildren) {
   const { t } = useTranslation("wallet");
-  const { address, chainId, isConnected, connector } = useAccount();
+  const { address, chainId, isConnected, connector, status } = useAccount();
   const { connectAsync, connectors } = useConnect();
   const { disconnectAsync } = useDisconnect();
   const { switchChainAsync } = useSwitchChain();
@@ -106,6 +107,7 @@ function CabWalletStateProvider({ children }: PropsWithChildren) {
     () => ({
       address,
       chainId,
+      status,
       isConnected,
       isSupportedChain: isSupportedChain(chainId),
       connectorName: connector?.name ?? null,
@@ -113,7 +115,7 @@ function CabWalletStateProvider({ children }: PropsWithChildren) {
       disconnect,
       switchToSupportedChain,
     }),
-    [address, chainId, connect, connector?.name, disconnect, isConnected, switchToSupportedChain],
+    [address, chainId, connect, connector?.name, disconnect, isConnected, status, switchToSupportedChain],
   );
 
   return <CabWalletContext.Provider value={value}>{children}</CabWalletContext.Provider>;

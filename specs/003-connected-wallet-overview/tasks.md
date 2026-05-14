@@ -13,16 +13,16 @@
 
 **Purpose**: Confirm the staged task plan still satisfies the repository constitution before implementation begins.
 
-- [ ] T000 Verify brand, localization, chain-awareness, provider-boundary, and explainability compliance for this stage in specs/003-connected-wallet-overview/plan.md and specs/003-connected-wallet-overview/tasks.md
+- [x] T000 Verify brand, localization, chain-awareness, provider-boundary, and explainability compliance for this stage in specs/003-connected-wallet-overview/plan.md and specs/003-connected-wallet-overview/tasks.md
 
 ## Phase 1: Setup (Shared Infrastructure)
 
 **Purpose**: Create the Overview feature and server module structure for backend-first delivery.
 
-- [ ] T001 Create Overview feature module folder and file skeleton in apps/web/src/features/overview/
-- [ ] T002 Create server Overview module folder and file skeleton in apps/web/src/server/overview/
-- [ ] T003 [P] Create connected Overview route entry file in apps/web/src/app/overview/page.tsx
-- [ ] T004 [P] Create Overview query module stub in apps/web/src/features/overview/overview.queries.ts
+- [x] T001 Create Overview feature module folder and file skeleton in apps/web/src/features/overview/
+- [x] T002 Create server Overview module folder and file skeleton in apps/web/src/server/overview/
+- [x] T003 [P] Create connected Overview route entry file in apps/web/src/app/overview/page.tsx
+- [x] T004 [P] Create Overview query module stub in apps/web/src/features/overview/overview.queries.ts
 
 ---
 
@@ -32,15 +32,15 @@
 
 **⚠️ CRITICAL**: No user story work should begin until this phase is complete.
 
-- [ ] T005 Define Overview request, response, and block-provenance server types in apps/web/src/server/overview/overview.types.ts
-- [ ] T006 [P] Define feature-side Overview view-model types in apps/web/src/features/overview/overview.types.ts
-- [ ] T007 Create Overview repository helpers for snapshots, coverage, and freshness reads/writes in apps/web/src/server/overview/overview.repository.ts
-- [ ] T008 [P] Update wallet-scoped and range-scoped request validation for Overview in apps/web/src/app/api/wallet/overview/route.ts
-- [ ] T009 [P] Normalize Overview query keys to include walletAddress, chainId, and range in apps/web/src/queries/keys.ts
-- [ ] T010 [P] Normalize Overview and analysis hook inputs around walletAddress, chainId, and range in apps/web/src/queries/hooks.ts
-- [ ] T011 Create recent-range normalization and 7d-default chart bucket utilities in apps/web/src/server/overview/getRecentOverview.ts
-- [ ] T012 [P] Add EN Overview namespace key scaffold for recent-view delivery in apps/web/src/i18n/locales/en/overview.json
-- [ ] T013 [P] Mirror ES Overview namespace key scaffold for parity in apps/web/src/i18n/locales/es/overview.json
+- [x] T005 Define Overview request, response, and block-provenance server types in apps/web/src/server/overview/overview.types.ts
+- [x] T006 [P] Define feature-side Overview view-model types in apps/web/src/features/overview/overview.types.ts
+- [x] T007 Create Overview repository helpers for snapshots, coverage, and freshness reads/writes in apps/web/src/server/overview/overview.repository.ts
+- [x] T008 [P] Update wallet-scoped and range-scoped request validation for Overview in apps/web/src/app/api/wallet/overview/route.ts
+- [x] T009 [P] Normalize Overview query keys to include walletAddress, chainId, and range in apps/web/src/queries/keys.ts
+- [x] T010 [P] Normalize Overview and analysis hook inputs around walletAddress, chainId, and range in apps/web/src/queries/hooks.ts
+- [x] T011 Create recent-range normalization and 7d-default chart bucket utilities in apps/web/src/server/overview/getRecentOverview.ts
+- [x] T012 [P] Add EN Overview namespace key scaffold for recent-view delivery in apps/web/src/i18n/locales/en/overview.json
+- [x] T013 [P] Mirror ES Overview namespace key scaffold for parity in apps/web/src/i18n/locales/es/overview.json
 
 **Checkpoint**: Backend contract and range foundations are ready; story work can now proceed.
 
@@ -54,16 +54,16 @@
 
 ### Implementation for User Story 2
 
-- [ ] T014 [US2] Implement Moralis and Alchemy recent-data aggregation for Overview in apps/web/src/server/overview/getRecentOverview.ts
-- [ ] T015 [P] [US2] Persist RawProviderRecord, PricePoint, CoverageReport, and PortfolioSnapshot artifacts for recent Overview fetches in apps/web/src/server/overview/overview.repository.ts
-- [ ] T016 [US2] Wire the Overview API route to the recent aggregation service with safe provider-error handling in apps/web/src/app/api/wallet/overview/route.ts
-- [ ] T017 [P] [US2] Map recent Overview API payloads into UI-ready summary, metrics, chart, distribution, assets, and activity models in apps/web/src/features/overview/overview.mappers.ts
-- [ ] T018 [P] [US2] Implement typed Overview query functions with range support in apps/web/src/features/overview/overview.queries.ts
-- [ ] T019 [US2] Implement recent Overview query orchestration, default 7d range behavior, and manual refresh control in apps/web/src/features/overview/Overview.container.tsx
-- [ ] T020 [US2] Render wallet summary, metrics, chart, capital distribution, assets table, and recent activity panels in apps/web/src/features/overview/Overview.component.tsx
-- [ ] T021 [US2] Implement recent-view range switching for 24h, 7d, and 30d chart and metrics refresh in apps/web/src/features/overview/Overview.container.tsx
-- [ ] T022 [US2] Render no-activity, missing-price, partial-coverage, and provider-failure states for recent Overview in apps/web/src/features/overview/Overview.component.tsx
-- [ ] T023 [US2] Surface block-level provenance and page-level coverage messaging for recent Overview blocks in apps/web/src/features/overview/Overview.component.tsx
+- [x] T014 [US2] Implement Moralis and Alchemy recent-data aggregation for Overview in apps/web/src/server/overview/getRecentOverview.ts
+- [x] T015 [P] [US2] Persist RawProviderRecord, PricePoint, CoverageReport, and PortfolioSnapshot artifacts for recent Overview fetches in apps/web/src/server/overview/overview.repository.ts
+- [x] T016 [US2] Wire the Overview API route to the recent aggregation service with safe provider-error handling in apps/web/src/app/api/wallet/overview/route.ts
+- [x] T017 [P] [US2] Map recent Overview API payloads into UI-ready summary, metrics, chart, distribution, assets, and activity models in apps/web/src/features/overview/overview.mappers.ts
+- [x] T018 [P] [US2] Implement typed Overview query functions with range support in apps/web/src/features/overview/overview.queries.ts
+- [x] T019 [US2] Implement recent Overview query orchestration, default 7d range behavior, and manual refresh control in apps/web/src/features/overview/Overview.container.tsx
+- [x] T020 [US2] Render wallet summary, metrics, chart, capital distribution, assets table, and recent activity panels in apps/web/src/features/overview/Overview.component.tsx
+- [x] T021 [US2] Implement recent-view range switching for 24h, 7d, and 30d chart and metrics refresh in apps/web/src/features/overview/Overview.container.tsx
+- [x] T022 [US2] Render no-activity, missing-price, partial-coverage, and provider-failure states for recent Overview in apps/web/src/features/overview/Overview.component.tsx
+- [x] T023 [US2] Surface block-level provenance and page-level coverage messaging for recent Overview blocks in apps/web/src/features/overview/Overview.component.tsx
 
 **Checkpoint**: User Story 2 is complete and independently testable as a backend-first MVP.
 
@@ -77,12 +77,12 @@
 
 ### Implementation for User Story 1
 
-- [ ] T024 [P] [US1] Implement Overview page composition entry in apps/web/src/app/overview/page.tsx
-- [ ] T025 [P] [US1] Create connected-shell Overview container composition in apps/web/src/features/overview/Overview.container.tsx
-- [ ] T026 [P] [US1] Create connected-shell Overview presentational layout in apps/web/src/features/overview/Overview.component.tsx
-- [ ] T027 [US1] Redirect successful supported wallet connect flows from landing into `/overview` in apps/web/src/app/page.tsx
-- [ ] T028 [US1] Add connected navigation state and lock-state mapping for Overview-first entry in apps/web/src/features/overview/overview.mappers.ts
-- [ ] T029 [US1] Implement disconnected and unsupported-chain entry handling for `/overview` in apps/web/src/app/overview/page.tsx
+- [x] T024 [P] [US1] Implement Overview page composition entry in apps/web/src/app/overview/page.tsx
+- [x] T025 [P] [US1] Create connected-shell Overview container composition in apps/web/src/features/overview/Overview.container.tsx
+- [x] T026 [P] [US1] Create connected-shell Overview presentational layout in apps/web/src/features/overview/Overview.component.tsx
+- [x] T027 [US1] Redirect successful supported wallet connect flows from landing into `/overview` in apps/web/src/app/page.tsx
+- [x] T028 [US1] Add connected navigation state and lock-state mapping for Overview-first entry in apps/web/src/features/overview/overview.mappers.ts
+- [x] T029 [US1] Implement disconnected and unsupported-chain entry handling for `/overview` in apps/web/src/app/overview/page.tsx
 
 **Checkpoint**: User Story 1 is complete and independently testable.
 
@@ -96,12 +96,12 @@
 
 ### Implementation for User Story 3
 
-- [ ] T030 [US3] Normalize canonical analysis status payload fields in apps/web/src/app/api/analysis/status/route.ts
-- [ ] T031 [P] [US3] Normalize analysis start payload fields for immediate UI updates in apps/web/src/app/api/analysis/start/route.ts
-- [ ] T032 [P] [US3] Align analysis hooks with canonical start and status contracts in apps/web/src/queries/hooks.ts
-- [ ] T033 [US3] Wire analysis CTA actions and status polling into Overview orchestration in apps/web/src/features/overview/Overview.container.tsx
-- [ ] T034 [US3] Render queued, running, failed, and stale analysis messaging without hiding recent Overview data in apps/web/src/features/overview/Overview.component.tsx
-- [ ] T035 [US3] Add analysis prompt panel behavior for not-analyzed and stale recent-view states in apps/web/src/features/overview/Overview.component.tsx
+- [x] T030 [US3] Normalize canonical analysis status payload fields in apps/web/src/app/api/analysis/status/route.ts
+- [x] T031 [P] [US3] Normalize analysis start payload fields for immediate UI updates in apps/web/src/app/api/analysis/start/route.ts
+- [x] T032 [P] [US3] Align analysis hooks with canonical start and status contracts in apps/web/src/queries/hooks.ts
+- [x] T033 [US3] Wire analysis CTA actions and status polling into Overview orchestration in apps/web/src/features/overview/Overview.container.tsx
+- [x] T034 [US3] Render queued, running, failed, and stale analysis messaging without hiding recent Overview data in apps/web/src/features/overview/Overview.component.tsx
+- [x] T035 [US3] Add analysis prompt panel behavior for not-analyzed and stale recent-view states in apps/web/src/features/overview/Overview.component.tsx
 
 **Checkpoint**: User Story 3 is complete and independently testable without historical analyzed-mode delivery.
 
@@ -115,12 +115,12 @@
 
 ### Implementation for User Story 5
 
-- [ ] T036 [P] [US5] Populate EN recent Overview strings for labels, ranges, coverage, empty states, and errors in apps/web/src/i18n/locales/en/overview.json
-- [ ] T037 [P] [US5] Populate ES recent Overview strings with key parity in apps/web/src/i18n/locales/es/overview.json
-- [ ] T038 [P] [US5] Add connected navigation label parity for Overview-first delivery in apps/web/src/i18n/locales/en/navigation.json and apps/web/src/i18n/locales/es/navigation.json
-- [ ] T039 [P] [US5] Add analysis and coverage copy for status, CTA, helper, and fallback states in apps/web/src/i18n/locales/en/analysis.json and apps/web/src/i18n/locales/es/analysis.json
-- [ ] T040 [P] [US5] Add chart legend parity in apps/web/src/i18n/locales/en/charts.json and apps/web/src/i18n/locales/es/charts.json plus coverage state/reason parity in apps/web/src/i18n/locales/en/coverage.json and apps/web/src/i18n/locales/es/coverage.json
-- [ ] T041 [US5] Apply locale-aware formatting helpers and translated strings across Overview rendering in apps/web/src/features/overview/Overview.component.tsx
+- [x] T036 [P] [US5] Populate EN recent Overview strings for labels, ranges, coverage, empty states, and errors in apps/web/src/i18n/locales/en/overview.json
+- [x] T037 [P] [US5] Populate ES recent Overview strings with key parity in apps/web/src/i18n/locales/es/overview.json
+- [x] T038 [P] [US5] Add connected navigation label parity for Overview-first delivery in apps/web/src/i18n/locales/en/navigation.json and apps/web/src/i18n/locales/es/navigation.json
+- [x] T039 [P] [US5] Add analysis and coverage copy for status, CTA, helper, and fallback states in apps/web/src/i18n/locales/en/analysis.json and apps/web/src/i18n/locales/es/analysis.json
+- [x] T040 [P] [US5] Add chart legend parity in apps/web/src/i18n/locales/en/charts.json and apps/web/src/i18n/locales/es/charts.json plus coverage state/reason parity in apps/web/src/i18n/locales/en/coverage.json and apps/web/src/i18n/locales/es/coverage.json
+- [x] T041 [US5] Apply locale-aware formatting helpers and translated strings across Overview rendering in apps/web/src/features/overview/Overview.component.tsx
 
 **Checkpoint**: User Story 5 is complete and independently testable.
 
@@ -130,13 +130,13 @@
 
 **Purpose**: Validate the backend-first recent Overview stage and enforce provider-boundary, i18n, and build quality gates.
 
-- [ ] T042 Verify Moralis and Alchemy smoke scripts still pass for Overview dependencies in apps/web/package.json
-- [ ] T043 Run i18n parity validation for touched namespaces in apps/web/scripts/check-i18n-parity.ts
-- [ ] T044 Run lint and resolve Overview-related findings through apps/web/eslint.config.mjs
-- [ ] T045 Run typecheck and resolve Overview typing regressions through apps/web/tsconfig.json
-- [ ] T046 Run production build validation for the recent Overview stage in apps/web/package.json
-- [ ] T047 Verify no browser-direct provider calls or public secret exposure were introduced in apps/web/src/features/overview/ and apps/web/src/server/
-- [ ] T048 Document stage-scope completion and deferred historical analyzed-mode work in specs/003-connected-wallet-overview/quickstart.md
+- [x] T042 Verify Moralis and Alchemy smoke scripts still pass for Overview dependencies in apps/web/package.json
+- [x] T043 Run i18n parity validation for touched namespaces in apps/web/scripts/check-i18n-parity.ts
+- [x] T044 Run lint and resolve Overview-related findings through apps/web/eslint.config.mjs
+- [x] T045 Run typecheck and resolve Overview typing regressions through apps/web/tsconfig.json
+- [x] T046 Run production build validation for the recent Overview stage in apps/web/package.json
+- [x] T047 Verify no browser-direct provider calls or public secret exposure were introduced in apps/web/src/features/overview/ and apps/web/src/server/
+- [x] T048 Document stage-scope completion and deferred historical analyzed-mode work in specs/003-connected-wallet-overview/quickstart.md
 
 ---
 

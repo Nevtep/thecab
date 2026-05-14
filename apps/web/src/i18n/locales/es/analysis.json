@@ -1,3 +1,28 @@
 {
-  "title": "PENDIENTE"
+  "title": "Estado del análisis",
+  "status": {
+    "not_analyzed": "Sin analizar",
+    "queued": "En cola",
+    "running": "En curso",
+    "ready": "Listo",
+    "stale": "Desactualizado",
+    "failed": "Fallido"
+  },
+  "lastSuccessfulRunAt": "Último análisis exitoso: {{value}}",
+  "actions": {
+    "start": "Iniciar análisis",
+    "starting": "Iniciando análisis...",
+    "retry": "Reintentar análisis"
+  },
+  "messages": {
+    "not_analyzed": "Ejecuta un análisis manual para desbloquear más adelante el estado histórico canónico. Los datos recientes del proveedor siguen disponibles ahora.",
+    "queued": "El análisis se puso en cola. El resumen reciente sigue disponible mientras comienza la ejecución.",
+    "running": "El análisis está en curso. El resumen reciente sigue visible mientras llegan actualizaciones de progreso.",
+    "ready": "Los metadatos del análisis están actualizados para esta wallet.",
+    "stale": "El último análisis exitoso tiene más de siete días. Inicia una nueva ejecución cuando necesites el historial reconstruido actualizado.",
+    "failed": "La última ejecución del análisis falló. Puedes reintentarlo sin perder los datos del resumen reciente que ya están visibles."
+  },
+  "fallback": {
+    "recentViewAvailable": "Los datos recientes del proveedor siguen disponibles mientras el análisis no está disponible."
+  }
 }

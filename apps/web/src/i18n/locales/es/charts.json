@@ -1,3 +1,6 @@
 {
-  "title": "PENDIENTE"
+  "series": {
+    "netPortfolioValue": "Valor neto de la cartera",
+    "idleValue": "Valor idle"
+  }
 }

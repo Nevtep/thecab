@@ -1,3 +1,17 @@
 {
-  "title": "PENDIENTE"
+  "items": {
+    "overview": "Resumen",
+    "pools": "Pools",
+    "deposits": "Depósitos",
+    "strategies": "Estrategias",
+    "rewards": "Recompensas",
+    "governance": "Gobernanza",
+    "activity": "Actividad",
+    "settings": "Configuración"
+  },
+  "states": {
+    "active": "Actual",
+    "requiresAnalysis": "Análisis",
+    "comingSoon": "Pronto"
+  }
 }

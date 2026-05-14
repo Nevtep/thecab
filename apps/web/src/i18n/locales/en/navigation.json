@@ -1,3 +1,17 @@
 {
-  "title": "TODO"
+  "items": {
+    "overview": "Overview",
+    "pools": "Pools",
+    "deposits": "Deposits",
+    "strategies": "Strategies",
+    "rewards": "Rewards",
+    "governance": "Governance",
+    "activity": "Activity",
+    "settings": "Settings"
+  },
+  "states": {
+    "active": "Live",
+    "requiresAnalysis": "Analysis",
+    "comingSoon": "Soon"
+  }
 }

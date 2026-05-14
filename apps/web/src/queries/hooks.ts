@@ -1,9 +1,14 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 
+import { getOverviewQueryOptions } from "@/features/overview/overview.queries";
+import type {
+  OverviewAnalysisStatus,
+  OverviewQueryInput,
+} from "@/features/overview/overview.types";
 import { apiClient } from "@/queries/apiClient";
 import { queryKeys } from "@/queries/keys";
 
-type ScopedInput = {
+type WalletScopedInput = {
   chainId: number;
   walletAddress: string;
 };
@@ -11,22 +16,35 @@ type ScopedInput = {
 type AnalysisStatusResponse = {
   walletAddress: string;
   chainId: number;
-  status: string;
+  status: OverviewAnalysisStatus;
+  runId: string | null;
   stage: string;
   progressPct: number;
+  lastSuccessfulRunAt: string | null;
   lastUpdatedAt: string | null;
   lastError: string | null;
 };
 
-export function useOverviewQuery(input: ScopedInput) {
+type StartAnalysisResponse = {
+  runId: string;
+  walletAddress: string;
+  chainId: number;
+  status: OverviewAnalysisStatus;
+  stage: string;
+  progressPct: number;
+  lastSuccessfulRunAt: string | null;
+  lastUpdatedAt: string | null;
+  lastError: string | null;
+};
+
+export function useOverviewQuery(input: OverviewQueryInput, options?: { enabled?: boolean }) {
   return useQuery({
-    queryKey: queryKeys.overview(input),
-    queryFn: () => apiClient(`/api/wallet/overview?chainId=${input.chainId}`),
-    enabled: Boolean(input.walletAddress),
+    ...getOverviewQueryOptions(input),
+    enabled: (options?.enabled ?? true) && Boolean(input.walletAddress),
   });
 }
 
-export function useAnalysisStatusQuery(input: ScopedInput) {
+export function useAnalysisStatusQuery(input: WalletScopedInput) {
   return useQuery<AnalysisStatusResponse>({
     queryKey: queryKeys.analysisStatus(input),
     queryFn: () =>
@@ -44,9 +62,9 @@ export function useAnalysisStatusQuery(input: ScopedInput) {
 }
 
 export function useStartAnalysisMutation() {
-  return useMutation({
-    mutationFn: (input: ScopedInput & { mode?: "full_history" | "incremental" }) =>
-      apiClient("/api/analysis/start", {
+  return useMutation<StartAnalysisResponse, Error, WalletScopedInput & { mode?: "full_history" | "incremental" }>({
+    mutationFn: (input: WalletScopedInput & { mode?: "full_history" | "incremental" }) =>
+      apiClient<StartAnalysisResponse>("/api/analysis/start", {
         method: "POST",
         body: {
           walletAddress: input.walletAddress,
@@ -57,7 +75,7 @@ export function useStartAnalysisMutation() {
   });
 }
 
-export function usePoolsQuery(input: ScopedInput) {
+export function usePoolsQuery(input: WalletScopedInput) {
   return useQuery({
     queryKey: queryKeys.pools(input),
     queryFn: () => apiClient(`/api/pools?chainId=${input.chainId}`),
@@ -73,7 +91,7 @@ export function usePoolDetailQuery(chainId: number, poolId: string) {
   });
 }
 
-export function useDepositsQuery(input: ScopedInput) {
+export function useDepositsQuery(input: WalletScopedInput) {
   return useQuery({
     queryKey: queryKeys.deposits(input),
     queryFn: () => apiClient(`/api/deposits?chainId=${input.chainId}`),
@@ -89,7 +107,7 @@ export function useDepositDetailQuery(chainId: number, depositId: string) {
   });
 }
 
-export function useStrategiesQuery(input: ScopedInput) {
+export function useStrategiesQuery(input: WalletScopedInput) {
   return useQuery({
     queryKey: queryKeys.strategies(input),
     queryFn: () => apiClient(`/api/strategies?chainId=${input.chainId}`),
@@ -105,7 +123,7 @@ export function useStrategyDetailQuery(chainId: number, strategyId: string) {
   });
 }
 
-export function useRewardsQuery(input: ScopedInput) {
+export function useRewardsQuery(input: WalletScopedInput) {
   return useQuery({
     queryKey: queryKeys.rewards(input),
     queryFn: () => apiClient(`/api/rewards?chainId=${input.chainId}`),
@@ -113,7 +131,7 @@ export function useRewardsQuery(input: ScopedInput) {
   });
 }
 
-export function useGovernanceQuery(input: ScopedInput) {
+export function useGovernanceQuery(input: WalletScopedInput) {
   return useQuery({
     queryKey: queryKeys.governance(input),
     queryFn: () => apiClient(`/api/governance?chainId=${input.chainId}`),
@@ -121,7 +139,7 @@ export function useGovernanceQuery(input: ScopedInput) {
   });
 }
 
-export function useActivityQuery(input: ScopedInput) {
+export function useActivityQuery(input: WalletScopedInput) {
   return useQuery({
     queryKey: queryKeys.activity(input),
     queryFn: () => apiClient(`/api/activity?chainId=${input.chainId}`),
@@ -129,7 +147,7 @@ export function useActivityQuery(input: ScopedInput) {
   });
 }
 
-export function useSettingsQuery(input: ScopedInput) {
+export function useSettingsQuery(input: WalletScopedInput) {
   return useQuery({
     queryKey: queryKeys.settings(input),
     queryFn: () => apiClient(`/api/settings?chainId=${input.chainId}`),

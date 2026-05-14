@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 
 import { DisconnectedShell } from "@/design-system";
@@ -15,11 +17,20 @@ import {
   LandingValueBlocksSection,
 } from "@/app/landing/components";
 import { landingAssets } from "@/app/landing/landingAssets";
+import { useCabWallet } from "@/wallet/useCabWallet";
 
 import styles from "@/app/page.module.css";
 
 export default function Home() {
   const { t } = useTranslation("landing");
+  const router = useRouter();
+  const { isConnected, isSupportedChain } = useCabWallet();
+
+  useEffect(() => {
+    if (isConnected && isSupportedChain) {
+      router.replace("/overview");
+    }
+  }, [isConnected, isSupportedChain, router]);
 
   return (
     <DisconnectedShell

@@ -1,3 +1,14 @@
 {
-  "title": "TODO"
+  "noticeTitle": "Partial coverage",
+  "status": {
+    "recent": "Recent coverage",
+    "partial": "Partial coverage",
+    "unknown": "Unknown coverage"
+  },
+  "reasons": {
+    "analysisPending": "Historical analysis is still pending",
+    "providerPartial": "One or more providers returned partial data",
+    "missingPrices": "Some assets do not have current prices",
+    "noRecentActivity": "No recent on-chain activity was found"
+  }
 }

@@ -1,3 +1,6 @@
 {
-  "title": "TODO"
+  "series": {
+    "netPortfolioValue": "Net portfolio value",
+    "idleValue": "Idle value"
+  }
 }

@@ -3,9 +3,13 @@ type BaseParams = {
   walletAddress?: string;
 };
 
+type OverviewParams = BaseParams & {
+  range: string;
+};
+
 export const queryKeys = {
-  overview: ({ chainId, walletAddress }: BaseParams) =>
-    ["overview", chainId, walletAddress ?? ""] as const,
+  overview: ({ chainId, walletAddress, range }: OverviewParams) =>
+    ["overview", chainId, walletAddress ?? "", range] as const,
   analysisStatus: ({ chainId, walletAddress }: BaseParams) =>
     ["analysis-status", chainId, walletAddress ?? ""] as const,
   pools: ({ chainId, walletAddress }: BaseParams) =>
