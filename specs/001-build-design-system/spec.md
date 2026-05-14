@@ -1,6 +1,6 @@
 # Feature Specification: Full Design System Implementation
 
-**Feature Branch**: `005-build-design-system`  
+**Feature Branch**: `001-build-design-system`  
 **Created**: 2026-05-13  
 **Status**: Draft  
 **Input**: User description: "Build complete internal Design System first, then migrate product UI to wrappers with enforcement and quality gates."

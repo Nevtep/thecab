@@ -8,7 +8,7 @@ Deliver the complete internal Design System before feature-page expansion, then 
 
 - Workspace root: /Users/core/Code/The Cab
 - Web app path: apps/web
-- Branch: 005-build-design-system
+- Branch: 001-build-design-system
 
 ## Milestone A: Foundation + Primitives Bootstrap
 

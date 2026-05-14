@@ -1,6 +1,6 @@
 # Implementation Plan: Full Design System Implementation
 
-**Branch**: `005-build-design-system` | **Date**: 2026-05-13 | **Spec**: [spec.md](./spec.md)
+**Branch**: `001-build-design-system` | **Date**: 2026-05-13 | **Spec**: [spec.md](./spec.md)
 **Input**: Feature specification from `/specs/001-build-design-system/spec.md`
 
 ## Summary
