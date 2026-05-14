@@ -11,11 +11,11 @@
 
 **Purpose**: Establish landing feature structure and asset workspace.
 
-- [ ] T001 Create landing section component folder structure in apps/web/src/app/landing/components/
-- [ ] T002 Create route-level section composition shell in apps/web/src/app/page.tsx
-- [ ] T003 [P] Create landing section style modules in apps/web/src/app/landing/components/
-- [ ] T004 [P] Create landing public asset directory and naming manifest in apps/web/public/landing/manifest.json
-- [ ] T005 Create reusable section wrapper component for consistent IA spacing in apps/web/src/app/landing/components/LandingSectionShell.tsx
+- [X] T001 Create landing section component folder structure in apps/web/src/app/landing/components/
+- [X] T002 Create route-level section composition shell in apps/web/src/app/page.tsx
+- [X] T003 [P] Create landing section style modules in apps/web/src/app/landing/components/
+- [X] T004 [P] Create landing public asset directory and naming manifest in apps/web/public/landing/manifest.json
+- [X] T005 Create reusable section wrapper component for consistent IA spacing in apps/web/src/app/landing/components/LandingSectionShell.tsx
 
 ---
 
@@ -25,14 +25,14 @@
 
 **⚠️ CRITICAL**: No user story work should begin until this phase is complete.
 
-- [ ] T006 Define canonical landing namespace structure and key groups in apps/web/src/i18n/locales/en/landing.json
-- [ ] T007 [P] Mirror landing namespace key structure for ES parity in apps/web/src/i18n/locales/es/landing.json
-- [ ] T008 [P] Add brand-locked typography and numeric utility classes for landing sections in apps/web/src/app/globals.css
-- [ ] T009 Create landing wallet CTA state mapper utility using useCabWallet contracts in apps/web/src/app/landing/landingWalletState.ts
-- [ ] T010 [P] Add landing asset typing/constants for semantic image usage in apps/web/src/app/landing/landingAssets.ts
-- [ ] T011 Establish landing accessibility text key usage (skip link, alt text, decorative labels) in apps/web/src/i18n/locales/en/landing.json
-- [ ] T012 [P] Add matching ES accessibility text keys in apps/web/src/i18n/locales/es/landing.json
-- [ ] T013 Finalize curated section-to-asset map in apps/web/public/landing/manifest.json
+- [X] T006 Define canonical landing namespace structure and key groups in apps/web/src/i18n/locales/en/landing.json
+- [X] T007 [P] Mirror landing namespace key structure for ES parity in apps/web/src/i18n/locales/es/landing.json
+- [X] T008 [P] Add brand-locked typography and numeric utility classes for landing sections in apps/web/src/app/globals.css
+- [X] T009 Create landing wallet CTA state mapper utility using useCabWallet contracts in apps/web/src/app/landing/landingWalletState.ts
+- [X] T010 [P] Add landing asset typing/constants for semantic image usage in apps/web/src/app/landing/landingAssets.ts
+- [X] T011 Establish landing accessibility text key usage (skip link, alt text, decorative labels) in apps/web/src/i18n/locales/en/landing.json
+- [X] T012 [P] Add matching ES accessibility text keys in apps/web/src/i18n/locales/es/landing.json
+- [X] T013 Finalize curated section-to-asset map in apps/web/public/landing/manifest.json
 
 **Checkpoint**: Foundation complete - user stories can now proceed.
 
@@ -46,17 +46,17 @@
 
 ### Implementation for User Story 1
 
-- [ ] T014 [P] [US1] Implement hero section component with DS-only composition in apps/web/src/app/landing/components/LandingHeroSection.tsx
-- [ ] T015 [P] [US1] Implement value proposition blocks component in apps/web/src/app/landing/components/LandingValueBlocksSection.tsx
-- [ ] T016 [US1] Implement wallet CTA component with disconnected/connected/unsupported handling in apps/web/src/app/landing/components/LandingWalletCta.tsx
-- [ ] T017 [US1] Wire page route composition to include hero and value sections in apps/web/src/app/page.tsx
-- [ ] T018 [US1] Apply first-fold mobile-first layout and CTA prominence styles in apps/web/src/app/page.module.css
-- [ ] T019 [US1] Populate EN hero/value/CTA copy from copy guideline source keys in apps/web/src/i18n/locales/en/landing.json
-- [ ] T020 [US1] Populate ES hero/value/CTA copy adapted from Spanish copy guideline in apps/web/src/i18n/locales/es/landing.json
-- [ ] T021 [US1] Move and map curated hero/value assets per manifest from branding/landing/ to apps/web/public/landing/
-- [ ] T022 [US1] Integrate selected hero/value assets into hero and value components in apps/web/src/app/landing/components/LandingHeroSection.tsx
-- [ ] T023 [US1] Add Base-v1 scoped unsupported-chain guidance copy keys for wallet CTA states in apps/web/src/i18n/locales/en/wallet.json
-- [ ] T024 [US1] Add ES parity for unsupported-chain guidance keys in apps/web/src/i18n/locales/es/wallet.json
+- [X] T014 [P] [US1] Implement hero section component with DS-only composition in apps/web/src/app/landing/components/LandingHeroSection.tsx
+- [X] T015 [P] [US1] Implement value proposition blocks component in apps/web/src/app/landing/components/LandingValueBlocksSection.tsx
+- [X] T016 [US1] Implement wallet CTA component with disconnected/connected/unsupported handling in apps/web/src/app/landing/components/LandingWalletCta.tsx
+- [X] T017 [US1] Wire page route composition to include hero and value sections in apps/web/src/app/page.tsx
+- [X] T018 [US1] Apply first-fold mobile-first layout and CTA prominence styles in apps/web/src/app/page.module.css
+- [X] T019 [US1] Populate EN hero/value/CTA copy from copy guideline source keys in apps/web/src/i18n/locales/en/landing.json
+- [X] T020 [US1] Populate ES hero/value/CTA copy adapted from Spanish copy guideline in apps/web/src/i18n/locales/es/landing.json
+- [X] T021 [US1] Move and map curated hero/value assets per manifest from branding/landing/ to apps/web/public/landing/
+- [X] T022 [US1] Integrate selected hero/value assets into hero and value components in apps/web/src/app/landing/components/LandingHeroSection.tsx
+- [X] T023 [US1] Add Base-v1 scoped unsupported-chain guidance copy keys for wallet CTA states in apps/web/src/i18n/locales/en/wallet.json
+- [X] T024 [US1] Add ES parity for unsupported-chain guidance keys in apps/web/src/i18n/locales/es/wallet.json
 
 **Checkpoint**: User Story 1 is complete and independently testable.
 
@@ -70,16 +70,24 @@
 
 ### Implementation for User Story 2
 
-- [ ] T025 [P] [US2] Implement how-it-works section component in apps/web/src/app/landing/components/LandingHowItWorksSection.tsx
-- [ ] T026 [P] [US2] Implement trust/privacy section component in apps/web/src/app/landing/components/LandingTrustPrivacySection.tsx
-- [ ] T027 [P] [US2] Implement final CTA section component in apps/web/src/app/landing/components/LandingFinalCtaSection.tsx
-- [ ] T028 [US2] Wire how-it-works, trust/privacy, and final CTA sections into landing route in apps/web/src/app/page.tsx
-- [ ] T029 [US2] Add EN how-it-works/trust/final CTA copy blocks from attached guideline map in apps/web/src/i18n/locales/en/landing.json
-- [ ] T030 [US2] Add ES how-it-works/trust/final CTA copy blocks from attached guideline map in apps/web/src/i18n/locales/es/landing.json
-- [ ] T031 [US2] Move and map curated workflow/trust/coverage assets per manifest from branding/landing/ to apps/web/public/landing/
-- [ ] T032 [US2] Bind workflow/trust/coverage assets to section components with semantic alt-label usage in apps/web/src/app/landing/components/LandingHowItWorksSection.tsx
-- [ ] T033 [US2] Enforce analysis-vs-execution and read-only trust statements via translation keys in apps/web/src/i18n/locales/en/landing.json
-- [ ] T034 [US2] Add ES parity for trust statements and coverage messaging in apps/web/src/i18n/locales/es/landing.json
+- [X] T025 [P] [US2] Implement how-it-works section component in apps/web/src/app/landing/components/LandingHowItWorksSection.tsx
+- [X] T026 [P] [US2] Implement trust/privacy section component in apps/web/src/app/landing/components/LandingTrustPrivacySection.tsx
+- [X] T027 [P] [US2] Implement final CTA section component in apps/web/src/app/landing/components/LandingFinalCtaSection.tsx
+- [X] T028 [US2] Wire how-it-works, trust/privacy, and final CTA sections into landing route in apps/web/src/app/page.tsx
+- [X] T029 [US2] Add EN how-it-works/trust/final CTA copy blocks from attached guideline map in apps/web/src/i18n/locales/en/landing.json
+- [X] T030 [US2] Add ES how-it-works/trust/final CTA copy blocks from attached guideline map in apps/web/src/i18n/locales/es/landing.json
+- [X] T031 [US2] Move and map curated workflow/trust/coverage assets per manifest from branding/landing/ to apps/web/public/landing/
+- [X] T032 [US2] Bind workflow/trust/coverage assets to section components with semantic alt-label usage in apps/web/src/app/landing/components/LandingHowItWorksSection.tsx
+- [X] T033 [US2] Enforce analysis-vs-execution and read-only trust statements via translation keys in apps/web/src/i18n/locales/en/landing.json
+- [X] T034 [US2] Add ES parity for trust statements and coverage messaging in apps/web/src/i18n/locales/es/landing.json
+- [X] T053 [US2] Implement product promise section component in apps/web/src/app/landing/components/LandingProductPromiseSection.tsx
+- [X] T054 [US2] Implement pools/deposits/strategies explanation section in apps/web/src/app/landing/components/LandingModelClaritySection.tsx
+- [X] T055 [US2] Implement activity intelligence section in apps/web/src/app/landing/components/LandingActivityIntelligenceSection.tsx
+- [X] T056 [US2] Wire product-promise, model-clarity, and activity-intelligence sections into apps/web/src/app/page.tsx
+- [X] T057 [US2] Add EN copy keys for product promise, model clarity, and activity intelligence in apps/web/src/i18n/locales/en/landing.json
+- [X] T058 [US2] Add ES parity for product promise, model clarity, and activity intelligence in apps/web/src/i18n/locales/es/landing.json
+- [X] T059 [US2] Map the added landing visuals in apps/web/src/app/landing/landingAssets.ts and apps/web/public/landing/manifest.json
+- [X] T060 [US2] Reconcile feature docs with the broader landing IA in specs/002-landing-page/spec.md and specs/002-landing-page/plan.md
 
 **Checkpoint**: User Story 2 is complete and independently testable.
 
@@ -93,14 +101,14 @@
 
 ### Implementation for User Story 3
 
-- [ ] T035 [P] [US3] Add skip-link and semantic landmark wrappers in landing route in apps/web/src/app/page.tsx
-- [ ] T036 [P] [US3] Implement reduced-motion safe animation variants in landing styles in apps/web/src/app/page.module.css
-- [ ] T037 [US3] Add focus-visible and keyboard traversal refinements for all interactive controls in apps/web/src/app/page.module.css
-- [ ] T038 [US3] Add responsive breakpoint tuning for mobile/tablet/desktop section density in apps/web/src/app/page.module.css
-- [ ] T039 [US3] Add EN accessibility and aria label keys used by landing components in apps/web/src/i18n/locales/en/landing.json
-- [ ] T040 [US3] Add ES parity for accessibility and aria label keys in apps/web/src/i18n/locales/es/landing.json
-- [ ] T041 [US3] Validate landing namespace key parity and fix mismatches in apps/web/src/i18n/locales/
-- [ ] T042 [US3] Verify no hardcoded user-facing strings remain in landing components under apps/web/src/app/landing/components/
+- [X] T035 [P] [US3] Add skip-link and semantic landmark wrappers in landing route in apps/web/src/app/page.tsx
+- [X] T036 [P] [US3] Implement reduced-motion safe animation variants in landing styles in apps/web/src/app/page.module.css
+- [X] T037 [US3] Add focus-visible and keyboard traversal refinements for all interactive controls in apps/web/src/app/page.module.css
+- [X] T038 [US3] Add responsive breakpoint tuning for mobile/tablet/desktop section density in apps/web/src/app/page.module.css
+- [X] T039 [US3] Add EN accessibility and aria label keys used by landing components in apps/web/src/i18n/locales/en/landing.json
+- [X] T040 [US3] Add ES parity for accessibility and aria label keys in apps/web/src/i18n/locales/es/landing.json
+- [X] T041 [US3] Validate landing namespace key parity and fix mismatches in apps/web/src/i18n/locales/
+- [X] T042 [US3] Verify no hardcoded user-facing strings remain in landing components under apps/web/src/app/landing/components/
 
 **Checkpoint**: User Story 3 is complete and independently testable.
 
@@ -110,16 +118,16 @@
 
 **Purpose**: Final hardening, quality validation, and release readiness.
 
-- [ ] T043 [P] [Optional] Add minimal non-invasive landing interaction telemetry hooks in apps/web/src/app/landing/landingTelemetry.ts
-- [ ] T044 [Optional] Integrate telemetry calls for hero/final CTA events in apps/web/src/app/landing/components/LandingWalletCta.tsx
-- [ ] T045 [P] Optimize selected landing assets for web delivery in apps/web/public/landing/
-- [ ] T046 Run localization parity checker and resolve issues using apps/web/scripts/check-i18n-parity.ts
-- [ ] T047 Run lint and resolve findings for landing changes from apps/web/eslint.config.mjs
-- [ ] T048 Run typecheck and resolve typing issues from apps/web/tsconfig.json
-- [ ] T049 Run production build validation and resolve regressions from apps/web/package.json
-- [ ] T050 Perform final acceptance review using pass/fail matrix in specs/002-landing-page/checklists/acceptance-matrix.md and feature checklist in specs/002-landing-page/spec.md
-- [ ] T051 Validate SC-001 with a usability comprehension check and record results in specs/002-landing-page/checklists/requirements.md
-- [ ] T052 Validate SC-002 with CTA discoverability timing checks on mobile/desktop and record results in specs/002-landing-page/checklists/requirements.md
+- [X] T043 [P] [Optional] Add minimal non-invasive landing interaction telemetry hooks in apps/web/src/app/landing/landingTelemetry.ts
+- [X] T044 [Optional] Integrate telemetry calls for hero/final CTA events in apps/web/src/app/landing/components/LandingWalletCta.tsx
+- [X] T045 [P] Optimize selected landing assets for web delivery in apps/web/public/landing/
+- [X] T046 Run localization parity checker and resolve issues using apps/web/scripts/check-i18n-parity.ts
+- [X] T047 Run lint and resolve findings for landing changes from apps/web/eslint.config.mjs
+- [X] T048 Run typecheck and resolve typing issues from apps/web/tsconfig.json
+- [X] T049 Run production build validation and resolve regressions from apps/web/package.json
+- [X] T050 Perform final acceptance review using pass/fail matrix in specs/002-landing-page/checklists/acceptance-matrix.md and feature checklist in specs/002-landing-page/spec.md
+- [X] T051 Validate SC-001 with a usability comprehension check and record results in specs/002-landing-page/checklists/requirements.md
+- [X] T052 Validate SC-002 with CTA discoverability timing checks on mobile/desktop and record results in specs/002-landing-page/checklists/requirements.md
 
 ---
 

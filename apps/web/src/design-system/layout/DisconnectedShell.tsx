@@ -5,20 +5,50 @@ import type { PropsWithChildren } from "react";
 
 import { cabColors } from "@/design-system/tokens";
 
-export function DisconnectedShell({ children }: PropsWithChildren) {
+type DisconnectedShellProps = PropsWithChildren<{
+  backgroundSrc?: string;
+  backgroundAlt?: string;
+}>;
+
+export function DisconnectedShell({
+  children,
+  backgroundSrc = "/background.png",
+  backgroundAlt = "The Cab background",
+}: DisconnectedShellProps) {
   return (
-    <main style={{ position: "relative", minHeight: "100vh", width: "100%", overflow: "hidden" }}>
-      <Image
-        src="/LandingBackground.png"
-        alt="The Cab background"
-        fill
-        priority
-        style={{ objectFit: "cover", objectPosition: "center" }}
-      />
+    <main
+      style={{
+        position: "relative",
+        minHeight: "100vh",
+        width: "100%",
+        overflow: "hidden",
+        backgroundColor: "#061221",
+      }}
+    >
+      <div
+        aria-hidden="true"
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 0,
+          pointerEvents: "none",
+        }}
+      >
+        <Image
+          src={backgroundSrc}
+          alt={backgroundAlt}
+          fill
+          priority
+          sizes="100vw"
+          style={{ objectFit: "cover", objectPosition: "center" }}
+        />
+      </div>
       <div
         style={{
-          position: "absolute",
+          position: "fixed",
           inset: 0,
+          zIndex: 0,
+          pointerEvents: "none",
           background:
             "linear-gradient(160deg, rgba(4,15,28,0.55) 0%, rgba(4,15,28,0.8) 70%, rgba(4,15,28,0.9) 100%)",
         }}

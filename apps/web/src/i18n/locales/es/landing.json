@@ -1,4 +1,239 @@
 {
-  "title": "Una torre de control para tu capital on-chain.",
-  "subtitle": "Conecta tu wallet para un resumen reciente y ejecuta un analisis historico para desbloquear todas las secciones del cockpit."
+  "meta": {
+    "title": "The Cab | Torre de control para capital on-chain",
+    "description": "The Cab le da a usuarios de Aerodrome una cabina precisa para monitorear exposición de wallet, pools, estrategias, rewards, governance y flujo histórico de capital."
+  },
+  "hero": {
+    "eyebrow": "Cabina de comando para portfolios en Aerodrome",
+    "title": "Una torre de control para tu capital on-chain.",
+    "body": "The Cab le da a usuarios de Aerodrome una cabina precisa para monitorear exposición de wallet, participación en pools, depósitos manuales, estrategias Mellow, rewards, actividad de governance y flujo histórico de capital.",
+    "support": "Conectá tu wallet para obtener una vista rápida del estado actual. Ejecutá el análisis histórico cuando quieras desbloquear vistas profundas de pools, depósitos, estrategias, rewards, governance y actividad.",
+    "primaryCta": {
+      "disconnected": "Conectar wallet",
+      "connected": "Continuar con esta wallet",
+      "unsupported": "Cambiar a Base"
+    },
+    "secondaryCta": "Cómo funciona el análisis",
+    "badges": {
+      "base": "Base mainnet",
+      "aerodrome": "Analytics para Aerodrome",
+      "mellow": "Estrategias Mellow",
+      "wallet": "Análisis por wallet"
+    },
+    "panel": {
+      "title": "Estado del portfolio",
+      "status": "Ready",
+      "poolExposureLabel": "Pool exposure",
+      "poolExposureValue": "WETH / cbBTC",
+      "coverageLabel": "Cobertura de estrategia",
+      "coverageValue": "Share-level",
+      "rewardsLabel": "Rewards trackeados",
+      "rewardsValue": "AERO + fees"
+    }
+  },
+  "value": {
+    "eyebrow": "Los datos están on-chain. La lectura no siempre es clara.",
+    "heading": "El historial de una wallet no está diseñado para explicar performance.",
+    "body": "La actividad en Aerodrome puede pasar por pools, gauges, depósitos manuales, estrategias Mellow, claims, votos, swaps, retiros y balances residuales. Un historial de wallet muestra transacciones. The Cab reconstruye la imagen operativa detrás de esas transacciones.",
+    "cards": {
+      "poolExposure": {
+        "title": "La exposición por pool se fragmenta",
+        "body": "El capital puede moverse entre depósitos, balances residuales, rebalances y nuevas posiciones. The Cab mantiene visible la exposición por pool en lugar de tratar cada retiro como una salida definitiva."
+      },
+      "strategies": {
+        "title": "Las estrategias no son depósitos manuales",
+        "body": "Las estrategias Mellow usan wrappers, shares, contratos de rewards y su propio modelo de cobertura. The Cab separa la exposición automatizada de los depósitos manuales en Aerodrome."
+      },
+      "rewards": {
+        "title": "Los rewards necesitan atribución",
+        "body": "Claims, fees, bribes y rewards de governance son útiles cuando pueden vincularse a pools, depósitos, estrategias o votos."
+      },
+      "activity": {
+        "title": "La actividad necesita interpretación",
+        "body": "Un swap puede ser una operación normal, un rebalance, una liquidación o parte de un flujo de atribución residual. The Cab etiqueta la actividad con contexto y confianza."
+      }
+    }
+  },
+  "productPromise": {
+    "eyebrow": "Vista de cabina",
+    "heading": "De actividad de wallet a inteligencia operativa del portfolio.",
+    "body": "The Cab convierte actividad cruda de wallet en un modelo estructurado de tu portfolio en Aerodrome: pools, depósitos, estrategias, rewards, governance, actividad y cobertura.",
+    "cards": {
+      "overview": {
+        "title": "Overview rápido de la wallet",
+        "body": "Conectá tu wallet y obtené una vista inmediata de balances, actividad reciente, valores de mercado, capital desplegado, activos idle y estado del análisis."
+      },
+      "pools": {
+        "title": "Exposición por pool",
+        "body": "Visualizá cada pool de Aerodrome como una unidad de mercado: depósitos manuales, estrategias automatizadas, rewards, balances residuales y actividad agrupada por pool."
+      },
+      "deposits": {
+        "title": "Ciclo de vida de depósitos manuales",
+        "body": "Seguimiento de depósitos directos en Aerodrome desde mint y cambios de liquidez hasta staking, claims, retiros y cierre."
+      },
+      "strategies": {
+        "title": "Accounting para estrategias automatizadas",
+        "body": "Analizá exposición en Mellow a través de wrappers, shares, StakingRewards, depósitos, retiros, claims y estado de cobertura."
+      },
+      "rewards": {
+        "title": "Atribución de rewards",
+        "body": "Entendé el valor reclamado por fuente: depósitos manuales, estrategias, governance fees, bribes, rebases y rewards asociados a pools."
+      },
+      "governance": {
+        "title": "veAERO y retornos por votación",
+        "body": "Monitoreá locks, votos, relays, voting fees, bribes y flujos de rewards de governance sin mezclarlos con la performance de depósitos."
+      }
+    }
+  },
+  "howItWorks": {
+    "eyebrow": "Flujo de análisis",
+    "heading": "Primero una vista rápida. Después, análisis profundo cuando lo necesitás.",
+    "body": "The Cab empieza con un overview rápido de la wallet y luego ejecuta un análisis histórico no bloqueante cuando pedís métricas más profundas. Podés seguir usando el dashboard mientras el análisis corre en segundo plano.",
+    "step01": {
+      "label": "01",
+      "title": "Conectá tu wallet",
+      "body": "Conectá con WalletConnect. Product v1 soporta Base mainnet y usa la wallet conectada como alcance del análisis."
+    },
+    "step02": {
+      "label": "02",
+      "title": "Obtené el overview rápido",
+      "body": "The Cab usa balances, historial reciente y precios de mercado para mostrar una cabina inicial mientras el análisis profundo sigue siendo opcional."
+    },
+    "step03": {
+      "label": "03",
+      "title": "Ejecutá el análisis histórico",
+      "body": "Dispará un análisis en segundo plano que reconstruye actividad en Aerodrome y Mellow: pools, depósitos, estrategias, rewards, governance y movimientos de wallet."
+    },
+    "step04": {
+      "label": "04",
+      "title": "Desbloqueá las secciones profundas",
+      "body": "Cuando el análisis está listo, la app conectada habilita Pools, Depósitos, Estrategias, Rewards, Governance y Actividad con datos normalizados e indicadores de cobertura."
+    },
+    "step05": {
+      "label": "05",
+      "title": "Actualizá cuando los datos estén viejos",
+      "body": "Si el último análisis tiene más de una semana, The Cab puede actualizarlo en segundo plano preservando los últimos datos válidos."
+    }
+  },
+  "modelClarity": {
+    "eyebrow": "Modelo claro",
+    "heading": "Pools, depósitos y estrategias están conectados, pero no son lo mismo.",
+    "body": "The Cab separa exposición de mercado, ciclo de vida de depósitos manuales y accounting de estrategias automatizadas. Así mantiene claridad cuando el capital se mueve entre pools de Aerodrome, depósitos directos, wrappers de Mellow, rewards y balances residuales.",
+    "blocks": {
+      "pool": {
+        "title": "Pool",
+        "body": "Un pool es el mercado base, como WETH/cbBTC o AERO/USDC. Las vistas de pool agregan depósitos manuales, estrategias automatizadas, rewards, balances residuales y actividad para ese mercado."
+      },
+      "deposit": {
+        "title": "Depósito",
+        "body": "Un depósito es exposición directa del usuario dentro de un pool de Aerodrome. The Cab sigue su ciclo de vida a través de cambios de liquidez, staking, claims, retiros y cierre."
+      },
+      "strategy": {
+        "title": "Estrategia",
+        "body": "Una estrategia es exposición automatizada, inicialmente enfocada en Mellow. Tiene su propio wrapper, shares, rewards, cobertura y modelo de accounting, aunque también contribuya al agregado del pool subyacente."
+      }
+    }
+  },
+  "activityIntelligence": {
+    "eyebrow": "Interpretación de transacciones",
+    "heading": "Las transacciones crudas se convierten en actividad explicable.",
+    "body": "The Cab transforma actividad de wallet en eventos clasificados: depósitos, retiros, swaps, claims, staking, votos, rebalances, movimientos de estrategias, liquidaciones, cash-ins y cash-outs.",
+    "cards": {
+      "rebalanceDetection": {
+        "title": "Detección de rebalances",
+        "body": "Un swap entre tokens del mismo pool puede clasificarse como rebalance cuando consume balances residuales atribuidos a ese pool."
+      },
+      "residualAttribution": {
+        "title": "Atribución residual",
+        "body": "Los tokens retirados de un pool permanecen atribuidos a ese pool hasta que un movimiento posterior los resuelve como redeployed, rebalanced, liquidated, transferred o still waiting."
+      },
+      "sourceWaterfall": {
+        "title": "Source waterfall",
+        "body": "Cuando un swap excede el residual de un pool, The Cab asigna el excedente entre cash-ins, inventario derivado de liquidaciones y otros estados residuales en lugar de sobre-atribuirlo."
+      }
+    }
+  },
+  "trust": {
+    "eyebrow": "Read-only por diseño",
+    "heading": "Conectar para analizar. No para ejecutar.",
+    "body": "The Cab es una superficie de monitoreo y analytics. Product v1 no ejecuta trades, no mueve fondos y no requiere reconciliación manual. Lee actividad de wallet, reconstruye contexto de portfolio y muestra analytics con cobertura visible.",
+    "title": "Los límites de confianza siguen visibles.",
+    "support": "El acceso por wallet se usa solo para analytics read-only. The Cab no custodia private keys y mantiene la ejecución fuera de la experiencia de landing.",
+    "bullets": {
+      "readOnlyAnalytics": {
+        "label": "Analytics read-only",
+        "body": "La wallet conectada define el alcance del análisis, pero product v1 sigue enfocado en monitoreo e interpretación."
+      },
+      "noPrivateKeyCustody": {
+        "label": "Sin custodia de private keys",
+        "body": "The Cab no pide private keys ni custodia autoridad de firma para reconstruir el historial del portfolio."
+      },
+      "noTransactionExecution": {
+        "label": "Sin ejecución de transacciones",
+        "body": "The Cab no tradea, no mueve fondos y no ejecuta acciones de wallet dentro de la landing ni del flujo de análisis."
+      },
+      "coverageVisible": {
+        "label": "Cobertura visible",
+        "body": "Cuando los datos son partial, share-level o unknown, la limitación se muestra de forma explícita en lugar de ocultarse detrás de falsa precisión."
+      }
+    }
+  },
+  "coverage": {
+    "heading": "La precisión también implica mostrar qué es parcial.",
+    "body": "The Cab no oculta la incertidumbre. El accounting de estrategias, los datos de providers, los precios, los mapeos de protocolo y la actividad decodificada pueden marcarse como full, share-level, partial, limited o unknown según la evidencia disponible.",
+    "cards": {
+      "full": {
+        "title": "Full",
+        "body": "El evento o la métrica fue reconstruido con evidencia confiable de protocolo, movimientos de tokens, precios y mapeos conocidos."
+      },
+      "shareLevel": {
+        "title": "Share-level",
+        "body": "La exposición del usuario en una estrategia es confiable a nivel de shares, aunque la mecánica interna de la estrategia no esté completamente reconstruida."
+      },
+      "partial": {
+        "title": "Partial",
+        "body": "Faltan algunos eventos, precios, mapeos o contexto histórico. La métrica es útil, pero debe leerse con sus limitaciones."
+      },
+      "unknown": {
+        "title": "Unknown",
+        "body": "La actividad fue detectada, pero The Cab no puede clasificarla con suficiente confianza como para presentarla como métrica confiable."
+      }
+    }
+  },
+  "cta": {
+    "eyebrow": "Listo para despegar",
+    "heading": "Llevá tu portfolio en Aerodrome a la cabina.",
+    "body": "Conectá tu wallet, inspeccioná el estado actual y ejecutá análisis histórico cuando necesites la imagen operativa completa.",
+    "secondary": "Revisar flujo de análisis",
+    "supportText": "La conexión de wallet sigue siendo read-only en product v1 y mantiene Base mainnet como alcance soportado del análisis."
+  },
+  "walletState": {
+    "disconnected": "Wallet desconectada",
+    "connectedBase": "Wallet conectada en Base mainnet",
+    "unsupportedChain": "La wallet conectada está en una red no soportada"
+  },
+  "a11y": {
+    "skipToContent": "Saltar al contenido de la landing",
+    "mainLandmark": "Contenido de la landing",
+    "heroLandmark": "Sección principal de la landing",
+    "footerLandmark": "Sección final de llamada a la acción",
+    "heroVisualAlt": "Interfaz ilustrada de torre de control mostrando el panel de estado de The Cab",
+    "problemPoolExposureAlt": "Ilustración que muestra la exposición por pool fragmentada entre posiciones desconectadas",
+    "problemStrategiesAlt": "Ilustración que muestra las estrategias automatizadas como una capa separada de los depósitos manuales",
+    "problemRewardsAlt": "Ilustración que muestra la atribución de rewards repartida entre múltiples fuentes y resultados",
+    "problemActivityAlt": "Ilustración que muestra la interpretación de actividad mediante un grafo ampliado de decisiones",
+    "productPromiseVisualAlt": "Ilustración panorámica de cabina mostrando cómo The Cab organiza pools, estrategias, rewards, governance, markets e inteligencia de portfolio en una sola vista operativa",
+    "howItWorksStep01Alt": "Ilustración que muestra la conexión de wallet como primer paso del flujo de análisis",
+    "howItWorksStep02Alt": "Ilustración que muestra el overview rápido del portfolio",
+    "howItWorksStep03Alt": "Ilustración que muestra la reconstrucción histórica en progreso",
+    "howItWorksStep04Alt": "Ilustración que muestra las superficies profundas desbloqueadas después del análisis",
+    "howItWorksStep05Alt": "Ilustración que muestra la actualización en segundo plano cuando los datos están viejos",
+    "modelClarityVisualAlt": "Diagrama que muestra un pool en el centro con depósitos manuales, estrategias automatizadas y atribución residual conectadas alrededor",
+    "activityIntelligenceVisualAlt": "Ilustración tipo timeline que muestra actividad de wallet decodificada en eventos operativos etiquetados a lo largo de un flujo de portfolio",
+    "trustReadOnlyAlt": "Ilustración de confianza read-only que muestra The Cab como cabina de monitoreo y no como terminal de ejecución",
+    "coverageFullAlt": "Imagen de cobertura que representa analytics totalmente reconstruidos",
+    "coverageShareLevelAlt": "Imagen de cobertura que representa accounting a nivel de shares",
+    "coveragePartialAlt": "Imagen de cobertura que representa datos con cobertura parcial",
+    "coverageUnknownAlt": "Imagen de cobertura que representa clasificación de actividad unknown"
+  }
 }

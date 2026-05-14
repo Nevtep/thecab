@@ -29,11 +29,11 @@ As a cautious DeFi user, I need a concise explanation of how The Cab works and w
 
 **Why this priority**: Trust and clarity are required to reduce hesitation for wallet connection in a crypto analytics product.
 
-**Independent Test**: Can be fully tested by verifying the presence and readability of how-it-works and trust/privacy sections, with explicit non-custodial and read-only positioning.
+**Independent Test**: Can be fully tested by verifying the presence and readability of product-promise, model-clarity, activity-intelligence, and trust/privacy sections, with explicit non-custodial and read-only positioning.
 
 **Acceptance Scenarios**:
 
-1. **Given** a visitor scrolls the page, **When** they reach explanatory content, **Then** they see clear high-level sections for workflow, trust/privacy, and product scope boundaries.
+1. **Given** a visitor scrolls the page, **When** they reach explanatory content, **Then** they see clear high-level sections for product promise, workflow, model clarity, activity interpretation, and trust/privacy boundaries.
 2. **Given** a visitor evaluating risk, **When** they read trust content, **Then** they can identify that The Cab is analytics-first, does not execute trades, and does not request private keys.
 
 ---
@@ -74,7 +74,7 @@ As an English- or Spanish-speaking visitor using varied devices and accessibilit
 
 #### 2) Product Goals and Non-Goals
 
-- **FR-003**: The page MUST clearly communicate value proposition, connect path, analysis model overview, and trust/privacy posture.
+- **FR-003**: The page MUST clearly communicate value proposition, connect path, analysis model overview, activity interpretation, and trust/privacy posture.
 - **FR-004**: The page MUST not present The Cab as a trading terminal, execution interface, or tax-reporting tool.
 - **FR-005**: The page MUST remain within v1 scope messaging (Base mainnet primary scope) without introducing multi-chain behavior claims beyond current product support.
 
@@ -85,12 +85,15 @@ As an English- or Spanish-speaking visitor using varied devices and accessibilit
 
 #### 4) Information Architecture of the Page
 
-- **FR-008**: The page MUST include sections in this order: Hero, Value Proposition Blocks, How It Works, Trust and Privacy, CTA/Wallet State Area.
+- **FR-008**: The page MUST include sections in this order: Hero, Problem / Value, Product Promise, How It Works, Model Clarity, Activity Intelligence, Trust and Privacy, CTA/Wallet State Area.
 - **FR-009**: Hero section MUST include brand-aligned visual anchor, concise positioning copy, and primary/secondary CTAs.
-- **FR-010**: Value proposition blocks MUST explain portfolio visibility, historical reconstruction, and coverage transparency.
-- **FR-011**: How-it-works section MUST explain high-level steps from wallet connection to analysis surfaces without implementation internals.
-- **FR-012**: Trust/privacy section MUST state read-only analytics posture, no private-key custody, and execution boundary.
-- **FR-013**: CTA area MUST handle disconnected, connected, and unsupported-chain states with clear localized labels and outcomes.
+- **FR-010**: The problem/value section MUST explain fragmented pool exposure, strategy-versus-manual-deposit separation, reward attribution, and activity interpretation.
+- **FR-011**: Product-promise section MUST surface the connected product modules: overview, pools, deposits, strategies, rewards, and governance.
+- **FR-012**: How-it-works section MUST explain high-level steps from wallet connection to analysis surfaces without implementation internals.
+- **FR-013**: Trust/privacy section MUST state read-only analytics posture, no private-key custody, and execution boundary.
+- **FR-013A**: Model-clarity section MUST distinguish pools, deposits, and strategies as related but non-equivalent concepts.
+- **FR-013B**: Activity-intelligence section MUST explain how raw transactions are classified into operational events such as rebalances, residual attribution, and source waterfalls.
+- **FR-013C**: CTA area MUST handle disconnected, connected, and unsupported-chain states with clear localized labels and outcomes.
 
 #### 5) UX and Visual Requirements
 
@@ -106,7 +109,7 @@ As an English- or Spanish-speaking visitor using varied devices and accessibilit
 - **FR-020**: All user-facing strings on the landing page MUST be sourced from translation keys (no hardcoded copy in components).
 - **FR-021**: Landing namespace MUST define complete English and Spanish key parity prior to merge.
 - **FR-022**: Browser language detection MUST resolve locale with English fallback behavior.
-- **FR-023**: Translation resources MUST include section-level key groups for hero, value blocks, how-it-works, trust/privacy, CTA/wallet states, and accessibility labels.
+- **FR-023**: Translation resources MUST include section-level key groups for hero, problem/value, product promise, how-it-works, model clarity, activity intelligence, trust/privacy, CTA/wallet states, and accessibility labels.
 
 #### 7) Technical Requirements
 
@@ -150,7 +153,7 @@ As an English- or Spanish-speaking visitor using varied devices and accessibilit
 
 ### Key Entities *(include if feature involves data)*
 
-- **Landing Section**: A top-level content unit (hero, value, workflow, trust, CTA) with ordered placement, purpose, and localized copy key set.
+- **Landing Section**: A top-level content unit (hero, problem, product promise, workflow, model clarity, activity intelligence, trust, CTA) with ordered placement, purpose, and localized copy key set.
 - **Wallet CTA State**: View-state model for disconnected, connected-on-Base, and unsupported-chain users that determines CTA label and action.
 - **Landing Translation Bundle**: Namespace-scoped set of English/Spanish keys for all landing copy, labels, accessibility text, and CTA states.
 - **Landing Telemetry Event**: Minimal interaction event record for conversion and content engagement measurement without sensitive wallet details.
@@ -167,12 +170,9 @@ As an English- or Spanish-speaking visitor using varied devices and accessibilit
 - `landing.hero.primaryCta.unsupported`
 - `landing.hero.secondaryCta`
 - `landing.value.heading`
-- `landing.value.blocks.portfolio.title`
-- `landing.value.blocks.portfolio.body`
-- `landing.value.blocks.history.title`
-- `landing.value.blocks.history.body`
-- `landing.value.blocks.coverage.title`
-- `landing.value.blocks.coverage.body`
+- `landing.productPromise.heading`
+- `landing.productPromise.cards.overview.title`
+- `landing.productPromise.cards.overview.body`
 - `landing.howItWorks.heading`
 - `landing.howItWorks.steps.connect.title`
 - `landing.howItWorks.steps.connect.body`
@@ -180,6 +180,12 @@ As an English- or Spanish-speaking visitor using varied devices and accessibilit
 - `landing.howItWorks.steps.analyze.body`
 - `landing.howItWorks.steps.inspect.title`
 - `landing.howItWorks.steps.inspect.body`
+- `landing.modelClarity.heading`
+- `landing.modelClarity.blocks.pool.title`
+- `landing.modelClarity.blocks.pool.body`
+- `landing.activityIntelligence.heading`
+- `landing.activityIntelligence.cards.rebalanceDetection.title`
+- `landing.activityIntelligence.cards.rebalanceDetection.body`
 - `landing.trust.heading`
 - `landing.trust.readOnly.title`
 - `landing.trust.readOnly.body`
@@ -205,7 +211,10 @@ As an English- or Spanish-speaking visitor using varied devices and accessibilit
 - `LandingPage` (route-level orchestrator)
 - `LandingHeroSection`
 - `LandingValueBlocksSection`
+- `LandingProductPromiseSection`
 - `LandingHowItWorksSection`
+- `LandingModelClaritySection`
+- `LandingActivityIntelligenceSection`
 - `LandingTrustPrivacySection`
 - `LandingCtaSection`
 - `LandingWalletCta` (state-based CTA behavior through wallet abstraction)
@@ -231,15 +240,15 @@ As an English- or Spanish-speaking visitor using varied devices and accessibilit
 
 ## Definition of Done Checklist
 
-- [ ] Landing route renders all required sections in defined information architecture order.
-- [ ] Primary CTA supports disconnected, connected, and unsupported-chain wallet states.
-- [ ] All landing copy and labels use translation keys only (no hardcoded component strings).
-- [ ] English and Spanish landing keys are complete and parity check passes.
-- [ ] Landing visuals use DS components/tokens and approved brand assets served from public paths.
-- [ ] Mobile/tablet/desktop responsive behavior satisfies readability and interaction requirements.
-- [ ] Accessibility requirements pass keyboard, contrast, semantic structure, and reduced-motion checks.
-- [ ] Feature introduces no analytics pipeline logic changes and no new data providers.
-- [ ] Lint, typecheck, i18n parity check, and build pass.
+- [x] Landing route renders all required sections in defined information architecture order.
+- [x] Primary CTA supports disconnected, connected, and unsupported-chain wallet states.
+- [x] All landing copy and labels use translation keys only (no hardcoded component strings).
+- [x] English and Spanish landing keys are complete and parity check passes.
+- [x] Landing visuals use DS components/tokens and approved brand assets served from public paths.
+- [x] Mobile/tablet/desktop responsive behavior satisfies readability and interaction requirements.
+- [x] Accessibility requirements pass keyboard, contrast, semantic structure, and reduced-motion checks.
+- [x] Feature introduces no analytics pipeline logic changes and no new data providers.
+- [x] Lint, typecheck, i18n parity check, and build pass.
 
 ## Implementation Sequence (Engineering Handoff)
 

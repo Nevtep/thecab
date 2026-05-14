@@ -1,0 +1,75 @@
+.layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.92fr) minmax(0, 1.08fr);
+  gap: clamp(20px, 3vw, 28px);
+  align-items: start;
+}
+
+.trustVisual {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: 24px;
+  overflow: hidden;
+  border: 1px solid rgba(184, 199, 230, 0.12);
+  background: rgba(4, 15, 28, 0.7);
+}
+
+.trustImage {
+  object-fit: cover;
+}
+
+.trustBullets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.bullet {
+  display: flex;
+  min-height: 100%;
+}
+
+.bullet > * {
+  flex: 1 1 auto;
+}
+
+.coverageGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.coverageCard {
+  display: flex;
+  min-height: 100%;
+}
+
+.coverageCard > * {
+  flex: 1 1 auto;
+}
+
+.coverageVisual {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(184, 199, 230, 0.12);
+  background: rgba(4, 15, 28, 0.68);
+}
+
+.coverageImage {
+  object-fit: cover;
+}
+
+@media (max-width: 1120px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .trustBullets,
+  .coverageGrid {
+    grid-template-columns: 1fr;
+  }
+}

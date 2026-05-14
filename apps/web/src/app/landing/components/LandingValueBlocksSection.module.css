@@ -1,0 +1,66 @@
+.section {
+  background:
+    linear-gradient(180deg, rgba(9, 20, 33, 0.82) 0%, rgba(7, 17, 29, 0.88) 100%),
+    rgba(12, 21, 34, 0.64);
+}
+
+.sectionBackgroundImage {
+  object-fit: cover;
+  object-position: center;
+}
+
+.sectionBackgroundTint {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 18% 22%, rgba(0, 224, 225, 0.08) 0%, transparent 34%),
+    linear-gradient(90deg, rgba(5, 15, 27, 0.44) 0%, rgba(5, 15, 27, 0.3) 44%, rgba(5, 15, 27, 0.54) 100%);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(16px, 2vw, 22px);
+}
+
+.card {
+  position: relative;
+  display: flex;
+  min-height: 100%;
+  overflow: hidden;
+}
+
+.card > * {
+  flex: 1 1 auto;
+}
+
+.imageWrap {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: 18px;
+  overflow: hidden;
+  border: 1px solid rgba(184, 199, 230, 0.12);
+  background: radial-gradient(circle at 50% 45%, rgba(7, 25, 45, 0.72) 0%, rgba(4, 15, 28, 0.94) 100%);
+}
+
+.image {
+  object-fit: contain;
+  padding: clamp(14px, 2vw, 22px);
+}
+
+.cardGlow {
+  position: absolute;
+  inset: auto -40px -40px auto;
+  width: 160px;
+  height: 160px;
+  border-radius: 999px;
+  background: rgba(0, 224, 225, 0.12);
+  filter: blur(24px);
+  pointer-events: none;
+}
+
+@media (max-width: 1080px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}

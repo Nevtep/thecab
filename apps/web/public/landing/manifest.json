@@ -1,0 +1,134 @@
+{
+  "version": 1,
+  "updatedAt": "2026-05-13",
+  "sections": {
+    "shell": {
+      "background": {
+        "source": "public/landing/background.webp",
+        "target": "/landing/background.webp",
+        "role": "page-background"
+      }
+    },
+    "hero": {
+      "background": {
+        "source": "public/landing/hero-background.webp",
+        "target": "/landing/hero-background.webp",
+        "role": "background"
+      },
+      "visual": {
+        "source": "public/landing/hero-visual.webp",
+        "target": "/landing/hero-visual.webp",
+        "role": "hero-visual"
+      }
+    },
+    "value": {
+      "background": {
+        "source": "public/landing/problem_section_background_rgba.webp",
+        "target": "/landing/problem_section_background_rgba.webp",
+        "role": "problem-section-background"
+      },
+      "poolExposure": {
+        "source": "public/landing/problem_01_pool_exposure_fragmented.webp",
+        "target": "/landing/problem_01_pool_exposure_fragmented.webp",
+        "role": "problem-pool-exposure-fragmented"
+      },
+      "strategies": {
+        "source": "public/landing/problem_02_strategies_not_manual_deposits.webp",
+        "target": "/landing/problem_02_strategies_not_manual_deposits.webp",
+        "role": "problem-strategies-not-manual-deposits"
+      },
+      "rewards": {
+        "source": "public/landing/problem_03_rewards_need_attribution.webp",
+        "target": "/landing/problem_03_rewards_need_attribution.webp",
+        "role": "problem-rewards-need-attribution"
+      },
+      "activity": {
+        "source": "public/landing/problem_04_activity_needs_interpretation.webp",
+        "target": "/landing/problem_04_activity_needs_interpretation.webp",
+        "role": "problem-activity-needs-interpretation"
+      }
+    },
+    "productPromise": {
+      "visual": {
+        "source": "public/landing/product_promise_visual_03.png",
+        "target": "/landing/product_promise_visual_03.png",
+        "role": "product-promise-portfolio-intelligence"
+      }
+    },
+    "howItWorks": {
+      "step01": {
+        "source": "public/landing/how_it_works_step_01_rgba.webp",
+        "target": "/landing/how_it_works_step_01_rgba.webp",
+        "role": "connect-wallet"
+      },
+      "step02": {
+        "source": "public/landing/how_it_works_step_02_rgba.webp",
+        "target": "/landing/how_it_works_step_02_rgba.webp",
+        "role": "quick-overview"
+      },
+      "step03": {
+        "source": "public/landing/how_it_works_step_03_rgba.webp",
+        "target": "/landing/how_it_works_step_03_rgba.webp",
+        "role": "historical-analysis"
+      },
+      "step04": {
+        "source": "public/landing/how_it_works_step_04_rgba.webp",
+        "target": "/landing/how_it_works_step_04_rgba.webp",
+        "role": "deep-sections"
+      },
+      "step05": {
+        "source": "public/landing/how_it_works_step_05_rgba.webp",
+        "target": "/landing/how_it_works_step_05_rgba.webp",
+        "role": "refresh-stale"
+      }
+    },
+    "modelClarity": {
+      "diagram": {
+        "source": "public/landing/landing_pools_deposits_strategies_diagram.png",
+        "target": "/landing/landing_pools_deposits_strategies_diagram.png",
+        "role": "pool-deposit-strategy-model-clarity"
+      }
+    },
+    "activityIntelligence": {
+      "visual": {
+        "source": "public/landing/landing_activity_interpretation_timeline.png",
+        "target": "/landing/landing_activity_interpretation_timeline.png",
+        "role": "activity-interpretation-timeline"
+      }
+    },
+    "trust": {
+      "readOnly": {
+        "source": "public/landing/landing_read_only_trust_icon_rgba.webp",
+        "target": "/landing/landing_read_only_trust_icon_rgba.webp",
+        "role": "read-only-trust"
+      },
+      "coverageFull": {
+        "source": "public/landing/coverage_01_full.webp",
+        "target": "/landing/coverage_01_full.webp",
+        "role": "coverage-full"
+      },
+      "coverageShareLevel": {
+        "source": "public/landing/coverage_02_share_level.webp",
+        "target": "/landing/coverage_02_share_level.webp",
+        "role": "coverage-share-level"
+      },
+      "coveragePartial": {
+        "source": "public/landing/coverage_03_partial.webp",
+        "target": "/landing/coverage_03_partial.webp",
+        "role": "coverage-partial"
+      },
+      "coverageUnknown": {
+        "source": "public/landing/coverage_04_unknown.webp",
+        "target": "/landing/coverage_04_unknown.webp",
+        "role": "coverage-unknown"
+      }
+    },
+    "cta": {
+      "background": {
+        "source": "public/landing/landing_final_cta_background.webp",
+        "target": "/landing/landing_final_cta_background.webp",
+        "role": "final-cta-background"
+      }
+    }
+  }
+}

@@ -2,97 +2,57 @@
 
 import { useTranslation } from "react-i18next";
 
-import {
-  CabButton,
-  CabStack,
-  CabText,
-  CabWalletAddress,
-  DisconnectedShell,
-  cabColors,
-} from "@/design-system";
+import { DisconnectedShell } from "@/design-system";
 
-import { useCabWallet } from "@/wallet/useCabWallet";
+import {
+  LandingActivityIntelligenceSection,
+  LandingCtaSection,
+  LandingHeroSection,
+  LandingHowItWorksSection,
+  LandingModelClaritySection,
+  LandingProductPromiseSection,
+  LandingTrustPrivacySection,
+  LandingValueBlocksSection,
+} from "@/app/landing/components";
+import { landingAssets } from "@/app/landing/landingAssets";
+
+import styles from "@/app/page.module.css";
 
 export default function Home() {
-  const { t } = useTranslation(["landing", "wallet", "common"]);
-  const {
-    address,
-    isConnected,
-    isSupportedChain,
-    connect,
-    disconnect,
-    switchToSupportedChain,
-  } = useCabWallet();
-
-  const walletConnectConfigured =
-    Boolean(process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID) &&
-    process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID !== "your_walletconnect_project_id";
+  const { t } = useTranslation("landing");
 
   return (
-    <DisconnectedShell>
-      <CabStack
-        alignItems="center"
-        justifyContent="center"
-        gap="$3"
-        padding="$6"
-        style={{
-          width: "100%",
-          maxWidth: 920,
-          textAlign: "center",
-        }}
-      >
-        <CabText
-          variant="display"
-          fontSize="$8"
-          fontWeight="800"
-          style={{ color: cabColors.text.primary, lineHeight: 1.1 }}
+    <DisconnectedShell
+      backgroundSrc={landingAssets.pageBackground.src}
+      backgroundAlt=""
+    >
+      <a href="#landing-content" className={styles.skipLink}>
+        {t("a11y.skipToContent")}
+      </a>
+
+      <div className={styles.page}>
+        <main
+          id="landing-content"
+          className={styles.main}
+          tabIndex={-1}
+          aria-label={t("a11y.mainLandmark")}
         >
-          {t("landing:title")}
-        </CabText>
+          <header className={styles.landmark} aria-label={t("a11y.heroLandmark")}>
+            <LandingHeroSection />
+          </header>
 
-        <CabText fontSize="$4" style={{ color: cabColors.text.secondary, maxWidth: 760 }}>
-          {t("landing:subtitle")}
-        </CabText>
+          <LandingValueBlocksSection />
+          <LandingProductPromiseSection />
+          <LandingHowItWorksSection />
+          <LandingModelClaritySection />
+          <LandingActivityIntelligenceSection />
+          <LandingTrustPrivacySection />
 
-        <CabText fontSize="$3" style={{ color: cabColors.brand.signalTeal }}>
-          {isConnected ? t("wallet:connected") : t("wallet:disconnected")}
-        </CabText>
-        {isConnected && address ? <CabWalletAddress address={address} /> : null}
-
-        {!isSupportedChain && isConnected ? (
-          <CabButton
-            onPress={() => {
-              void switchToSupportedChain();
-            }}
-            tone="warning"
-          >
-            {t("wallet:unsupported")}
-          </CabButton>
-        ) : null}
-
-        {!isConnected ? (
-          <CabButton
-            onPress={() => {
-              void connect();
-            }}
-            disabled={!walletConnectConfigured}
-            tone="primary"
-          >
-            {walletConnectConfigured
-              ? t("wallet:actions.connect")
-              : t("wallet:actions.configureWalletConnect")}
-          </CabButton>
-        ) : (
-          <CabButton
-            onPress={() => {
-              disconnect();
-            }}
-            tone="secondary"
-          >
-            {t("wallet:actions.disconnect")}
-          </CabButton>
-        )}
-      </CabStack>
+          <footer className={styles.landmark} aria-label={t("a11y.footerLandmark")}>
+            <LandingCtaSection />
+          </footer>
+        </main>
+      </div>
     </DisconnectedShell>
   );
 }
