@@ -9,6 +9,9 @@
     "connectedBase": "Tu wallet está lista para el siguiente paso dentro del cockpit de The Cab.",
     "unsupportedBaseOnly": "The Cab v1 soporta flujos de wallet solo en Base mainnet. Cambiá de red para continuar."
   },
+  "signature": {
+    "welcomeMessage": "Bienvenido a The Cab.\n\nFirmá este mensaje para verificar que controlás {{address}} y continuar al cockpit.\n\nEsta solicitud no ejecuta una transacción ni consume gas."
+  },
   "actions": {
     "connect": "Conectar wallet",
     "disconnect": "Desconectar",
