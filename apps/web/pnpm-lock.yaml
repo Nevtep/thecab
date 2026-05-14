@@ -11,6 +11,9 @@ importers:
       '@coinbase/wallet-sdk':
         specifier: ^4.3.7
         version: 4.3.7(typescript@5.9.3)(zod@4.4.3)
+      '@gsap/react':
+        specifier: ^2.1.2
+        version: 2.1.2(gsap@3.15.0)(react@19.2.4)
       '@metamask/connect-evm':
         specifier: ^1.2.0
         version: 1.2.0(@babel/runtime@7.29.2)(typescript@5.9.3)
@@ -44,6 +47,9 @@ importers:
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2(@opentelemetry/api@1.9.0)(@types/pg@8.20.0)(pg@8.20.0)
+      gsap:
+        specifier: ^3.15.0
+        version: 3.15.0
       i18next:
         specifier: ^26.1.0
         version: 26.1.0(typescript@5.9.3)
@@ -1041,6 +1047,12 @@ packages:
   '@google-cloud/precise-date@4.0.0':
     resolution: {integrity: sha512-1TUx3KdaU3cN7nfCdNf+UVqA/PSX29Cjcox3fZZBtINlRrXVTmUkQnCKv2MbBUbCopbK4olAT1IHl76uZyCiVA==}
     engines: {node: '>=14.0.0'}
+
+  '@gsap/react@2.1.2':
+    resolution: {integrity: sha512-JqliybO1837UcgH2hVOM4VO+38APk3ECNrsuSM4MuXp+rbf+/2IG2K1YJiqfTcXQHH7XlA0m3ykniFYstfq0Iw==}
+    peerDependencies:
+      gsap: ^3.12.5
+      react: '>=17'
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -4669,6 +4681,9 @@ packages:
   graceful-fs@4.2.11:
     resolution: {integrity: sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ==}
 
+  gsap@3.15.0:
+    resolution: {integrity: sha512-dMW4CWBTUK1AEEDeZc1g4xpPGIrSf9fJF960qbTZmN/QwZIWY5wgliS6JWl9/25fpTGJrMRtSjGtOmPnfjZB+A==}
+
   h3@1.15.11:
     resolution: {integrity: sha512-L3THSe2MPeBwgIZVSH5zLdBBU90TOxarvhK9d04IDY2AmVS8j2Jz2LIWtwsGOU3lu2I5jCN7FNvVfY2+XyF+mg==}
 
@@ -7858,6 +7873,11 @@ snapshots:
   '@floating-ui/utils@0.2.11': {}
 
   '@google-cloud/precise-date@4.0.0': {}
+
+  '@gsap/react@2.1.2(gsap@3.15.0)(react@19.2.4)':
+    dependencies:
+      gsap: 3.15.0
+      react: 19.2.4
 
   '@humanfs/core@0.19.2':
     dependencies:
@@ -13253,6 +13273,8 @@ snapshots:
   gopd@1.2.0: {}
 
   graceful-fs@4.2.11: {}
+
+  gsap@3.15.0: {}
 
   h3@1.15.11:
     dependencies:

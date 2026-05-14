@@ -3,6 +3,15 @@
   "connected": "Wallet connected",
   "disconnected": "Wallet disconnected",
   "unsupported": "Unsupported network",
+  "guidance": {
+    "configurationRequired": "Add a WalletConnect project id before testing wallet connection flows.",
+    "disconnected": "Connect a Base wallet to unlock the cockpit and request deeper analysis when needed.",
+    "connectedBase": "Your wallet is ready for the next step into The Cab cockpit.",
+    "unsupportedBaseOnly": "The Cab v1 supports Base mainnet wallet flows. Switch networks to continue."
+  },
+  "signature": {
+    "welcomeMessage": "Welcome to The Cab.\n\nSign this message to verify that you own {{address}} and continue to the cockpit.\n\nThis request will not trigger a blockchain transaction or cost any gas."
+  },
   "actions": {
     "connect": "Connect wallet",
     "disconnect": "Disconnect",

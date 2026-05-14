@@ -1,0 +1,77 @@
+.layout {
+  display: grid;
+  gap: clamp(20px, 3vw, 28px);
+}
+
+.visualCard {
+  display: flex;
+}
+
+.visualCard > * {
+  flex: 1 1 auto;
+}
+
+.visualWrap {
+  position: relative;
+  min-height: clamp(280px, 42vw, 520px);
+  border-radius: 28px;
+  overflow: hidden;
+  border: 1px solid rgba(184, 199, 230, 0.14);
+  background: rgba(4, 15, 28, 0.82);
+}
+
+.visualImage {
+  object-fit: cover;
+}
+
+.visualTint {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(3, 10, 20, 0.08), rgba(3, 10, 20, 0.5)),
+    radial-gradient(circle at center, rgba(51, 226, 217, 0.12), transparent 52%);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.card {
+  display: flex;
+  min-height: 100%;
+}
+
+.card > * {
+  flex: 1 1 auto;
+}
+
+.cardIndex {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-width: 40px;
+  min-height: 32px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(242, 193, 78, 0.34);
+  background: rgba(242, 193, 78, 0.08);
+}
+
+@media (max-width: 1080px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .visualWrap {
+    min-height: 240px;
+  }
+}
