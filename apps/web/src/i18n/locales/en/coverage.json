@@ -9,6 +9,15 @@
     "analysisPending": "Historical analysis is still pending",
     "providerPartial": "One or more providers returned partial data",
     "missingPrices": "Some assets do not have current prices",
-    "noRecentActivity": "No recent on-chain activity was found"
+    "noRecentActivity": "No recent on-chain activity was found",
+    "excludedSuspiciousAssets": "Suspicious assets were excluded from default totals",
+    "lowConfidenceAssetsHidden": "Low-confidence assets are hidden by default",
+    "visibleUnpricedAssets": "Visible assets without reliable prices are excluded from valuation totals",
+    "hiddenAssetsPresent": "Hidden assets are present in this wallet",
+    "knownProtocolSignalConflict": "Known protocol recognition conflicts with provider caution signals",
+    "providerTrustSignalsMissing": "Some provider trust signals are missing",
+    "metadataIncomplete": "Some assets have incomplete metadata",
+    "dustAssetsHidden": "Dust-sized low-confidence assets were hidden",
+    "valuationPartial": "Portfolio valuation is partial"
   }
 }

@@ -5,5 +5,6 @@ export * from "@/design-system/primitives/CabCard";
 export * from "@/design-system/primitives/CabInput";
 export * from "@/design-system/primitives/CabSeparator";
 export * from "@/design-system/primitives/CabStack";
+export * from "@/design-system/primitives/CabSwitch";
 export * from "@/design-system/primitives/CabText";
 export * from "@/design-system/primitives/CabTooltip";

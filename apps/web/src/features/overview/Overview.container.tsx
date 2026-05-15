@@ -4,7 +4,11 @@ import { startTransition, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { OverviewComponent } from "@/features/overview/Overview.component";
-import { createInitialOverviewScreenState, normalizeOverviewRange } from "@/features/overview/overview.mappers";
+import {
+  createInitialOverviewScreenState,
+  normalizeOverviewRange,
+  partitionOverviewAssetRows,
+} from "@/features/overview/overview.mappers";
 import type { OverviewRange } from "@/features/overview/overview.types";
 import { useAnalysisStatusQuery, useOverviewQuery, useStartAnalysisMutation } from "@/queries/hooks";
 import { SUPPORTED_CHAIN_ID } from "@/wallet/supportedChains";
@@ -16,6 +20,8 @@ export function OverviewContainer() {
   const [screenState, setScreenState] = useState(() =>
     createInitialOverviewScreenState(address?.toLowerCase() ?? null, chainId ?? null),
   );
+  const [showHiddenAssets, setShowHiddenAssets] = useState(false);
+  const [showUnpricedAssets, setShowUnpricedAssets] = useState(false);
 
   const walletAddress = address?.toLowerCase() ?? null;
   const resolvedChainId = chainId ?? SUPPORTED_CHAIN_ID;
@@ -40,6 +46,10 @@ export function OverviewContainer() {
   const viewModel = useMemo(() => overviewQuery.data ?? null, [overviewQuery.data]);
   const errorCode = overviewQuery.error instanceof Error ? overviewQuery.error.message : null;
   const analysis = analysisStatusQuery.data ?? viewModel?.analysis ?? null;
+  const { visibleRows, hiddenRows } = useMemo(
+    () => partitionOverviewAssetRows(viewModel?.assets.rows ?? []),
+    [viewModel?.assets.rows],
+  );
 
   function handleRangeChange(nextRange: OverviewRange) {
     startTransition(() => {
@@ -82,6 +92,10 @@ export function OverviewContainer() {
       isSupportedChain={isSupportedChain}
       range={screenState.range}
       viewModel={viewModel}
+      visibleAssetRows={visibleRows}
+      hiddenAssetRows={hiddenRows}
+      showHiddenAssets={showHiddenAssets}
+      showUnpricedAssets={showUnpricedAssets}
       analysis={analysis}
       isLoading={overviewQuery.isLoading}
       isRefreshing={overviewQuery.isFetching}
@@ -92,6 +106,8 @@ export function OverviewContainer() {
       onRefresh={handleRefresh}
       onRangeChange={handleRangeChange}
       onStartAnalysis={() => void handleStartAnalysis()}
+      onToggleHiddenAssets={() => setShowHiddenAssets((currentValue) => !currentValue)}
+      onToggleUnpricedAssets={() => setShowUnpricedAssets((currentValue) => !currentValue)}
     />
   );
 }

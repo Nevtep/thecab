@@ -6,6 +6,7 @@ import {
   CabAnalysisCta,
   CabAnalysisStatusBadge,
   CabAreaChart,
+  CabBadge,
   CabButton,
   CabCard,
   CabDashboardGrid,
@@ -20,8 +21,10 @@ import {
   CabSidebar,
   CabSidebarNavItem,
   CabStack,
+  CabSwitch,
   CabText,
   CabTopNav,
+  CabTooltip,
   ConnectedShell,
 } from "@/design-system";
 import {
@@ -33,7 +36,11 @@ import {
 
 import {
   formatWalletAddressLabel,
+  getOverviewCoverageReasonLabelKeys,
   getOverviewNavigationItems,
+  getOverviewTrustBadgeTone,
+  getOverviewTrustReasonLabelKeys,
+  getOverviewTrustStatusLabelKey,
   mapOverviewAnalysisStatusToBadgeStatus,
 } from "@/features/overview/overview.mappers";
 import type { OverviewRange, OverviewViewModel } from "@/features/overview/overview.types";
@@ -45,6 +52,10 @@ type OverviewComponentProps = {
   isSupportedChain: boolean;
   range: OverviewRange;
   viewModel: OverviewViewModel | null;
+  visibleAssetRows: OverviewViewModel["assets"]["rows"];
+  hiddenAssetRows: OverviewViewModel["assets"]["rows"];
+  showHiddenAssets: boolean;
+  showUnpricedAssets: boolean;
   analysis: OverviewViewModel["analysis"] | null;
   isLoading: boolean;
   isRefreshing: boolean;
@@ -55,6 +66,8 @@ type OverviewComponentProps = {
   onRefresh: () => void;
   onRangeChange: (range: OverviewRange) => void;
   onStartAnalysis: () => void;
+  onToggleHiddenAssets: () => void;
+  onToggleUnpricedAssets: () => void;
 };
 
 function formatCurrencyValue(value: number | null, locale: string, fallbackLabel: string) {
@@ -63,12 +76,10 @@ function formatCurrencyValue(value: number | null, locale: string, fallbackLabel
 
 function buildCoverageMessage(
   status: OverviewViewModel["coverage"]["status"],
-  reasonCodes: string[] | null,
+  reasonCodes: OverviewViewModel["coverage"]["reasonCodes"] | null,
   translate: (key: string) => string,
 ) {
-  const reasonLabels = (reasonCodes ?? []).map((reasonCode) =>
-    translate(`coverage:reasons.${reasonCode}`),
-  );
+  const reasonLabels = getOverviewCoverageReasonLabelKeys(reasonCodes).map((labelKey) => translate(labelKey));
 
   return [translate(`coverage:status.${status}`), ...reasonLabels].join(" · ");
 }
@@ -76,13 +87,105 @@ function buildCoverageMessage(
 function buildSourceSubtitle(
   source: OverviewViewModel["summary"]["source"],
   coverageStatus: OverviewViewModel["coverage"]["status"],
-  reasonCodes: string[] | null,
+  reasonCodes: OverviewViewModel["summary"]["coverageReasonCodes"],
   translate: (key: string) => string,
 ) {
   return [
     translate(`overview:sources.${source}`),
     buildCoverageMessage(coverageStatus, reasonCodes, translate),
   ].join(" · ");
+}
+
+function buildExclusionMessage(
+  summary: OverviewViewModel["metrics"]["exclusions"] | null,
+  translate: (key: string, options?: Record<string, unknown>) => string,
+  locale: string,
+) {
+  if (!summary) {
+    return null;
+  }
+
+  const reasonLabels = summary.reasonCodes.map((reasonCode) => translate(`coverage:reasons.${reasonCode}`));
+
+  return [
+    translate("assets.exclusionsSummary", {
+      count: summary.excludedAssetCount,
+      value:
+        summary.excludedValueUsd === null
+          ? translate("states.unavailableValue")
+          : formatUsd(summary.excludedValueUsd, locale),
+    }),
+    ...reasonLabels,
+  ].join(" · ");
+}
+
+function renderAssetRows(
+  rows: OverviewViewModel["assets"]["rows"],
+  input: {
+    locale: string;
+    translate: (key: string, options?: Record<string, unknown>) => string;
+  },
+) {
+  return rows.map((row) => {
+    const trustStatusLabel = input.translate(getOverviewTrustStatusLabelKey(row.trustStatus));
+    const trustReasonLabels = getOverviewTrustReasonLabelKeys(row.trustReasonCodes).map((labelKey) =>
+      input.translate(labelKey),
+    );
+
+    return (
+      <CabCard key={`${row.tokenAddress ?? row.symbol}-${row.balance}-${row.isHiddenByDefault}`} density="default">
+        <CabStack gap="$2">
+          <CabStack row justifyContent="space-between" alignItems="center" gap="$3">
+            <CabStack gap="$1">
+              <CabStack row alignItems="center" gap="$2" flexWrap="wrap">
+                <CabText variant="label">{row.symbol}</CabText>
+                <CabTooltip label={trustReasonLabels.join(" · ") || trustStatusLabel}>
+                  <span>
+                    <CabBadge tone={getOverviewTrustBadgeTone(row.trustStatus)} size="sm">
+                      {trustStatusLabel}
+                    </CabBadge>
+                  </span>
+                </CabTooltip>
+                {row.isHiddenByDefault ? (
+                  <CabBadge tone="warning" size="sm">
+                    {input.translate("assets.hiddenByDefault")}
+                  </CabBadge>
+                ) : null}
+              </CabStack>
+              <CabText variant="caption" fontSize={12}>
+                {row.name ?? input.translate("states.unavailableValue")}
+              </CabText>
+              <CabText variant="caption" fontSize={12}>
+                {row.balance}
+              </CabText>
+            </CabStack>
+            <CabStack alignItems="flex-end" gap="$1">
+              <CabText variant="label">
+                {formatCurrencyValue(row.priceUsd, input.locale, input.translate("states.unavailableValue"))}
+              </CabText>
+              <CabText variant="caption" fontSize={12}>
+                {row.valueUsd === null
+                  ? input.translate("assets.priceUnavailable")
+                  : input.translate("assets.positionValue", { value: formatUsd(row.valueUsd, input.locale) })}
+              </CabText>
+              <CabText variant="caption" fontSize={12}>
+                {row.movement24hPct !== null
+                  ? input.translate("assets.change24h", { value: formatPercent(row.movement24hPct, input.locale) })
+                  : row.movement7dPct !== null
+                    ? input.translate("assets.change7d", { value: formatPercent(row.movement7dPct, input.locale) })
+                    : input.translate("coverage:reasons.missingPrices")}
+              </CabText>
+            </CabStack>
+          </CabStack>
+          {trustReasonLabels.length > 0 ? (
+            <CabText variant="caption" fontSize={12}>
+              {input.translate("assets.trustReasons", { reasons: trustReasonLabels.join(" · ") })}
+            </CabText>
+          ) : null}
+        </CabStack>
+      </CabCard>
+    );
+  });
 }
 
 export function OverviewComponent({
@@ -92,6 +195,10 @@ export function OverviewComponent({
   isSupportedChain,
   range,
   viewModel,
+  visibleAssetRows,
+  hiddenAssetRows,
+  showHiddenAssets,
+  showUnpricedAssets,
   analysis,
   isLoading,
   isRefreshing,
@@ -102,8 +209,10 @@ export function OverviewComponent({
   onRefresh,
   onRangeChange,
   onStartAnalysis,
+  onToggleHiddenAssets,
+  onToggleUnpricedAssets,
 }: OverviewComponentProps) {
-  const { t, i18n } = useTranslation(["overview", "navigation", "analysis", "coverage", "charts"]);
+  const { t, i18n } = useTranslation(["overview", "navigation", "analysis", "coverage", "charts", "trust"]);
   const locale = i18n.language;
   const rangeOptions = ["24h", "7d", "30d"].map((option) => ({
     key: option,
@@ -197,6 +306,13 @@ export function OverviewComponent({
     activeAnalysis.status === "failed";
   const analysisActionLabel =
     activeAnalysis.status === "failed" ? t("analysis.actions.retry") : t("analysis.actions.start");
+  const exclusionMessage = buildExclusionMessage(viewModel.metrics.exclusions, t, locale);
+  const visibleRenderableRows = showUnpricedAssets
+    ? visibleAssetRows
+    : visibleAssetRows.filter((row) => row.priceUsd !== null);
+  const hiddenRenderableRows = showUnpricedAssets
+    ? hiddenAssetRows
+    : hiddenAssetRows.filter((row) => row.priceUsd !== null);
 
   return (
     <section data-overview-root>
@@ -342,6 +458,11 @@ export function OverviewComponent({
               value={formatCurrencyValue(viewModel.metrics.idleValueUsd, locale, t("states.unavailableValue"))}
             />
           </CabDashboardGrid>
+          {exclusionMessage ? (
+            <CabText variant="caption" fontSize={12}>
+              {exclusionMessage}
+            </CabText>
+          ) : null}
 
           <div
             style={{
@@ -398,6 +519,11 @@ export function OverviewComponent({
                     ))}
                   </CabStack>
                 )}
+                {viewModel.distribution.exclusions ? (
+                  <CabText variant="caption" fontSize={12}>
+                    {buildExclusionMessage(viewModel.distribution.exclusions, t, locale)}
+                  </CabText>
+                ) : null}
               </CabStack>
             </CabCard>
           </div>
@@ -419,43 +545,64 @@ export function OverviewComponent({
                     viewModel.assets.coverageReasonCodes,
                     t,
                   )}
+                  actions={
+                    <CabSwitch
+                      checked={showUnpricedAssets}
+                      onCheckedChange={onToggleUnpricedAssets}
+                      label={t("assets.showUnpricedAssets")}
+                    />
+                  }
                 />
-                {viewModel.assets.rows.length === 0 ? (
+                {viewModel.assets.hiddenSummary ? (
+                  <CabCard density="default">
+                    <CabStack gap="$2">
+                      <CabText variant="label">
+                        {t("assets.hiddenNoticeTitle", { count: viewModel.assets.hiddenSummary.hiddenCount })}
+                      </CabText>
+                      <CabText variant="caption" fontSize={12}>
+                        {t("assets.hiddenNoticeDescription", {
+                          count: viewModel.assets.hiddenSummary.hiddenCount,
+                          visibleCount: viewModel.assets.defaultVisibleCount,
+                        })}
+                      </CabText>
+                      <CabText variant="caption" fontSize={12}>
+                        {viewModel.assets.hiddenSummary.reasonCodes
+                          .map((reasonCode) => t(`coverage:reasons.${reasonCode}`))
+                          .join(" · ")}
+                      </CabText>
+                      <CabStack row gap="$2" flexWrap="wrap" alignItems="center">
+                        <CabButton tone="secondary" onPress={onToggleHiddenAssets}>
+                          {showHiddenAssets ? t("assets.hideHiddenAssets") : t("assets.showHiddenAssets")}
+                        </CabButton>
+                        <CabText variant="caption" fontSize={12}>
+                          {t("assets.noSecurityGuarantee")}
+                        </CabText>
+                      </CabStack>
+                    </CabStack>
+                  </CabCard>
+                ) : null}
+                {visibleRenderableRows.length === 0 && hiddenRenderableRows.length === 0 ? (
                   <CabEmptyState
-                    title={t("states.emptyAssetsTitle")}
-                    description={t("states.emptyAssetsDescription")}
+                    title={showUnpricedAssets ? t("states.emptyAssetsTitle") : t("assets.filteredUnpricedEmptyTitle")}
+                    description={showUnpricedAssets ? t("states.emptyAssetsDescription") : t("assets.filteredUnpricedEmptyDescription")}
+                  />
+                ) : visibleRenderableRows.length === 0 && hiddenRenderableRows.length > 0 && !showHiddenAssets ? (
+                  <CabEmptyState
+                    title={t("assets.hiddenOnlyTitle")}
+                    description={t("assets.hiddenOnlyDescription")}
                   />
                 ) : (
                   <CabStack gap="$2">
-                    {viewModel.assets.rows.map((row) => (
-                      <CabCard key={`${row.tokenAddress ?? row.symbol}-${row.balance}`} density="default">
-                        <CabStack row justifyContent="space-between" alignItems="center" gap="$3">
-                          <CabStack gap="$1">
-                            <CabText variant="label">{row.symbol}</CabText>
-                            <CabText variant="caption" fontSize={12}>
-                              {row.balance}
-                            </CabText>
-                          </CabStack>
-                          <CabStack alignItems="flex-end" gap="$1">
-                            <CabText variant="label">
-                              {formatCurrencyValue(row.priceUsd, locale, t("states.unavailableValue"))}
-                            </CabText>
-                            <CabText variant="caption" fontSize={12}>
-                              {row.valueUsd === null
-                                ? t("assets.priceUnavailable")
-                                : t("assets.positionValue", { value: formatUsd(row.valueUsd, locale) })}
-                            </CabText>
-                            <CabText variant="caption" fontSize={12}>
-                              {row.movement24hPct !== null
-                                ? t("assets.change24h", { value: formatPercent(row.movement24hPct, locale) })
-                                : row.movement7dPct !== null
-                                  ? t("assets.change7d", { value: formatPercent(row.movement7dPct, locale) })
-                                  : t("coverage:reasons.missingPrices")}
-                            </CabText>
-                          </CabStack>
-                        </CabStack>
-                      </CabCard>
-                    ))}
+                    {renderAssetRows(visibleRenderableRows, { locale, translate: t })}
+                    {showHiddenAssets && hiddenRenderableRows.length > 0 ? (
+                      <CabStack gap="$2">
+                        <CabSectionHeader
+                          title={t("assets.hiddenInspectionTitle")}
+                          subtitle={t("assets.hiddenInspectionDescription")}
+                        />
+                        {renderAssetRows(hiddenRenderableRows, { locale, translate: t })}
+                      </CabStack>
+                    ) : null}
                   </CabStack>
                 )}
               </CabStack>

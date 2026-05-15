@@ -1,11 +1,19 @@
 import { assertSupportedChain } from "@/server/chains";
 import { getLatestAnalysisRun } from "@/server/analysis/analysis-run.repository";
 import {
+  ASSET_TRUST_CLASSIFIER_VERSION,
+  type AssetTrustClassifierInput,
+  type OverviewTrustCoverageReasonCode,
+} from "@/server/asset-trust/assetTrust.types";
+import { classifyWalletAssetTrust } from "@/server/asset-trust/classifyWalletAssetTrust";
+import { resolveKnownProtocolAssetMatch } from "@/server/asset-trust/knownProtocolAssets";
+import {
   getCurrentTokenPricesByAddress,
   getHistoricalTokenPricesByAddress,
 } from "@/server/providers/alchemy";
 import { getWalletHistory, getWalletTokens } from "@/server/providers/moralis";
 import {
+  readKnownProtocolContracts,
   insertOverviewCoverageReport,
   insertOverviewPortfolioSnapshot,
   insertOverviewRawProviderRecord,
@@ -15,6 +23,8 @@ import {
 } from "@/server/overview/overview.repository";
 import type {
   OverviewChartPoint,
+  OverviewCoverageReasonCode,
+  OverviewExclusionSummary,
   OverviewRange,
   OverviewRequest,
   OverviewResponse,
@@ -32,9 +42,17 @@ const NATIVE_ETH_SENTINEL = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 const BASE_WETH_ADDRESS = "0x4200000000000000000000000000000000000006";
 const BASE_CBBTC_ADDRESS = "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf";
 const BASE_AERO_ADDRESS = "0x940181a94a35a4569e4529a3cdfb74e38fd98631";
-const BASE_USDBC_ADDRESS = "0xd9aaec86b65d86f6a7b5a1b0c42ffa531710b6ca";
 const BASE_USDC_ADDRESS = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
 const HISTORICAL_PRICE_BATCH_SIZE = 8;
+const DUST_VALUE_THRESHOLD_USD = 1;
+
+type MoralisTokenRecord = Record<string, unknown>;
+
+type TrustHydratedAssetRow = {
+  assetRow: OverviewResponse["assets"]["rows"][number];
+  trustInput: AssetTrustClassifierInput;
+  knownProtocolConflict: boolean;
+};
 
 export function normalizeOverviewRange(range?: string | null): OverviewRange {
   if (range === "24h" || range === "30d") {
@@ -94,6 +112,7 @@ export function createEmptyRecentOverviewResponse(input: OverviewRequest): Overv
       automatedStrategiesValueUsd: null,
       residualAttributedValueUsd: null,
       governanceValueUsd: null,
+      exclusions: null,
     },
     chart: {
       source: "recent_provider_data",
@@ -108,12 +127,15 @@ export function createEmptyRecentOverviewResponse(input: OverviewRequest): Overv
       coverageStatus: "partial",
       coverageReasonCodes: ["analysisPending"],
       slices: [],
+      exclusions: null,
     },
     assets: {
       source: "recent_provider_data",
       coverageStatus: "partial",
       coverageReasonCodes: ["analysisPending"],
       rows: [],
+      hiddenSummary: null,
+      defaultVisibleCount: 0,
     },
     activity: {
       source: "recent_provider_data",
@@ -144,6 +166,18 @@ function asNumber(value: unknown): number | null {
 
 function asBoolean(value: unknown) {
   return value === true;
+}
+
+function asBooleanOrNull(value: unknown): boolean | null {
+  if (value === true) {
+    return true;
+  }
+
+  if (value === false) {
+    return false;
+  }
+
+  return null;
 }
 
 function formatBalance(balanceRaw: string | null, decimals: number | null) {
@@ -263,6 +297,134 @@ function normalizeTokenMetadata(value: string | null) {
   return value?.trim().toLowerCase() ?? "";
 }
 
+function hasTokenMetadata(symbol: string | null, name: string | null, decimals: number | null) {
+  return Boolean(symbol && name && decimals !== null);
+}
+
+function hasTokenLogo(token: MoralisTokenRecord) {
+  return Boolean(
+    asString(token.logo) ?? asString(token.logo_url) ?? asString(token.thumbnail),
+  );
+}
+
+function sanitizeMoralisTokenForPersistence(token: MoralisTokenRecord) {
+  return {
+    tokenAddress: asString(token.token_address)?.toLowerCase() ?? null,
+    symbol: asString(token.symbol),
+    name: asString(token.name),
+    balanceRaw: asString(token.balance),
+    balanceFormatted: asString(token.balance_formatted),
+    decimals: asNumber(token.decimals),
+    possibleSpam: asBooleanOrNull(token.possible_spam),
+    verifiedContract: asBooleanOrNull(token.verified_contract),
+    nativeToken: asBoolean(token.native_token),
+    hasLogo: hasTokenLogo(token),
+  };
+}
+
+function sumNullableUsd(values: Array<number | null>) {
+  const pricedValues = values.filter((value): value is number => value !== null);
+  if (pricedValues.length === 0) {
+    return null;
+  }
+
+  return pricedValues.reduce((sum, value) => sum + value, 0);
+}
+
+function buildHiddenAssetReasonCodes(rows: TrustHydratedAssetRow[]): OverviewTrustCoverageReasonCode[] {
+  const reasonCodes: OverviewTrustCoverageReasonCode[] = [];
+
+  if (rows.length > 0) {
+    reasonCodes.push("hiddenAssetsPresent");
+  }
+
+  if (rows.some((row) => row.assetRow.trustStatus === "possible_spam" || row.assetRow.trustStatus === "blocked")) {
+    reasonCodes.push("excludedSuspiciousAssets");
+  }
+
+  if (rows.some((row) => row.assetRow.trustStatus === "low_confidence")) {
+    reasonCodes.push("lowConfidenceAssetsHidden");
+  }
+
+  if (rows.some((row) => row.trustInput.isDustValue)) {
+    reasonCodes.push("dustAssetsHidden");
+  }
+
+  return Array.from(new Set(reasonCodes));
+}
+
+function buildExclusionSummary(
+  hiddenRows: TrustHydratedAssetRow[],
+  visibleRows: TrustHydratedAssetRow[],
+): OverviewExclusionSummary | null {
+  const visibleUnpricedRows = visibleRows.filter((row) => row.assetRow.valueUsd === null);
+  const excludedAssetCount = hiddenRows.length + visibleUnpricedRows.length;
+
+  if (excludedAssetCount === 0) {
+    return null;
+  }
+
+  const reasonCodes: OverviewTrustCoverageReasonCode[] = [
+    ...buildHiddenAssetReasonCodes(hiddenRows),
+    ...(visibleUnpricedRows.length > 0 ? (["visibleUnpricedAssets", "valuationPartial"] as const) : []),
+  ];
+
+  return {
+    excludedAssetCount,
+    excludedValueUsd: sumNullableUsd(hiddenRows.map((row) => row.assetRow.valueUsd)),
+    reasonCodes: Array.from(new Set(reasonCodes)),
+    includesUnpricedVisibleAssets: visibleUnpricedRows.length > 0,
+  };
+}
+
+function buildCoverageReasonCodes(
+  rows: TrustHydratedAssetRow[],
+  input: {
+    providerPartial: boolean;
+    chartPartial: boolean;
+    hasRecentActivity: boolean;
+  },
+): OverviewCoverageReasonCode[] {
+  const hiddenRows = rows.filter((row) => row.assetRow.isHiddenByDefault);
+  const visibleRows = rows.filter((row) => !row.assetRow.isHiddenByDefault);
+  const visibleUnpricedRows = visibleRows.filter((row) => row.assetRow.valueUsd === null);
+  const reasonCodes: OverviewCoverageReasonCode[] = ["analysisPending"];
+
+  if (input.providerPartial) {
+    reasonCodes.push("providerPartial");
+  }
+
+  if (!input.hasRecentActivity) {
+    reasonCodes.push("noRecentActivity");
+  }
+
+  if (rows.some((row) => row.assetRow.priceUsd === null) || input.chartPartial) {
+    reasonCodes.push("missingPrices");
+  }
+
+  if (visibleUnpricedRows.length > 0) {
+    reasonCodes.push("visibleUnpricedAssets", "valuationPartial");
+  }
+
+  if (hiddenRows.length > 0) {
+    reasonCodes.push(...buildHiddenAssetReasonCodes(hiddenRows));
+  }
+
+  if (rows.some((row) => !row.trustInput.hasMetadata || !row.trustInput.hasLogo)) {
+    reasonCodes.push("metadataIncomplete");
+  }
+
+  if (rows.some((row) => row.trustInput.moralisPossibleSpam === null || row.trustInput.moralisVerifiedContract === null)) {
+    reasonCodes.push("providerTrustSignalsMissing");
+  }
+
+  if (rows.some((row) => row.knownProtocolConflict)) {
+    reasonCodes.push("knownProtocolSignalConflict");
+  }
+
+  return Array.from(new Set(reasonCodes));
+}
+
 function resolveAlchemyPricingAddress(
   chainId: number,
   tokenAddress: string | null,
@@ -291,10 +453,6 @@ function resolveAlchemyPricingAddress(
       ))
     ) {
       return BASE_WETH_ADDRESS;
-    }
-
-    if (normalizedAddress === BASE_USDBC_ADDRESS) {
-      return BASE_USDC_ADDRESS;
     }
 
     if (
@@ -343,7 +501,7 @@ function getHistoricalBaselinePrice(
 
 export async function getRecentOverview(input: OverviewRequest): Promise<OverviewResponse> {
   const response = createEmptyRecentOverviewResponse(input);
-  const [tokensResult, historyResult, latestRun, freshness] = await Promise.all([
+  const [tokensResult, historyResult, latestRun, freshness, protocolMetadata] = await Promise.all([
     getWalletTokens(input.walletAddress, input.chainId).then(
       (value) => ({ status: "fulfilled" as const, value }),
       (error) => ({ status: "rejected" as const, reason: sanitizeProviderError(error) }),
@@ -354,6 +512,7 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
     ),
     getLatestAnalysisRun(input.walletAddress, input.chainId),
     readOverviewFreshness(input),
+    readKnownProtocolContracts({ chainId: input.chainId }),
   ]);
 
   if (tokensResult.status === "rejected" && historyResult.status === "rejected") {
@@ -417,7 +576,10 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
       provider: "moralis",
       endpoint: "/wallets/:walletAddress/tokens",
       requestJson: { walletAddress: input.walletAddress, chainId: input.chainId },
-      responseJson: { resultCount: tokens.length },
+      responseJson: {
+        resultCount: tokens.length,
+        tokens: tokens.map((token) => sanitizeMoralisTokenForPersistence(token as MoralisTokenRecord)),
+      },
     });
   }
 
@@ -575,7 +737,7 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
     historicalPriceFetchFailed = historicalPriceResults.some((result) => result.status === "rejected");
   }
 
-  const assetRows = tokenPricingContexts.map((context) => {
+  const hydratedAssetRows = tokenPricingContexts.map((context) => {
     const decimals = asNumber(context.token.decimals);
     const balanceRaw = asString(context.token.balance);
     const balance = asString(context.token.balance_formatted) ?? formatBalance(balanceRaw, decimals);
@@ -591,50 +753,89 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
             pricedAt: historicalFallbackPriceEntry.pricedAt,
             confidence: "medium" as const,
           }
-        : context.moralisPriceUsd !== null
-          ? {
-              priceUsd: context.moralisPriceUsd,
-              pricedAt: null,
-              confidence: "low" as const,
-            }
         : null);
     const priceUsd = resolvedPriceEntry?.priceUsd ?? null;
-    const valueUsd =
-      resolvedPriceEntry?.confidence === "low" && context.moralisValueUsd !== null
-        ? context.moralisValueUsd
-        : priceUsd !== null
-          ? Number.parseFloat(balance) * priceUsd
-          : null;
+    const valueUsd = priceUsd !== null ? Number.parseFloat(balance) * priceUsd : null;
     const movement24hBaseline = getHistoricalBaselinePrice(
       historicalSeries,
       bucketTimestamps[Math.max(0, bucketTimestamps.length - 2)] ?? null,
     );
     const movement7dBaseline = getHistoricalBaselinePrice(historicalSeries, bucketTimestamps[0] ?? null);
-
-    return {
+    const knownProtocolMatch = resolveKnownProtocolAssetMatch(
+      input.chainId,
+      context.tokenAddress,
+      protocolMetadata,
+    );
+    const trustInput: AssetTrustClassifierInput = {
+      walletAddress: input.walletAddress.toLowerCase(),
+      chainId: input.chainId,
       tokenAddress: context.tokenAddress,
       symbol: context.symbol,
-      balance,
-      priceUsd,
+      name: context.name,
+      balanceRaw: balanceRaw ?? "0",
+      balanceFormatted: balance,
       valueUsd,
-      movement24hPct: calculatePercentChange(priceUsd, movement24hBaseline),
-      movement7dPct:
-        input.range === "24h" ? null : calculatePercentChange(priceUsd, movement7dBaseline),
-      classification: "idle" as const,
-      priceConfidence: resolvedPriceEntry?.confidence ?? null,
+      hasReliableAlchemyPrice: resolvedPriceEntry !== null,
+      moralisPossibleSpam: asBooleanOrNull(context.token.possible_spam),
+      moralisVerifiedContract: asBooleanOrNull(context.token.verified_contract),
+      hasLogo: hasTokenLogo(context.token),
+      hasMetadata: hasTokenMetadata(context.symbol, context.name, decimals),
+      isKnownProtocolAsset: knownProtocolMatch !== null,
+      isNativeAsset: asBoolean(context.token.native_token),
+      isDustValue: valueUsd !== null ? valueUsd < DUST_VALUE_THRESHOLD_USD : Number.parseFloat(balance) === 0,
+      classifierVersion: ASSET_TRUST_CLASSIFIER_VERSION,
+    };
+    const trustClassification = classifyWalletAssetTrust(trustInput, {
+      knownProtocolReasonCode: knownProtocolMatch?.reasonCode ?? null,
+    });
+
+    return {
+      assetRow: {
+        tokenAddress: context.tokenAddress,
+        chainId: input.chainId,
+        symbol: context.symbol,
+        name: context.name,
+        balance,
+        priceUsd,
+        valueUsd,
+        movement24hPct: calculatePercentChange(priceUsd, movement24hBaseline),
+        movement7dPct:
+          input.range === "24h" ? null : calculatePercentChange(priceUsd, movement7dBaseline),
+        classification: "idle" as const,
+        priceConfidence: resolvedPriceEntry?.confidence ?? null,
+        trustStatus: trustClassification.trustStatus,
+        trustReasonCodes: trustClassification.trustReasonCodes,
+        isHiddenByDefault: trustClassification.isHiddenByDefault,
+        classifierVersion: trustClassification.classifierVersion,
+      },
+      trustInput,
+      knownProtocolConflict:
+        knownProtocolMatch !== null && asBooleanOrNull(context.token.possible_spam) === true,
     };
   });
+
+  const assetRows = hydratedAssetRows.map((row) => row.assetRow);
+  const hiddenAssetRows = hydratedAssetRows.filter((row) => row.assetRow.isHiddenByDefault);
+  const visibleAssetRows = hydratedAssetRows.filter((row) => !row.assetRow.isHiddenByDefault);
+  const pricedVisibleAssetRows = visibleAssetRows.filter((row) => row.assetRow.valueUsd !== null);
+  const totalValueUsd = sumNullableUsd(pricedVisibleAssetRows.map((row) => row.assetRow.valueUsd));
+  const hiddenAssetReasonCodes = buildHiddenAssetReasonCodes(hiddenAssetRows);
+  const exclusionSummary = buildExclusionSummary(hiddenAssetRows, visibleAssetRows);
 
   const chartSeries = buildChartPoints(
     bucketTimestamps,
     historicalPriceLookup,
-    assetRows
+    visibleAssetRows
       .filter(
-        (row) => Number.isFinite(Number.parseFloat(row.balance)),
+        (row) => Number.isFinite(Number.parseFloat(row.assetRow.balance)),
       )
       .map((row) => ({
-        tokenAddress: resolveAlchemyPricingAddress(input.chainId, row.tokenAddress, row.symbol) ?? "",
-        balance: Number.parseFloat(row.balance),
+        tokenAddress: resolveAlchemyPricingAddress(
+          input.chainId,
+          row.assetRow.tokenAddress,
+          row.assetRow.symbol,
+        ) ?? "",
+        balance: Number.parseFloat(row.assetRow.balance),
       }))
       .filter((row) => row.tokenAddress.length > 0),
   );
@@ -644,14 +845,6 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
     .reverse()
     .find((point) => point.totalValueUsd !== null)?.totalValueUsd ?? null;
 
-  const totalValueUsd = assetRows.reduce<number | null>((sum, row) => {
-    if (row.valueUsd === null) {
-      return sum;
-    }
-
-    return (sum ?? 0) + row.valueUsd;
-  }, 0);
-
   const providerPartial =
     tokensResult.status === "rejected" ||
     historyResult.status === "rejected" ||
@@ -659,15 +852,19 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
     historicalPriceFetchFailed;
   const missingPrices = assetRows.some((row) => row.priceUsd === null);
   const chartPartial = chartSeries.hasPartialHistory || chartSeries.points.some((point) => point.totalValueUsd === null);
-  const coverageReasonCodes = [
-    "analysisPending",
-    ...(providerPartial ? ["providerPartial"] : []),
-    ...(missingPrices ? ["missingPrices"] : []),
-    ...(chartPartial ? ["missingPrices"] : []),
-    ...(history.length === 0 ? ["noRecentActivity"] : []),
-  ];
-  const uniqueCoverageReasonCodes = Array.from(new Set(coverageReasonCodes));
-  const coverageStatus = providerPartial || missingPrices ? "partial" : "recent";
+  const uniqueCoverageReasonCodes = buildCoverageReasonCodes(hydratedAssetRows, {
+    providerPartial,
+    chartPartial,
+    hasRecentActivity: history.length > 0,
+  });
+  const coverageStatus =
+    providerPartial ||
+    missingPrices ||
+    hiddenAssetRows.length > 0 ||
+    Boolean(exclusionSummary) ||
+    chartPartial
+      ? "partial"
+      : "recent";
 
   response.coverage = {
     status: coverageStatus,
@@ -691,6 +888,7 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
     deployedValueUsd: null,
     idleValueUsd: totalValueUsd,
     changeOverSelectedPeriodPct: calculatePercentChange(lastChartValue, firstChartValue),
+    exclusions: exclusionSummary,
   };
 
   response.chart = {
@@ -705,6 +903,7 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
     ...response.distribution,
     coverageStatus,
     coverageReasonCodes: uniqueCoverageReasonCodes,
+    exclusions: exclusionSummary,
     slices:
       totalValueUsd && totalValueUsd > 0
         ? [
@@ -723,6 +922,19 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
     coverageStatus,
     coverageReasonCodes: uniqueCoverageReasonCodes,
     rows: assetRows,
+    hiddenSummary:
+      hiddenAssetRows.length > 0
+        ? {
+            hiddenCount: hiddenAssetRows.length,
+            hiddenValueUsd: sumNullableUsd(hiddenAssetRows.map((row) => row.assetRow.valueUsd)),
+            reasonCodes: hiddenAssetReasonCodes,
+            affectsTotals: true,
+            allVisibleAssetsUnpricedOrZero:
+              visibleAssetRows.length === 0 ||
+              visibleAssetRows.every((row) => (row.assetRow.valueUsd ?? 0) <= 0),
+          }
+        : null,
+    defaultVisibleCount: visibleAssetRows.length,
   };
 
   response.activity = {
@@ -757,6 +969,15 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
     metadataJson: {
       reasonCodes: uniqueCoverageReasonCodes,
       range: input.range,
+      classifierVersion: ASSET_TRUST_CLASSIFIER_VERSION,
+      trustInputHydration: {
+        source: "normalized_overview_response",
+        totalAssets: hydratedAssetRows.length,
+        hiddenAssetCount: hiddenAssetRows.length,
+        visibleAssetCount: visibleAssetRows.length,
+        knownProtocolMatchCount: hydratedAssetRows.filter((row) => row.trustInput.isKnownProtocolAsset).length,
+      },
+      exclusions: exclusionSummary,
     },
   });
 
@@ -771,6 +992,10 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
       metadataJson: {
         range: input.range,
         source: "recent_provider_data",
+        classifierVersion: ASSET_TRUST_CLASSIFIER_VERSION,
+        hiddenSummary: response.assets.hiddenSummary,
+        exclusions: exclusionSummary,
+        trustInputs: hydratedAssetRows.map((row) => row.trustInput),
       },
     });
   }

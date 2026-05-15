@@ -1,0 +1,30 @@
+{
+  "status": {
+    "trusted": "Confiable",
+    "verified": "Verificado",
+    "known_protocol": "Protocolo conocido",
+    "priced": "Con precio",
+    "low_confidence": "Baja confianza",
+    "possible_spam": "Posible spam",
+    "blocked": "Bloqueado",
+    "unknown": "Desconocido"
+  },
+  "reasons": {
+    "moralisPossibleSpam": "Moralis marcó este activo como posible spam.",
+    "moralisVerifiedContract": "Moralis marcó este contrato como verificado.",
+    "alchemyMissingPrice": "Alchemy no devolvió un precio confiable para este activo.",
+    "missingLogo": "A este activo le falta logo o miniatura.",
+    "missingMetadata": "A este activo le faltan metadatos suficientes para clasificarlo con confianza.",
+    "suspiciousSymbol": "El símbolo o el nombre parece sospechoso o imita a otro activo.",
+    "zeroOrDustValue": "El valor con precio es de polvo o prácticamente cero.",
+    "unrecognizedContract": "Este contrato no está reconocido por las fuentes de protocolos conocidas para esta etapa.",
+    "knownAerodromeToken": "Este activo coincide con metadatos de tokens de Aerodrome en Base.",
+    "knownProtocolContract": "Este activo coincide con metadatos de protocolos conocidos para esta vista de wallet.",
+    "hasReliablePrice": "Se resolvió un precio confiable basado en dirección para este activo.",
+    "userHidden": "Reservado para una futura anulación de usuario oculta.",
+    "userAllowed": "Reservado para una futura anulación de usuario permitida."
+  },
+  "helpers": {
+    "reasonFallback": "No se registraron señales de confianza adicionales."
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "status": {
+    "trusted": "Trusted",
+    "verified": "Verified",
+    "known_protocol": "Known protocol",
+    "priced": "Priced",
+    "low_confidence": "Low confidence",
+    "possible_spam": "Possible spam",
+    "blocked": "Blocked",
+    "unknown": "Unknown"
+  },
+  "reasons": {
+    "moralisPossibleSpam": "Moralis flagged this asset as possible spam.",
+    "moralisVerifiedContract": "Moralis marked this contract as verified.",
+    "alchemyMissingPrice": "Alchemy did not return a reliable price for this asset.",
+    "missingLogo": "This asset is missing a logo or thumbnail.",
+    "missingMetadata": "This asset is missing enough metadata to classify confidently.",
+    "suspiciousSymbol": "The symbol or name looks suspicious or impersonates another asset.",
+    "zeroOrDustValue": "The priced value is dust-sized or effectively zero.",
+    "unrecognizedContract": "This contract is not recognized by the known protocol sources for this stage.",
+    "knownAerodromeToken": "This asset matches Aerodrome token metadata for Base.",
+    "knownProtocolContract": "This asset matches known protocol metadata for this wallet view.",
+    "hasReliablePrice": "A reliable address-based price was resolved for this asset.",
+    "userHidden": "Reserved for a future user-hidden override.",
+    "userAllowed": "Reserved for a future user-allowed override."
+  },
+  "helpers": {
+    "reasonFallback": "No additional trust signals were recorded."
+  }
+}

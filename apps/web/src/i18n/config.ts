@@ -16,6 +16,7 @@ import enPools from "@/i18n/locales/en/pools.json";
 import enRewards from "@/i18n/locales/en/rewards.json";
 import enSettings from "@/i18n/locales/en/settings.json";
 import enStrategies from "@/i18n/locales/en/strategies.json";
+import enTrust from "@/i18n/locales/en/trust.json";
 import enValidation from "@/i18n/locales/en/validation.json";
 import enWallet from "@/i18n/locales/en/wallet.json";
 import esCommon from "@/i18n/locales/es/common.json";
@@ -33,6 +34,7 @@ import esPools from "@/i18n/locales/es/pools.json";
 import esRewards from "@/i18n/locales/es/rewards.json";
 import esSettings from "@/i18n/locales/es/settings.json";
 import esStrategies from "@/i18n/locales/es/strategies.json";
+import esTrust from "@/i18n/locales/es/trust.json";
 import esValidation from "@/i18n/locales/es/validation.json";
 import esWallet from "@/i18n/locales/es/wallet.json";
 
@@ -62,6 +64,7 @@ const resources = {
     pools: enPools,
     deposits: enDeposits,
     strategies: enStrategies,
+    trust: enTrust,
     rewards: enRewards,
     governance: enGovernance,
     activity: enActivity,
@@ -81,6 +84,7 @@ const resources = {
     pools: esPools,
     deposits: esDeposits,
     strategies: esStrategies,
+    trust: esTrust,
     rewards: esRewards,
     governance: esGovernance,
     activity: esActivity,
@@ -102,6 +106,7 @@ const namespaces = [
   "pools",
   "deposits",
   "strategies",
+  "trust",
   "rewards",
   "governance",
   "activity",

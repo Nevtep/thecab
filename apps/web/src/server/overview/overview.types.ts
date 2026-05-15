@@ -1,6 +1,26 @@
+import type {
+  OverviewTrustCoverageReasonCode,
+  TokenTrustReasonCode,
+  TokenTrustStatus,
+} from "@/server/asset-trust/assetTrust.types";
+
 export const OVERVIEW_RANGES = ["24h", "7d", "30d"] as const;
 
+export const EXISTING_OVERVIEW_COVERAGE_REASON_CODES = [
+  "analysisPending",
+  "providerPartial",
+  "missingPrices",
+  "noRecentActivity",
+] as const;
+
 export type OverviewRange = (typeof OVERVIEW_RANGES)[number];
+
+export type ExistingOverviewCoverageReasonCode =
+  (typeof EXISTING_OVERVIEW_COVERAGE_REASON_CODES)[number];
+
+export type OverviewCoverageReasonCode =
+  | ExistingOverviewCoverageReasonCode
+  | OverviewTrustCoverageReasonCode;
 
 export type OverviewMode = "recent_view";
 
@@ -19,7 +39,7 @@ export type OverviewAnalysisStatus =
 export type OverviewBlockProvenance = {
   source: OverviewDataSource;
   coverageStatus: OverviewCoverageStatus;
-  coverageReasonCodes: string[] | null;
+  coverageReasonCodes: OverviewCoverageReasonCode[] | null;
 };
 
 export type OverviewRequest = {
@@ -41,7 +61,7 @@ export type OverviewAnalysisState = {
 export type OverviewCoverage = {
   status: OverviewCoverageStatus;
   confidence: "low" | "medium" | "high" | null;
-  reasonCodes: string[];
+  reasonCodes: OverviewCoverageReasonCode[];
   details: string | null;
 };
 
@@ -63,6 +83,7 @@ export type OverviewMetrics = OverviewBlockProvenance & {
   automatedStrategiesValueUsd: number | null;
   residualAttributedValueUsd: number | null;
   governanceValueUsd: number | null;
+  exclusions: OverviewExclusionSummary | null;
 };
 
 export type OverviewChartPoint = {
@@ -86,12 +107,30 @@ export type OverviewDistribution = OverviewBlockProvenance & {
     valueUsd: number;
     coverageStatus: OverviewCoverageStatus | null;
   }>;
+  exclusions: OverviewExclusionSummary | null;
+};
+
+export type OverviewExclusionSummary = {
+  excludedAssetCount: number;
+  excludedValueUsd: number | null;
+  reasonCodes: OverviewTrustCoverageReasonCode[];
+  includesUnpricedVisibleAssets: boolean;
+};
+
+export type HiddenAssetSummary = {
+  hiddenCount: number;
+  hiddenValueUsd: number | null;
+  reasonCodes: OverviewTrustCoverageReasonCode[];
+  affectsTotals: boolean;
+  allVisibleAssetsUnpricedOrZero: boolean;
 };
 
 export type OverviewAssets = OverviewBlockProvenance & {
   rows: Array<{
     tokenAddress: string | null;
+    chainId: number;
     symbol: string;
+    name: string | null;
     balance: string;
     priceUsd: number | null;
     valueUsd: number | null;
@@ -99,7 +138,13 @@ export type OverviewAssets = OverviewBlockProvenance & {
     movement7dPct: number | null;
     classification: "deployed" | "idle" | "residual" | "reward" | "governance" | "unknown";
     priceConfidence: "low" | "medium" | "high" | null;
+    trustStatus: TokenTrustStatus;
+    trustReasonCodes: TokenTrustReasonCode[];
+    isHiddenByDefault: boolean;
+    classifierVersion: string | null;
   }>;
+  hiddenSummary: HiddenAssetSummary | null;
+  defaultVisibleCount: number;
 };
 
 export type OverviewActivity = OverviewBlockProvenance & {

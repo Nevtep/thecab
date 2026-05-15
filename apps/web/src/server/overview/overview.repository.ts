@@ -5,6 +5,7 @@ import {
   coverageReports,
   portfolioSnapshots,
   pricePoints,
+  protocolContracts,
   rawProviderRecords,
   walletContexts,
 } from "@/server/db/schema";
@@ -226,4 +227,18 @@ export async function getLatestOverviewPortfolioSnapshot(input: ScopedWalletInpu
     .limit(1);
 
   return rows[0] ?? null;
+}
+
+export async function readKnownProtocolContracts(input: Pick<OverviewRequest, "chainId">) {
+  const db = getDb();
+  return db
+    .select({
+      chainId: protocolContracts.chainId,
+      address: protocolContracts.address,
+      protocol: protocolContracts.protocol,
+      contractType: protocolContracts.contractType,
+      metadataJson: protocolContracts.metadataJson,
+    })
+    .from(protocolContracts)
+    .where(eq(protocolContracts.chainId, input.chainId));
 }

@@ -85,7 +85,22 @@
     "positionValue": "Position value: {{value}}",
     "change24h": "24h: {{value}}",
     "change7d": "7d: {{value}}",
-    "priceUnavailable": "Spot price unavailable"
+    "priceUnavailable": "Spot price unavailable",
+    "trustReasons": "Trust signals: {{reasons}}",
+    "hiddenByDefault": "Hidden",
+    "hiddenNoticeTitle": "{{count}} assets are hidden by default",
+    "hiddenNoticeDescription": "Overview keeps suspicious or low-confidence assets in the payload, but excludes them from default totals. {{visibleCount}} assets remain visible by default.",
+    "showHiddenAssets": "Reveal hidden assets",
+    "hideHiddenAssets": "Hide hidden assets",
+    "showUnpricedAssets": "Show assets without prices",
+    "hiddenInspectionTitle": "Hidden asset inspection",
+    "hiddenInspectionDescription": "These rows stay out of default totals until you reveal them for this session.",
+    "hiddenOnlyTitle": "Default view is hiding all current asset rows",
+    "hiddenOnlyDescription": "Reveal hidden assets to inspect low-confidence or suspicious rows without changing totals.",
+    "filteredUnpricedEmptyTitle": "All current asset rows are missing prices",
+    "filteredUnpricedEmptyDescription": "Turn on the unpriced asset switch to inspect rows without prices. Default totals stay unchanged.",
+    "exclusionsSummary": "{{count}} assets are excluded from default totals. Excluded priced value: {{value}}.",
+    "noSecurityGuarantee": "Trust labels help triage visibility. They are not a security guarantee."
   },
   "actions": {
     "refresh": "Refresh",

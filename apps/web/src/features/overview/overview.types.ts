@@ -12,6 +12,53 @@ export type OverviewAnalysisStatus =
 
 export type OverviewCoverageStatus = "recent" | "partial" | "unknown";
 
+export type ExistingOverviewCoverageReasonCode =
+  | "analysisPending"
+  | "providerPartial"
+  | "missingPrices"
+  | "noRecentActivity";
+
+export type OverviewTrustCoverageReasonCode =
+  | "excludedSuspiciousAssets"
+  | "lowConfidenceAssetsHidden"
+  | "missingPrices"
+  | "visibleUnpricedAssets"
+  | "hiddenAssetsPresent"
+  | "knownProtocolSignalConflict"
+  | "providerTrustSignalsMissing"
+  | "metadataIncomplete"
+  | "dustAssetsHidden"
+  | "valuationPartial";
+
+export type OverviewCoverageReasonCode =
+  | ExistingOverviewCoverageReasonCode
+  | OverviewTrustCoverageReasonCode;
+
+export type TokenTrustStatus =
+  | "trusted"
+  | "verified"
+  | "known_protocol"
+  | "priced"
+  | "low_confidence"
+  | "possible_spam"
+  | "blocked"
+  | "unknown";
+
+export type TokenTrustReasonCode =
+  | "moralisPossibleSpam"
+  | "moralisVerifiedContract"
+  | "alchemyMissingPrice"
+  | "missingLogo"
+  | "missingMetadata"
+  | "suspiciousSymbol"
+  | "zeroOrDustValue"
+  | "unrecognizedContract"
+  | "knownAerodromeToken"
+  | "knownProtocolContract"
+  | "hasReliablePrice"
+  | "userHidden"
+  | "userAllowed";
+
 export type OverviewScreenState = {
   walletAddress: string | null;
   chainId: number | null;
@@ -35,13 +82,13 @@ export type OverviewViewModel = {
   coverage: {
     status: OverviewCoverageStatus;
     confidence: "low" | "medium" | "high" | null;
-    reasonCodes: string[];
+    reasonCodes: OverviewCoverageReasonCode[];
     details: string | null;
   };
   summary: {
     source: "recent_provider_data" | "partial_fallback";
     coverageStatus: OverviewCoverageStatus;
-    coverageReasonCodes: string[] | null;
+    coverageReasonCodes: OverviewCoverageReasonCode[] | null;
     walletAddress: string;
     chainId: number;
     chainLabel: string;
@@ -51,7 +98,7 @@ export type OverviewViewModel = {
   metrics: {
     source: "recent_provider_data" | "partial_fallback";
     coverageStatus: OverviewCoverageStatus;
-    coverageReasonCodes: string[] | null;
+    coverageReasonCodes: OverviewCoverageReasonCode[] | null;
     netPortfolioValueUsd: number | null;
     deployedValueUsd: number | null;
     idleValueUsd: number | null;
@@ -61,11 +108,12 @@ export type OverviewViewModel = {
     automatedStrategiesValueUsd: number | null;
     residualAttributedValueUsd: number | null;
     governanceValueUsd: number | null;
+    exclusions: OverviewExclusionSummary | null;
   };
   chart: {
     source: "recent_provider_data" | "partial_fallback";
     coverageStatus: OverviewCoverageStatus;
-    coverageReasonCodes: string[] | null;
+    coverageReasonCodes: OverviewCoverageReasonCode[] | null;
     range: OverviewRange;
     hasRewardMarkers: boolean;
     points: Array<{
@@ -79,21 +127,24 @@ export type OverviewViewModel = {
   distribution: {
     source: "recent_provider_data" | "partial_fallback";
     coverageStatus: OverviewCoverageStatus;
-    coverageReasonCodes: string[] | null;
+    coverageReasonCodes: OverviewCoverageReasonCode[] | null;
     slices: Array<{
       dimension: "pool" | "token" | "strategy" | "idle" | "governance";
       label: string;
       valueUsd: number;
       coverageStatus: OverviewCoverageStatus | null;
     }>;
+    exclusions: OverviewExclusionSummary | null;
   };
   assets: {
     source: "recent_provider_data" | "partial_fallback";
     coverageStatus: OverviewCoverageStatus;
-    coverageReasonCodes: string[] | null;
+    coverageReasonCodes: OverviewCoverageReasonCode[] | null;
     rows: Array<{
       tokenAddress: string | null;
+      chainId: number;
       symbol: string;
+      name: string | null;
       balance: string;
       priceUsd: number | null;
       valueUsd: number | null;
@@ -101,12 +152,18 @@ export type OverviewViewModel = {
       movement7dPct: number | null;
       classification: "deployed" | "idle" | "residual" | "reward" | "governance" | "unknown";
       priceConfidence: "low" | "medium" | "high" | null;
+      trustStatus: TokenTrustStatus;
+      trustReasonCodes: TokenTrustReasonCode[];
+      isHiddenByDefault: boolean;
+      classifierVersion: string | null;
     }>;
+    hiddenSummary: HiddenAssetSummary | null;
+    defaultVisibleCount: number;
   };
   activity: {
     source: "recent_provider_data" | "partial_fallback";
     coverageStatus: OverviewCoverageStatus;
-    coverageReasonCodes: string[] | null;
+    coverageReasonCodes: OverviewCoverageReasonCode[] | null;
     items: Array<{
       id: string;
       occurredAt: string;
@@ -117,6 +174,21 @@ export type OverviewViewModel = {
       isUnclassified: boolean;
     }>;
   };
+};
+
+export type OverviewExclusionSummary = {
+  excludedAssetCount: number;
+  excludedValueUsd: number | null;
+  reasonCodes: OverviewTrustCoverageReasonCode[];
+  includesUnpricedVisibleAssets: boolean;
+};
+
+export type HiddenAssetSummary = {
+  hiddenCount: number;
+  hiddenValueUsd: number | null;
+  reasonCodes: OverviewTrustCoverageReasonCode[];
+  affectsTotals: boolean;
+  allVisibleAssetsUnpricedOrZero: boolean;
 };
 
 export type OverviewQueryInput = {

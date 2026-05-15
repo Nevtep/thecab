@@ -9,6 +9,15 @@
     "analysisPending": "El análisis histórico todavía está pendiente",
     "providerPartial": "Uno o más proveedores devolvieron datos parciales",
     "missingPrices": "Algunos activos no tienen precios actuales",
-    "noRecentActivity": "No se encontró actividad on-chain reciente"
+    "noRecentActivity": "No se encontró actividad on-chain reciente",
+    "excludedSuspiciousAssets": "Los activos sospechosos se excluyeron de los totales por defecto",
+    "lowConfidenceAssetsHidden": "Los activos de baja confianza están ocultos por defecto",
+    "visibleUnpricedAssets": "Los activos visibles sin precios confiables se excluyen de los totales de valoración",
+    "hiddenAssetsPresent": "Hay activos ocultos en esta wallet",
+    "knownProtocolSignalConflict": "El reconocimiento de protocolo conocido entra en conflicto con señales de cautela del proveedor",
+    "providerTrustSignalsMissing": "Faltan algunas señales de confianza del proveedor",
+    "metadataIncomplete": "Algunos activos tienen metadatos incompletos",
+    "dustAssetsHidden": "Se ocultaron activos de baja confianza con valor de polvo",
+    "valuationPartial": "La valoración de la cartera es parcial"
   }
 }
