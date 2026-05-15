@@ -17,17 +17,15 @@ Implication:
 ## Finding 2: Main Asset Pricing Requires Canonical Alchemy Address Resolution
 
 - Native Base ETH must be priced through Base WETH for Alchemy valuation.
-- Bridged Base USDbC must be priced through canonical Base USDC for reliable Alchemy valuation.
-- Canonical Base addresses for WETH, USDC, cbBTC, and AERO are usable pricing anchors for recent Overview valuation.
+- Canonical Base addresses for WETH, USDC, cbBTC, and AERO are usable pricing anchors for recent Overview valuation where the asset itself is that canonical token.
 
 Resolved pricing aliases used during Feature 003 research:
 
 - ETH -> Base WETH `0x4200000000000000000000000000000000000006`
-- USDbC `0xd9aaec86b65d86f6a7b5a1b0c42ffa531710b6ca` -> Base USDC `0x833589fcd6edb6e08f4c7c32d4f71b54bda02913`
 
 Implication:
 
-- Asset rows for main assets should not rely only on the wallet token address returned by Moralis. They need canonical pricing-address resolution before valuation.
+- Asset rows for main assets should not rely only on the wallet token address returned by Moralis. They need explicit pricing-address resolution only where the asset is genuinely the same priced instrument, such as native ETH resolving through Base WETH.
 
 ## Finding 3: Alchemy Current Prices Are Useful But Not Sufficiently Reliable Alone
 
