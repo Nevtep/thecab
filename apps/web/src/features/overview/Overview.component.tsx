@@ -56,6 +56,7 @@ type OverviewComponentProps = {
   hiddenAssetRows: OverviewViewModel["assets"]["rows"];
   showHiddenAssets: boolean;
   showUnpricedAssets: boolean;
+  showDustAssets: boolean;
   analysis: OverviewViewModel["analysis"] | null;
   isLoading: boolean;
   isRefreshing: boolean;
@@ -66,8 +67,9 @@ type OverviewComponentProps = {
   onRefresh: () => void;
   onRangeChange: (range: OverviewRange) => void;
   onStartAnalysis: () => void;
-  onToggleHiddenAssets: () => void;
-  onToggleUnpricedAssets: () => void;
+  onToggleHiddenAssets: (checked: boolean) => void;
+  onToggleUnpricedAssets: (checked: boolean) => void;
+  onToggleDustAssets: (checked: boolean) => void;
 };
 
 function formatCurrencyValue(value: number | null, locale: string, fallbackLabel: string) {
@@ -117,6 +119,10 @@ function buildExclusionMessage(
     }),
     ...reasonLabels,
   ].join(" · ");
+}
+
+function isDustValueRow(row: OverviewViewModel["assets"]["rows"][number]) {
+  return row.trustReasonCodes.includes("zeroOrDustValue");
 }
 
 function renderAssetRows(
@@ -199,6 +205,7 @@ export function OverviewComponent({
   hiddenAssetRows,
   showHiddenAssets,
   showUnpricedAssets,
+  showDustAssets,
   analysis,
   isLoading,
   isRefreshing,
@@ -211,6 +218,7 @@ export function OverviewComponent({
   onStartAnalysis,
   onToggleHiddenAssets,
   onToggleUnpricedAssets,
+  onToggleDustAssets,
 }: OverviewComponentProps) {
   const { t, i18n } = useTranslation(["overview", "navigation", "analysis", "coverage", "charts", "trust"]);
   const locale = i18n.language;
@@ -307,12 +315,28 @@ export function OverviewComponent({
   const analysisActionLabel =
     activeAnalysis.status === "failed" ? t("analysis.actions.retry") : t("analysis.actions.start");
   const exclusionMessage = buildExclusionMessage(viewModel.metrics.exclusions, t, locale);
-  const visibleRenderableRows = showUnpricedAssets
-    ? visibleAssetRows
-    : visibleAssetRows.filter((row) => row.priceUsd !== null);
-  const hiddenRenderableRows = showUnpricedAssets
-    ? hiddenAssetRows
-    : hiddenAssetRows.filter((row) => row.priceUsd !== null);
+  const visibleRenderableRows = visibleAssetRows.filter((row) => {
+    if (!showUnpricedAssets && row.priceUsd === null) {
+      return false;
+    }
+
+    if (!showDustAssets && isDustValueRow(row)) {
+      return false;
+    }
+
+    return true;
+  });
+  const hiddenRenderableRows = hiddenAssetRows.filter((row) => {
+    if (!showUnpricedAssets && row.priceUsd === null) {
+      return false;
+    }
+
+    if (!showDustAssets && isDustValueRow(row)) {
+      return false;
+    }
+
+    return true;
+  });
 
   return (
     <section data-overview-root>
@@ -546,45 +570,30 @@ export function OverviewComponent({
                     t,
                   )}
                   actions={
-                    <CabSwitch
-                      checked={showUnpricedAssets}
-                      onCheckedChange={onToggleUnpricedAssets}
-                      label={t("assets.showUnpricedAssets")}
-                    />
+                    <CabStack row gap="$3" flexWrap="wrap" alignItems="center">
+                      <CabSwitch
+                        checked={showHiddenAssets}
+                        onCheckedChange={onToggleHiddenAssets}
+                        label={t("assets.showHiddenAssets")}
+                      />
+                      <CabSwitch
+                        checked={showUnpricedAssets}
+                        onCheckedChange={onToggleUnpricedAssets}
+                        label={t("assets.showUnpricedAssets")}
+                      />
+                      <CabSwitch
+                        checked={showDustAssets}
+                        onCheckedChange={onToggleDustAssets}
+                        label={t("assets.showDustAssets")}
+                      />
+                    </CabStack>
                   }
                 />
-                {viewModel.assets.hiddenSummary ? (
-                  <CabCard density="default">
-                    <CabStack gap="$2">
-                      <CabText variant="label">
-                        {t("assets.hiddenNoticeTitle", { count: viewModel.assets.hiddenSummary.hiddenCount })}
-                      </CabText>
-                      <CabText variant="caption" fontSize={12}>
-                        {t("assets.hiddenNoticeDescription", {
-                          count: viewModel.assets.hiddenSummary.hiddenCount,
-                          visibleCount: viewModel.assets.defaultVisibleCount,
-                        })}
-                      </CabText>
-                      <CabText variant="caption" fontSize={12}>
-                        {viewModel.assets.hiddenSummary.reasonCodes
-                          .map((reasonCode) => t(`coverage:reasons.${reasonCode}`))
-                          .join(" · ")}
-                      </CabText>
-                      <CabStack row gap="$2" flexWrap="wrap" alignItems="center">
-                        <CabButton tone="secondary" onPress={onToggleHiddenAssets}>
-                          {showHiddenAssets ? t("assets.hideHiddenAssets") : t("assets.showHiddenAssets")}
-                        </CabButton>
-                        <CabText variant="caption" fontSize={12}>
-                          {t("assets.noSecurityGuarantee")}
-                        </CabText>
-                      </CabStack>
-                    </CabStack>
-                  </CabCard>
-                ) : null}
+                
                 {visibleRenderableRows.length === 0 && hiddenRenderableRows.length === 0 ? (
                   <CabEmptyState
-                    title={showUnpricedAssets ? t("states.emptyAssetsTitle") : t("assets.filteredUnpricedEmptyTitle")}
-                    description={showUnpricedAssets ? t("states.emptyAssetsDescription") : t("assets.filteredUnpricedEmptyDescription")}
+                    title={t("assets.filteredEmptyTitle")}
+                    description={t("assets.filteredEmptyDescription")}
                   />
                 ) : visibleRenderableRows.length === 0 && hiddenRenderableRows.length > 0 && !showHiddenAssets ? (
                   <CabEmptyState

@@ -22,6 +22,7 @@ export function OverviewContainer() {
   );
   const [showHiddenAssets, setShowHiddenAssets] = useState(false);
   const [showUnpricedAssets, setShowUnpricedAssets] = useState(false);
+  const [showDustAssets, setShowDustAssets] = useState(false);
 
   const walletAddress = address?.toLowerCase() ?? null;
   const resolvedChainId = chainId ?? SUPPORTED_CHAIN_ID;
@@ -96,6 +97,7 @@ export function OverviewContainer() {
       hiddenAssetRows={hiddenRows}
       showHiddenAssets={showHiddenAssets}
       showUnpricedAssets={showUnpricedAssets}
+      showDustAssets={showDustAssets}
       analysis={analysis}
       isLoading={overviewQuery.isLoading}
       isRefreshing={overviewQuery.isFetching}
@@ -106,8 +108,9 @@ export function OverviewContainer() {
       onRefresh={handleRefresh}
       onRangeChange={handleRangeChange}
       onStartAnalysis={() => void handleStartAnalysis()}
-      onToggleHiddenAssets={() => setShowHiddenAssets((currentValue) => !currentValue)}
-      onToggleUnpricedAssets={() => setShowUnpricedAssets((currentValue) => !currentValue)}
+      onToggleHiddenAssets={(checked) => setShowHiddenAssets(checked)}
+      onToggleUnpricedAssets={(checked) => setShowUnpricedAssets(checked)}
+      onToggleDustAssets={(checked) => setShowDustAssets(checked)}
     />
   );
 }
