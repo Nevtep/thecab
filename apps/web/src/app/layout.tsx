@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, Inter, Orbitron } from "next/font/google";
+import "./cab-focus.css";
 import "./globals.css";
 import { AppProviders } from "@/app/providers";
 
@@ -38,7 +39,7 @@ export default function RootLayout({
 
   return (
     <html lang="en" className={fontVariables}>
-      <body className={fontVariables}>
+      <body className={`${fontVariables} cab-focus-root`}>
         <AppProviders>{children}</AppProviders>
       </body>
     </html>

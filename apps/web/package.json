@@ -14,7 +14,9 @@
     "db:studio": "drizzle-kit studio --config drizzle.config.ts",
     "provider:smoke": "tsx src/server/scripts/provider-smoke.ts",
     "i18n:check": "tsx scripts/check-i18n-parity.ts",
-    "ds:check": "tsx scripts/check-ds-color-semantics.ts"
+    "ds:check": "tsx scripts/check-ds-color-semantics.ts && tsx scripts/check-wcag-contrast.ts && tsx scripts/check-hardcoded-hex.ts",
+    "ds:contrast": "tsx scripts/check-wcag-contrast.ts",
+    "test:a11y": "playwright test"
   },
   "dependencies": {
     "@coinbase/wallet-sdk": "^4.3.7",
@@ -54,8 +56,11 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "drizzle-kit": "^0.31.10",
+    "@axe-core/playwright": "^4.10.2",
+    "@playwright/test": "^1.52.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
     "tsx": "^4.21.0",
     "typescript": "^5"
   }

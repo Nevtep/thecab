@@ -4,7 +4,7 @@ import type { ComponentProps, PropsWithChildren } from "react";
 import { Button } from "tamagui";
 
 import type { CabDensity } from "@/design-system/tokens";
-import { cabColors } from "@/design-system/tokens";
+import { cabColors, cabTouchTarget } from "@/design-system/tokens";
 
 type CabButtonSize = "sm" | "md" | "lg";
 
@@ -18,9 +18,9 @@ const buttonSizeStyles: Record<
     gap: number;
   }
 > = {
-  sm: { height: 28, paddingHorizontal: 12, paddingVertical: 6, fontSize: 12, gap: 6 },
-  md: { height: 36, paddingHorizontal: 16, paddingVertical: 8, fontSize: 13, gap: 8 },
-  lg: { height: 42, paddingHorizontal: 20, paddingVertical: 10, fontSize: 14, gap: 10 },
+  sm: { height: cabTouchTarget.compact, paddingHorizontal: 12, paddingVertical: 6, fontSize: 12, gap: 6 },
+  md: { height: cabTouchTarget.min, paddingHorizontal: 16, paddingVertical: 8, fontSize: 13, gap: 8 },
+  lg: { height: cabTouchTarget.comfortable, paddingHorizontal: 20, paddingVertical: 10, fontSize: 14, gap: 10 },
 };
 
 const densityToSize: Record<CabDensity, CabButtonSize> = {
@@ -48,28 +48,31 @@ const variantStyles = {
     },
   },
   secondary: {
-    backgroundColor: cabColors.action.secondaryBg,
+    backgroundColor: "rgba(234, 241, 255, 0.08)",
     color: cabColors.action.secondaryText,
-    borderColor: cabColors.action.secondaryBorder,
+    borderColor: "rgba(184, 199, 230, 0.28)",
     hoverStyle: {
+      backgroundColor: "rgba(234, 241, 255, 0.12)",
       borderColor: cabColors.action.secondaryHoverBorder,
     },
   },
   technical: {
-    backgroundColor: "transparent",
+    backgroundColor: "rgba(0, 224, 225, 0.08)",
     color: cabColors.action.technicalText,
     borderColor: cabColors.action.technicalBorder,
     hoverStyle: {
+      backgroundColor: "rgba(0, 224, 225, 0.12)",
       borderColor: cabColors.action.technicalHoverBorder,
       shadowColor: cabColors.action.technicalGlow,
       shadowRadius: 10,
     },
   },
   ghost: {
-    backgroundColor: "transparent",
+    backgroundColor: "rgba(234, 241, 255, 0.07)",
     color: cabColors.text.primary,
-    borderColor: cabColors.surface.border,
+    borderColor: "rgba(184, 199, 230, 0.22)",
     hoverStyle: {
+      backgroundColor: "rgba(234, 241, 255, 0.11)",
       borderColor: cabColors.action.secondaryHoverBorder,
     },
   },
@@ -77,6 +80,10 @@ const variantStyles = {
     backgroundColor: cabColors.brand.cabGold,
     color: cabColors.brand.cabNight,
     borderColor: cabColors.brand.cabGold,
+    hoverStyle: {
+      backgroundColor: cabColors.action.primaryHoverBg,
+      borderColor: cabColors.action.primaryHoverBg,
+    },
   },
 } as const;
 
@@ -90,6 +97,8 @@ export function CabButton({
   const resolvedSize = controlSize ?? densityToSize[density];
   const sizeStyle = buttonSizeStyles[resolvedSize];
 
+  const variant = variantStyles[tone];
+
   return (
     <Button
       borderWidth={1}
@@ -100,7 +109,18 @@ export function CabButton({
       paddingVertical={sizeStyle.paddingVertical}
       gap={sizeStyle.gap}
       justifyContent="center"
-      {...variantStyles[tone]}
+      cursor="pointer"
+      pressStyle={{ opacity: 0.88, scale: 0.98 }}
+      focusVisibleStyle={{
+        outlineColor: cabColors.brand.signalTeal,
+        outlineWidth: 2,
+        outlineStyle: "solid",
+        outlineOffset: 2,
+      }}
+      {...variant}
+      hoverStyle={{
+        ...("hoverStyle" in variant ? variant.hoverStyle : {}),
+      }}
       {...props}
     >
       {children}

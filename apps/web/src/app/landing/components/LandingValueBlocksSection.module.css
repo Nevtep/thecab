@@ -4,9 +4,11 @@
     rgba(12, 21, 34, 0.64);
 }
 
-.sectionBackgroundImage {
-  object-fit: cover;
-  object-position: center;
+.sectionBackgroundFrame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
 }
 
 .sectionBackgroundTint {

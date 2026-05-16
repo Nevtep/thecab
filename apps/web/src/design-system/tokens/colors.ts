@@ -21,7 +21,7 @@ export const cabColors = {
   text: {
     primary: "#EAF1FF",
     secondary: "#B8C7E6",
-    muted: "#6B7A98",
+    muted: "#8494B2",
   },
   semantic: {
     success: "#22C55E",

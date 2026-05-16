@@ -27,6 +27,8 @@ export type CabAreaChartProps<T extends Record<string, unknown>> = {
   title?: string;
   subtitle?: string;
   height?: number;
+  ariaLabel?: string;
+  summary?: string;
 };
 
 export function CabAreaChart<T extends Record<string, unknown>>({
@@ -36,9 +38,17 @@ export function CabAreaChart<T extends Record<string, unknown>>({
   title,
   subtitle,
   height,
+  ariaLabel,
+  summary,
 }: CabAreaChartProps<T>) {
   return (
-    <CabChartFrame title={title} subtitle={subtitle} height={height}>
+    <CabChartFrame
+      title={title}
+      subtitle={subtitle}
+      height={height}
+      ariaLabel={ariaLabel ?? title}
+      summary={summary ?? subtitle}
+    >
       <ResponsiveContainer>
         <AreaChart data={data} margin={{ top: 4, right: 8, bottom: 4, left: 2 }}>
           <CartesianGrid stroke={cabColors.surface.border} strokeDasharray="3 3" />

@@ -59,7 +59,8 @@ export function HowItWorksScrollStepperContainer() {
     body: t(step.bodyKey),
     imageSrc: step.asset.src,
     imageAlt: step.asset.altKey ? t(step.asset.altKey) : "",
-    imageObjectPosition: step.objectPosition,
+    imageWidth: step.asset.width,
+    imageHeight: step.asset.height,
   }));
 
   useGSAP(

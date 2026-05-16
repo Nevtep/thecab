@@ -1,5 +1,6 @@
 export * from "@/design-system/charts";
 export * from "@/design-system/data-display";
+export * from "@/design-system/media";
 export * from "@/design-system/domain";
 export * from "@/design-system/feedback";
 export * from "@/design-system/icons";

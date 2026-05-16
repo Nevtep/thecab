@@ -2,9 +2,7 @@
 
 import type { RefObject } from "react";
 
-import Image from "next/image";
-
-import { CabCard, CabStack, CabText, cabColors } from "@/design-system";
+import { CabCard, CabMediaFrame, CabStack, CabText, cabColors } from "@/design-system";
 
 import { LandingSectionShell } from "@/app/landing/components/LandingSectionShell";
 import styles from "@/app/landing/how-it-works/HowItWorksScrollStepper.module.css";
@@ -16,7 +14,8 @@ export type HowItWorksResolvedStep = {
   body: string;
   imageSrc: string;
   imageAlt: string;
-  imageObjectPosition?: string;
+  imageWidth: number;
+  imageHeight: number;
 };
 
 type HowItWorksScrollStepperProps = {
@@ -92,27 +91,31 @@ export function HowItWorksScrollStepperComponent({
                 {steps.map((step) => (
                   <article key={step.id} className={styles.panel}>
                     <div className={styles.panelVisual}>
-                      <div className={styles.visualMedia}>
-                        <Image
-                          src={step.imageSrc}
-                          alt={step.imageAlt}
-                          fill
-                          sizes="(max-width: 1100px) 100vw, 58vw"
-                          className={styles.visualImage}
-                          style={step.imageObjectPosition ? { objectPosition: step.imageObjectPosition } : undefined}
-                        />
-                      </div>
-                      <div className={styles.visualLabel}>
-                        <CabText
-                          variant="mono"
-                          fontSize="$2"
-                          className={styles.panelStepLabel}
-                          style={{ color: cabColors.brand.cabGold }}
-                        >
-                          {step.label}
-                        </CabText>
-                      </div>
-                      <div className={styles.visualGlow} aria-hidden="true" />
+                      <CabMediaFrame
+                        src={step.imageSrc}
+                        alt={step.imageAlt}
+                        intrinsicWidth={step.imageWidth}
+                        intrinsicHeight={step.imageHeight}
+                        role="diagram"
+                        fit="contain"
+                        sizes="(max-width: 1100px) 100vw, 58vw"
+                        className={styles.visualMediaFrame}
+                        overlay={
+                          <>
+                            <div className={styles.visualLabel}>
+                              <CabText
+                                variant="mono"
+                                fontSize="$2"
+                                className={styles.panelStepLabel}
+                                style={{ color: cabColors.brand.cabGold }}
+                              >
+                                {step.label}
+                              </CabText>
+                            </div>
+                            <div className={styles.visualGlow} aria-hidden="true" />
+                          </>
+                        }
+                      />
                     </div>
                   </article>
                 ))}
@@ -124,13 +127,14 @@ export function HowItWorksScrollStepperComponent({
             {steps.map((step) => (
               <article key={step.id} className={styles.staticPanel}>
                 <div className={styles.staticVisual}>
-                  <Image
+                  <CabMediaFrame
                     src={step.imageSrc}
                     alt={step.imageAlt}
-                    fill
+                    intrinsicWidth={step.imageWidth}
+                    intrinsicHeight={step.imageHeight}
+                    role="diagram"
+                    fit="contain"
                     sizes="(max-width: 900px) 100vw, 50vw"
-                    className={styles.staticImage}
-                    style={step.imageObjectPosition ? { objectPosition: step.imageObjectPosition } : undefined}
                   />
                 </div>
 

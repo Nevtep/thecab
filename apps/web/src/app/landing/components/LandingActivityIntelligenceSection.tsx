@@ -1,9 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import { useTranslation } from "react-i18next";
 
-import { CabCard, CabStack, CabText, cabColors } from "@/design-system";
+import { CabCard, CabMediaFrame, CabStack, CabText, cabColors } from "@/design-system";
 
 import { landingAssets } from "@/app/landing/landingAssets";
 import { LandingSectionShell } from "@/app/landing/components/LandingSectionShell";
@@ -17,6 +16,7 @@ const activityIntelligenceCardOrder = [
 
 export function LandingActivityIntelligenceSection() {
   const { t } = useTranslation("landing");
+  const visual = landingAssets.activityIntelligenceVisual;
 
   return (
     <LandingSectionShell
@@ -56,12 +56,14 @@ export function LandingActivityIntelligenceSection() {
         <div className={styles.visualCard}>
           <CabCard density="spacious">
             <div className={styles.visualWrap}>
-              <Image
-                src={landingAssets.activityIntelligenceVisual.src}
+              <CabMediaFrame
+                src={visual.src}
                 alt={t("a11y.activityIntelligenceVisualAlt")}
-                fill
+                intrinsicWidth={visual.width}
+                intrinsicHeight={visual.height}
+                role="diagram"
+                fit="contain"
                 sizes="(max-width: 1120px) 100vw, 52vw"
-                className={styles.visualImage}
               />
             </div>
           </CabCard>

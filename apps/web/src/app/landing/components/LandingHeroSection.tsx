@@ -1,9 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import { useTranslation } from "react-i18next";
 
-import { CabBadge, CabButton, CabStack, CabText, cabColors } from "@/design-system";
+import { CabBadge, CabButton, CabMediaFrame, CabStack, CabText, cabColors } from "@/design-system";
 
 import { landingAssets } from "@/app/landing/landingAssets";
 import { scrollToLandingTarget } from "@/app/landing/landingMotion";
@@ -21,6 +20,8 @@ const panelMetricKeys = [
 
 export function LandingHeroSection() {
   const { t } = useTranslation("landing");
+  const heroVisual = landingAssets.heroVisual;
+  const heroBackground = landingAssets.heroBackground;
 
   return (
     <LandingSectionShell
@@ -31,13 +32,16 @@ export function LandingHeroSection() {
       description={t("hero.body")}
       background={
         <>
-          <Image
-            src={landingAssets.heroBackground.src}
+          <CabMediaFrame
+            src={heroBackground.src}
             alt=""
-            fill
+            intrinsicWidth={heroBackground.width}
+            intrinsicHeight={heroBackground.height}
+            role="decorative"
+            fit="cover"
             priority
             sizes="100vw"
-            className={styles.heroBackgroundImage}
+            className={styles.heroBackgroundFrame}
           />
           <div className={styles.heroBackgroundTint} aria-hidden="true" />
         </>
@@ -53,7 +57,12 @@ export function LandingHeroSection() {
 
           <div className={styles.badgeRow}>
             {heroBadgeKeys.map((badgeKey) => (
-              <CabBadge key={badgeKey} tone={badgeKey === "base" ? "warning" : "info"}>
+              <CabBadge
+                key={badgeKey}
+                variant="status"
+                size="sm"
+                tone={badgeKey === "base" ? "warning" : "info"}
+              >
                 {t(`hero.badges.${badgeKey}`)}
               </CabBadge>
             ))}
@@ -72,18 +81,18 @@ export function LandingHeroSection() {
         </CabStack>
 
         <div className={styles.visualFrame}>
-          <div className={styles.visualMedia}>
-            <Image
-              src={landingAssets.heroVisual.src}
-              alt={t("a11y.heroVisualAlt")}
-              fill
-              priority
-              sizes="(max-width: 960px) 100vw, 40vw"
-              className={styles.visualImage}
-            />
-          </div>
-
-          <div className={styles.visualOverlay} aria-hidden="true" />
+          <CabMediaFrame
+            src={heroVisual.src}
+            alt={t("a11y.heroVisualAlt")}
+            intrinsicWidth={heroVisual.width}
+            intrinsicHeight={heroVisual.height}
+            role="diagram"
+            fit="contain"
+            priority
+            sizes="(max-width: 960px) 100vw, 40vw"
+            className={styles.visualMediaFrame}
+            overlay={<div className={styles.visualOverlay} aria-hidden="true" />}
+          />
 
           <div className={styles.panel}>
             <CabStack gap="$3">

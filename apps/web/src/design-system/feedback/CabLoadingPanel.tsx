@@ -1,5 +1,6 @@
 "use client";
 
+import { useId } from "react";
 import { Spinner } from "tamagui";
 
 import { CabCard } from "@/design-system/primitives/CabCard";
@@ -12,14 +13,18 @@ export type CabLoadingPanelProps = {
 };
 
 export function CabLoadingPanel({ label }: CabLoadingPanelProps) {
+  const labelId = useId();
+
   return (
     <CabCard density="spacious">
-      <CabStack alignItems="center" justifyContent="center" gap="$3">
-        <Spinner color={cabColors.brand.signalTeal} />
-        <CabText variant="caption" fontSize={12} color={cabColors.text.secondary}>
-          {label}
-        </CabText>
-      </CabStack>
+      <div role="status" aria-live="polite" aria-busy="true" aria-labelledby={labelId}>
+        <CabStack alignItems="center" justifyContent="center" gap="$3">
+          <Spinner color={cabColors.brand.signalTeal} />
+          <CabText id={labelId} variant="caption" fontSize={13} color={cabColors.text.secondary}>
+            {label}
+          </CabText>
+        </CabStack>
+      </div>
     </CabCard>
   );
 }

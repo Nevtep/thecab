@@ -1,9 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import { useTranslation } from "react-i18next";
 
-import { CabCard, CabStack, CabText, cabColors } from "@/design-system";
+import { CabCard, CabMediaFrame, CabStack, CabText, cabColors } from "@/design-system";
 
 import { landingAssets } from "@/app/landing/landingAssets";
 import { LandingSectionShell } from "@/app/landing/components/LandingSectionShell";
@@ -13,6 +12,7 @@ const modelClarityBlockOrder = ["pool", "deposit", "strategy"] as const;
 
 export function LandingModelClaritySection() {
   const { t } = useTranslation("landing");
+  const diagram = landingAssets.modelClarityDiagram;
 
   return (
     <LandingSectionShell
@@ -25,12 +25,14 @@ export function LandingModelClaritySection() {
         <div className={styles.visualCard}>
           <CabCard density="spacious">
             <div className={styles.visualWrap}>
-              <Image
-                src={landingAssets.modelClarityDiagram.src}
+              <CabMediaFrame
+                src={diagram.src}
                 alt={t("a11y.modelClarityVisualAlt")}
-                fill
+                intrinsicWidth={diagram.width}
+                intrinsicHeight={diagram.height}
+                role="diagram"
+                fit="contain"
                 sizes="(max-width: 1120px) 100vw, 48vw"
-                className={styles.visualImage}
               />
             </div>
           </CabCard>

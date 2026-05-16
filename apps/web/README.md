@@ -1,36 +1,37 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# The Cab — Web App
 
-## Getting Started
+Portfolio command cabin for Aerodrome on Base.
 
-First, run the development server:
+## Stack
+
+- **Next.js 16** (App Router, webpack)
+- **React 19**
+- **Tamagui 2 RC** — internal **Cab\*** design system
+- **wagmi / viem** — wallet
+- **TanStack Query** — server state
+- **i18next** — EN / ES
+- **Recharts** — charts (via DS wrappers only)
+- **GSAP** — landing “How it works” stepper (reduced-motion safe)
+
+## Scripts
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm dev          # local dev server
+pnpm build        # production build
+pnpm lint         # ESLint (includes jsx-a11y)
+pnpm typecheck    # TypeScript
+pnpm i18n:check   # locale key parity
+pnpm ds:check     # DS color semantics + WCAG contrast + hex inventory
+pnpm ds:contrast  # contrast pairs only
+pnpm test:a11y    # Playwright smoke + axe (requires build)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Design system
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Tokens: `src/design-system/tokens/`
+- Master rules: `docs/design-system/MASTER.md`
+- Product code must import UI from `@/design-system` only (see `eslint.config.mjs`).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## UI/UX audit
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+See `docs/ui-ux-audit-report.md` for the latest audit scope and verification viewports.

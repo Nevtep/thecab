@@ -23,6 +23,91 @@ __export(tamagui_config_exports, {
 });
 module.exports = __toCommonJS(tamagui_config_exports);
 var import_core = require("@tamagui/core");
+
+// src/design-system/tokens/colors.ts
+var cabColors = {
+  brand: {
+    cabNight: "#040F1C",
+    deepSpace: "#0F1826",
+    controlBlue: "#15233A",
+    signalTeal: "#00E0E1",
+    electricBlue: "#3B82F6",
+    cabGold: "#F2C14E"
+  },
+  brandExtended: {
+    signalTealRaw: "#00E0E1",
+    signalTealUi: "#2EC5C9",
+    signalTealMuted: "#1A8F98",
+    signalTealGlow: "rgba(0, 224, 225, 0.22)"
+  },
+  surface: {
+    darkSurface: "#111A27",
+    elevatedSurface: "#1A2233",
+    border: "#2A3347"
+  },
+  text: {
+    primary: "#EAF1FF",
+    secondary: "#B8C7E6",
+    muted: "#8494B2"
+  },
+  semantic: {
+    success: "#22C55E",
+    warning: "#FBBF24",
+    danger: "#EF4444",
+    info: "#38BDF8"
+  },
+  action: {
+    primaryBg: "#F2C14E",
+    primaryText: "#040F1C",
+    primaryBorder: "#F2C14E",
+    primaryHoverBg: "#F6CF6A",
+    secondaryBg: "transparent",
+    secondaryText: "#EAF1FF",
+    secondaryBorder: "#2A3347",
+    secondaryHoverBorder: "#2EC5C9",
+    technicalText: "#2EC5C9",
+    technicalBorder: "#1A8F98",
+    technicalHoverBorder: "#2EC5C9",
+    technicalGlow: "rgba(0, 224, 225, 0.22)"
+  }
+};
+
+// src/design-system/tokens/tamaguiColorTokens.ts
+var tamaguiColorTokens = {
+  background: cabColors.brand.cabNight,
+  deepSpace: cabColors.brand.deepSpace,
+  controlBlue: cabColors.brand.controlBlue,
+  surface: cabColors.surface.darkSurface,
+  surfaceElevated: cabColors.surface.elevatedSurface,
+  border: cabColors.surface.border,
+  foreground: cabColors.text.primary,
+  secondary: cabColors.text.secondary,
+  muted: cabColors.text.muted,
+  accent: cabColors.brand.signalTeal,
+  signalTealUi: cabColors.brandExtended.signalTealUi,
+  signalTealMuted: cabColors.brandExtended.signalTealMuted,
+  signalTealGlow: cabColors.brandExtended.signalTealGlow,
+  electricBlue: cabColors.brand.electricBlue,
+  gold: cabColors.brand.cabGold,
+  primaryActionBg: cabColors.action.primaryBg,
+  primaryActionText: cabColors.action.primaryText,
+  primaryActionBorder: cabColors.action.primaryBorder,
+  primaryActionHoverBg: cabColors.action.primaryHoverBg,
+  secondaryActionBg: cabColors.action.secondaryBg,
+  secondaryActionText: cabColors.action.secondaryText,
+  secondaryActionBorder: cabColors.action.secondaryBorder,
+  secondaryActionHoverBorder: cabColors.action.secondaryHoverBorder,
+  technicalActionText: cabColors.action.technicalText,
+  technicalActionBorder: cabColors.action.technicalBorder,
+  technicalActionHoverBorder: cabColors.action.technicalHoverBorder,
+  technicalActionGlow: cabColors.action.technicalGlow,
+  success: cabColors.semantic.success,
+  warning: cabColors.semantic.warning,
+  danger: cabColors.semantic.danger,
+  info: cabColors.semantic.info
+};
+
+// tamagui.config.ts
 var interFont = (0, import_core.createFont)({
   family: "var(--cab-font-ui), Inter, system-ui, -apple-system, sans-serif",
   size: {
@@ -111,39 +196,7 @@ var monoFont = (0, import_core.createFont)({
   }
 });
 var tokens = (0, import_core.createTokens)({
-  color: {
-    background: "#040F1C",
-    deepSpace: "#0F1826",
-    controlBlue: "#15233A",
-    surface: "#111A27",
-    surfaceElevated: "#1A2233",
-    border: "#2A3347",
-    foreground: "#EAF1FF",
-    secondary: "#B8C7E6",
-    muted: "#6B7A98",
-    accent: "#00E0E1",
-    signalTealUi: "#2EC5C9",
-    signalTealMuted: "#1A8F98",
-    signalTealGlow: "rgba(0, 224, 225, 0.22)",
-    electricBlue: "#3B82F6",
-    gold: "#F2C14E",
-    primaryActionBg: "#F2C14E",
-    primaryActionText: "#040F1C",
-    primaryActionBorder: "#F2C14E",
-    primaryActionHoverBg: "#F6CF6A",
-    secondaryActionBg: "transparent",
-    secondaryActionText: "#EAF1FF",
-    secondaryActionBorder: "#2A3347",
-    secondaryActionHoverBorder: "#2EC5C9",
-    technicalActionText: "#2EC5C9",
-    technicalActionBorder: "#1A8F98",
-    technicalActionHoverBorder: "#2EC5C9",
-    technicalActionGlow: "rgba(0, 224, 225, 0.22)",
-    success: "#22C55E",
-    warning: "#FBBF24",
-    danger: "#EF4444",
-    info: "#38BDF8"
-  },
+  color: { ...tamaguiColorTokens },
   size: {
     0: 0,
     1: 8,

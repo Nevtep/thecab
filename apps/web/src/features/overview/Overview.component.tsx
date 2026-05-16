@@ -220,7 +220,14 @@ export function OverviewComponent({
   onToggleUnpricedAssets,
   onToggleDustAssets,
 }: OverviewComponentProps) {
-  const { t, i18n } = useTranslation(["overview", "navigation", "analysis", "coverage", "charts", "trust"]);
+  const { t, i18n } = useTranslation([
+    "overview",
+    "navigation",
+    "analysis",
+    "coverage",
+    "charts",
+    "trust",
+  ]);
   const locale = i18n.language;
   const rangeOptions = ["24h", "7d", "30d"].map((option) => ({
     key: option,
@@ -341,6 +348,8 @@ export function OverviewComponent({
   return (
     <section data-overview-root>
       <ConnectedShell
+        menuLabel={t("navigation:a11y.openMenu")}
+        closeMenuLabel={t("navigation:a11y.closeMenu")}
         sidebar={
           <CabSidebar
             header={
@@ -492,7 +501,7 @@ export function OverviewComponent({
             style={{
               display: "grid",
               gap: 16,
-              gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fit, minmax(0, 1fr))",
             }}
           >
             <CabAreaChart
@@ -556,7 +565,7 @@ export function OverviewComponent({
             style={{
               display: "grid",
               gap: 16,
-              gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fit, minmax(0, 1fr))",
             }}
           >
             <CabCard density="spacious">

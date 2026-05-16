@@ -1,0 +1,62 @@
+/* Global focus ring for Cab design-system surfaces */
+:where(
+  .cab-focus-root a:focus-visible,
+  .cab-focus-root button:focus-visible,
+  .cab-focus-root [role="button"]:focus-visible,
+  .cab-focus-root input:focus-visible,
+  .cab-focus-root select:focus-visible,
+  .cab-focus-root textarea:focus-visible,
+  .cab-focus-root [tabindex]:not([tabindex="-1"]):focus-visible
+) {
+  outline: 2px solid var(--cab-focus-ring, rgba(0, 224, 225, 0.95));
+  outline-offset: 3px;
+  box-shadow: 0 0 0 5px var(--cab-focus-ring-glow, rgba(0, 224, 225, 0.12));
+}
+
+/* Skip link: hidden until keyboard focus (Tab). Jumps past nav to main content. */
+.cab-skip-link {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1000;
+  margin: 12px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 224, 225, 0.4);
+  background: rgba(8, 20, 32, 0.96);
+  color: rgba(244, 248, 255, 0.98);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  transform: translateY(-160%);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    transform 160ms ease,
+    opacity 160ms ease;
+}
+
+.cab-skip-link:focus,
+.cab-skip-link:focus-visible {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+  outline: 2px solid var(--cab-focus-ring, rgba(0, 224, 225, 0.95));
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(.cab-focus-root *) {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .cab-skip-link {
+    transition: none;
+  }
+}
