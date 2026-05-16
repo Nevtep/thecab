@@ -1,42 +1,56 @@
 .layout {
-  display: grid;
-  gap: clamp(20px, 3vw, 28px);
+  display: block;
+}
+
+.visualStage {
+  position: relative;
+  width: 100%;
 }
 
 .visualCard {
   display: flex;
+  overflow: hidden;
 }
 
 .visualCard > * {
   flex: 1 1 auto;
+  width: 100%;
 }
 
 .visualWrap {
   position: relative;
   width: 100%;
   aspect-ratio: 4 / 3;
+  min-height: clamp(320px, 42vw, 520px);
   border-radius: 28px;
   overflow: hidden;
-  border: 1px solid rgba(184, 199, 230, 0.14);
-  background: rgba(4, 15, 28, 0.82);
 }
 
-.visualImage {
-  object-fit: cover;
+.visualMedia {
+  border-radius: 28px;
 }
 
 .visualTint {
-  position: absolute;
-  inset: 0;
   background:
-    linear-gradient(180deg, rgba(3, 10, 20, 0.08), rgba(3, 10, 20, 0.5)),
-    radial-gradient(circle at center, rgba(51, 226, 217, 0.12), transparent 52%);
+    linear-gradient(180deg, rgba(3, 10, 20, 0.04) 0%, rgba(3, 10, 20, 0.35) 45%, rgba(3, 10, 20, 0.88) 100%),
+    radial-gradient(circle at center, rgba(51, 226, 217, 0.1), transparent 52%);
+}
+
+.cardsOverlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  padding: clamp(12px, 2vw, 20px);
+  pointer-events: none;
 }
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: clamp(10px, 1.2vw, 14px);
+  pointer-events: auto;
 }
 
 .card {
@@ -46,33 +60,30 @@
 
 .card > * {
   flex: 1 1 auto;
+  background: rgba(10, 18, 31, 0.82) !important;
+  backdrop-filter: blur(10px);
+  border-color: rgba(184, 199, 230, 0.16) !important;
 }
 
-.cardIndex {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: fit-content;
-  min-width: 40px;
-  min-height: 32px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(242, 193, 78, 0.34);
-  background: rgba(242, 193, 78, 0.08);
+@media (max-width: 1180px) {
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
-@media (max-width: 1080px) {
+@media (max-width: 900px) {
   .grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@media (max-width: 720px) {
-  .grid {
-    grid-template-columns: 1fr;
+@media (max-width: 640px) {
+  .visualWrap {
+    aspect-ratio: auto;
+    min-height: 520px;
   }
 
-  .visualWrap {
-    min-height: 240px;
+  .grid {
+    grid-template-columns: 1fr;
   }
 }

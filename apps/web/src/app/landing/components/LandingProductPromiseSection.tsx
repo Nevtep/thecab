@@ -29,8 +29,9 @@ export function LandingProductPromiseSection() {
       description={t("productPromise.body")}
     >
       <div className={styles.layout}>
-        <div className={styles.visualCard}>
-          <CabCard density="spacious">
+        <div className={styles.visualStage}>
+          <div className={styles.visualCard}>
+            <CabCard density="spacious">
             <div className={styles.visualWrap}>
               <CabMediaFrame
                 src={visual.src}
@@ -41,37 +42,40 @@ export function LandingProductPromiseSection() {
                 fit="contain"
                 sizes="(max-width: 920px) 100vw, 60vw"
                 className={styles.visualMedia}
-                overlay={<div className={styles.visualTint} aria-hidden="true" />}
+                overlay={
+                  <>
+                    <div className={styles.visualTint} aria-hidden="true" />
+                    <div className={styles.cardsOverlay}>
+                      <div className={styles.grid}>
+                        {productPromiseCardOrder.map((cardId) => (
+                          <div key={cardId} className={styles.card}>
+                            <CabCard density="default">
+                              <CabStack gap="$2">
+                                <CabText
+                                  variant="heading"
+                                  fontSize="$4"
+                                  style={{ color: cabColors.text.primary }}
+                                >
+                                  {t(`productPromise.cards.${cardId}.title`)}
+                                </CabText>
+                                <CabText
+                                  fontSize="$2"
+                                  style={{ color: cabColors.text.secondary, lineHeight: 20 }}
+                                >
+                                  {t(`productPromise.cards.${cardId}.body`)}
+                                </CabText>
+                              </CabStack>
+                            </CabCard>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                }
               />
             </div>
           </CabCard>
-        </div>
-
-        <div className={styles.grid}>
-          {productPromiseCardOrder.map((cardId, index) => (
-            <div key={cardId} className={styles.card}>
-              <CabCard density="spacious">
-                <CabStack gap="$3">
-                  <CabText
-                    variant="mono"
-                    fontSize="$2"
-                    className={styles.cardIndex}
-                    style={{ color: cabColors.brand.cabGold }}
-                  >
-                    {String(index + 1).padStart(2, "0")}
-                  </CabText>
-
-                  <CabText variant="heading" fontSize="$5" style={{ color: cabColors.text.primary }}>
-                    {t(`productPromise.cards.${cardId}.title`)}
-                  </CabText>
-
-                  <CabText fontSize="$3" style={{ color: cabColors.text.secondary, lineHeight: 24 }}>
-                    {t(`productPromise.cards.${cardId}.body`)}
-                  </CabText>
-                </CabStack>
-              </CabCard>
-            </div>
-          ))}
+          </div>
         </div>
       </div>
     </LandingSectionShell>
