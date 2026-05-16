@@ -37,7 +37,7 @@ export default function Home() {
       backgroundSrc={landingAssets.pageBackground.src}
       backgroundAlt=""
     >
-      <a href="#landing-content" className={styles.skipLink}>
+      <a href="#landing-content" className="cab-skip-link">
         {t("a11y.skipToContent")}
       </a>
 

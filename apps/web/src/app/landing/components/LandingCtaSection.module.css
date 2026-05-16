@@ -7,6 +7,12 @@
   position: absolute;
   inset: 0;
   opacity: 0.2;
+  overflow: hidden;
+}
+
+.backgroundMedia {
+  width: 100%;
+  height: 100%;
 }
 
 .content {
@@ -16,7 +22,7 @@
 
 .grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 420px);
   gap: clamp(20px, 4vw, 36px);
   align-items: stretch;
 }

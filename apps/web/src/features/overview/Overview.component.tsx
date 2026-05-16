@@ -761,6 +761,8 @@ export function OverviewComponent({
   return (
     <section data-overview-root>
       <ConnectedShell
+        menuLabel={t("navigation:a11y.openMenu")}
+        closeMenuLabel={t("navigation:a11y.closeMenu")}
         sidebar={
           <CabSidebar
             header={
@@ -929,7 +931,7 @@ export function OverviewComponent({
             style={{
               display: "grid",
               gap: 16,
-              gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fit, minmax(0, 1fr))",
             }}
           >
             {isInitialChartLoading ? (
@@ -1139,7 +1141,7 @@ export function OverviewComponent({
             style={{
               display: "grid",
               gap: 16,
-              gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fit, minmax(0, 1fr))",
             }}
           >
             {isInitialSectionsLoading ? (

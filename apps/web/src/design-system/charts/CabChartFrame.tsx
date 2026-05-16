@@ -13,9 +13,27 @@ export type CabChartFrameProps = PropsWithChildren<{
   height?: number;
   actions?: ReactNode;
   notice?: string;
+  /** Accessible name for the chart graphic */
+  ariaLabel?: string;
+  /** Screen-reader summary of the chart insight */
+  summary?: string;
+  /** Optional tabular data alternative */
+  dataTable?: ReactNode;
 }>;
 
-export function CabChartFrame({ title, subtitle, height = 280, actions, notice, children }: CabChartFrameProps) {
+export function CabChartFrame({
+  title,
+  subtitle,
+  height = 280,
+  actions, 
+  notice,
+  ariaLabel,
+  summary,
+  dataTable,
+  children,
+}: CabChartFrameProps) {
+  const accessibleName = ariaLabel ?? title ?? "Chart";
+
   return (
     <CabCard density="default">
       <CabStack gap="$3">
@@ -41,13 +59,27 @@ export function CabChartFrame({ title, subtitle, height = 280, actions, notice, 
           <CabText variant="caption" color={cabColors.text.muted} fontSize={12}>
             {subtitle}
           </CabText>
-        ) : null}
+        ) : null }
         {notice ? (
           <CabText variant="caption" color={cabColors.text.secondary} fontSize={12}>
             {notice}
           </CabText>
         ) : null}
-        <div style={{ width: "100%", height }}>{children}</div>
+        {summary ? (
+          <p className="sr-only">{summary}</p>
+        ) : null}
+        <div
+          role="img"
+          aria-label={accessibleName}
+          style={{ width: "100%", height }}
+        >
+          {children}
+        </div>
+        {dataTable ? (
+          <div className="sr-only" aria-hidden={false}>
+            {dataTable}
+          </div>
+        ) : null}
       </CabStack>
     </CabCard>
   );

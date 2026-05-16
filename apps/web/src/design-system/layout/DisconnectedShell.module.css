@@ -1,0 +1,53 @@
+.shell {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+  background-color: var(--cab-brand-night, #040f1c);
+}
+
+.backgroundLayer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-color: var(--cab-brand-night, #040f1c);
+  background-image: var(--shell-background-image);
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: cover;
+}
+
+.backgroundLayer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    160deg,
+    rgba(4, 15, 28, 0.55) 0%,
+    rgba(4, 15, 28, 0.8) 70%,
+    rgba(4, 15, 28, 0.92) 100%
+  );
+}
+
+/* Avoid upscaling the 1672px-wide asset on very large viewports (reduces pixelation). */
+@media (min-width: 1680px) {
+  .backgroundLayer {
+    background-size: 1672px auto;
+    background-position: center center;
+  }
+}
+
+.content {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
+  padding: clamp(20px, 4vw, 32px) clamp(16px, 3vw, 24px);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}

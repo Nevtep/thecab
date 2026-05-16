@@ -32384,7 +32384,7 @@
           "isVar": true,
           "key": "$muted",
           "name": "c-muted",
-          "val": "#6B7A98",
+          "val": "#8494B2",
           "variable": "var(--c-muted)"
         },
         "accent": {
@@ -32827,7 +32827,7 @@
         "border": "#2A3347",
         "foreground": "#EAF1FF",
         "secondary": "#B8C7E6",
-        "muted": "#6B7A98",
+        "muted": "#8494B2",
         "accent": "#00E0E1",
         "signalTealUi": "#2EC5C9",
         "signalTealMuted": "#1A8F98",
@@ -32996,7 +32996,7 @@
         "isVar": true,
         "key": "$muted",
         "name": "c-muted",
-        "val": "#6B7A98",
+        "val": "#8494B2",
         "variable": "var(--c-muted)"
       },
       "$color.primaryActionBg": {
@@ -33407,6 +33407,48 @@
       }
     },
     "defaultFontToken": "",
-    "shorthands": {}
+    "shorthands": {
+      "bblr": "borderBottomLeftRadius",
+      "bbrr": "borderBottomRightRadius",
+      "bbs": "borderBottomStyle",
+      "bls": "borderLeftStyle",
+      "brc": "borderRightColor",
+      "brs": "borderRightStyle",
+      "brw": "borderRightWidth",
+      "bs": "borderStyle",
+      "btc": "borderTopColor",
+      "btlr": "borderTopLeftRadius",
+      "btrr": "borderTopRightRadius",
+      "bts": "borderTopStyle",
+      "btw": "borderTopWidth",
+      "bw": "borderWidth",
+      "bxs": "boxSizing",
+      "bxsh": "boxShadow",
+      "col": "color",
+      "cur": "cursor",
+      "dsp": "display",
+      "fb": "flexBasis",
+      "fd": "flexDirection",
+      "ff": "fontFamily",
+      "fs": "fontSize",
+      "fst": "fontStyle",
+      "fw": "fontWeight",
+      "fwr": "flexWrap",
+      "lh": "lineHeight",
+      "ls": "letterSpacing",
+      "o": "opacity",
+      "ov": "overflow",
+      "ox": "overflowX",
+      "oy": "overflowY",
+      "pe": "pointerEvents",
+      "pos": "position",
+      "td": "textDecorationLine",
+      "tr": "transform",
+      "tt": "textTransform",
+      "va": "verticalAlign",
+      "wb": "wordBreak",
+      "ws": "whiteSpace",
+      "ww": "wordWrap"
+    }
   }
 }

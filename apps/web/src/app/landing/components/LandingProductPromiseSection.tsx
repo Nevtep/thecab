@@ -1,9 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import { useTranslation } from "react-i18next";
 
-import { CabCard, CabStack, CabText, cabColors } from "@/design-system";
+import { CabCard, CabMediaFrame, CabStack, CabText, cabColors } from "@/design-system";
 
 import { landingAssets } from "@/app/landing/landingAssets";
 import { LandingSectionShell } from "@/app/landing/components/LandingSectionShell";
@@ -20,6 +19,7 @@ const productPromiseCardOrder = [
 
 export function LandingProductPromiseSection() {
   const { t } = useTranslation("landing");
+  const visual = landingAssets.productPromiseVisual;
 
   return (
     <LandingSectionShell
@@ -32,14 +32,17 @@ export function LandingProductPromiseSection() {
         <div className={styles.visualCard}>
           <CabCard density="spacious">
             <div className={styles.visualWrap}>
-              <Image
-                src={landingAssets.productPromiseVisual.src}
+              <CabMediaFrame
+                src={visual.src}
                 alt={t("a11y.productPromiseVisualAlt")}
-                fill
-                sizes="(max-width: 920px) 100vw, 1240px"
-                className={styles.visualImage}
+                intrinsicWidth={visual.width}
+                intrinsicHeight={visual.height}
+                role="diagram"
+                fit="contain"
+                sizes="(max-width: 920px) 100vw, 60vw"
+                className={styles.visualMedia}
+                overlay={<div className={styles.visualTint} aria-hidden="true" />}
               />
-              <div className={styles.visualTint} aria-hidden="true" />
             </div>
           </CabCard>
         </div>

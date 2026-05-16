@@ -1,9 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import { useTranslation } from "react-i18next";
 
-import { CabButton, CabStack, CabText, cabColors } from "@/design-system";
+import { CabButton, CabMediaFrame, CabStack, CabText, cabColors } from "@/design-system";
 
 import { landingAssets } from "@/app/landing/landingAssets";
 import { scrollToLandingTarget } from "@/app/landing/landingMotion";
@@ -13,6 +12,7 @@ import styles from "@/app/landing/components/LandingCtaSection.module.css";
 
 export function LandingCtaSection() {
   const { t } = useTranslation("landing");
+  const background = landingAssets.finalCtaBackground;
 
   return (
     <LandingSectionShell
@@ -23,12 +23,15 @@ export function LandingCtaSection() {
       description={t("cta.body")}
     >
       <div className={styles.background} aria-hidden="true">
-        <Image
-          src={landingAssets.finalCtaBackground.src}
+        <CabMediaFrame
+          src={background.src}
           alt=""
-          fill
+          intrinsicWidth={background.width}
+          intrinsicHeight={background.height}
+          role="decorative"
+          fit="cover"
           sizes="(max-width: 920px) 100vw, 1240px"
-          style={{ objectFit: "cover" }}
+          className={styles.backgroundMedia}
         />
       </div>
 

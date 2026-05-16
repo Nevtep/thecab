@@ -9,6 +9,11 @@
     "activity": "Activity",
     "settings": "Settings"
   },
+  "a11y": {
+    "openMenu": "Open navigation menu",
+    "closeMenu": "Close navigation menu",
+    "skipToContent": "Skip to main content"
+  },
   "states": {
     "active": "Live",
     "requiresAnalysis": "Analysis",

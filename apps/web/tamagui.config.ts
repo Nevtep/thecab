@@ -1,5 +1,7 @@
 import { createFont, createTamagui, createTokens } from "@tamagui/core";
 
+import { tamaguiColorTokens } from "@/design-system/tokens/tamaguiColorTokens";
+
 const interFont = createFont({
   family: "var(--cab-font-ui), Inter, system-ui, -apple-system, sans-serif",
   size: {
@@ -91,39 +93,7 @@ const monoFont = createFont({
 });
 
 const tokens = createTokens({
-  color: {
-    background: "#040F1C",
-    deepSpace: "#0F1826",
-    controlBlue: "#15233A",
-    surface: "#111A27",
-    surfaceElevated: "#1A2233",
-    border: "#2A3347",
-    foreground: "#EAF1FF",
-    secondary: "#B8C7E6",
-    muted: "#6B7A98",
-    accent: "#00E0E1",
-    signalTealUi: "#2EC5C9",
-    signalTealMuted: "#1A8F98",
-    signalTealGlow: "rgba(0, 224, 225, 0.22)",
-    electricBlue: "#3B82F6",
-    gold: "#F2C14E",
-    primaryActionBg: "#F2C14E",
-    primaryActionText: "#040F1C",
-    primaryActionBorder: "#F2C14E",
-    primaryActionHoverBg: "#F6CF6A",
-    secondaryActionBg: "transparent",
-    secondaryActionText: "#EAF1FF",
-    secondaryActionBorder: "#2A3347",
-    secondaryActionHoverBorder: "#2EC5C9",
-    technicalActionText: "#2EC5C9",
-    technicalActionBorder: "#1A8F98",
-    technicalActionHoverBorder: "#2EC5C9",
-    technicalActionGlow: "rgba(0, 224, 225, 0.22)",
-    success: "#22C55E",
-    warning: "#FBBF24",
-    danger: "#EF4444",
-    info: "#38BDF8",
-  },
+  color: { ...tamaguiColorTokens },
   size: {
     0: 0,
     1: 8,

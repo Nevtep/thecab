@@ -1,9 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import { useTranslation } from "react-i18next";
 
-import { CabCard, CabStack, CabText, cabColors } from "@/design-system";
+import { CabCard, CabMediaFrame, CabStack, CabText, cabColors } from "@/design-system";
 
 import {
   landingAssets,
@@ -22,6 +21,7 @@ const trustBulletOrder = [
 
 export function LandingTrustPrivacySection() {
   const { t } = useTranslation("landing");
+  const trustAsset = landingAssets.trustReadOnly;
 
   return (
     <LandingSectionShell
@@ -34,12 +34,14 @@ export function LandingTrustPrivacySection() {
         <CabCard density="spacious">
           <CabStack gap="$4">
             <div className={styles.trustVisual}>
-              <Image
-                src={landingAssets.trustReadOnly.src}
+              <CabMediaFrame
+                src={trustAsset.src}
                 alt={t("a11y.trustReadOnlyAlt")}
-                fill
+                intrinsicWidth={trustAsset.width}
+                intrinsicHeight={trustAsset.height}
+                role="diagram"
+                fit="contain"
                 sizes="(max-width: 1120px) 100vw, 35vw"
-                className={styles.trustImage}
               />
             </div>
 
@@ -90,12 +92,14 @@ export function LandingTrustPrivacySection() {
                   <CabCard density="spacious">
                     <CabStack gap="$3">
                       <div className={styles.coverageVisual}>
-                        <Image
+                        <CabMediaFrame
                           src={asset.src}
                           alt={asset.altKey ? t(asset.altKey) : ""}
-                          fill
+                          intrinsicWidth={asset.width}
+                          intrinsicHeight={asset.height}
+                          role="diagram"
+                          fit="contain"
                           sizes="(max-width: 720px) 100vw, (max-width: 1120px) 50vw, 25vw"
-                          className={styles.coverageImage}
                         />
                       </div>
 

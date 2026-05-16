@@ -4,9 +4,11 @@
     rgba(17, 26, 39, 0.62);
 }
 
-.heroBackgroundImage {
-  object-fit: cover;
-  object-position: center;
+.heroBackgroundFrame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
 }
 
 .heroBackgroundTint {
@@ -19,7 +21,7 @@
 
 .heroGrid {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.95fr);
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
   gap: clamp(28px, 5vw, 56px);
   align-items: center;
 }
@@ -36,31 +38,22 @@
 
 .visualFrame {
   position: relative;
-  min-height: 440px;
+  min-width: 0;
   border-radius: 28px;
-  border: 1px solid rgba(184, 199, 230, 0.12);
+  border: 1px solid var(--landing-section-border);
   overflow: hidden;
-  background: rgba(4, 15, 28, 0.46);
+  background: var(--landing-overlay-soft);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
-.visualMedia {
-  position: absolute;
-  inset: 0;
+.visualMediaFrame {
+  border-radius: 28px;
 }
 
 .visualOverlay {
-  position: absolute;
-  inset: 0;
   background:
     radial-gradient(circle at 18% 18%, rgba(0, 224, 225, 0.12) 0%, transparent 32%),
     linear-gradient(180deg, rgba(4, 15, 28, 0.08) 0%, rgba(4, 15, 28, 0.28) 50%, rgba(4, 15, 28, 0.8) 100%);
-}
-
-.visualImage {
-  position: absolute;
-  object-fit: cover;
-  object-position: center;
 }
 
 .panel {
@@ -68,12 +61,12 @@
   left: 18px;
   right: 18px;
   bottom: 18px;
-  z-index: 1;
+  z-index: 2;
   padding: 18px;
   border: 1px solid rgba(184, 199, 230, 0.16);
   border-radius: 22px;
   backdrop-filter: blur(10px);
-  background: rgba(10, 18, 31, 0.82);
+  background: var(--landing-panel-bg);
 }
 
 .panelGrid {
@@ -90,18 +83,10 @@
   .heroGrid {
     grid-template-columns: 1fr;
   }
-
-  .visualFrame {
-    min-height: 380px;
-  }
 }
 
 @media (max-width: 640px) {
   .panelGrid {
     grid-template-columns: 1fr;
-  }
-
-  .visualFrame {
-    min-height: 340px;
   }
 }

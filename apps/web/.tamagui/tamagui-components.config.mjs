@@ -14174,7 +14174,7 @@ function createFocusGuard() {
 }
 __name(createFocusGuard, "createFocusGuard");
 
-// node_modules/.pnpm/@tamagui+popper@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7._ruscvr6dnxizmjjbd4rodzsbta/node_modules/@tamagui/popper/dist/esm/Popper.mjs
+// node_modules/.pnpm/@tamagui+popper@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+c_4bc3a21cb45d4c3d87ca5b8c1cd6cf65/node_modules/@tamagui/popper/dist/esm/Popper.mjs
 import { flushSync as flushSync5 } from "react-dom";
 import { LayoutMeasurementController as LayoutMeasurementController2, View as TamaguiView, createStyledContext as createStyledContext12, getVariableValue as getVariableValue5, registerLayoutNode, styled as styled27 } from "@tamagui/core";
 
@@ -16041,7 +16041,7 @@ var arrow3 = /* @__PURE__ */ __name((options, deps) => {
   };
 }, "arrow");
 
-// node_modules/.pnpm/@tamagui+floating@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@_pn3dhyn3pu7hqxks3awc4a6txu/node_modules/@tamagui/floating/dist/esm/useFloating.mjs
+// node_modules/.pnpm/@tamagui+floating@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel_4d62a9db7c1d5820c5675c8a71cbe161/node_modules/@tamagui/floating/dist/esm/useFloating.mjs
 import React52 from "react";
 var FloatingOverrideContext = React52.createContext(null);
 var useFloating2 = /* @__PURE__ */ __name((props) => {
@@ -16068,7 +16068,7 @@ var useFloating2 = /* @__PURE__ */ __name((props) => {
   });
 }, "useFloating");
 
-// node_modules/.pnpm/@tamagui+floating@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@_pn3dhyn3pu7hqxks3awc4a6txu/node_modules/@tamagui/floating/dist/esm/interactions/createFloatingEvents.mjs
+// node_modules/.pnpm/@tamagui+floating@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel_4d62a9db7c1d5820c5675c8a71cbe161/node_modules/@tamagui/floating/dist/esm/interactions/createFloatingEvents.mjs
 function createFloatingEvents() {
   const listeners2 = /* @__PURE__ */ new Map();
   return {
@@ -16094,7 +16094,7 @@ function createFloatingEvents() {
 }
 __name(createFloatingEvents, "createFloatingEvents");
 
-// node_modules/.pnpm/@tamagui+floating@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@_pn3dhyn3pu7hqxks3awc4a6txu/node_modules/@tamagui/floating/dist/esm/interactions/PopupTriggerMap.mjs
+// node_modules/.pnpm/@tamagui+floating@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel_4d62a9db7c1d5820c5675c8a71cbe161/node_modules/@tamagui/floating/dist/esm/interactions/PopupTriggerMap.mjs
 var PopupTriggerMap = class {
   static {
     __name(this, "PopupTriggerMap");
@@ -16121,7 +16121,7 @@ var PopupTriggerMap = class {
   }
 };
 
-// node_modules/.pnpm/@tamagui+floating@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@_pn3dhyn3pu7hqxks3awc4a6txu/node_modules/@tamagui/floating/dist/esm/interactions/useInteractions.mjs
+// node_modules/.pnpm/@tamagui+floating@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel_4d62a9db7c1d5820c5675c8a71cbe161/node_modules/@tamagui/floating/dist/esm/interactions/useInteractions.mjs
 function useInteractions(propsList) {
   const filtered = propsList.filter(Boolean);
   const referenceFns = /* @__PURE__ */ new Map();
@@ -16204,10 +16204,10 @@ function buildProps(fnMap, staticProps, userProps) {
 }
 __name(buildProps, "buildProps");
 
-// node_modules/.pnpm/@tamagui+floating@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@_pn3dhyn3pu7hqxks3awc4a6txu/node_modules/@tamagui/floating/dist/esm/interactions/useHover.mjs
+// node_modules/.pnpm/@tamagui+floating@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel_4d62a9db7c1d5820c5675c8a71cbe161/node_modules/@tamagui/floating/dist/esm/interactions/useHover.mjs
 import * as React53 from "react";
 
-// node_modules/.pnpm/@tamagui+floating@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@_pn3dhyn3pu7hqxks3awc4a6txu/node_modules/@tamagui/floating/dist/esm/interactions/utils.mjs
+// node_modules/.pnpm/@tamagui+floating@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel_4d62a9db7c1d5820c5675c8a71cbe161/node_modules/@tamagui/floating/dist/esm/interactions/utils.mjs
 function getDocument(node) {
   return node?.ownerDocument || document;
 }
@@ -16396,7 +16396,7 @@ function isIndexOutOfListBounds(listRef, index2) {
 }
 __name(isIndexOutOfListBounds, "isIndexOutOfListBounds");
 
-// node_modules/.pnpm/@tamagui+floating@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@_pn3dhyn3pu7hqxks3awc4a6txu/node_modules/@tamagui/floating/dist/esm/interactions/useHover.mjs
+// node_modules/.pnpm/@tamagui+floating@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel_4d62a9db7c1d5820c5675c8a71cbe161/node_modules/@tamagui/floating/dist/esm/interactions/useHover.mjs
 var safePolygonIdentifier = "data-floating-ui-safe-polygon";
 function getDelay(value, prop, pointerType) {
   if (pointerType && !isMouseLikePointerType(pointerType)) {
@@ -16724,7 +16724,7 @@ function useHover(context4, props = {}) {
 }
 __name(useHover, "useHover");
 
-// node_modules/.pnpm/@tamagui+floating@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@_pn3dhyn3pu7hqxks3awc4a6txu/node_modules/@tamagui/floating/dist/esm/interactions/safePolygon.mjs
+// node_modules/.pnpm/@tamagui+floating@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel_4d62a9db7c1d5820c5675c8a71cbe161/node_modules/@tamagui/floating/dist/esm/interactions/safePolygon.mjs
 function isPointInPolygon(point, polygon) {
   const [x, y] = point;
   let isInside2 = false;
@@ -16975,7 +16975,7 @@ function safePolygon(options = {}) {
 }
 __name(safePolygon, "safePolygon");
 
-// node_modules/.pnpm/@tamagui+floating@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@_pn3dhyn3pu7hqxks3awc4a6txu/node_modules/@tamagui/floating/dist/esm/interactions/useFocus.mjs
+// node_modules/.pnpm/@tamagui+floating@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel_4d62a9db7c1d5820c5675c8a71cbe161/node_modules/@tamagui/floating/dist/esm/interactions/useFocus.mjs
 import { useEffect as useEffect21, useMemo as useMemo17, useRef as useRef22 } from "react";
 function isMacSafari() {
   return isMac() && isSafari();
@@ -17085,7 +17085,7 @@ function useFocus(context4, props = {}) {
 }
 __name(useFocus, "useFocus");
 
-// node_modules/.pnpm/@tamagui+floating@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@_pn3dhyn3pu7hqxks3awc4a6txu/node_modules/@tamagui/floating/dist/esm/interactions/useRole.mjs
+// node_modules/.pnpm/@tamagui+floating@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel_4d62a9db7c1d5820c5675c8a71cbe161/node_modules/@tamagui/floating/dist/esm/interactions/useRole.mjs
 import * as React54 from "react";
 var componentRoleToAriaRoleMap = /* @__PURE__ */ new Map([["select", "listbox"], ["combobox", "listbox"], ["label", false]]);
 var idCounter2 = 0;
@@ -17172,7 +17172,7 @@ function useRole(context4, props = {}) {
 }
 __name(useRole, "useRole");
 
-// node_modules/.pnpm/@tamagui+floating@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@_pn3dhyn3pu7hqxks3awc4a6txu/node_modules/@tamagui/floating/dist/esm/interactions/useClick.mjs
+// node_modules/.pnpm/@tamagui+floating@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel_4d62a9db7c1d5820c5675c8a71cbe161/node_modules/@tamagui/floating/dist/esm/interactions/useClick.mjs
 import { useMemo as useMemo19, useRef as useRef23 } from "react";
 function isButtonTarget(event) {
   return isHTMLElement2(event.target) && event.target.tagName === "BUTTON";
@@ -17274,7 +17274,7 @@ function useClick(context4, props = {}) {
 }
 __name(useClick, "useClick");
 
-// node_modules/.pnpm/@tamagui+floating@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@_pn3dhyn3pu7hqxks3awc4a6txu/node_modules/@tamagui/floating/dist/esm/interactions/useListNavigation.mjs
+// node_modules/.pnpm/@tamagui+floating@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel_4d62a9db7c1d5820c5675c8a71cbe161/node_modules/@tamagui/floating/dist/esm/interactions/useListNavigation.mjs
 import { useLayoutEffect as useLayoutEffect7, useMemo as useMemo20, useRef as useRef24, useState as useState11 } from "react";
 var ARROW_UP = "ArrowUp";
 var ARROW_DOWN = "ArrowDown";
@@ -17676,7 +17676,7 @@ function useListNavigation(context4, props) {
 }
 __name(useListNavigation, "useListNavigation");
 
-// node_modules/.pnpm/@tamagui+floating@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@_pn3dhyn3pu7hqxks3awc4a6txu/node_modules/@tamagui/floating/dist/esm/interactions/useTypeahead.mjs
+// node_modules/.pnpm/@tamagui+floating@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel_4d62a9db7c1d5820c5675c8a71cbe161/node_modules/@tamagui/floating/dist/esm/interactions/useTypeahead.mjs
 import { useLayoutEffect as useLayoutEffect8, useMemo as useMemo21, useRef as useRef25 } from "react";
 function useTypeahead(context4, props) {
   const {
@@ -17794,7 +17794,7 @@ function useTypeahead(context4, props) {
 }
 __name(useTypeahead, "useTypeahead");
 
-// node_modules/.pnpm/@tamagui+floating@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@_pn3dhyn3pu7hqxks3awc4a6txu/node_modules/@tamagui/floating/dist/esm/interactions/useInnerOffset.mjs
+// node_modules/.pnpm/@tamagui+floating@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel_4d62a9db7c1d5820c5675c8a71cbe161/node_modules/@tamagui/floating/dist/esm/interactions/useInnerOffset.mjs
 import * as React55 from "react";
 import * as ReactDOM3 from "react-dom";
 function useInnerOffset(context4, props) {
@@ -17887,7 +17887,7 @@ function useInnerOffset(context4, props) {
 }
 __name(useInnerOffset, "useInnerOffset");
 
-// node_modules/.pnpm/@tamagui+floating@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@_pn3dhyn3pu7hqxks3awc4a6txu/node_modules/@tamagui/floating/dist/esm/interactions/useDelayGroup.mjs
+// node_modules/.pnpm/@tamagui+floating@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel_4d62a9db7c1d5820c5675c8a71cbe161/node_modules/@tamagui/floating/dist/esm/interactions/useDelayGroup.mjs
 import * as React56 from "react";
 var DelayGroupContext = React56.createContext({
   currentId: null,
@@ -17969,7 +17969,7 @@ function getClose(delay) {
 }
 __name(getClose, "getClose");
 
-// node_modules/.pnpm/@tamagui+floating@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@_pn3dhyn3pu7hqxks3awc4a6txu/node_modules/@tamagui/floating/dist/esm/middleware/inner.mjs
+// node_modules/.pnpm/@tamagui+floating@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel_4d62a9db7c1d5820c5675c8a71cbe161/node_modules/@tamagui/floating/dist/esm/middleware/inner.mjs
 import * as ReactDOM4 from "react-dom";
 function getArgsWithCustomFloatingHeight(state5, height) {
   return {
@@ -18051,7 +18051,7 @@ var inner = /* @__PURE__ */ __name((props) => ({
   }
 }), "inner");
 
-// node_modules/.pnpm/@tamagui+popper@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7._ruscvr6dnxizmjjbd4rodzsbta/node_modules/@tamagui/popper/dist/esm/Popper.mjs
+// node_modules/.pnpm/@tamagui+popper@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+c_4bc3a21cb45d4c3d87ca5b8c1cd6cf65/node_modules/@tamagui/popper/dist/esm/Popper.mjs
 import * as React57 from "react";
 import { jsx as jsx36 } from "react/jsx-runtime";
 var PopperContextFast = createStyledContext12(
@@ -18832,12 +18832,12 @@ function wrapArray(array, startIndex) {
 }
 __name(wrapArray, "wrapArray");
 
-// node_modules/.pnpm/@tamagui+create-menu@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+co_tujlt7l7e5azitzqjut67cbqzi/node_modules/@tamagui/create-menu/dist/esm/createBaseMenu.mjs
+// node_modules/.pnpm/@tamagui+create-menu@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@ba_1b10778cc05f3b45cfba0c275925e69e/node_modules/@tamagui/create-menu/dist/esm/createBaseMenu.mjs
 import { composeEventHandlers as composeEventHandlers3, composeRefs as composeRefs2, createStyledContext as createStyledContext14, isWeb as isWeb3, styled as styled29, Text as Text5, Theme as Theme2, useComposedRefs as useComposedRefs2, useIsTouchDevice, useThemeName as useThemeName4, View as View16, withStaticProperties as withStaticProperties5 } from "@tamagui/web";
 import * as React59 from "react";
 import { useId as useId12 } from "react";
 
-// node_modules/.pnpm/@tamagui+create-menu@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+co_tujlt7l7e5azitzqjut67cbqzi/node_modules/@tamagui/create-menu/dist/esm/MenuPredefined.mjs
+// node_modules/.pnpm/@tamagui+create-menu@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@ba_1b10778cc05f3b45cfba0c275925e69e/node_modules/@tamagui/create-menu/dist/esm/MenuPredefined.mjs
 import { styled as styled28, View as View15 } from "@tamagui/web";
 var GROUP_NAME3 = "MenuGroup";
 var MenuGroup = styled28(View15, {
@@ -19001,7 +19001,7 @@ var MenuPredefined = {
   MenuLabel
 };
 
-// node_modules/.pnpm/@tamagui+create-menu@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+co_tujlt7l7e5azitzqjut67cbqzi/node_modules/@tamagui/create-menu/dist/esm/createBaseMenu.mjs
+// node_modules/.pnpm/@tamagui+create-menu@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@ba_1b10778cc05f3b45cfba0c275925e69e/node_modules/@tamagui/create-menu/dist/esm/createBaseMenu.mjs
 import { Fragment as Fragment9, jsx as jsx38, jsxs as jsxs7 } from "react/jsx-runtime";
 function whenMouse(handler) {
   return (event) => event.pointerType === "mouse" ? handler(event) : void 0;
@@ -20263,7 +20263,7 @@ function isPointerInGraceArea(event, area) {
 }
 __name(isPointerInGraceArea, "isPointerInGraceArea");
 
-// node_modules/.pnpm/@tamagui+create-menu@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+co_tujlt7l7e5azitzqjut67cbqzi/node_modules/@tamagui/create-menu/dist/esm/createNativeMenu/createNativeMenu.mjs
+// node_modules/.pnpm/@tamagui+create-menu@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@ba_1b10778cc05f3b45cfba0c275925e69e/node_modules/@tamagui/create-menu/dist/esm/createNativeMenu/createNativeMenu.mjs
 import { isWeb as isWeb4, withStaticProperties as withStaticProperties6, isIos as isIos2 } from "@tamagui/web";
 import React60 from "react";
 import { Fragment as Fragment10, jsx as jsx39 } from "react/jsx-runtime";
@@ -20626,7 +20626,7 @@ var createNativeMenu = /* @__PURE__ */ __name((MenuType) => {
   };
 }, "createNativeMenu");
 
-// node_modules/.pnpm/@tamagui+create-menu@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+co_tujlt7l7e5azitzqjut67cbqzi/node_modules/@tamagui/create-menu/dist/esm/createNativeMenu/withNativeMenu.mjs
+// node_modules/.pnpm/@tamagui+create-menu@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@ba_1b10778cc05f3b45cfba0c275925e69e/node_modules/@tamagui/create-menu/dist/esm/createNativeMenu/withNativeMenu.mjs
 import { isWeb as isWeb5 } from "@tamagui/web";
 import { jsx as jsx40 } from "react/jsx-runtime";
 function withNativeMenu({
@@ -20649,7 +20649,7 @@ function withNativeMenu({
 }
 __name(withNativeMenu, "withNativeMenu");
 
-// node_modules/.pnpm/@tamagui+menu@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7.29_jenq55wgz3ayf6fsuuidntwtpq/node_modules/@tamagui/menu/dist/esm/Menu.mjs
+// node_modules/.pnpm/@tamagui+menu@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+cor_3e7eb100a2d89017f36b859253580bb1/node_modules/@tamagui/menu/dist/esm/Menu.mjs
 import { isWeb as isWeb7, withStaticProperties as withStaticProperties8 } from "@tamagui/web";
 import React62 from "react";
 
@@ -20669,7 +20669,7 @@ var ScrollView2 = styled30(ScrollView_default, {
   }
 });
 
-// node_modules/.pnpm/@tamagui+menu@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7.29_jenq55wgz3ayf6fsuuidntwtpq/node_modules/@tamagui/menu/dist/esm/createNonNativeMenu.mjs
+// node_modules/.pnpm/@tamagui+menu@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+cor_3e7eb100a2d89017f36b859253580bb1/node_modules/@tamagui/menu/dist/esm/createNonNativeMenu.mjs
 import { composeEventHandlers as composeEventHandlers4, composeRefs as composeRefs3, createStyledContext as createStyledContext15, isAndroid as isAndroid4, isWeb as isWeb6, Slot as Slot4, styled as styled31, useEvent as useEvent4, useIsTouchDevice as useIsTouchDevice2, View as View17, withStaticProperties as withStaticProperties7 } from "@tamagui/web";
 import * as React61 from "react";
 import { useId as useId14 } from "react";
@@ -21027,7 +21027,7 @@ function createNonNativeMenu(params) {
 }
 __name(createNonNativeMenu, "createNonNativeMenu");
 
-// node_modules/.pnpm/@tamagui+menu@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7.29_jenq55wgz3ayf6fsuuidntwtpq/node_modules/@tamagui/menu/dist/esm/Menu.mjs
+// node_modules/.pnpm/@tamagui+menu@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+cor_3e7eb100a2d89017f36b859253580bb1/node_modules/@tamagui/menu/dist/esm/Menu.mjs
 import { Fragment as Fragment11, jsx as jsx42 } from "react/jsx-runtime";
 function createMenu(params) {
   const {
@@ -21180,7 +21180,7 @@ function createMenu(params) {
 }
 __name(createMenu, "createMenu");
 
-// node_modules/.pnpm/@tamagui+menu@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7.29_jenq55wgz3ayf6fsuuidntwtpq/node_modules/@tamagui/menu/dist/esm/index.mjs
+// node_modules/.pnpm/@tamagui+menu@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+cor_3e7eb100a2d89017f36b859253580bb1/node_modules/@tamagui/menu/dist/esm/index.mjs
 var Menu = createMenu({
   Icon: MenuPredefined.MenuIcon,
   Image: MenuPredefined.MenuImage,
@@ -21193,11 +21193,11 @@ var Menu = createMenu({
   Title: MenuPredefined.Title
 });
 
-// node_modules/.pnpm/@tamagui+context-menu@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+c_afffsjfiff7fmzwxch7e53kf5m/node_modules/@tamagui/context-menu/dist/esm/ContextMenu.mjs
+// node_modules/.pnpm/@tamagui+context-menu@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@b_1f200eea8823268cedc506b69783c30b/node_modules/@tamagui/context-menu/dist/esm/ContextMenu.mjs
 import { withStaticProperties as withStaticProperties10 } from "@tamagui/web";
 import React64 from "react";
 
-// node_modules/.pnpm/@tamagui+context-menu@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+c_afffsjfiff7fmzwxch7e53kf5m/node_modules/@tamagui/context-menu/dist/esm/createNonNativeContextMenu.mjs
+// node_modules/.pnpm/@tamagui+context-menu@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@b_1f200eea8823268cedc506b69783c30b/node_modules/@tamagui/context-menu/dist/esm/createNonNativeContextMenu.mjs
 import { composeEventHandlers as composeEventHandlers5, composeRefs as composeRefs4, createStyledContext as createStyledContext16, isAndroid as isAndroid5, isWeb as isWeb8, Slot as Slot5, View as View18, withStaticProperties as withStaticProperties9 } from "@tamagui/web";
 import React63, { useId as useId15 } from "react";
 import { Fragment as Fragment12, jsx as jsx43, jsxs as jsxs8 } from "react/jsx-runtime";
@@ -21602,7 +21602,7 @@ function createNonNativeContextMenu(params) {
 }
 __name(createNonNativeContextMenu, "createNonNativeContextMenu");
 
-// node_modules/.pnpm/@tamagui+context-menu@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+c_afffsjfiff7fmzwxch7e53kf5m/node_modules/@tamagui/context-menu/dist/esm/ContextMenu.mjs
+// node_modules/.pnpm/@tamagui+context-menu@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@b_1f200eea8823268cedc506b69783c30b/node_modules/@tamagui/context-menu/dist/esm/ContextMenu.mjs
 var COMMON_PARAMS = {
   isRoot: false,
   scope: CONTEXTMENU_CONTEXT
@@ -21748,7 +21748,7 @@ function createContextMenu(param) {
 }
 __name(createContextMenu, "createContextMenu");
 
-// node_modules/.pnpm/@tamagui+context-menu@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+c_afffsjfiff7fmzwxch7e53kf5m/node_modules/@tamagui/context-menu/dist/esm/index.mjs
+// node_modules/.pnpm/@tamagui+context-menu@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@b_1f200eea8823268cedc506b69783c30b/node_modules/@tamagui/context-menu/dist/esm/index.mjs
 var ContextMenu = createContextMenu({
   Icon: MenuPredefined.MenuIcon,
   Image: MenuPredefined.MenuImage,
@@ -21761,11 +21761,11 @@ var ContextMenu = createContextMenu({
   Title: MenuPredefined.Title
 });
 
-// node_modules/.pnpm/@tamagui+popover@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7_e3vv4cq5dzanioowb2tmqhhzvy/node_modules/@tamagui/popover/dist/esm/Popover.mjs
+// node_modules/.pnpm/@tamagui+popover@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+_7a1b8c53989c69864c2774ee1e90dcbf/node_modules/@tamagui/popover/dist/esm/Popover.mjs
 import { createStyledContext as createStyledContext17, useCreateShallowSetState, useEvent as useEvent5, useGet as useGet2, View as View19 } from "@tamagui/core";
 import * as React66 from "react";
 
-// node_modules/.pnpm/@tamagui+popover@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7_e3vv4cq5dzanioowb2tmqhhzvy/node_modules/@tamagui/popover/dist/esm/useFloatingContext.mjs
+// node_modules/.pnpm/@tamagui+popover@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+_7a1b8c53989c69864c2774ee1e90dcbf/node_modules/@tamagui/popover/dist/esm/useFloatingContext.mjs
 import React65 from "react";
 var useFloatingContext = /* @__PURE__ */ __name(({
   open: open2,
@@ -21976,7 +21976,7 @@ var useFloatingContext = /* @__PURE__ */ __name(({
   }, [setOpen]);
 }, "useFloatingContext");
 
-// node_modules/.pnpm/@tamagui+popover@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7_e3vv4cq5dzanioowb2tmqhhzvy/node_modules/@tamagui/popover/dist/esm/Popover.mjs
+// node_modules/.pnpm/@tamagui+popover@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+_7a1b8c53989c69864c2774ee1e90dcbf/node_modules/@tamagui/popover/dist/esm/Popover.mjs
 import { Fragment as Fragment13, jsx as jsx44, jsxs as jsxs9 } from "react/jsx-runtime";
 var needsRepropagation2 = needsPortalRepropagation();
 var openPopovers = /* @__PURE__ */ new Set();
@@ -23258,7 +23258,7 @@ var RadioGroup = createRadioGroup({
   Item: RadioGroupItemFrame
 });
 
-// node_modules/.pnpm/@tamagui+select@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7._23wxa7igjmuoetwg5sslrzlzqm/node_modules/@tamagui/select/dist/esm/Select.mjs
+// node_modules/.pnpm/@tamagui+select@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+c_a84c1ab54215db91fe1a669d845e8a98/node_modules/@tamagui/select/dist/esm/Select.mjs
 import { createStyledContext as createStyledContext21, getVariableValue as getVariableValue8, styled as styled37, useEvent as useEvent7, useGet as useGet3 } from "@tamagui/core";
 
 // node_modules/.pnpm/@tamagui+separator@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/@tamagui/separator/dist/esm/Separator.mjs
@@ -23299,10 +23299,10 @@ var Separator = styled34(View20, {
   }
 });
 
-// node_modules/.pnpm/@tamagui+select@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7._23wxa7igjmuoetwg5sslrzlzqm/node_modules/@tamagui/select/dist/esm/Select.mjs
+// node_modules/.pnpm/@tamagui+select@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+c_a84c1ab54215db91fe1a669d845e8a98/node_modules/@tamagui/select/dist/esm/Select.mjs
 import * as React75 from "react";
 
-// node_modules/.pnpm/@tamagui+select@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7._23wxa7igjmuoetwg5sslrzlzqm/node_modules/@tamagui/select/dist/esm/context.mjs
+// node_modules/.pnpm/@tamagui+select@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+c_a84c1ab54215db91fe1a669d845e8a98/node_modules/@tamagui/select/dist/esm/context.mjs
 import { createStyledContext as createStyledContext19 } from "@tamagui/core";
 import { createContext as createContext16 } from "react";
 import { jsx as jsx49 } from "react/jsx-runtime";
@@ -23336,17 +23336,17 @@ var ForwardSelectContext = /* @__PURE__ */ __name(({
   });
 }, "ForwardSelectContext");
 
-// node_modules/.pnpm/@tamagui+select@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7._23wxa7igjmuoetwg5sslrzlzqm/node_modules/@tamagui/select/dist/esm/SelectContent.mjs
+// node_modules/.pnpm/@tamagui+select@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+c_a84c1ab54215db91fe1a669d845e8a98/node_modules/@tamagui/select/dist/esm/SelectContent.mjs
 import { isWeb as isWeb11 } from "@tamagui/core";
 import { useContext as useContext19 } from "react";
 
-// node_modules/.pnpm/@tamagui+select@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7._23wxa7igjmuoetwg5sslrzlzqm/node_modules/@tamagui/select/dist/esm/useSelectBreakpointActive.mjs
+// node_modules/.pnpm/@tamagui+select@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+c_a84c1ab54215db91fe1a669d845e8a98/node_modules/@tamagui/select/dist/esm/useSelectBreakpointActive.mjs
 var useShowSelectSheet = /* @__PURE__ */ __name((context4) => {
   const breakpointActive = useAdaptIsActive(context4.adaptScope);
   return context4.open === false ? false : breakpointActive;
 }, "useShowSelectSheet");
 
-// node_modules/.pnpm/@tamagui+select@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7._23wxa7igjmuoetwg5sslrzlzqm/node_modules/@tamagui/select/dist/esm/SelectContent.mjs
+// node_modules/.pnpm/@tamagui+select@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+c_a84c1ab54215db91fe1a669d845e8a98/node_modules/@tamagui/select/dist/esm/SelectContent.mjs
 import { Fragment as Fragment15, jsx as jsx50 } from "react/jsx-runtime";
 var SelectContent = /* @__PURE__ */ __name(({
   children,
@@ -23409,16 +23409,16 @@ var SelectContent = /* @__PURE__ */ __name(({
   });
 }, "SelectContent");
 
-// node_modules/.pnpm/@tamagui+select@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7._23wxa7igjmuoetwg5sslrzlzqm/node_modules/@tamagui/select/dist/esm/SelectImpl.mjs
+// node_modules/.pnpm/@tamagui+select@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+c_a84c1ab54215db91fe1a669d845e8a98/node_modules/@tamagui/select/dist/esm/SelectImpl.mjs
 import { useEvent as useEvent6, useIsTouchDevice as useIsTouchDevice3 } from "@tamagui/core";
 import * as React69 from "react";
 import { flushSync as flushSync6 } from "react-dom";
 
-// node_modules/.pnpm/@tamagui+select@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7._23wxa7igjmuoetwg5sslrzlzqm/node_modules/@tamagui/select/dist/esm/constants.mjs
+// node_modules/.pnpm/@tamagui+select@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+c_a84c1ab54215db91fe1a669d845e8a98/node_modules/@tamagui/select/dist/esm/constants.mjs
 var SCROLL_ARROW_THRESHOLD = 8;
 var VIEWPORT_NAME = "SelectViewport";
 
-// node_modules/.pnpm/@tamagui+select@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7._23wxa7igjmuoetwg5sslrzlzqm/node_modules/@tamagui/select/dist/esm/SelectImpl.mjs
+// node_modules/.pnpm/@tamagui+select@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+c_a84c1ab54215db91fe1a669d845e8a98/node_modules/@tamagui/select/dist/esm/SelectImpl.mjs
 import { jsx as jsx51 } from "react/jsx-runtime";
 var SelectInlineImpl = /* @__PURE__ */ __name((props) => {
   const {
@@ -23717,7 +23717,7 @@ var SelectInlineImpl = /* @__PURE__ */ __name((props) => {
   });
 }, "SelectInlineImpl");
 
-// node_modules/.pnpm/@tamagui+select@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7._23wxa7igjmuoetwg5sslrzlzqm/node_modules/@tamagui/select/dist/esm/SelectItem.mjs
+// node_modules/.pnpm/@tamagui+select@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+c_a84c1ab54215db91fe1a669d845e8a98/node_modules/@tamagui/select/dist/esm/SelectItem.mjs
 import { createStyledContext as createStyledContext20 } from "@tamagui/core";
 import * as React70 from "react";
 import { jsx as jsx52 } from "react/jsx-runtime";
@@ -23903,7 +23903,7 @@ var SelectItem = ListItem2.Frame.styleable(/* @__PURE__ */ __name(function Selec
   disableTheme: true
 });
 
-// node_modules/.pnpm/@tamagui+select@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7._23wxa7igjmuoetwg5sslrzlzqm/node_modules/@tamagui/select/dist/esm/SelectItemText.mjs
+// node_modules/.pnpm/@tamagui+select@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+c_a84c1ab54215db91fe1a669d845e8a98/node_modules/@tamagui/select/dist/esm/SelectItemText.mjs
 import { styled as styled35, useIsomorphicLayoutEffect as useIsomorphicLayoutEffect2 } from "@tamagui/core";
 import * as React71 from "react";
 import { Fragment as Fragment16, jsx as jsx53 } from "react/jsx-runtime";
@@ -23963,7 +23963,7 @@ var SelectItemText = SelectItemTextFrame.styleable(/* @__PURE__ */ __name(functi
   });
 }, "SelectItemText2"));
 
-// node_modules/.pnpm/@tamagui+select@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7._23wxa7igjmuoetwg5sslrzlzqm/node_modules/@tamagui/select/dist/esm/SelectScrollButton.mjs
+// node_modules/.pnpm/@tamagui+select@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+c_a84c1ab54215db91fe1a669d845e8a98/node_modules/@tamagui/select/dist/esm/SelectScrollButton.mjs
 import * as React72 from "react";
 import { flushSync as flushSync7 } from "react-dom";
 import { jsx as jsx54 } from "react/jsx-runtime";
@@ -24080,7 +24080,7 @@ var SelectScrollButtonImpl = React72.memo(React72.forwardRef((props, forwardedRe
   });
 }));
 
-// node_modules/.pnpm/@tamagui+select@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7._23wxa7igjmuoetwg5sslrzlzqm/node_modules/@tamagui/select/dist/esm/SelectTrigger.mjs
+// node_modules/.pnpm/@tamagui+select@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+c_a84c1ab54215db91fe1a669d845e8a98/node_modules/@tamagui/select/dist/esm/SelectTrigger.mjs
 import * as React73 from "react";
 import { jsx as jsx55 } from "react/jsx-runtime";
 var TRIGGER_NAME2 = "SelectTrigger";
@@ -24140,7 +24140,7 @@ var SelectTrigger = React73.forwardRef(/* @__PURE__ */ __name(function SelectTri
   });
 }, "SelectTrigger2"));
 
-// node_modules/.pnpm/@tamagui+select@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7._23wxa7igjmuoetwg5sslrzlzqm/node_modules/@tamagui/select/dist/esm/SelectViewport.mjs
+// node_modules/.pnpm/@tamagui+select@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+c_a84c1ab54215db91fe1a669d845e8a98/node_modules/@tamagui/select/dist/esm/SelectViewport.mjs
 import { styled as styled36 } from "@tamagui/core";
 import * as React74 from "react";
 import { Fragment as Fragment17, jsx as jsx56, jsxs as jsxs11 } from "react/jsx-runtime";
@@ -24276,7 +24276,7 @@ var selectViewportCSS = `
 }
 `;
 
-// node_modules/.pnpm/@tamagui+select@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7._23wxa7igjmuoetwg5sslrzlzqm/node_modules/@tamagui/select/dist/esm/Select.mjs
+// node_modules/.pnpm/@tamagui+select@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+c_a84c1ab54215db91fe1a669d845e8a98/node_modules/@tamagui/select/dist/esm/Select.mjs
 import { Fragment as Fragment18, jsx as jsx57 } from "react/jsx-runtime";
 var SelectValueFrame = styled37(SizableText2, {
   name: "SelectValue",
@@ -29360,7 +29360,7 @@ var ToggleGroupImpl = ToggleGroupFrame.styleable((props, forwardedRef) => {
   });
 });
 
-// node_modules/.pnpm/@tamagui+tooltip@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7_qr2pq5ohi2mbklxfg4urwjto4a/node_modules/@tamagui/tooltip/dist/esm/Tooltip.mjs
+// node_modules/.pnpm/@tamagui+tooltip@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+_f987487fea22488e38e4dfc7c875e782/node_modules/@tamagui/tooltip/dist/esm/Tooltip.mjs
 import { useEvent as useEvent13 } from "@tamagui/core";
 import * as React94 from "react";
 import { jsx as jsx79 } from "react/jsx-runtime";
@@ -29555,7 +29555,7 @@ var Tooltip2 = withStaticProperties(TooltipComponent, {
 var voidFn2 = /* @__PURE__ */ __name(() => {
 }, "voidFn");
 
-// node_modules/.pnpm/@tamagui+tooltip@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7_qr2pq5ohi2mbklxfg4urwjto4a/node_modules/@tamagui/tooltip/dist/esm/TooltipSimple.mjs
+// node_modules/.pnpm/@tamagui+tooltip@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+_f987487fea22488e38e4dfc7c875e782/node_modules/@tamagui/tooltip/dist/esm/TooltipSimple.mjs
 import * as React95 from "react";
 import { jsx as jsx80, jsxs as jsxs19 } from "react/jsx-runtime";
 var TooltipSimple = React95.forwardRef(({
@@ -29799,7 +29799,7 @@ function useWindowDimensions({
 }
 __name(useWindowDimensions, "useWindowDimensions");
 
-// node_modules/.pnpm/tamagui@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7.29.0_@re_eer4f2vov7d7u6oevxbubywav4/node_modules/tamagui/dist/esm/createTamagui.mjs
+// node_modules/.pnpm/tamagui@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7.29_577ae768273d7359e51096ff2721049e/node_modules/tamagui/dist/esm/createTamagui.mjs
 import { createTamagui as createTamaguiCore } from "@tamagui/core";
 var createTamagui = process.env.NODE_ENV !== "development" ? createTamaguiCore : (conf) => {
   const sizeTokenKeys = ["$true"];
@@ -29854,7 +29854,7 @@ Expected a subset of: ${expected.join(", ")}
   return tamaguiConfig;
 };
 
-// node_modules/.pnpm/tamagui@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7.29.0_@re_eer4f2vov7d7u6oevxbubywav4/node_modules/tamagui/dist/esm/views/TamaguiProvider.mjs
+// node_modules/.pnpm/tamagui@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7.29_577ae768273d7359e51096ff2721049e/node_modules/tamagui/dist/esm/views/TamaguiProvider.mjs
 import { TamaguiProvider as OGProvider } from "@tamagui/core";
 import { jsx as jsx81 } from "react/jsx-runtime";
 var TamaguiProvider = /* @__PURE__ */ __name(({
@@ -29873,7 +29873,7 @@ var TamaguiProvider = /* @__PURE__ */ __name(({
   });
 }, "TamaguiProvider");
 
-// node_modules/.pnpm/tamagui@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7.29.0_@re_eer4f2vov7d7u6oevxbubywav4/node_modules/tamagui/dist/esm/views/Anchor.mjs
+// node_modules/.pnpm/tamagui@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7.29_577ae768273d7359e51096ff2721049e/node_modules/tamagui/dist/esm/views/Anchor.mjs
 import { styled as styled50 } from "@tamagui/core";
 import { jsx as jsx82 } from "react/jsx-runtime";
 var AnchorFrame = styled50(SizableText2, {
@@ -29905,7 +29905,7 @@ var Anchor = AnchorFrame.styleable(({
   });
 });
 
-// node_modules/.pnpm/tamagui@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7.29.0_@re_eer4f2vov7d7u6oevxbubywav4/node_modules/tamagui/dist/esm/views/EnsureFlexed.mjs
+// node_modules/.pnpm/tamagui@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7.29_577ae768273d7359e51096ff2721049e/node_modules/tamagui/dist/esm/views/EnsureFlexed.mjs
 import { Text as Text8, styled as styled51 } from "@tamagui/core";
 var EnsureFlexed = styled51(Text8, {
   opacity: 0,
@@ -29918,7 +29918,7 @@ var EnsureFlexed = styled51(Text8, {
 });
 EnsureFlexed["isVisuallyHidden"] = true;
 
-// node_modules/.pnpm/tamagui@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7.29.0_@re_eer4f2vov7d7u6oevxbubywav4/node_modules/tamagui/dist/esm/views/Fieldset.mjs
+// node_modules/.pnpm/tamagui@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7.29_577ae768273d7359e51096ff2721049e/node_modules/tamagui/dist/esm/views/Fieldset.mjs
 import { styled as styled52 } from "@tamagui/core";
 var Fieldset = styled52(YStack, {
   name: "Fieldset",
@@ -30241,7 +30241,7 @@ var Spinner = YStack.styleable((props, ref) => {
   });
 });
 
-// node_modules/.pnpm/tamagui@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7.29.0_@re_eer4f2vov7d7u6oevxbubywav4/node_modules/tamagui/dist/esm/views/Text.mjs
+// node_modules/.pnpm/tamagui@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7.29_577ae768273d7359e51096ff2721049e/node_modules/tamagui/dist/esm/views/Text.mjs
 import { Text as TamaguiText, styled as styled55 } from "@tamagui/core";
 var Text10 = styled55(TamaguiText, {
   variants: {
@@ -30256,7 +30256,7 @@ var Text10 = styled55(TamaguiText, {
   }
 });
 
-// node_modules/.pnpm/tamagui@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7.29.0_@re_eer4f2vov7d7u6oevxbubywav4/node_modules/tamagui/dist/esm/index.mjs
+// node_modules/.pnpm/tamagui@2.0.0-rc.42_react-dom@19.2.4_react@19.2.4__react-native@0.85.3_@babel+core@7.29_577ae768273d7359e51096ff2721049e/node_modules/tamagui/dist/esm/index.mjs
 import { ClientOnly, Configuration, ComponentContext, GroupContext, FontLanguage, Theme as Theme4, View as View30, createComponent as createComponent2, createFont, createShorthands, createStyledContext as createStyledContext30, createTokens, createVariable, getConfig as getConfig3, getMedia, getCSSStylesAtomic, getThemes, getToken, getTokenValue as getTokenValue4, getTokens as getTokens5, getVariable as getVariable2, getVariableName, getVariableValue as getVariableValue14, insertFont, setConfig, setupDev, _withStableStyle, isBrowser as isBrowser2, isChrome as isChrome2, isClient as isClient3, isServer as isServer2, isTamaguiComponent, isTamaguiElement as isTamaguiElement2, isTouchable as isTouchable2, isVariable as isVariable4, isWeb as isWeb15, isWebTouchable as isWebTouchable2, matchMedia as matchMedia2, mediaObjectToString, mediaQueryConfig, mediaState, setOnLayoutStrategy, styled as styled56, themeable, useClientValue, useDidFinishSSR as useDidFinishSSR4, useEvent as useEvent14, useGet as useGet4, useIsTouchDevice as useIsTouchDevice4, useIsomorphicLayoutEffect as useIsomorphicLayoutEffect3, useMedia as useMedia2, useProps as useProps3, usePropsAndStyle, useStyle, useConfiguration as useConfiguration5, useTheme as useTheme5, useThemeName as useThemeName7, variableToString as variableToString2, withStaticProperties as withStaticProperties13 } from "@tamagui/core";
 export {
   ACTIONS,

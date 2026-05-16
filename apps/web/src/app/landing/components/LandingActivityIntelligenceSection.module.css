@@ -1,6 +1,6 @@
 .layout {
   display: grid;
-  grid-template-columns: minmax(0, 0.88fr) minmax(320px, 1.12fr);
+  grid-template-columns: minmax(0, 0.88fr) minmax(0, 1.12fr);
   gap: clamp(20px, 3vw, 28px);
   align-items: start;
 }
@@ -23,7 +23,8 @@
 
 .visualWrap {
   position: relative;
-  min-height: clamp(280px, 38vw, 520px);
+  width: 100%;
+  aspect-ratio: 16 / 9;
   border-radius: 24px;
   overflow: hidden;
   border: 1px solid rgba(184, 199, 230, 0.14);

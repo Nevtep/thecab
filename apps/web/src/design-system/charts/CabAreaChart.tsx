@@ -32,6 +32,8 @@ export type CabAreaChartProps<T extends Record<string, unknown>> = {
   yTickFormatter?: (value: number) => string;
   actions?: ReactNode;
   notice?: string;
+  ariaLabel?: string;
+  summary?: string;
 };
 
 export function CabAreaChart<T extends Record<string, unknown>>({
@@ -45,9 +47,19 @@ export function CabAreaChart<T extends Record<string, unknown>>({
   yTickFormatter,
   actions,
   notice,
+  ariaLabel,
+  summary,
 }: CabAreaChartProps<T>) {
   return (
-    <CabChartFrame title={title} subtitle={subtitle} height={height} actions={actions} notice={notice}>
+    <CabChartFrame
+      title={title}
+      subtitle={subtitle}
+      height={height}
+      actions={actions} 
+      notice={notice}
+      ariaLabel={ariaLabel ?? title}
+      summary={summary ?? subtitle}
+    >
       <ResponsiveContainer>
         <AreaChart data={data} margin={{ top: 4, right: 8, bottom: 4, left: 2 }}>
           <CartesianGrid stroke={cabColors.surface.border} strokeDasharray="3 3" />

@@ -1,9 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import { useTranslation } from "react-i18next";
 
-import { CabCard, CabStack, CabText, cabColors } from "@/design-system";
+import { CabCard, CabMediaFrame, CabStack, CabText, cabColors } from "@/design-system";
 
 import {
   landingAssets,
@@ -15,6 +14,7 @@ import styles from "@/app/landing/components/LandingValueBlocksSection.module.cs
 
 export function LandingValueBlocksSection() {
   const { t } = useTranslation("landing");
+  const sectionBackground = landingAssets.problemSectionBackground;
 
   return (
     <LandingSectionShell
@@ -25,12 +25,15 @@ export function LandingValueBlocksSection() {
       description={t("value.body")}
       background={
         <>
-          <Image
-            src={landingAssets.problemSectionBackground.src}
+          <CabMediaFrame
+            src={sectionBackground.src}
             alt=""
-            fill
+            intrinsicWidth={sectionBackground.width}
+            intrinsicHeight={sectionBackground.height}
+            role="decorative"
+            fit="cover"
             sizes="100vw"
-            className={styles.sectionBackgroundImage}
+            className={styles.sectionBackgroundFrame}
           />
           <div className={styles.sectionBackgroundTint} aria-hidden="true" />
         </>
@@ -45,12 +48,14 @@ export function LandingValueBlocksSection() {
               <CabCard density="spacious">
                 <CabStack gap="$4">
                   <div className={styles.imageWrap}>
-                    <Image
+                    <CabMediaFrame
                       src={asset.src}
                       alt={asset.altKey ? t(asset.altKey) : ""}
-                      fill
+                      intrinsicWidth={asset.width}
+                      intrinsicHeight={asset.height}
+                      role="diagram"
+                      fit="contain"
                       sizes="(max-width: 1080px) 100vw, 33vw"
-                      className={styles.image}
                     />
                   </div>
 
@@ -62,10 +67,10 @@ export function LandingValueBlocksSection() {
                       {t(`value.cards.${cardId}.body`)}
                     </CabText>
                   </CabStack>
+
+                  <div className={styles.cardGlow} aria-hidden="true" />
                 </CabStack>
               </CabCard>
-
-              <div className={styles.cardGlow} aria-hidden="true" />
             </div>
           );
         })}

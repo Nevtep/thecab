@@ -9,6 +9,11 @@
     "activity": "Actividad",
     "settings": "Configuración"
   },
+  "a11y": {
+    "openMenu": "Abrir menú de navegación",
+    "closeMenu": "Cerrar menú de navegación",
+    "skipToContent": "Saltar al contenido principal"
+  },
   "states": {
     "active": "Actual",
     "requiresAnalysis": "Análisis",
