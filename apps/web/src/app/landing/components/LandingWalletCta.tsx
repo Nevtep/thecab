@@ -39,16 +39,11 @@ export function LandingWalletCta({ continueTargetId, placement, variant = "card"
     switchToSupportedChain,
   } = useCabWallet();
 
-  const walletConnectConfigured =
-    Boolean(process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID) &&
-    process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID !== "your_walletconnect_project_id";
-
   const state = getLandingWalletState({
     isConnected,
     isAuthenticated,
     isAuthenticating,
     isSupportedChain,
-    walletConnectConfigured,
   });
 
   const accentColor =

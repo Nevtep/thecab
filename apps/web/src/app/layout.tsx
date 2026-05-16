@@ -3,6 +3,7 @@ import { IBM_Plex_Mono, Inter, Orbitron } from "next/font/google";
 import "./cab-focus.css";
 import "./globals.css";
 import { AppProviders } from "@/app/providers";
+import { resolveRequestLocale } from "@/i18n/resolveRequestLocale";
 
 const orbitron = Orbitron({
   subsets: ["latin"],
@@ -30,17 +31,18 @@ export const metadata: Metadata = {
   description: "Portfolio command cabin for Aerodrome on Base",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await resolveRequestLocale();
   const fontVariables = `${orbitron.variable} ${inter.variable} ${ibmPlexMono.variable}`;
 
   return (
-    <html lang="en" className={fontVariables}>
+    <html lang={locale} className={fontVariables}>
       <body className={`${fontVariables} cab-focus-root`}>
-        <AppProviders>{children}</AppProviders>
+        <AppProviders initialLocale={locale}>{children}</AppProviders>
       </body>
     </html>
   );
