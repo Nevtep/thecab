@@ -39,19 +39,10 @@ export function LandingModelClaritySection() {
         </div>
 
         <div className={styles.blocks}>
-          {modelClarityBlockOrder.map((blockId, index) => (
+          {modelClarityBlockOrder.map((blockId) => (
             <div key={blockId} className={styles.block}>
               <CabCard density="spacious">
                 <CabStack gap="$3">
-                  <CabText
-                    variant="mono"
-                    fontSize="$2"
-                    className={styles.blockIndex}
-                    style={{ color: cabColors.brand.signalTeal }}
-                  >
-                    {String(index + 1).padStart(2, "0")}
-                  </CabText>
-
                   <CabText variant="heading" fontSize="$6" style={{ color: cabColors.text.primary }}>
                     {t(`modelClarity.blocks.${blockId}.title`)}
                   </CabText>

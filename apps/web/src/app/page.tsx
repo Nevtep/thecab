@@ -37,9 +37,11 @@ export default function Home() {
       backgroundSrc={landingAssets.pageBackground.src}
       backgroundAlt=""
     >
-      <a href="#landing-content" className="cab-skip-link">
-        {t("a11y.skipToContent")}
-      </a>
+      {process.env.NODE_ENV === "development" ? (
+        <a href="#landing-content" className="cab-skip-link">
+          {t("a11y.skipToContent")}
+        </a>
+      ) : null}
 
       <div className={styles.page}>
         <main

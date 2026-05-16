@@ -21,14 +21,16 @@
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: clamp(16px, 2vw, 22px);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(12px, 1.6vw, 18px);
+  align-items: stretch;
 }
 
 .card {
   position: relative;
   display: flex;
   min-height: 100%;
+  min-width: 0;
   overflow: hidden;
 }
 
@@ -45,11 +47,6 @@
   background: radial-gradient(circle at 50% 45%, rgba(7, 25, 45, 0.72) 0%, rgba(4, 15, 28, 0.94) 100%);
 }
 
-.image {
-  object-fit: contain;
-  padding: clamp(14px, 2vw, 22px);
-}
-
 .cardGlow {
   position: absolute;
   inset: auto -40px -40px auto;
@@ -61,7 +58,13 @@
   pointer-events: none;
 }
 
-@media (max-width: 1080px) {
+@media (max-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
   .grid {
     grid-template-columns: 1fr;
   }
