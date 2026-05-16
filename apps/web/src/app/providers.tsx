@@ -2,14 +2,19 @@
 
 import type { PropsWithChildren } from "react";
 
+import type { AppLocale } from "@/i18n/locale";
 import { I18nProvider } from "@/providers/i18n-provider";
 import { QueryProvider } from "@/providers/query-provider";
 import { TamaguiProvider } from "@/providers/tamagui-provider";
 import { CabWalletProvider } from "@/wallet/CabWalletProvider";
 
-export function AppProviders({ children }: PropsWithChildren) {
+type AppProvidersProps = PropsWithChildren<{
+  initialLocale: AppLocale;
+}>;
+
+export function AppProviders({ children, initialLocale }: AppProvidersProps) {
   return (
-    <I18nProvider>
+    <I18nProvider initialLocale={initialLocale}>
       <QueryProvider>
         <CabWalletProvider>
           <TamaguiProvider>{children}</TamaguiProvider>

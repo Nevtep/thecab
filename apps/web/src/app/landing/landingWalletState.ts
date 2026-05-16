@@ -1,7 +1,6 @@
 type LandingWalletSnapshot = {
   isConnected: boolean;
   isSupportedChain: boolean;
-  walletConnectConfigured: boolean;
 };
 
 export type LandingWalletState = {
@@ -17,20 +16,14 @@ export type LandingWalletState = {
 export function getLandingWalletState({
   isConnected,
   isSupportedChain,
-  walletConnectConfigured,
 }: LandingWalletSnapshot): LandingWalletState {
   if (!isConnected) {
     return {
       kind: "disconnected",
-      primaryLabelKey: walletConnectConfigured
-        ? "landing:hero.primaryCta.disconnected"
-        : "wallet:actions.configureWalletConnect",
+      primaryLabelKey: "landing:hero.primaryCta.disconnected",
       primaryTone: "primary",
       statusLabelKey: "landing:walletState.disconnected",
-      helperTextKey: walletConnectConfigured
-        ? "wallet:guidance.disconnected"
-        : "wallet:guidance.configurationRequired",
-      isPrimaryDisabled: !walletConnectConfigured,
+      helperTextKey: "wallet:guidance.disconnected",
     };
   }
 

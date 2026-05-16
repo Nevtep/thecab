@@ -1,6 +1,10 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 
+import { DEFAULT_LOCALE, SUPPORTED_LOCALES, type AppLocale } from "@/i18n/locale";
+
+export { DEFAULT_LOCALE, SUPPORTED_LOCALES, normalizeLocale, type AppLocale } from "@/i18n/locale";
+
 import enCommon from "@/i18n/locales/en/common.json";
 import enActivity from "@/i18n/locales/en/activity.json";
 import enAnalysis from "@/i18n/locales/en/analysis.json";
@@ -37,21 +41,6 @@ import esStrategies from "@/i18n/locales/es/strategies.json";
 import esTrust from "@/i18n/locales/es/trust.json";
 import esValidation from "@/i18n/locales/es/validation.json";
 import esWallet from "@/i18n/locales/es/wallet.json";
-
-export const SUPPORTED_LOCALES = ["en", "es"] as const;
-export const DEFAULT_LOCALE = "en" as const;
-
-export type AppLocale = (typeof SUPPORTED_LOCALES)[number];
-
-export function normalizeLocale(input?: string): AppLocale {
-  if (!input) return DEFAULT_LOCALE;
-
-  const lowered = input.toLowerCase();
-  if (lowered.startsWith("es")) return "es";
-  if (lowered.startsWith("en")) return "en";
-
-  return DEFAULT_LOCALE;
-}
 
 const resources = {
   en: {
@@ -117,14 +106,19 @@ const namespaces = [
   "charts",
 ] as const;
 
-export function initI18n() {
-  if (i18n.isInitialized) return i18n;
+export function initI18n(locale: AppLocale = DEFAULT_LOCALE) {
+  if (i18n.isInitialized) {
+    if (i18n.language !== locale) {
+      void i18n.changeLanguage(locale);
+    }
+    return i18n;
+  }
 
   i18n
     .use(initReactI18next)
     .init({
       resources,
-      lng: DEFAULT_LOCALE,
+      lng: locale,
       fallbackLng: DEFAULT_LOCALE,
       supportedLngs: SUPPORTED_LOCALES,
       defaultNS: "common",
