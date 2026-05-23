@@ -12,17 +12,64 @@ export type OverviewQueryParams = {
 };
 
 export function buildOverviewPath({ walletAddress, chainId, range }: OverviewQueryParams) {
+  return buildOverviewScopedPath("", { walletAddress, chainId, range });
+}
+
+export function buildOverviewShellPath({ walletAddress, chainId, range }: OverviewQueryParams) {
+  return buildOverviewScopedPath("/shell", { walletAddress, chainId, range });
+}
+
+export function buildOverviewActivityPath({ walletAddress, chainId, range }: OverviewQueryParams) {
+  return buildOverviewScopedPath("/activity", { walletAddress, chainId, range });
+}
+
+export function buildOverviewChartPath({ walletAddress, chainId, range }: OverviewQueryParams) {
+  return buildOverviewScopedPath("/chart", { walletAddress, chainId, range });
+}
+
+export function buildOverviewProtocolPositionsPath({ walletAddress, chainId, range }: OverviewQueryParams) {
+  return buildOverviewScopedPath("/protocol-positions", { walletAddress, chainId, range });
+}
+
+function buildOverviewScopedPath(
+  suffix: string,
+  { walletAddress, chainId, range }: OverviewQueryParams,
+) {
   const searchParams = new URLSearchParams({
     walletAddress,
     chainId: String(chainId),
     range,
   });
 
-  return `/api/wallet/overview?${searchParams.toString()}`;
+  return `/api/wallet/overview${suffix}?${searchParams.toString()}`;
 }
 
 export async function fetchOverview(input: OverviewQueryInput) {
   const response = await apiClient<OverviewViewModel>(buildOverviewPath(input));
+
+  return mapOverviewResponseToViewModel(response);
+}
+
+export async function fetchOverviewShell(input: OverviewQueryInput) {
+  const response = await apiClient<OverviewViewModel>(buildOverviewShellPath(input));
+
+  return mapOverviewResponseToViewModel(response);
+}
+
+export async function fetchOverviewActivity(input: OverviewQueryInput) {
+  const response = await apiClient<OverviewViewModel>(buildOverviewActivityPath(input));
+
+  return mapOverviewResponseToViewModel(response);
+}
+
+export async function fetchOverviewChart(input: OverviewQueryInput) {
+  const response = await apiClient<OverviewViewModel>(buildOverviewChartPath(input));
+
+  return mapOverviewResponseToViewModel(response);
+}
+
+export async function fetchOverviewProtocolPositions(input: OverviewQueryInput) {
+  const response = await apiClient<OverviewViewModel>(buildOverviewProtocolPositionsPath(input));
 
   return mapOverviewResponseToViewModel(response);
 }
@@ -37,6 +84,51 @@ export function getOverviewQueryOptions(
   return {
     queryKey: queryKeys.overview(input),
     queryFn: () => fetchOverview(input),
+    placeholderData: (previousData) => previousData,
+    staleTime: 30_000,
+  };
+}
+
+export function getOverviewShellQueryOptions(
+  input: OverviewQueryInput,
+): UseQueryOptions<OverviewViewModel, Error, OverviewViewModel, ReturnType<typeof queryKeys.overviewShell>> {
+  return {
+    queryKey: queryKeys.overviewShell(input),
+    queryFn: () => fetchOverviewShell(input),
+    placeholderData: (previousData) => previousData,
+    staleTime: 30_000,
+  };
+}
+
+export function getOverviewActivityQueryOptions(
+  input: OverviewQueryInput,
+): UseQueryOptions<OverviewViewModel, Error, OverviewViewModel, ReturnType<typeof queryKeys.overviewActivity>> {
+  return {
+    queryKey: queryKeys.overviewActivity(input),
+    queryFn: () => fetchOverviewActivity(input),
+    placeholderData: (previousData) => previousData,
+    staleTime: 30_000,
+  };
+}
+
+export function getOverviewChartQueryOptions(
+  input: OverviewQueryInput,
+): UseQueryOptions<OverviewViewModel, Error, OverviewViewModel, ReturnType<typeof queryKeys.overviewChart>> {
+  return {
+    queryKey: queryKeys.overviewChart(input),
+    queryFn: () => fetchOverviewChart(input),
+    placeholderData: (previousData) => previousData,
+    staleTime: 30_000,
+  };
+}
+
+export function getOverviewProtocolPositionsQueryOptions(
+  input: OverviewQueryInput,
+): UseQueryOptions<OverviewViewModel, Error, OverviewViewModel, ReturnType<typeof queryKeys.overviewProtocolPositions>> {
+  return {
+    queryKey: queryKeys.overviewProtocolPositions(input),
+    queryFn: () => fetchOverviewProtocolPositions(input),
+    placeholderData: (previousData) => previousData,
     staleTime: 30_000,
   };
 }

@@ -195,6 +195,40 @@ export async function readLatestOverviewPricePoints(input: {
   return Array.from(latestRows.values());
 }
 
+export async function readOverviewPricePointsInRange(input: {
+  chainId: number;
+  tokenAddresses: string[];
+  startAt: Date;
+  endAt: Date;
+  resolution: string;
+}) {
+  if (input.tokenAddresses.length === 0) {
+    return [];
+  }
+
+  const db = getDb();
+  const normalizedAddresses = Array.from(new Set(input.tokenAddresses.map((address) => address.toLowerCase())));
+
+  return db
+    .select({
+      tokenAddress: pricePoints.tokenAddress,
+      pricedAt: pricePoints.pricedAt,
+      priceUsd: pricePoints.priceUsd,
+      confidence: pricePoints.confidence,
+    })
+    .from(pricePoints)
+    .where(
+      and(
+        eq(pricePoints.chainId, input.chainId),
+        inArray(pricePoints.tokenAddress, normalizedAddresses),
+        gte(pricePoints.pricedAt, input.startAt),
+        lte(pricePoints.pricedAt, input.endAt),
+        eq(pricePoints.resolution, input.resolution),
+      ),
+    )
+    .orderBy(desc(pricePoints.pricedAt));
+}
+
 export async function getLatestOverviewCoverageReport(input: ScopedWalletInput, scope = "overview") {
   const db = getDb();
   const rows = await db
@@ -277,6 +311,7 @@ export async function readOverviewPortfolioSnapshots(input: ScopedWalletInput & 
       totalValueUsd: portfolioSnapshots.totalValueUsd,
       deployedValueUsd: portfolioSnapshots.deployedValueUsd,
       idleValueUsd: portfolioSnapshots.idleValueUsd,
+      metadataJson: portfolioSnapshots.metadataJson,
     })
     .from(portfolioSnapshots)
     .where(

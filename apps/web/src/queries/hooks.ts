@@ -1,9 +1,16 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 
-import { getOverviewQueryOptions } from "@/features/overview/overview.queries";
+import {
+  getOverviewActivityQueryOptions,
+  getOverviewChartQueryOptions,
+  getOverviewProtocolPositionsQueryOptions,
+  getOverviewQueryOptions,
+  getOverviewShellQueryOptions,
+} from "@/features/overview/overview.queries";
 import type {
   OverviewAnalysisStatus,
   OverviewQueryInput,
+  OverviewRange,
 } from "@/features/overview/overview.types";
 import { apiClient } from "@/queries/apiClient";
 import { queryKeys } from "@/queries/keys";
@@ -37,9 +44,44 @@ type StartAnalysisResponse = {
   lastError: string | null;
 };
 
+type WarmOverviewResponse = {
+  status: "queued" | "already_running";
+  walletAddress: string;
+  chainId: number;
+  range: OverviewRange;
+};
+
 export function useOverviewQuery(input: OverviewQueryInput, options?: { enabled?: boolean }) {
   return useQuery({
     ...getOverviewQueryOptions(input),
+    enabled: (options?.enabled ?? true) && Boolean(input.walletAddress),
+  });
+}
+
+export function useOverviewShellQuery(input: OverviewQueryInput, options?: { enabled?: boolean }) {
+  return useQuery({
+    ...getOverviewShellQueryOptions(input),
+    enabled: (options?.enabled ?? true) && Boolean(input.walletAddress),
+  });
+}
+
+export function useOverviewActivityQuery(input: OverviewQueryInput, options?: { enabled?: boolean }) {
+  return useQuery({
+    ...getOverviewActivityQueryOptions(input),
+    enabled: (options?.enabled ?? true) && Boolean(input.walletAddress),
+  });
+}
+
+export function useOverviewChartQuery(input: OverviewQueryInput, options?: { enabled?: boolean }) {
+  return useQuery({
+    ...getOverviewChartQueryOptions(input),
+    enabled: (options?.enabled ?? true) && Boolean(input.walletAddress),
+  });
+}
+
+export function useOverviewProtocolPositionsQuery(input: OverviewQueryInput, options?: { enabled?: boolean }) {
+  return useQuery({
+    ...getOverviewProtocolPositionsQueryOptions(input),
     enabled: (options?.enabled ?? true) && Boolean(input.walletAddress),
   });
 }
@@ -71,6 +113,16 @@ export function useStartAnalysisMutation() {
           chainId: input.chainId,
           mode: input.mode ?? "full_history",
         },
+      }),
+  });
+}
+
+export function useWarmOverviewMutation() {
+  return useMutation<WarmOverviewResponse, Error, WalletScopedInput & { range: OverviewRange }>({
+    mutationFn: (input) =>
+      apiClient<WarmOverviewResponse>("/api/wallet/overview/warmup", {
+        method: "POST",
+        body: input,
       }),
   });
 }

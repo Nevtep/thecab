@@ -27,6 +27,8 @@ export type CabAreaChartProps<T extends Record<string, unknown>> = {
   title?: string;
   subtitle?: string;
   height?: number;
+  yAxisWidth?: number;
+  yTickFormatter?: (value: number) => string;
 };
 
 export function CabAreaChart<T extends Record<string, unknown>>({
@@ -36,6 +38,8 @@ export function CabAreaChart<T extends Record<string, unknown>>({
   title,
   subtitle,
   height,
+  yAxisWidth,
+  yTickFormatter,
 }: CabAreaChartProps<T>) {
   return (
     <CabChartFrame title={title} subtitle={subtitle} height={height}>
@@ -43,7 +47,12 @@ export function CabAreaChart<T extends Record<string, unknown>>({
         <AreaChart data={data} margin={{ top: 4, right: 8, bottom: 4, left: 2 }}>
           <CartesianGrid stroke={cabColors.surface.border} strokeDasharray="3 3" />
           <XAxis dataKey={xKey as never} stroke={cabColors.text.muted} tick={{ fontSize: 12 }} />
-          <YAxis stroke={cabColors.text.muted} tick={{ fontSize: 12 }} width={46} />
+          <YAxis
+            stroke={cabColors.text.muted}
+            tick={{ fontSize: 12 }}
+            width={yAxisWidth ?? 72}
+            tickFormatter={yTickFormatter}
+          />
           <Tooltip
             cursor={{
               stroke: cabColors.brandExtended.signalTealUi,

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getRecentOverviewCurrentState } from "@/server/overview/getRecentOverview";
+import { getRecentOverviewChart } from "@/server/overview/getRecentOverview";
 import {
   assertNoProviderLeakage,
   getOverviewErrorResponse,
@@ -11,10 +11,9 @@ import {
 export async function GET(request: Request) {
   try {
     const payload = parseOverviewRequest(request);
-    const overview = await getRecentOverviewCurrentState(payload);
-    const sanitizedOverview = assertNoProviderLeakage(sanitizeOverviewResponse(overview));
+    const overview = await getRecentOverviewChart(payload);
 
-    return NextResponse.json(sanitizedOverview);
+    return NextResponse.json(assertNoProviderLeakage(sanitizeOverviewResponse(overview)));
   } catch (error) {
     return getOverviewErrorResponse(error);
   }

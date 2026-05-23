@@ -10,6 +10,14 @@ type OverviewParams = BaseParams & {
 export const queryKeys = {
   overview: ({ chainId, walletAddress, range }: OverviewParams) =>
     ["overview", chainId, walletAddress ?? "", range] as const,
+  overviewShell: ({ chainId, walletAddress, range }: OverviewParams) =>
+    ["overview-shell", chainId, walletAddress ?? "", range] as const,
+  overviewActivity: ({ chainId, walletAddress, range }: OverviewParams) =>
+    ["overview-activity", chainId, walletAddress ?? "", range] as const,
+  overviewChart: ({ chainId, walletAddress, range }: OverviewParams) =>
+    ["overview-chart", chainId, walletAddress ?? "", range] as const,
+  overviewProtocolPositions: ({ chainId, walletAddress, range }: OverviewParams) =>
+    ["overview-protocol-positions", chainId, walletAddress ?? "", range] as const,
   analysisStatus: ({ chainId, walletAddress }: BaseParams) =>
     ["analysis-status", chainId, walletAddress ?? ""] as const,
   pools: ({ chainId, walletAddress }: BaseParams) =>

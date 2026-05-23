@@ -14,7 +14,10 @@ import {
 import { getWalletDefiPositions, getWalletHistory, getWalletTokens } from "@/server/providers/moralis";
 import { detectProtocolPositions } from "@/server/protocol-positions/detectProtocolPositions";
 import {
+  getLatestOverviewPortfolioSnapshot,
+  readLatestOverviewPricePoints,
   readKnownProtocolContracts,
+  readOverviewPricePointsInRange,
   readOverviewPortfolioSnapshots,
   insertOverviewCoverageReport,
   insertOverviewPortfolioSnapshot,
@@ -46,6 +49,9 @@ const BASE_CBBTC_ADDRESS = "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf";
 const BASE_AERO_ADDRESS = "0x940181a94a35a4569e4529a3cdfb74e38fd98631";
 const BASE_USDC_ADDRESS = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
 const HISTORICAL_PRICE_BATCH_SIZE = 8;
+const CURRENT_PRICE_CACHE_TTL_MS = 10 * 60 * 1000;
+const MAX_ALCHEMY_CURRENT_PRICE_ADDRESSES_PER_REQUEST = 40;
+const MAX_ALCHEMY_HISTORICAL_ADDRESSES_PER_REQUEST = 24;
 const DUST_VALUE_THRESHOLD_USD = 1;
 
 type MoralisTokenRecord = Record<string, unknown>;
@@ -166,6 +172,572 @@ export function createEmptyRecentOverviewResponse(input: OverviewRequest): Overv
   };
 }
 
+function createOverviewAnalysisState(input: {
+  latestRun: Awaited<ReturnType<typeof getLatestAnalysisRun>>;
+  freshness: Awaited<ReturnType<typeof readOverviewFreshness>>;
+}) {
+  const priorAnalyzedAt = input.freshness?.lastAnalyzedAt ?? input.latestRun?.completedAt ?? null;
+  const analysisStatus = input.latestRun?.status === "queued" || input.latestRun?.status === "running"
+    ? input.latestRun.status
+    : input.latestRun?.status === "failed"
+      ? "failed"
+      : isStale(priorAnalyzedAt)
+        ? "stale"
+        : priorAnalyzedAt
+          ? "ready"
+          : "not_analyzed";
+
+  return {
+    status: analysisStatus,
+    runId: input.latestRun?.id ?? input.freshness?.lastSuccessfulRunId ?? null,
+    stage:
+      input.latestRun?.stage ??
+      (analysisStatus === "ready" || analysisStatus === "stale" ? "completed" : "idle"),
+    progressPct:
+      input.latestRun?.progressPct ?? (analysisStatus === "ready" || analysisStatus === "stale" ? 100 : 0),
+    lastSuccessfulRunAt: priorAnalyzedAt ? priorAnalyzedAt.toISOString() : null,
+    lastUpdatedAt: input.latestRun?.updatedAt ? input.latestRun.updatedAt.toISOString() : null,
+    lastError: input.latestRun?.lastError ?? null,
+  } as OverviewResponse["analysis"];
+}
+
+function buildOverviewActivityBlock(input: {
+  response: OverviewResponse;
+  history: MoralisHistoryRecord[];
+  historyFulfilled: boolean;
+  now: Date;
+  walletAddress: string;
+}) {
+  input.response.activity = {
+    ...input.response.activity,
+    coverageStatus: input.historyFulfilled ? "recent" : "partial",
+    coverageReasonCodes:
+      input.historyFulfilled ? ["analysisPending"] : ["providerPartial", "analysisPending"],
+    items: input.history.slice(0, 10).map((item: MoralisHistoryRecord, index) => ({
+      id:
+        asString(item.transaction_hash) ??
+        asString(item.hash) ??
+        `${input.walletAddress.toLowerCase()}-${index}`,
+      occurredAt:
+        asString(item.block_timestamp) ??
+        asString(item.block_time) ??
+        asString(item.created_at) ??
+        input.now.toISOString(),
+      eventType: asString(item.category) ?? "unclassified",
+      labelKey: "overview.activity.unclassified",
+      txHash: asString(item.transaction_hash) ?? asString(item.hash),
+      confidence: "low",
+      isUnclassified: true,
+    })),
+  };
+}
+
+export async function getRecentOverviewShell(input: OverviewRequest): Promise<OverviewResponse> {
+  const response = createEmptyRecentOverviewResponse(input);
+  const [latestRun, freshness, latestSnapshot] = await Promise.all([
+    getLatestAnalysisRun(input.walletAddress, input.chainId),
+    readOverviewFreshness(input),
+    getLatestOverviewPortfolioSnapshot(input),
+  ]);
+
+  response.analysis = createOverviewAnalysisState({ latestRun, freshness });
+
+  const snapshotCapturedAt = latestSnapshot?.capturedAt instanceof Date
+    ? latestSnapshot.capturedAt.toISOString()
+    : null;
+  const freshnessMetadata = freshness?.metadataJson as Record<string, unknown> | null | undefined;
+  const lastOverviewRefreshedAt = asString(freshnessMetadata?.lastOverviewRefreshedAt) ?? snapshotCapturedAt;
+  const coverageReasonCodes: OverviewCoverageReasonCode[] = latestSnapshot ? [] : ["analysisPending"];
+  const coverageStatus = latestSnapshot ? "recent" : "partial";
+
+  response.coverage = {
+    status: coverageStatus,
+    confidence: latestSnapshot ? "high" : "medium",
+    reasonCodes: coverageReasonCodes,
+    details: null,
+  };
+  response.summary = {
+    ...response.summary,
+    coverageStatus,
+    coverageReasonCodes,
+    lastRefreshedAt: lastOverviewRefreshedAt,
+  };
+  response.metrics = {
+    ...response.metrics,
+    coverageStatus,
+    coverageReasonCodes,
+    netPortfolioValueUsd: asNumber(latestSnapshot?.totalValueUsd),
+    deployedValueUsd: asNumber(latestSnapshot?.deployedValueUsd),
+    idleValueUsd: asNumber(latestSnapshot?.idleValueUsd),
+  };
+
+  return response;
+}
+
+export async function getRecentOverviewActivity(input: OverviewRequest): Promise<OverviewResponse> {
+  const response = createEmptyRecentOverviewResponse(input);
+  const [historyResult, latestRun, freshness] = await Promise.all([
+    getWalletHistory(input.walletAddress, input.chainId, 50).then(
+      (value) => ({ status: "fulfilled" as const, value }),
+      (error) => ({ status: "rejected" as const, reason: sanitizeProviderError(error) }),
+    ),
+    getLatestAnalysisRun(input.walletAddress, input.chainId),
+    readOverviewFreshness(input),
+  ]);
+
+  const now = new Date();
+  const historyFulfilled = historyResult.status === "fulfilled";
+  const history = historyFulfilled ? (historyResult.value.result ?? []) : [];
+  response.analysis = createOverviewAnalysisState({ latestRun, freshness });
+
+  if (!historyFulfilled) {
+    const coverageReasonCodes = buildProviderPartialReasonCodes(response.coverage.reasonCodes);
+    response.coverage = {
+      ...response.coverage,
+      status: "partial",
+      confidence: "medium",
+      reasonCodes: coverageReasonCodes,
+    };
+    response.summary = {
+      ...response.summary,
+      coverageStatus: "partial",
+      coverageReasonCodes,
+      lastRefreshedAt: response.summary.lastRefreshedAt,
+    };
+  }
+
+  response.summary = {
+    ...response.summary,
+    lastRefreshedAt: historyFulfilled ? now.toISOString() : response.summary.lastRefreshedAt,
+  };
+
+  if (historyFulfilled) {
+    await insertOverviewRawProviderRecord({
+      walletAddress: input.walletAddress,
+      chainId: input.chainId,
+      provider: "moralis",
+      endpoint: "/wallets/:walletAddress/history",
+      requestJson: { walletAddress: input.walletAddress, chainId: input.chainId, limit: 50 },
+      responseJson: {
+        resultCount: history.length,
+        items: history.slice(0, 20).map((item) => sanitizeMoralisHistoryForPersistence(item as MoralisHistoryRecord)),
+      },
+    });
+  }
+
+  buildOverviewActivityBlock({
+    response,
+    history,
+    historyFulfilled,
+    now,
+    walletAddress: input.walletAddress,
+  });
+
+  return response;
+}
+
+export async function getRecentOverviewProtocolPositions(input: OverviewRequest): Promise<OverviewResponse> {
+  const response = createEmptyRecentOverviewResponse(input);
+  const [tokensResult, historyResult, defiPositionsResult, latestRun, freshness, protocolMetadata] = await Promise.all([
+    getWalletTokens(input.walletAddress, input.chainId).then(
+      (value) => ({ status: "fulfilled" as const, value }),
+      (error) => ({ status: "rejected" as const, reason: sanitizeProviderError(error) }),
+    ),
+    getWalletHistory(input.walletAddress, input.chainId, 50).then(
+      (value) => ({ status: "fulfilled" as const, value }),
+      (error) => ({ status: "rejected" as const, reason: sanitizeProviderError(error) }),
+    ),
+    getWalletDefiPositions(input.walletAddress, input.chainId).then(
+      (value) => ({ status: "fulfilled" as const, value }),
+      (error) => ({ status: "rejected" as const, reason: sanitizeProviderError(error) }),
+    ),
+    getLatestAnalysisRun(input.walletAddress, input.chainId),
+    readOverviewFreshness(input),
+    readKnownProtocolContracts({ chainId: input.chainId }),
+  ]);
+
+  if (
+    tokensResult.status === "rejected" &&
+    historyResult.status === "rejected" &&
+    defiPositionsResult.status === "rejected"
+  ) {
+    const coverageReasonCodes = buildProviderPartialReasonCodes(response.coverage.reasonCodes);
+    const now = new Date().toISOString();
+
+    response.analysis = createOverviewAnalysisState({ latestRun, freshness });
+    response.coverage = {
+      ...response.coverage,
+      status: "partial",
+      confidence: "medium",
+      reasonCodes: coverageReasonCodes,
+    };
+    response.summary = {
+      ...response.summary,
+      coverageStatus: "partial",
+      coverageReasonCodes,
+      lastRefreshedAt: response.summary.lastRefreshedAt ?? now,
+    };
+    response.protocolPositions = {
+      ...response.protocolPositions,
+      source: "partial_fallback",
+      coverageStatus: "partial",
+      coverageReasonCodes: null,
+    };
+
+    return response;
+  }
+
+  const now = new Date();
+  const tokens = tokensResult.status === "fulfilled" ? (tokensResult.value.result ?? []) : [];
+  const history = historyResult.status === "fulfilled" ? (historyResult.value.result ?? []) : [];
+  const defiPositions = defiPositionsResult.status === "fulfilled" ? defiPositionsResult.value : [];
+
+  response.analysis = createOverviewAnalysisState({ latestRun, freshness });
+  response.summary = {
+    ...response.summary,
+    lastRefreshedAt: now.toISOString(),
+  };
+
+  if (tokensResult.status === "fulfilled") {
+    await insertOverviewRawProviderRecord({
+      walletAddress: input.walletAddress,
+      chainId: input.chainId,
+      provider: "moralis",
+      endpoint: "/wallets/:walletAddress/tokens",
+      requestJson: { walletAddress: input.walletAddress, chainId: input.chainId },
+      responseJson: {
+        resultCount: tokens.length,
+        tokens: tokens.map((token) => sanitizeMoralisTokenForPersistence(token as MoralisTokenRecord)),
+      },
+    });
+  }
+
+  if (historyResult.status === "fulfilled") {
+    await insertOverviewRawProviderRecord({
+      walletAddress: input.walletAddress,
+      chainId: input.chainId,
+      provider: "moralis",
+      endpoint: "/wallets/:walletAddress/history",
+      requestJson: { walletAddress: input.walletAddress, chainId: input.chainId, limit: 50 },
+      responseJson: {
+        resultCount: history.length,
+        items: history.slice(0, 20).map((item) => sanitizeMoralisHistoryForPersistence(item as MoralisHistoryRecord)),
+      },
+    });
+  }
+
+  if (defiPositionsResult.status === "fulfilled") {
+    await insertOverviewRawProviderRecord({
+      walletAddress: input.walletAddress,
+      chainId: input.chainId,
+      provider: "moralis",
+      endpoint: "/wallets/:walletAddress/defi/positions",
+      requestJson: { walletAddress: input.walletAddress, chainId: input.chainId },
+      responseJson: {
+        resultCount: defiPositions.length,
+        items: defiPositions.slice(0, 20).map((position) => sanitizeMoralisDefiPositionForPersistence(position)),
+      },
+    });
+  }
+
+  const protocolPositions = await detectProtocolPositions({
+    walletAddress: input.walletAddress,
+    chainId: input.chainId,
+    protocolContracts: protocolMetadata,
+    walletTokens: tokens,
+    defiPositions,
+    history,
+    now,
+  });
+
+  if (protocolPositions.artifacts.manualCurrentState) {
+    await insertOverviewRawProviderRecord({
+      walletAddress: input.walletAddress,
+      chainId: input.chainId,
+      provider: "alchemy",
+      endpoint: "/rpc/aerodrome/manual-positions",
+      requestJson: {
+        walletAddress: input.walletAddress,
+        chainId: input.chainId,
+      },
+      responseJson: protocolPositions.artifacts.manualCurrentState,
+    });
+  }
+
+  if (protocolPositions.artifacts.mellowCurrentState) {
+    await insertOverviewRawProviderRecord({
+      walletAddress: input.walletAddress,
+      chainId: input.chainId,
+      provider: "alchemy",
+      endpoint: "/rpc/mellow/strategy-wrappers",
+      requestJson: {
+        walletAddress: input.walletAddress,
+        chainId: input.chainId,
+      },
+      responseJson: protocolPositions.artifacts.mellowCurrentState,
+    });
+  }
+
+  response.protocolPositions = protocolPositions.block;
+  response.coverage = {
+    ...response.coverage,
+    status: toRequiredOverviewCoverageStatus(protocolPositions.block.coverageStatus),
+    confidence: protocolPositions.block.coverageStatus === "full" ? "high" : "medium",
+    reasonCodes: protocolPositions.block.coverageReasonCodes ?? [],
+  };
+  response.summary = {
+    ...response.summary,
+    coverageStatus: toRequiredOverviewCoverageStatus(protocolPositions.block.coverageStatus),
+    coverageReasonCodes: protocolPositions.block.coverageReasonCodes,
+  };
+
+  return response;
+}
+
+export async function getRecentOverviewChart(input: OverviewRequest): Promise<OverviewResponse> {
+  try {
+    return await getRecentOverview(input);
+  } catch (error) {
+    if (!isProviderRequestFailed(error)) {
+      throw error;
+    }
+
+    return getRecentOverviewChartFallback(input);
+  }
+}
+
+export async function getRecentOverviewCurrentState(input: OverviewRequest): Promise<OverviewResponse> {
+  const response = createEmptyRecentOverviewResponse(input);
+  const [tokensResult, latestRun, freshness, protocolMetadata] = await Promise.all([
+    getWalletTokens(input.walletAddress, input.chainId).then(
+      (value) => ({ status: "fulfilled" as const, value }),
+      (error) => ({ status: "rejected" as const, reason: sanitizeProviderError(error) }),
+    ),
+    getLatestAnalysisRun(input.walletAddress, input.chainId),
+    readOverviewFreshness(input),
+    readKnownProtocolContracts({ chainId: input.chainId }),
+  ]);
+
+  if (tokensResult.status === "rejected") {
+    return getRecentOverviewCurrentStateFallback(input);
+  }
+
+  const now = new Date();
+  const tokens = tokensResult.value.result ?? [];
+  response.analysis = createOverviewAnalysisState({ latestRun, freshness });
+
+  await insertOverviewRawProviderRecord({
+    walletAddress: input.walletAddress,
+    chainId: input.chainId,
+    provider: "moralis",
+    endpoint: "/wallets/:walletAddress/tokens",
+    requestJson: { walletAddress: input.walletAddress, chainId: input.chainId },
+    responseJson: {
+      resultCount: tokens.length,
+      tokens: tokens.map((token) => sanitizeMoralisTokenForPersistence(token as MoralisTokenRecord)),
+    },
+  });
+
+  const tokenPricingContexts = tokens.map((token) => {
+    const tokenAddress = asString(token.token_address)?.toLowerCase() ?? null;
+    const symbol = asString(token.symbol) ?? "UNKNOWN";
+    const name = asString(token.name);
+    const pricingAddress = resolveAlchemyPricingAddress(input.chainId, tokenAddress, symbol, {
+      name,
+      nativeToken: asBoolean(token.native_token),
+      verifiedContract: asBoolean(token.verified_contract),
+    });
+
+    return {
+      token,
+      tokenAddress,
+      symbol,
+      name,
+      pricingAddress,
+      moralisValueUsd: asNumber(token.usd_value),
+      isPriorityPricingAsset: isPriorityPricingAsset(pricingAddress),
+    };
+  });
+
+  const uniqueTokenAddresses = Array.from(
+    new Map(
+      [...tokenPricingContexts]
+        .sort((left, right) => {
+          if (left.isPriorityPricingAsset !== right.isPriorityPricingAsset) {
+            return Number(right.isPriorityPricingAsset) - Number(left.isPriorityPricingAsset);
+          }
+
+          return (right.moralisValueUsd ?? -1) - (left.moralisValueUsd ?? -1);
+        })
+        .filter((context) => Boolean(context.pricingAddress))
+        .map((context) => [context.pricingAddress as string, context]),
+    ).keys(),
+  );
+
+  const priceLookup = new Map<string, { priceUsd: number; pricedAt: string | null; confidence: "high" | "medium" }>();
+  const priceFetchFailed = await hydrateCurrentPriceLookup({
+    walletAddress: input.walletAddress,
+    chainId: input.chainId,
+    addresses: uniqueTokenAddresses,
+    now,
+    priceLookup,
+  });
+
+  const hydratedAssetRows = tokenPricingContexts.map((context) => {
+    const decimals = asNumber(context.token.decimals);
+    const balanceRaw = asString(context.token.balance);
+    const balance = asString(context.token.balance_formatted) ?? formatBalance(balanceRaw, decimals);
+    const pricingAddress = context.pricingAddress;
+    const priceEntry = pricingAddress ? priceLookup.get(pricingAddress) : null;
+    const priceUsd = priceEntry?.priceUsd ?? null;
+    const valueUsd = priceUsd !== null ? Number.parseFloat(balance) * priceUsd : null;
+    const knownProtocolMatch = resolveKnownProtocolAssetMatch(
+      input.chainId,
+      context.tokenAddress,
+      protocolMetadata,
+    );
+    const trustInput: AssetTrustClassifierInput = {
+      walletAddress: input.walletAddress.toLowerCase(),
+      chainId: input.chainId,
+      tokenAddress: context.tokenAddress,
+      symbol: context.symbol,
+      name: context.name,
+      balanceRaw: balanceRaw ?? "0",
+      balanceFormatted: balance,
+      valueUsd,
+      hasReliableAlchemyPrice: priceEntry !== null,
+      moralisPossibleSpam: asBooleanOrNull(context.token.possible_spam),
+      moralisVerifiedContract: asBooleanOrNull(context.token.verified_contract),
+      hasLogo: hasTokenLogo(context.token),
+      hasMetadata: hasTokenMetadata(context.symbol, context.name, decimals),
+      isKnownProtocolAsset: knownProtocolMatch !== null,
+      isNativeAsset: asBoolean(context.token.native_token),
+      isDustValue: valueUsd !== null ? valueUsd < DUST_VALUE_THRESHOLD_USD : Number.parseFloat(balance) === 0,
+      classifierVersion: ASSET_TRUST_CLASSIFIER_VERSION,
+    };
+    const trustClassification = classifyWalletAssetTrust(trustInput, {
+      knownProtocolReasonCode: knownProtocolMatch?.reasonCode ?? null,
+    });
+
+    return {
+      assetRow: {
+        tokenAddress: context.tokenAddress,
+        chainId: input.chainId,
+        symbol: context.symbol,
+        name: context.name,
+        balance,
+        priceUsd,
+        valueUsd,
+        movement24hPct: null,
+        movement7dPct: null,
+        classification: "idle" as const,
+        priceConfidence: priceEntry?.confidence ?? null,
+        trustStatus: trustClassification.trustStatus,
+        trustReasonCodes: trustClassification.trustReasonCodes,
+        isHiddenByDefault: trustClassification.isHiddenByDefault,
+        classifierVersion: trustClassification.classifierVersion,
+      },
+      trustInput,
+      knownProtocolConflict:
+        knownProtocolMatch !== null && asBooleanOrNull(context.token.possible_spam) === true,
+    };
+  });
+
+  const assetRows = hydratedAssetRows.map((row) => row.assetRow);
+  const hiddenAssetRows = hydratedAssetRows.filter((row) => row.assetRow.isHiddenByDefault);
+  const visibleAssetRows = hydratedAssetRows.filter((row) => !row.assetRow.isHiddenByDefault);
+  const pricedVisibleAssetRows = visibleAssetRows.filter((row) => row.assetRow.valueUsd !== null);
+  const idleValueUsd = sumNullableUsd(pricedVisibleAssetRows.map((row) => row.assetRow.valueUsd));
+  const hiddenAssetReasonCodes = buildHiddenAssetReasonCodes(hiddenAssetRows);
+  const exclusionSummary = buildExclusionSummary(hiddenAssetRows, visibleAssetRows);
+  const missingPrices = assetRows.some((row) => row.priceUsd === null);
+  const uniqueCoverageReasonCodes = Array.from(
+    new Set([
+      ...buildCoverageReasonCodes(hydratedAssetRows, {
+        providerPartial: priceFetchFailed,
+        chartPartial: false,
+        hasRecentActivity: true,
+      }),
+    ]),
+  );
+  const coverageStatus =
+    priceFetchFailed ||
+    missingPrices ||
+    hiddenAssetRows.length > 0 ||
+    Boolean(exclusionSummary)
+      ? "partial"
+      : "recent";
+
+  response.coverage = {
+    status: coverageStatus,
+    confidence: coverageStatus === "partial" ? "medium" : "high",
+    reasonCodes: uniqueCoverageReasonCodes,
+    details: null,
+  };
+  response.summary = {
+    ...response.summary,
+    coverageStatus,
+    coverageReasonCodes: uniqueCoverageReasonCodes,
+    lastRefreshedAt: now.toISOString(),
+  };
+  response.metrics = {
+    ...response.metrics,
+    coverageStatus,
+    coverageReasonCodes: uniqueCoverageReasonCodes,
+    netPortfolioValueUsd: idleValueUsd,
+    deployedValueUsd: null,
+    idleValueUsd,
+    exclusions: exclusionSummary,
+  };
+  response.assets = {
+    ...response.assets,
+    coverageStatus,
+    coverageReasonCodes: uniqueCoverageReasonCodes,
+    rows: assetRows,
+    hiddenSummary:
+      hiddenAssetRows.length > 0
+        ? {
+            hiddenCount: hiddenAssetRows.length,
+            hiddenValueUsd: sumNullableUsd(hiddenAssetRows.map((row) => row.assetRow.valueUsd)),
+            reasonCodes: hiddenAssetReasonCodes,
+            affectsTotals: true,
+            allVisibleAssetsUnpricedOrZero:
+              visibleAssetRows.length === 0 ||
+              visibleAssetRows.every((row) => (row.assetRow.valueUsd ?? 0) <= 0),
+          }
+        : null,
+    defaultVisibleCount: visibleAssetRows.length,
+  };
+  response.distribution = {
+    ...response.distribution,
+    coverageStatus,
+    coverageReasonCodes: uniqueCoverageReasonCodes,
+    exclusions: exclusionSummary,
+    slices: idleValueUsd && idleValueUsd > 0
+      ? [{
+          dimension: "idle",
+          label: "Idle assets",
+          valueUsd: idleValueUsd,
+          coverageStatus,
+        }]
+      : [],
+  };
+
+  await upsertOverviewFreshness({
+    walletAddress: input.walletAddress,
+    chainId: input.chainId,
+    lastAnalyzedAt: freshness?.lastAnalyzedAt ?? null,
+    lastSuccessfulRunId: freshness?.lastSuccessfulRunId ?? null,
+    metadataJson: {
+      ...(freshness?.metadataJson ?? {}),
+      lastOverviewRefreshedAt: now.toISOString(),
+      lastOverviewRange: input.range,
+    },
+  });
+
+  return response;
+}
+
 type MoralisHistoryRecord = Record<string, unknown>;
 function asString(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
@@ -232,29 +804,40 @@ function buildChartPoints(
     deployedValueUsd: number | null;
     idleValueUsd: number | null;
   }>,
+  estimatedDeployedValueByBucket: Map<string, number | null>,
   hasProtocolPositions: boolean,
+  hasPartialProtocolHistory: boolean,
 ) {
-  let hasPartialHistory = false;
+  let hasPartialHistory = hasPartialProtocolHistory;
 
   const points: OverviewChartPoint[] = bucketTimestamps.map((bucketTimestamp) => {
     const snapshotPoint = snapshotValuesByBucket.get(bucketTimestamp);
     if (snapshotPoint) {
+      const estimatedDeployedValueUsd = estimatedDeployedValueByBucket.get(bucketTimestamp) ?? null;
+      const shouldMergeDeployedValue = snapshotPoint.deployedValueUsd === null && estimatedDeployedValueUsd !== null;
+      const deployedValueUsd = shouldMergeDeployedValue
+        ? estimatedDeployedValueUsd
+        : snapshotPoint.deployedValueUsd;
       const totalValueUsd =
-        snapshotPoint.totalValueUsd ??
-        (snapshotPoint.idleValueUsd === null && snapshotPoint.deployedValueUsd === null
-          ? null
-          : (snapshotPoint.idleValueUsd ?? 0) + (snapshotPoint.deployedValueUsd ?? 0));
+        shouldMergeDeployedValue
+          ? (snapshotPoint.idleValueUsd === null && deployedValueUsd === null
+              ? null
+              : (snapshotPoint.idleValueUsd ?? 0) + (deployedValueUsd ?? 0))
+          : snapshotPoint.totalValueUsd ??
+            (snapshotPoint.idleValueUsd === null && deployedValueUsd === null
+              ? null
+              : (snapshotPoint.idleValueUsd ?? 0) + (deployedValueUsd ?? 0));
 
       return {
         capturedAt: bucketTimestamp,
         totalValueUsd,
-        deployedValueUsd: snapshotPoint.deployedValueUsd,
+        deployedValueUsd,
         idleValueUsd: snapshotPoint.idleValueUsd,
         rewardValueUsd: null,
       };
     }
 
-    if (hasProtocolPositions) {
+    if (hasProtocolPositions && !estimatedDeployedValueByBucket.has(bucketTimestamp)) {
       hasPartialHistory = true;
     }
 
@@ -274,10 +857,16 @@ function buildChartPoints(
       hasIdleValue = true;
     }
 
+    const estimatedDeployedValueUsd = estimatedDeployedValueByBucket.get(bucketTimestamp) ?? null;
+    const totalValueUsd =
+      !hasIdleValue && estimatedDeployedValueUsd === null
+        ? null
+        : (hasIdleValue ? idleValueUsd : 0) + (estimatedDeployedValueUsd ?? 0);
+
     return {
       capturedAt: bucketTimestamp,
-      totalValueUsd: hasIdleValue ? idleValueUsd : null,
-      deployedValueUsd: null,
+      totalValueUsd,
+      deployedValueUsd: estimatedDeployedValueUsd,
       idleValueUsd: hasIdleValue ? idleValueUsd : null,
       rewardValueUsd: null,
     };
@@ -333,12 +922,14 @@ function toBucketTimestamp(timestamp: string, granularity: "hour" | "day") {
 }
 
 function buildSnapshotValueLookup(input: {
+  range: OverviewRange;
   granularity: "hour" | "day";
   snapshotRows: Array<{
     capturedAt: Date;
     totalValueUsd: string;
     deployedValueUsd: string | null;
     idleValueUsd: string | null;
+    metadataJson: Record<string, unknown>;
   }>;
   currentPoint: {
     capturedAt: Date;
@@ -347,19 +938,47 @@ function buildSnapshotValueLookup(input: {
     idleValueUsd: number | null;
   };
 }) {
-  const snapshotValuesByBucket = new Map<string, {
+  const snapshotCandidatesByBucket = new Map<string, {
     totalValueUsd: number | null;
     deployedValueUsd: number | null;
     idleValueUsd: number | null;
+    score: number;
+    capturedAtMs: number;
   }>();
 
   for (const row of input.snapshotRows) {
+    const totalValueUsd = asNumber(row.totalValueUsd);
+    const deployedValueUsd = asNumber(row.deployedValueUsd);
+    const idleValueUsd = asNumber(row.idleValueUsd);
+
+    if (totalValueUsd === null && deployedValueUsd === null && idleValueUsd === null) {
+      continue;
+    }
+
     const bucketTimestamp = toBucketTimestamp(row.capturedAt.toISOString(), input.granularity);
-    snapshotValuesByBucket.set(bucketTimestamp, {
-      totalValueUsd: asNumber(row.totalValueUsd),
-      deployedValueUsd: asNumber(row.deployedValueUsd),
-      idleValueUsd: asNumber(row.idleValueUsd),
-    });
+    const metadataJson = row.metadataJson ?? {};
+    const score =
+      (metadataJson.snapshotKind === "range_bucket" ? 8 : 0) +
+      (metadataJson.range === input.range ? 4 : 0) +
+      (row.deployedValueUsd !== null ? 3 : 0) +
+      (row.idleValueUsd !== null ? 2 : 0) +
+      (row.totalValueUsd !== null ? 1 : 0);
+    const nextCandidate = {
+      totalValueUsd,
+      deployedValueUsd,
+      idleValueUsd,
+      score,
+      capturedAtMs: row.capturedAt.getTime(),
+    };
+    const existingCandidate = snapshotCandidatesByBucket.get(bucketTimestamp);
+
+    if (
+      !existingCandidate ||
+      nextCandidate.score > existingCandidate.score ||
+      (nextCandidate.score === existingCandidate.score && nextCandidate.capturedAtMs > existingCandidate.capturedAtMs)
+    ) {
+      snapshotCandidatesByBucket.set(bucketTimestamp, nextCandidate);
+    }
   }
 
   const currentBucketTimestamp = toBucketTimestamp(
@@ -367,13 +986,525 @@ function buildSnapshotValueLookup(input: {
     input.granularity,
   );
 
-  snapshotValuesByBucket.set(currentBucketTimestamp, {
+  snapshotCandidatesByBucket.set(currentBucketTimestamp, {
     totalValueUsd: input.currentPoint.totalValueUsd,
     deployedValueUsd: input.currentPoint.deployedValueUsd,
     idleValueUsd: input.currentPoint.idleValueUsd,
+    score: Number.MAX_SAFE_INTEGER,
+    capturedAtMs: input.currentPoint.capturedAt.getTime(),
   });
 
+  const snapshotValuesByBucket = new Map<string, {
+    totalValueUsd: number | null;
+    deployedValueUsd: number | null;
+    idleValueUsd: number | null;
+  }>();
+
+  for (const [bucketTimestamp, candidate] of snapshotCandidatesByBucket.entries()) {
+    snapshotValuesByBucket.set(bucketTimestamp, {
+      totalValueUsd: candidate.totalValueUsd,
+      deployedValueUsd: candidate.deployedValueUsd,
+      idleValueUsd: candidate.idleValueUsd,
+    });
+  }
+
   return snapshotValuesByBucket;
+}
+
+function fillMissingBucketPrices(
+  bucketTimestamps: string[],
+  priceSeriesByBucket: Map<string, number>,
+  fallbackPriceUsd: number | null,
+) {
+  let lastSeenPriceUsd: number | null = null;
+
+  for (const bucketTimestamp of bucketTimestamps) {
+    const nextPriceUsd = priceSeriesByBucket.get(bucketTimestamp);
+    if (nextPriceUsd !== undefined) {
+      lastSeenPriceUsd = nextPriceUsd;
+      continue;
+    }
+
+    if (lastSeenPriceUsd !== null) {
+      priceSeriesByBucket.set(bucketTimestamp, lastSeenPriceUsd);
+    }
+  }
+
+  let nextSeenPriceUsd: number | null = null;
+  for (const bucketTimestamp of [...bucketTimestamps].reverse()) {
+    const previousPriceUsd = priceSeriesByBucket.get(bucketTimestamp);
+    if (previousPriceUsd !== undefined) {
+      nextSeenPriceUsd = previousPriceUsd;
+      continue;
+    }
+
+    if (nextSeenPriceUsd !== null) {
+      priceSeriesByBucket.set(bucketTimestamp, nextSeenPriceUsd);
+      continue;
+    }
+
+    if (fallbackPriceUsd !== null) {
+      priceSeriesByBucket.set(bucketTimestamp, fallbackPriceUsd);
+    }
+  }
+}
+
+async function hydrateCurrentPriceLookup(input: {
+  walletAddress: string;
+  chainId: number;
+  addresses: string[];
+  now: Date;
+  priceLookup: Map<string, { priceUsd: number; pricedAt: string | null; confidence: "high" | "medium" }>;
+}) {
+  const normalizedAddresses = Array.from(
+    new Set(
+      input.addresses
+        .map((address) => address.toLowerCase())
+        .filter((address) => address.length > 0),
+    ),
+  );
+
+  if (normalizedAddresses.length === 0) {
+    return false;
+  }
+
+  const cachedPricePoints = await readLatestOverviewPricePoints({
+    chainId: input.chainId,
+    tokenAddresses: normalizedAddresses,
+  });
+  const staleFallbackPriceLookup = new Map<string, { priceUsd: number; pricedAt: string | null; confidence: "high" | "medium" }>();
+
+  for (const cachedPricePoint of cachedPricePoints) {
+    const address = cachedPricePoint.tokenAddress.toLowerCase();
+    const priceUsd = Number(cachedPricePoint.priceUsd);
+    if (!Number.isFinite(priceUsd)) {
+      continue;
+    }
+
+    const cachedEntry = {
+      priceUsd,
+      pricedAt: cachedPricePoint.pricedAt.toISOString(),
+      confidence: cachedPricePoint.confidence === "high" ? "high" as const : "medium" as const,
+    };
+    const ageMs = Math.max(0, input.now.getTime() - cachedPricePoint.pricedAt.getTime());
+
+    if (ageMs <= CURRENT_PRICE_CACHE_TTL_MS) {
+      input.priceLookup.set(address, cachedEntry);
+    } else {
+      staleFallbackPriceLookup.set(address, {
+        ...cachedEntry,
+        confidence: "medium",
+      });
+    }
+  }
+
+  const missingAddresses = normalizedAddresses.filter((address) => !input.priceLookup.has(address));
+  if (missingAddresses.length === 0) {
+    return false;
+  }
+
+  const boundedMissingAddresses = missingAddresses.slice(0, MAX_ALCHEMY_CURRENT_PRICE_ADDRESSES_PER_REQUEST);
+  const skippedAddresses = new Set(missingAddresses.slice(boundedMissingAddresses.length));
+  let priceFetchFailed = skippedAddresses.size > 0;
+
+  if (boundedMissingAddresses.length > 0) {
+    try {
+      const prices = await getCurrentTokenPricesByAddress(input.chainId, boundedMissingAddresses);
+      await insertOverviewRawProviderRecord({
+        walletAddress: input.walletAddress,
+        chainId: input.chainId,
+        provider: "alchemy",
+        endpoint: "/prices/v1/tokens/by-address",
+        requestJson: {
+          chainId: input.chainId,
+          addresses: boundedMissingAddresses,
+          maxAddressesPerRequest: MAX_ALCHEMY_CURRENT_PRICE_ADDRESSES_PER_REQUEST,
+          skippedAddressCount: skippedAddresses.size,
+        },
+        responseJson: { resultCount: prices.data?.length ?? 0 },
+      });
+
+      for (const item of prices.data ?? []) {
+        const address = item.address.toLowerCase();
+        const usdPrice = item.prices?.find((price) => price.currency === "usd") ?? item.prices?.[0];
+        const priceUsd = usdPrice ? Number(usdPrice.value) : NaN;
+        if (!Number.isFinite(priceUsd)) {
+          continue;
+        }
+
+        input.priceLookup.set(address, {
+          priceUsd,
+          pricedAt: usdPrice?.lastUpdatedAt ?? null,
+          confidence: "high",
+        });
+
+        await upsertOverviewPricePoint({
+          walletAddress: input.walletAddress,
+          chainId: input.chainId,
+          tokenAddress: address,
+          pricedAt: usdPrice?.lastUpdatedAt ? new Date(usdPrice.lastUpdatedAt) : input.now,
+          priceUsd: String(priceUsd),
+          metadataJson: { provider: "alchemy" },
+        });
+      }
+    } catch {
+      priceFetchFailed = true;
+    }
+  }
+
+  for (const address of missingAddresses) {
+    if (input.priceLookup.has(address)) {
+      continue;
+    }
+
+    const staleFallbackEntry = staleFallbackPriceLookup.get(address);
+    if (staleFallbackEntry) {
+      input.priceLookup.set(address, staleFallbackEntry);
+    }
+  }
+
+  return priceFetchFailed || missingAddresses.some((address) => !input.priceLookup.has(address));
+}
+
+async function hydrateHistoricalPriceLookup(input: {
+  walletAddress: string;
+  chainId: number;
+  range: OverviewRange;
+  bucketTimestamps: string[];
+  granularity: "hour" | "day";
+  addresses: string[];
+  historicalPriceLookup: Map<string, Map<string, number>>;
+  latestHistoricalPriceLookup: Map<string, { priceUsd: number; pricedAt: string | null }>;
+  currentPriceLookup: Map<string, { priceUsd: number; pricedAt: string | null; confidence: "high" | "medium" }>;
+}) {
+  const normalizedAddresses = Array.from(
+    new Set(
+      input.addresses
+        .map((address) => address.toLowerCase())
+        .filter((address) => address.length > 0)
+        .filter((address) => !input.historicalPriceLookup.has(address)),
+    ),
+  );
+
+  if (normalizedAddresses.length === 0) {
+    return false;
+  }
+
+  const startTime = input.bucketTimestamps[0] ?? new Date().toISOString();
+  const endTime = input.bucketTimestamps[input.bucketTimestamps.length - 1] ?? new Date().toISOString();
+  const resolution = input.granularity === "hour" ? "1h" : "1d";
+  const cachedPriceRows = await readOverviewPricePointsInRange({
+    chainId: input.chainId,
+    tokenAddresses: normalizedAddresses,
+    startAt: new Date(startTime),
+    endAt: new Date(endTime),
+    resolution,
+  });
+  const cachedRowsByAddress = new Map<string, typeof cachedPriceRows>();
+
+  for (const cachedPriceRow of cachedPriceRows) {
+    const address = cachedPriceRow.tokenAddress.toLowerCase();
+    const existingRows = cachedRowsByAddress.get(address);
+    if (existingRows) {
+      existingRows.push(cachedPriceRow);
+      continue;
+    }
+
+    cachedRowsByAddress.set(address, [cachedPriceRow]);
+  }
+
+  const addressesNeedingRemoteLookup: string[] = [];
+
+  for (const address of normalizedAddresses) {
+    const priceSeriesByBucket = new Map<string, number>();
+    let latestHistoricalPoint: { priceUsd: number; pricedAt: string | null } | null = null;
+
+    for (const cachedPriceRow of cachedRowsByAddress.get(address) ?? []) {
+      const priceUsd = Number(cachedPriceRow.priceUsd);
+      if (!Number.isFinite(priceUsd)) {
+        continue;
+      }
+
+      if (
+        !latestHistoricalPoint ||
+        cachedPriceRow.pricedAt.getTime() > new Date(latestHistoricalPoint.pricedAt ?? 0).getTime()
+      ) {
+        latestHistoricalPoint = {
+          priceUsd,
+          pricedAt: cachedPriceRow.pricedAt.toISOString(),
+        };
+      }
+
+      const bucketTimestamp = toBucketTimestamp(cachedPriceRow.pricedAt.toISOString(), input.granularity);
+      if (!priceSeriesByBucket.has(bucketTimestamp)) {
+        priceSeriesByBucket.set(bucketTimestamp, priceUsd);
+      }
+    }
+
+    fillMissingBucketPrices(
+      input.bucketTimestamps,
+      priceSeriesByBucket,
+      latestHistoricalPoint?.priceUsd ?? input.currentPriceLookup.get(address)?.priceUsd ?? null,
+    );
+
+    if (priceSeriesByBucket.size > 0) {
+      input.historicalPriceLookup.set(address, priceSeriesByBucket);
+
+      if (latestHistoricalPoint) {
+        input.latestHistoricalPriceLookup.set(address, latestHistoricalPoint);
+      }
+
+      continue;
+    }
+
+    const currentPriceFallback = input.currentPriceLookup.get(address);
+    if (currentPriceFallback) {
+      for (const bucketTimestamp of input.bucketTimestamps) {
+        priceSeriesByBucket.set(bucketTimestamp, currentPriceFallback.priceUsd);
+      }
+
+      input.historicalPriceLookup.set(address, priceSeriesByBucket);
+      input.latestHistoricalPriceLookup.set(address, {
+        priceUsd: currentPriceFallback.priceUsd,
+        pricedAt: currentPriceFallback.pricedAt,
+      });
+      continue;
+    }
+
+    addressesNeedingRemoteLookup.push(address);
+  }
+
+  if (addressesNeedingRemoteLookup.length === 0) {
+    return false;
+  }
+
+  const boundedAddresses = addressesNeedingRemoteLookup.slice(0, MAX_ALCHEMY_HISTORICAL_ADDRESSES_PER_REQUEST);
+  const skippedAddressCount = addressesNeedingRemoteLookup.length - boundedAddresses.length;
+  const historicalPriceResults: PromiseSettledResult<void>[] = [];
+
+  for (let batchStart = 0; batchStart < boundedAddresses.length; batchStart += HISTORICAL_PRICE_BATCH_SIZE) {
+    const batchAddresses = boundedAddresses.slice(batchStart, batchStart + HISTORICAL_PRICE_BATCH_SIZE);
+    const batchResults = await Promise.allSettled(
+      batchAddresses.map(async (address) => {
+        const priceSeriesByBucket = new Map<string, number>();
+        let latestHistoricalPoint: { priceUsd: number; pricedAt: string | null } | null = null;
+
+        try {
+          const historicalPrices = await getHistoricalTokenPricesByAddress(input.chainId, {
+            address,
+            startTime,
+            endTime,
+            interval: resolution,
+          });
+
+          await insertOverviewRawProviderRecord({
+            walletAddress: input.walletAddress,
+            chainId: input.chainId,
+            provider: "alchemy",
+            endpoint: "/prices/v1/tokens/historical",
+            requestJson: {
+              chainId: input.chainId,
+              address,
+              startTime,
+              endTime,
+              interval: resolution,
+              range: input.range,
+              maxAddressesPerRequest: MAX_ALCHEMY_HISTORICAL_ADDRESSES_PER_REQUEST,
+              skippedAddressCount,
+            },
+            responseJson: { resultCount: historicalPrices.data?.length ?? 0 },
+          });
+
+          for (const pricePoint of historicalPrices.data ?? []) {
+            const priceUsd = Number(pricePoint.value);
+            if (!Number.isFinite(priceUsd)) {
+              continue;
+            }
+
+            if (
+              !latestHistoricalPoint ||
+              new Date(pricePoint.timestamp).getTime() > new Date(latestHistoricalPoint.pricedAt ?? 0).getTime()
+            ) {
+              latestHistoricalPoint = {
+                priceUsd,
+                pricedAt: pricePoint.timestamp,
+              };
+            }
+
+            const bucketTimestamp = toBucketTimestamp(pricePoint.timestamp, input.granularity);
+            priceSeriesByBucket.set(bucketTimestamp, priceUsd);
+
+            await upsertOverviewPricePoint({
+              walletAddress: input.walletAddress,
+              chainId: input.chainId,
+              tokenAddress: address,
+              pricedAt: new Date(pricePoint.timestamp),
+              priceUsd: String(priceUsd),
+              resolution,
+              metadataJson: {
+                provider: "alchemy",
+                range: input.range,
+              },
+            });
+          }
+        } catch (error) {
+          const fallbackPriceEntry = input.currentPriceLookup.get(address);
+          if (!fallbackPriceEntry) {
+            throw error;
+          }
+
+          latestHistoricalPoint = {
+            priceUsd: fallbackPriceEntry.priceUsd,
+            pricedAt: fallbackPriceEntry.pricedAt,
+          };
+        }
+
+        if (priceSeriesByBucket.size === 0 && latestHistoricalPoint) {
+          for (const bucketTimestamp of input.bucketTimestamps) {
+            priceSeriesByBucket.set(bucketTimestamp, latestHistoricalPoint.priceUsd);
+          }
+        }
+
+        fillMissingBucketPrices(
+          input.bucketTimestamps,
+          priceSeriesByBucket,
+          latestHistoricalPoint?.priceUsd ?? input.currentPriceLookup.get(address)?.priceUsd ?? null,
+        );
+
+        input.historicalPriceLookup.set(address, priceSeriesByBucket);
+
+        if (latestHistoricalPoint) {
+          input.latestHistoricalPriceLookup.set(address, latestHistoricalPoint);
+        }
+      }),
+    );
+
+    historicalPriceResults.push(...batchResults);
+  }
+
+  return skippedAddressCount > 0 || historicalPriceResults.some((result) => result.status === "rejected");
+}
+
+function buildHistoricalProtocolValueLookup(input: {
+  bucketTimestamps: string[];
+  seriesByToken: Map<string, Map<string, number>>;
+  protocolRows: OverviewResponse["protocolPositions"]["rows"];
+  manualArtifacts: {
+    positions: Array<{
+      tokenId: string;
+      token0Address: string;
+      token1Address: string;
+    }>;
+  } | null;
+  mellowArtifacts: {
+    wrappers: Array<{
+      wrapperAddress: string;
+      token0Address: string;
+      token1Address: string;
+    }>;
+  } | null;
+}) {
+  const estimatedDeployedValueByBucket = new Map<string, number | null>();
+  const manualArtifactByTokenId = new Map(
+    (input.manualArtifacts?.positions ?? []).map((position) => [position.tokenId, position] as const),
+  );
+  const mellowArtifactByWrapperAddress = new Map(
+    (input.mellowArtifacts?.wrappers ?? []).map((wrapper) => [wrapper.wrapperAddress.toLowerCase(), wrapper] as const),
+  );
+  const pricedComponents: Array<{
+    token0Address: string;
+    token1Address: string;
+    token0Amount: number | null;
+    token1Amount: number | null;
+  }> = [];
+  let hasPartialHistory = false;
+
+  for (const row of input.protocolRows) {
+    if (row.family === "governance_lock") {
+      hasPartialHistory = true;
+      continue;
+    }
+
+    if (row.family === "manual_deposit" || row.family === "staked_lp") {
+      if (!row.tokenId) {
+        hasPartialHistory = true;
+        continue;
+      }
+
+      const artifact = manualArtifactByTokenId.get(row.tokenId);
+      if (!artifact) {
+        hasPartialHistory = true;
+        continue;
+      }
+
+      pricedComponents.push({
+        token0Address: artifact.token0Address.toLowerCase(),
+        token1Address: artifact.token1Address.toLowerCase(),
+        token0Amount: row.primaryTokenAmount,
+        token1Amount: row.secondaryTokenAmount,
+      });
+      continue;
+    }
+
+    if (row.family === "strategy_exposure") {
+      const wrapperAddress = row.metadata.wrapperAddress?.toLowerCase() ?? null;
+      if (!wrapperAddress) {
+        hasPartialHistory = true;
+        continue;
+      }
+
+      const artifact = mellowArtifactByWrapperAddress.get(wrapperAddress);
+      if (!artifact) {
+        hasPartialHistory = true;
+        continue;
+      }
+
+      pricedComponents.push({
+        token0Address: artifact.token0Address.toLowerCase(),
+        token1Address: artifact.token1Address.toLowerCase(),
+        token0Amount: row.primaryTokenAmount,
+        token1Amount: row.secondaryTokenAmount,
+      });
+    }
+  }
+
+  for (const bucketTimestamp of input.bucketTimestamps) {
+    let deployedValueUsd = 0;
+    let hasAnyValue = false;
+
+    for (const component of pricedComponents) {
+      if (component.token0Amount !== null) {
+        const price0 = input.seriesByToken.get(component.token0Address)?.get(bucketTimestamp);
+        if (price0 === undefined) {
+          hasPartialHistory = true;
+        } else {
+          deployedValueUsd += component.token0Amount * price0;
+          hasAnyValue = true;
+        }
+      } else {
+        hasPartialHistory = true;
+      }
+
+      if (component.token1Amount !== null) {
+        const price1 = input.seriesByToken.get(component.token1Address)?.get(bucketTimestamp);
+        if (price1 === undefined) {
+          hasPartialHistory = true;
+        } else {
+          deployedValueUsd += component.token1Amount * price1;
+          hasAnyValue = true;
+        }
+      } else {
+        hasPartialHistory = true;
+      }
+    }
+
+    estimatedDeployedValueByBucket.set(bucketTimestamp, hasAnyValue ? deployedValueUsd : null);
+  }
+
+  return {
+    estimatedDeployedValueByBucket,
+    hasPartialHistory,
+  };
 }
 
 function calculatePercentChange(currentValue: number | null, previousValue: number | null) {
@@ -459,6 +1590,20 @@ function toOverviewCoverageStatus(
   }
 
   return status;
+}
+
+function toRequiredOverviewCoverageStatus(
+  status: OverviewResponse["protocolPositions"]["coverageStatus"],
+): OverviewResponse["coverage"]["status"] {
+  if (status === "full") {
+    return "recent";
+  }
+
+  if (status === "partial") {
+    return "partial";
+  }
+
+  return "unknown";
 }
 
 function buildHiddenAssetReasonCodes(rows: TrustHydratedAssetRow[]): OverviewTrustCoverageReasonCode[] {
@@ -553,6 +1698,144 @@ function buildCoverageReasonCodes(
   }
 
   return Array.from(new Set(reasonCodes));
+}
+
+function buildProviderPartialReasonCodes(
+  existingReasonCodes: OverviewCoverageReasonCode[] | null | undefined,
+): OverviewCoverageReasonCode[] {
+  return Array.from(new Set([...(existingReasonCodes ?? []), "analysisPending", "providerPartial"]));
+}
+
+function isProviderRequestFailed(error: unknown) {
+  return error instanceof Error && error.message.startsWith("PROVIDER_REQUEST_FAILED");
+}
+
+async function getRecentOverviewChartFallback(input: OverviewRequest): Promise<OverviewResponse> {
+  const response = await getRecentOverviewShell(input);
+  const now = new Date();
+  const bucketConfig = getRecentOverviewBucketConfig(input.range);
+  const bucketTimestamps = buildBucketTimestamps(input.range, now);
+  const historicalSnapshotRows = await readOverviewPortfolioSnapshots({
+    walletAddress: input.walletAddress,
+    chainId: input.chainId,
+    startAt: new Date(bucketTimestamps[0] ?? now.toISOString()),
+    endAt: now,
+  });
+  const coverageReasonCodes = buildProviderPartialReasonCodes(response.coverage.reasonCodes);
+  const snapshotValuesByBucket = buildSnapshotValueLookup({
+    range: input.range,
+    granularity: bucketConfig.granularity,
+    snapshotRows: historicalSnapshotRows,
+    currentPoint: {
+      capturedAt: now,
+      totalValueUsd: response.metrics.netPortfolioValueUsd,
+      deployedValueUsd: response.metrics.deployedValueUsd,
+      idleValueUsd: response.metrics.idleValueUsd,
+    },
+  });
+  const chartPoints: OverviewChartPoint[] = bucketTimestamps.map((bucketTimestamp) => {
+    const snapshot = snapshotValuesByBucket.get(bucketTimestamp);
+
+    return {
+      capturedAt: bucketTimestamp,
+      totalValueUsd: snapshot?.totalValueUsd ?? null,
+      deployedValueUsd: snapshot?.deployedValueUsd ?? null,
+      idleValueUsd: snapshot?.idleValueUsd ?? null,
+      rewardValueUsd: null,
+    };
+  });
+  const hasChartValues = chartPoints.some((point) =>
+    point.totalValueUsd !== null || point.deployedValueUsd !== null || point.idleValueUsd !== null,
+  );
+  const distributionSlices: OverviewResponse["distribution"]["slices"] = [];
+
+  if (response.metrics.idleValueUsd && response.metrics.idleValueUsd > 0) {
+    distributionSlices.push({
+      dimension: "idle",
+      label: "Idle assets",
+      valueUsd: response.metrics.idleValueUsd,
+      coverageStatus: "partial",
+    });
+  }
+
+  if (response.metrics.deployedValueUsd && response.metrics.deployedValueUsd > 0) {
+    distributionSlices.push({
+      dimension: "strategy",
+      label: "Deployed positions",
+      valueUsd: response.metrics.deployedValueUsd,
+      coverageStatus: "partial",
+    });
+  }
+
+  response.coverage = {
+    ...response.coverage,
+    status: "partial",
+    confidence: "medium",
+    reasonCodes: coverageReasonCodes,
+  };
+  response.summary = {
+    ...response.summary,
+    coverageStatus: "partial",
+    coverageReasonCodes,
+    lastRefreshedAt: response.summary.lastRefreshedAt,
+  };
+  response.metrics = {
+    ...response.metrics,
+    coverageStatus: "partial",
+    coverageReasonCodes,
+  };
+  response.chart = {
+    ...response.chart,
+    source: "partial_fallback",
+    coverageStatus: "partial",
+    coverageReasonCodes,
+    range: input.range,
+    points: hasChartValues ? chartPoints : [],
+  };
+  response.distribution = {
+    ...response.distribution,
+    source: "partial_fallback",
+    coverageStatus: "partial",
+    coverageReasonCodes,
+    slices: distributionSlices,
+  };
+
+  return response;
+}
+
+async function getRecentOverviewCurrentStateFallback(input: OverviewRequest): Promise<OverviewResponse> {
+  const response = await getRecentOverviewShell(input);
+  const coverageReasonCodes = buildProviderPartialReasonCodes(response.coverage.reasonCodes);
+
+  response.coverage = {
+    ...response.coverage,
+    status: "partial",
+    confidence: "medium",
+    reasonCodes: coverageReasonCodes,
+  };
+  response.summary = {
+    ...response.summary,
+    coverageStatus: "partial",
+    coverageReasonCodes,
+    lastRefreshedAt: response.summary.lastRefreshedAt,
+  };
+  response.metrics = {
+    ...response.metrics,
+    coverageStatus: "partial",
+    coverageReasonCodes,
+    exclusions: null,
+  };
+  response.assets = {
+    ...response.assets,
+    source: "partial_fallback",
+    coverageStatus: "partial",
+    coverageReasonCodes,
+    rows: [],
+    hiddenSummary: null,
+    defaultVisibleCount: 0,
+  };
+
+  return response;
 }
 
 function resolveAlchemyPricingAddress(
@@ -658,29 +1941,7 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
   }
 
   const now = new Date();
-  const priorAnalyzedAt = freshness?.lastAnalyzedAt ?? latestRun?.completedAt ?? null;
-  const analysisStatus = latestRun?.status === "queued" || latestRun?.status === "running"
-    ? latestRun.status
-    : latestRun?.status === "failed"
-      ? "failed"
-      : isStale(priorAnalyzedAt)
-        ? "stale"
-        : priorAnalyzedAt
-          ? "ready"
-          : "not_analyzed";
-
-  response.analysis = {
-    status: analysisStatus,
-    runId: latestRun?.id ?? freshness?.lastSuccessfulRunId ?? null,
-    stage:
-      latestRun?.stage ??
-      (analysisStatus === "ready" || analysisStatus === "stale" ? "completed" : "idle"),
-    progressPct:
-      latestRun?.progressPct ?? (analysisStatus === "ready" || analysisStatus === "stale" ? 100 : 0),
-    lastSuccessfulRunAt: priorAnalyzedAt ? priorAnalyzedAt.toISOString() : null,
-    lastUpdatedAt: latestRun?.updatedAt ? latestRun.updatedAt.toISOString() : null,
-    lastError: latestRun?.lastError ?? null,
-  };
+  response.analysis = createOverviewAnalysisState({ latestRun, freshness });
 
   const tokens = tokensResult.status === "fulfilled" ? (tokensResult.value.result ?? []) : [];
   const history = historyResult.status === "fulfilled" ? (historyResult.value.result ?? []) : [];
@@ -770,46 +2031,13 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
   const latestHistoricalPriceLookup = new Map<string, { priceUsd: number; pricedAt: string | null }>();
   let priceFetchFailed = false;
   let historicalPriceFetchFailed = false;
-
-  if (uniqueTokenAddresses.length > 0) {
-    try {
-      const prices = await getCurrentTokenPricesByAddress(input.chainId, uniqueTokenAddresses);
-      await insertOverviewRawProviderRecord({
-        walletAddress: input.walletAddress,
-        chainId: input.chainId,
-        provider: "alchemy",
-        endpoint: "/prices/v1/tokens/by-address",
-        requestJson: { chainId: input.chainId, addresses: uniqueTokenAddresses },
-        responseJson: { resultCount: prices.data?.length ?? 0 },
-      });
-
-      for (const item of prices.data ?? []) {
-        const address = item.address.toLowerCase();
-        const usdPrice = item.prices?.find((price) => price.currency === "usd") ?? item.prices?.[0];
-        const priceUsd = usdPrice ? Number(usdPrice.value) : NaN;
-        if (!Number.isFinite(priceUsd)) {
-          continue;
-        }
-
-        priceLookup.set(address, {
-          priceUsd,
-          pricedAt: usdPrice?.lastUpdatedAt ?? null,
-          confidence: "high",
-        });
-
-        await upsertOverviewPricePoint({
-          walletAddress: input.walletAddress,
-          chainId: input.chainId,
-          tokenAddress: address,
-          pricedAt: usdPrice?.lastUpdatedAt ? new Date(usdPrice.lastUpdatedAt) : now,
-          priceUsd: String(priceUsd),
-          metadataJson: { provider: "alchemy" },
-        });
-      }
-    } catch {
-      priceFetchFailed = true;
-    }
-  }
+  priceFetchFailed = await hydrateCurrentPriceLookup({
+    walletAddress: input.walletAddress,
+    chainId: input.chainId,
+    addresses: uniqueTokenAddresses,
+    now,
+    priceLookup,
+  });
 
   const bucketConfig = getRecentOverviewBucketConfig(input.range);
   const bucketTimestamps = buildBucketTimestamps(input.range, now);
@@ -820,84 +2048,17 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
     endAt: now,
   });
 
-  if (uniqueTokenAddresses.length > 0) {
-    const historicalPriceResults: PromiseSettledResult<void>[] = [];
-
-    for (let batchStart = 0; batchStart < uniqueTokenAddresses.length; batchStart += HISTORICAL_PRICE_BATCH_SIZE) {
-      const batchAddresses = uniqueTokenAddresses.slice(batchStart, batchStart + HISTORICAL_PRICE_BATCH_SIZE);
-      const batchResults = await Promise.allSettled(
-        batchAddresses.map(async (address) => {
-        const historicalPrices = await getHistoricalTokenPricesByAddress(input.chainId, {
-          address,
-          startTime: bucketTimestamps[0] ?? now.toISOString(),
-          endTime: bucketTimestamps[bucketTimestamps.length - 1] ?? now.toISOString(),
-          interval: bucketConfig.granularity === "hour" ? "1h" : "1d",
-        });
-
-        await insertOverviewRawProviderRecord({
-          walletAddress: input.walletAddress,
-          chainId: input.chainId,
-          provider: "alchemy",
-          endpoint: "/prices/v1/tokens/historical",
-          requestJson: {
-            chainId: input.chainId,
-            address,
-            startTime: bucketTimestamps[0] ?? now.toISOString(),
-            endTime: bucketTimestamps[bucketTimestamps.length - 1] ?? now.toISOString(),
-            interval: bucketConfig.granularity === "hour" ? "1h" : "1d",
-          },
-          responseJson: { resultCount: historicalPrices.data?.length ?? 0 },
-        });
-
-        const priceSeriesByBucket = new Map<string, number>();
-        let latestHistoricalPoint: { priceUsd: number; pricedAt: string | null } | null = null;
-
-        for (const pricePoint of historicalPrices.data ?? []) {
-          const priceUsd = Number(pricePoint.value);
-          if (!Number.isFinite(priceUsd)) {
-            continue;
-          }
-
-          if (
-            !latestHistoricalPoint ||
-            new Date(pricePoint.timestamp).getTime() > new Date(latestHistoricalPoint.pricedAt ?? 0).getTime()
-          ) {
-            latestHistoricalPoint = {
-              priceUsd,
-              pricedAt: pricePoint.timestamp,
-            };
-          }
-
-          const bucketTimestamp = toBucketTimestamp(pricePoint.timestamp, bucketConfig.granularity);
-          priceSeriesByBucket.set(bucketTimestamp, priceUsd);
-
-          await upsertOverviewPricePoint({
-            walletAddress: input.walletAddress,
-            chainId: input.chainId,
-            tokenAddress: address,
-            pricedAt: new Date(pricePoint.timestamp),
-            priceUsd: String(priceUsd),
-            resolution: bucketConfig.granularity === "hour" ? "1h" : "1d",
-            metadataJson: {
-              provider: "alchemy",
-              range: input.range,
-            },
-          });
-        }
-
-        historicalPriceLookup.set(address, priceSeriesByBucket);
-
-        if (latestHistoricalPoint) {
-          latestHistoricalPriceLookup.set(address, latestHistoricalPoint);
-        }
-        }),
-      );
-
-      historicalPriceResults.push(...batchResults);
-    }
-
-    historicalPriceFetchFailed = historicalPriceResults.some((result) => result.status === "rejected");
-  }
+  historicalPriceFetchFailed = await hydrateHistoricalPriceLookup({
+    walletAddress: input.walletAddress,
+    chainId: input.chainId,
+    range: input.range,
+    bucketTimestamps,
+    granularity: bucketConfig.granularity,
+    addresses: uniqueTokenAddresses,
+    historicalPriceLookup,
+    latestHistoricalPriceLookup,
+    currentPriceLookup: priceLookup,
+  });
 
   const hydratedAssetRows = tokenPricingContexts.map((context) => {
     const decimals = asNumber(context.token.decimals);
@@ -1044,7 +2205,52 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
       ? null
       : (idleValueUsd ?? 0) + (deployedValueUsd ?? 0);
 
+  const protocolPriceAddresses = Array.from(
+    new Set(
+      [
+        ...(protocolPositions.artifacts.manualCurrentState?.priceAddresses ?? []),
+        ...(protocolPositions.artifacts.mellowCurrentState?.priceAddresses ?? []),
+      ].map((address) => address.toLowerCase()),
+    ),
+  );
+  const missingCurrentProtocolPriceAddresses = protocolPriceAddresses.filter(
+    (address) => !priceLookup.has(address),
+  );
+
+  if (missingCurrentProtocolPriceAddresses.length > 0) {
+    priceFetchFailed =
+      (await hydrateCurrentPriceLookup({
+        walletAddress: input.walletAddress,
+        chainId: input.chainId,
+        addresses: missingCurrentProtocolPriceAddresses,
+        now,
+        priceLookup,
+      })) || priceFetchFailed;
+  }
+
+  historicalPriceFetchFailed =
+    (await hydrateHistoricalPriceLookup({
+      walletAddress: input.walletAddress,
+      chainId: input.chainId,
+      range: input.range,
+      bucketTimestamps,
+      granularity: bucketConfig.granularity,
+      addresses: protocolPriceAddresses,
+      historicalPriceLookup,
+      latestHistoricalPriceLookup,
+      currentPriceLookup: priceLookup,
+    })) || historicalPriceFetchFailed;
+
+  const historicalProtocolValues = buildHistoricalProtocolValueLookup({
+    bucketTimestamps,
+    seriesByToken: historicalPriceLookup,
+    protocolRows: protocolPositions.block.rows,
+    manualArtifacts: protocolPositions.artifacts.manualCurrentState,
+    mellowArtifacts: protocolPositions.artifacts.mellowCurrentState,
+  });
+
   const snapshotValuesByBucket = buildSnapshotValueLookup({
+    range: input.range,
     granularity: bucketConfig.granularity,
     snapshotRows: historicalSnapshotRows,
     currentPoint: {
@@ -1072,7 +2278,9 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
       }))
       .filter((row) => row.tokenAddress.length > 0),
     snapshotValuesByBucket,
+    historicalProtocolValues.estimatedDeployedValueByBucket,
     protocolPositions.block.rows.length > 0,
+    historicalProtocolValues.hasPartialHistory,
   );
 
   const firstChartValue = chartSeries.points.find((point) => point.totalValueUsd !== null)?.totalValueUsd ?? null;
@@ -1146,6 +2354,28 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
     coverageReasonCodes: chartPartial ? uniqueCoverageReasonCodes : uniqueCoverageReasonCodes,
     points: chartSeries.points,
   };
+
+  await Promise.all(
+    chartSeries.points
+      .filter((point) => point.totalValueUsd !== null)
+      .map((point) =>
+        insertOverviewPortfolioSnapshot({
+          walletAddress: input.walletAddress,
+          chainId: input.chainId,
+          capturedAt: new Date(point.capturedAt),
+          totalValueUsd: String(point.totalValueUsd),
+          deployedValueUsd: point.deployedValueUsd !== null ? String(point.deployedValueUsd) : null,
+          idleValueUsd: point.idleValueUsd !== null ? String(point.idleValueUsd) : null,
+          metadataJson: {
+            range: input.range,
+            source: "recent_provider_data",
+            snapshotKind: "range_bucket",
+            coverageStatus: response.chart.coverageStatus,
+            coverageReasonCodes: uniqueCoverageReasonCodes,
+          },
+        }),
+      ),
+  );
 
   const distributionSlices: OverviewResponse["distribution"]["slices"] = [];
 
@@ -1224,28 +2454,13 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
 
   response.protocolPositions = protocolPositions.block;
 
-  response.activity = {
-    ...response.activity,
-    coverageStatus: historyResult.status === "fulfilled" ? "recent" : "partial",
-    coverageReasonCodes:
-      historyResult.status === "fulfilled" ? ["analysisPending"] : ["providerPartial", "analysisPending"],
-    items: history.slice(0, 10).map((item: MoralisHistoryRecord, index) => ({
-      id:
-        asString(item.transaction_hash) ??
-        asString(item.hash) ??
-        `${input.walletAddress.toLowerCase()}-${index}`,
-      occurredAt:
-        asString(item.block_timestamp) ??
-        asString(item.block_time) ??
-        asString(item.created_at) ??
-        now.toISOString(),
-      eventType: asString(item.category) ?? "unclassified",
-      labelKey: "overview.activity.unclassified",
-      txHash: asString(item.transaction_hash) ?? asString(item.hash),
-      confidence: "low",
-      isUnclassified: true,
-    })),
-  };
+  buildOverviewActivityBlock({
+    response,
+    history,
+    historyFulfilled: historyResult.status === "fulfilled",
+    now,
+    walletAddress: input.walletAddress,
+  });
 
   await insertOverviewCoverageReport({
     walletAddress: input.walletAddress,

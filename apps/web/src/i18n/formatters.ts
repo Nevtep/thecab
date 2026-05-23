@@ -62,3 +62,23 @@ export function formatCompactNumber(value: number, locale: string): string {
     maximumFractionDigits: 2,
   }).format(value);
 }
+
+export function formatCompactAxisNumber(value: number, locale: string): string {
+  const absValue = Math.abs(value);
+
+  if (absValue >= 1_000_000) {
+    return `${new Intl.NumberFormat(locale, {
+      maximumFractionDigits: absValue >= 10_000_000 ? 0 : 1,
+    }).format(value / 1_000_000)}M`;
+  }
+
+  if (absValue >= 1_000) {
+    return `${new Intl.NumberFormat(locale, {
+      maximumFractionDigits: absValue >= 100_000 ? 0 : 1,
+    }).format(value / 1_000)}k`;
+  }
+
+  return new Intl.NumberFormat(locale, {
+    maximumFractionDigits: 0,
+  }).format(value);
+}

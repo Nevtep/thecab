@@ -3,10 +3,11 @@ import { createConfig, http } from "wagmi";
 import { injected, walletConnect } from "wagmi/connectors";
 
 const walletConnectProjectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
+const hasIndexedDb = typeof globalThis !== "undefined" && "indexedDB" in globalThis;
 
 const connectors = [
 	injected({ shimDisconnect: true }),
-	...(walletConnectProjectId && walletConnectProjectId !== "your_walletconnect_project_id"
+	...(walletConnectProjectId && walletConnectProjectId !== "your_walletconnect_project_id" && hasIndexedDb
 		? [
 				walletConnect({
 					projectId: walletConnectProjectId,
@@ -23,6 +24,7 @@ const connectors = [
 ];
 
 export const wagmiConfig = createConfig({
+	ssr: true,
 	chains: [base],
 	connectors,
 	transports: {

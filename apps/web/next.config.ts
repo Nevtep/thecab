@@ -11,6 +11,17 @@ const tamaguiPlugin = withTamagui({
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   transpilePackages: ["react-native-web", "tamagui", "@tamagui/core"],
+  webpack(config) {
+    config.ignoreWarnings = [
+      ...(config.ignoreWarnings ?? []),
+      {
+        module: /ox[\\/]_esm[\\/]tempo[\\/]internal[\\/]virtualMasterPool\.js/,
+        message: /Critical dependency: the request of a dependency is an expression/,
+      },
+    ];
+
+    return config;
+  },
 };
 
 export default tamaguiPlugin(nextConfig);

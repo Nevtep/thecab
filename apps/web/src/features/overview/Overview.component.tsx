@@ -1,5 +1,6 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -30,6 +31,7 @@ import {
   ConnectedShell,
 } from "@/design-system";
 import {
+  formatCompactAxisNumber,
   formatDateTime,
   formatPercent,
   formatRelativeTime,
@@ -50,21 +52,36 @@ import type { OverviewRange, OverviewViewModel } from "@/features/overview/overv
 type OverviewComponentProps = {
   walletAddress: string | null;
   chainId: number | null;
+  walletStatus: "connected" | "connecting" | "reconnecting" | "disconnected";
   isConnected: boolean;
   isSupportedChain: boolean;
   range: OverviewRange;
-  viewModel: OverviewViewModel | null;
+  shellViewModel: OverviewViewModel | null;
+  overviewViewModel: OverviewViewModel | null;
+  chartViewModel: OverviewViewModel | null;
+  activityViewModel: OverviewViewModel["activity"] | null;
+  protocolPositionsViewModel: OverviewViewModel | null;
   visibleAssetRows: OverviewViewModel["assets"]["rows"];
   hiddenAssetRows: OverviewViewModel["assets"]["rows"];
   showHiddenAssets: boolean;
   showUnpricedAssets: boolean;
   showDustAssets: boolean;
   analysis: OverviewViewModel["analysis"] | null;
-  isLoading: boolean;
+  isShellLoading: boolean;
+  isOverviewSectionsLoading: boolean;
+  isChartLoading: boolean;
+  isActivityLoading: boolean;
+  isProtocolPositionsLoading: boolean;
   isRefreshing: boolean;
   errorCode: string | null;
+  sectionsErrorCode: string | null;
+  chartErrorCode: string | null;
+  activityErrorCode: string | null;
+  protocolPositionsErrorCode: string | null;
   isStartingAnalysis: boolean;
+  isWarmingSnapshots: boolean;
   onConnect: () => void;
+  onDisconnect: () => void;
   onSwitchChain: () => void;
   onRefresh: () => void;
   onRangeChange: (range: OverviewRange) => void;
@@ -138,7 +155,6 @@ function renderAssetRows(
     const trustStatusLabel = input.translate(getOverviewTrustStatusLabelKey(row.trustStatus));
     const trustReasonLabels = getOverviewTrustReasonLabelKeys(row.trustReasonCodes).map((labelKey) =>
       input.translate(labelKey),
-    CabDonutChart,
     );
 
     return (
@@ -470,21 +486,36 @@ function renderProtocolPositionRows(
 export function OverviewComponent({
   walletAddress,
   chainId,
+  walletStatus,
   isConnected,
   isSupportedChain,
   range,
-  viewModel,
+  shellViewModel,
+  overviewViewModel,
+  chartViewModel,
+  activityViewModel,
+  protocolPositionsViewModel,
   visibleAssetRows,
   hiddenAssetRows,
   showHiddenAssets,
   showUnpricedAssets,
   showDustAssets,
   analysis,
-  isLoading,
+  isShellLoading,
+  isOverviewSectionsLoading,
+  isChartLoading,
+  isActivityLoading,
+  isProtocolPositionsLoading,
   isRefreshing,
   errorCode,
+  sectionsErrorCode,
+  chartErrorCode,
+  activityErrorCode,
+  protocolPositionsErrorCode,
   isStartingAnalysis,
+  isWarmingSnapshots,
   onConnect,
+  onDisconnect,
   onSwitchChain,
   onRefresh,
   onRangeChange,
@@ -493,14 +524,29 @@ export function OverviewComponent({
   onToggleUnpricedAssets,
   onToggleDustAssets,
 }: OverviewComponentProps) {
-  const { t, i18n } = useTranslation(["overview", "navigation", "analysis", "coverage", "charts", "trust"]);
+  const { t, i18n } = useTranslation(["overview", "navigation", "analysis", "coverage", "charts", "trust", "wallet"]);
+  const isHydrated = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false,
+  );
+
   const locale = i18n.language;
+  const isWalletPending = walletStatus === "connecting" || walletStatus === "reconnecting";
   const rangeOptions = ["24h", "7d", "30d"].map((option) => ({
     key: option,
     label: t(`ranges.${option}`),
   }));
 
-  if (!isConnected) {
+  if (!isHydrated) {
+    return (
+      <section data-overview-root>
+        <CabLoadingPanel label={t("states.loadingTitle")} />
+      </section>
+    );
+  }
+
+  if (!isConnected && !isWalletPending) {
     return (
       <section data-overview-root>
         <CabEmptyState
@@ -526,15 +572,7 @@ export function OverviewComponent({
     );
   }
 
-  if (isLoading && !viewModel) {
-    return (
-      <section data-overview-root>
-        <CabLoadingPanel label={t("states.loadingTitle")} />
-      </section>
-    );
-  }
-
-  if (!viewModel && errorCode) {
+  if (!shellViewModel && !overviewViewModel && errorCode) {
     return (
       <section data-overview-root>
         <CabErrorPanel
@@ -547,7 +585,7 @@ export function OverviewComponent({
     );
   }
 
-  if (!viewModel) {
+  if (!shellViewModel && !overviewViewModel && !isShellLoading && !isOverviewSectionsLoading && !isWalletPending) {
     return (
       <section data-overview-root>
         <CabEmptyState
@@ -560,24 +598,46 @@ export function OverviewComponent({
     );
   }
 
-  const pageCoverageMessage = buildCoverageMessage(
-    viewModel.coverage.status,
-    viewModel.coverage.reasonCodes,
-    t,
-  );
-  const activeAnalysis = analysis ?? viewModel.analysis;
+  const baseViewModel = shellViewModel ?? overviewViewModel;
+  const resolvedProtocolPositionsViewModel = protocolPositionsViewModel;
+  const resolvedChartViewModel = chartViewModel;
+  const isInitialShellLoading = isWalletPending || (isShellLoading && !baseViewModel);
+  const isInitialSectionsLoading = isWalletPending || (isOverviewSectionsLoading && !overviewViewModel);
+  const isInitialChartLoading = isWalletPending || (isChartLoading && !resolvedChartViewModel);
+  const isInitialActivityLoading = isWalletPending || (isActivityLoading && !activityViewModel);
+  const isInitialProtocolPositionsLoading =
+    isWalletPending || (isProtocolPositionsLoading && !resolvedProtocolPositionsViewModel);
+  const resolvedShellViewModel = baseViewModel as OverviewViewModel;
+  const resolvedOverviewViewModel = overviewViewModel as OverviewViewModel;
+
+  const pageCoverageMessage = baseViewModel
+    ? buildCoverageMessage(
+        baseViewModel.coverage.status,
+        baseViewModel.coverage.reasonCodes,
+        t,
+      )
+    : t("states.loadingTitle");
+  const activeAnalysis = analysis ?? baseViewModel?.analysis ?? {
+    status: "not_analyzed",
+    runId: null,
+    stage: "idle",
+    progressPct: 0,
+    lastSuccessfulRunAt: null,
+    lastUpdatedAt: null,
+    lastError: null,
+  };
   const analysisStatusLabel = t(`analysis:status.${activeAnalysis.status}`);
   const formattedWalletAddress = walletAddress ? formatWalletAddressLabel(walletAddress) : t("states.unavailableValue");
-  const chartData = viewModel.chart.points.map((point) => ({
+  const chartData = (resolvedChartViewModel?.chart.points ?? []).map((point) => ({
     label:
-      viewModel.chart.range === "24h"
+      resolvedChartViewModel?.chart.range === "24h"
         ? new Intl.DateTimeFormat(locale, { hour: "numeric" }).format(new Date(point.capturedAt))
         : new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" }).format(new Date(point.capturedAt)),
     totalValueUsd: point.totalValueUsd,
     deployedValueUsd: point.deployedValueUsd,
     idleValueUsd: point.idleValueUsd,
   }));
-  const totalDistributionUsd = viewModel.distribution.slices.reduce(
+  const totalDistributionUsd = (resolvedChartViewModel?.distribution.slices ?? []).reduce(
     (sum, slice) => sum + slice.valueUsd,
     0,
   );
@@ -588,7 +648,7 @@ export function OverviewComponent({
     activeAnalysis.status === "failed";
   const analysisActionLabel =
     activeAnalysis.status === "failed" ? t("analysis.actions.retry") : t("analysis.actions.start");
-  const exclusionMessage = buildExclusionMessage(viewModel.metrics.exclusions, t, locale);
+  const exclusionMessage = buildExclusionMessage(overviewViewModel?.metrics.exclusions ?? null, t, locale);
   const visibleRenderableRows = visibleAssetRows.filter((row) => {
     if (!showUnpricedAssets && row.priceUsd === null) {
       return false;
@@ -611,37 +671,39 @@ export function OverviewComponent({
 
     return true;
   });
-  const protocolPositionsCoverageMessage = buildProtocolCoverageMessage(
-    viewModel.protocolPositions.coverageStatus,
-    viewModel.protocolPositions.coverageReasonCodes,
-    t,
-  );
-  const distributionChartData = viewModel.distribution.slices.map((slice) => ({
+  const protocolPositionsCoverageMessage = protocolPositionsViewModel
+    ? buildProtocolCoverageMessage(
+        protocolPositionsViewModel.protocolPositions.coverageStatus,
+        protocolPositionsViewModel.protocolPositions.coverageReasonCodes,
+        t,
+      )
+    : t("states.loadingProtocolPositions");
+  const distributionChartData = (resolvedChartViewModel?.distribution.slices ?? []).map((slice) => ({
     label: getDistributionSliceLabel(slice, t),
     value: slice.valueUsd,
     color: getDistributionSliceColor(slice.dimension),
   }));
-  const hasProtocolPositions = viewModel.protocolPositions.rows.length > 0;
-  const protocolSummaryChips = [
+  const hasProtocolPositions = (resolvedProtocolPositionsViewModel?.protocolPositions.rows.length ?? 0) > 0;
+  const protocolSummaryChips = resolvedProtocolPositionsViewModel ? [
     t("protocolPositions.summary.totalCount", {
-      count: viewModel.protocolPositions.summary.totalCount,
+      count: resolvedProtocolPositionsViewModel.protocolPositions.summary.totalCount,
     }),
-    viewModel.protocolPositions.summary.familyCounts.manualDeposit > 0
+    resolvedProtocolPositionsViewModel.protocolPositions.summary.familyCounts.manualDeposit > 0
       ? t("protocolPositions.summary.manualDepositCount", {
-          count: viewModel.protocolPositions.summary.familyCounts.manualDeposit,
+          count: resolvedProtocolPositionsViewModel.protocolPositions.summary.familyCounts.manualDeposit,
         })
       : null,
-    viewModel.protocolPositions.summary.familyCounts.strategyExposure > 0
+    resolvedProtocolPositionsViewModel.protocolPositions.summary.familyCounts.strategyExposure > 0
       ? t("protocolPositions.summary.strategyExposureCount", {
-          count: viewModel.protocolPositions.summary.familyCounts.strategyExposure,
+          count: resolvedProtocolPositionsViewModel.protocolPositions.summary.familyCounts.strategyExposure,
         })
       : null,
-    viewModel.protocolPositions.summary.familyCounts.governanceLock > 0
+    resolvedProtocolPositionsViewModel.protocolPositions.summary.familyCounts.governanceLock > 0
       ? t("protocolPositions.summary.governanceLockCount", {
-          count: viewModel.protocolPositions.summary.familyCounts.governanceLock,
+          count: resolvedProtocolPositionsViewModel.protocolPositions.summary.familyCounts.governanceLock,
         })
       : null,
-  ].filter((value): value is string => Boolean(value));
+  ].filter((value): value is string => Boolean(value)) : [];
 
   return (
     <section data-overview-root>
@@ -693,7 +755,7 @@ export function OverviewComponent({
                   </CabText>
                 </CabStack>
                 <CabText variant="label">
-                  {viewModel.summary.chainLabel} {chainId ? `(${chainId})` : ""}
+                  {baseViewModel?.summary.chainLabel ?? t("states.unavailableValue")} {chainId ? `(${chainId})` : ""}
                 </CabText>
                 <CabStack row alignItems="center" gap="$2">
                   <CabIcon name="activity" tone="muted" size="sm" />
@@ -702,8 +764,8 @@ export function OverviewComponent({
                   </CabText>
                 </CabStack>
                 <CabText variant="label">
-                  {viewModel.summary.lastRefreshedAt
-                    ? formatRelativeTime(viewModel.summary.lastRefreshedAt, locale)
+                  {baseViewModel?.summary.lastRefreshedAt
+                    ? formatRelativeTime(baseViewModel.summary.lastRefreshedAt, locale)
                     : t("states.unavailableValue")}
                 </CabText>
               </CabStack>
@@ -721,51 +783,63 @@ export function OverviewComponent({
               <CabButton tone="secondary" onPress={onRefresh} disabled={isRefreshing}>
                 {isRefreshing ? t("actions.refreshing") : t("actions.refresh")}
               </CabButton>
+              <CabButton tone="secondary" onPress={onDisconnect}>
+                {t("wallet:actions.disconnect")}
+              </CabButton>
             </CabStack>
           </CabTopNav>
         }
       >
         <CabStack gap="$4">
-          <CabCard density="spacious">
-            <CabStack gap="$3">
-              <CabSectionHeader
-                title={t("analysis:title")}
-                subtitle={t(`analysis:messages.${activeAnalysis.status}`)}
-                actions={
-                  <CabAnalysisStatusBadge
-                    status={mapOverviewAnalysisStatusToBadgeStatus(activeAnalysis.status)}
-                    label={analysisStatusLabel}
-                  />
-                }
-              />
-              {activeAnalysis.lastSuccessfulRunAt ? (
-                <CabText variant="caption" fontSize={12}>
-                  {t("analysis:lastSuccessfulRunAt", {
-                    value: formatDateTime(activeAnalysis.lastSuccessfulRunAt, locale),
-                  })}
-                </CabText>
-              ) : null}
-              {activeAnalysis.lastError ? (
-                <CabStack gap="$1">
-                  <CabText variant="caption" fontSize={12}>
-                    {t("analysis:fallback.recentViewAvailable")}
-                  </CabText>
-                  <CabText variant="caption" fontSize={12}>
-                    {activeAnalysis.lastError}
-                  </CabText>
-                </CabStack>
-              ) : null}
-              {showAnalysisAction ? (
-                <CabAnalysisCta
-                  label={isStartingAnalysis ? t("analysis:actions.starting") : analysisActionLabel}
-                  disabled={isStartingAnalysis}
-                  onPress={onStartAnalysis}
+          {isInitialShellLoading ? (
+            <CabLoadingPanel label={t("states.loadingAnalysis")} />
+          ) : (
+            <CabCard density="spacious">
+              <CabStack gap="$3">
+                <CabSectionHeader
+                  title={t("analysis:title")}
+                  subtitle={t(`analysis:messages.${activeAnalysis.status}`)}
+                  actions={
+                    <CabAnalysisStatusBadge
+                      status={mapOverviewAnalysisStatusToBadgeStatus(activeAnalysis.status)}
+                      label={analysisStatusLabel}
+                    />
+                  }
                 />
-              ) : null}
-            </CabStack>
-          </CabCard>
+                {isWarmingSnapshots ? (
+                  <CabText variant="caption" fontSize={12}>
+                    {t("states.loadingWarmup30d")}
+                  </CabText>
+                ) : null}
+                {activeAnalysis.lastSuccessfulRunAt ? (
+                  <CabText variant="caption" fontSize={12}>
+                    {t("analysis:lastSuccessfulRunAt", {
+                      value: formatDateTime(activeAnalysis.lastSuccessfulRunAt, locale),
+                    })}
+                  </CabText>
+                ) : null}
+                {activeAnalysis.lastError ? (
+                  <CabStack gap="$1">
+                    <CabText variant="caption" fontSize={12}>
+                      {t("analysis:fallback.recentViewAvailable")}
+                    </CabText>
+                    <CabText variant="caption" fontSize={12}>
+                      {activeAnalysis.lastError}
+                    </CabText>
+                  </CabStack>
+                ) : null}
+                {showAnalysisAction ? (
+                  <CabAnalysisCta
+                    label={isStartingAnalysis ? t("analysis:actions.starting") : analysisActionLabel}
+                    disabled={isStartingAnalysis}
+                    onPress={onStartAnalysis}
+                  />
+                ) : null}
+              </CabStack>
+            </CabCard>
+          )}
 
-          {viewModel.coverage.status === "partial" ? (
+          {!isInitialShellLoading && baseViewModel?.coverage.status === "partial" ? (
             <CabPartialCoverageNotice
               title={t("coverage:noticeTitle")}
               description={pageCoverageMessage}
@@ -773,72 +847,35 @@ export function OverviewComponent({
           ) : null}
 
           <CabDashboardGrid>
-            <CabMetricCard
-              label={t("metrics.netPortfolioValue")}
-              value={formatCurrencyValue(viewModel.metrics.netPortfolioValueUsd, locale, t("states.unavailableValue"))}
-              delta={viewModel.metrics.changeOverSelectedPeriodPct ?? undefined}
-            />
-            <CabMetricCard
-              label={t("metrics.deployedValue")}
-              value={formatCurrencyValue(viewModel.metrics.deployedValueUsd, locale, t("states.unavailableValue"))}
-            />
-            <CabMetricCard
-              label={t("metrics.idleValue")}
-              value={formatCurrencyValue(viewModel.metrics.idleValueUsd, locale, t("states.unavailableValue"))}
-            />
+            {isInitialShellLoading ? (
+              <>
+                <CabLoadingPanel label={t("states.loadingMetrics")} />
+                <CabLoadingPanel label={t("states.loadingMetrics")} />
+                <CabLoadingPanel label={t("states.loadingMetrics")} />
+              </>
+            ) : (
+              <>
+                <CabMetricCard
+                  label={t("metrics.netPortfolioValue")}
+                  value={formatCurrencyValue(resolvedShellViewModel.metrics.netPortfolioValueUsd, locale, t("states.unavailableValue"))}
+                  delta={resolvedShellViewModel.metrics.changeOverSelectedPeriodPct ?? undefined}
+                />
+                <CabMetricCard
+                  label={t("metrics.deployedValue")}
+                  value={formatCurrencyValue(resolvedShellViewModel.metrics.deployedValueUsd, locale, t("states.unavailableValue"))}
+                />
+                <CabMetricCard
+                  label={t("metrics.idleValue")}
+                  value={formatCurrencyValue(resolvedShellViewModel.metrics.idleValueUsd, locale, t("states.unavailableValue"))}
+                />
+              </>
+            )}
           </CabDashboardGrid>
-          {exclusionMessage ? (
+          {!isInitialSectionsLoading && exclusionMessage ? (
             <CabText variant="caption" fontSize={12}>
               {exclusionMessage}
             </CabText>
           ) : null}
-
-          <CabCard density="spacious">
-            <CabStack gap="$3">
-              <CabSectionHeader
-                title={t("sections.protocolPositions")}
-                subtitle={buildSourceSubtitle(
-                  viewModel.protocolPositions.source,
-                  viewModel.coverage.status,
-                  viewModel.protocolPositions.coverageReasonCodes,
-                  t,
-                )}
-              />
-              <CabText variant="caption" fontSize={12}>
-                {protocolPositionsCoverageMessage}
-              </CabText>
-              {hasProtocolPositions ? (
-                <CabStack gap="$2">
-                  <CabStack row gap="$2" flexWrap="wrap" alignItems="center">
-                    {protocolSummaryChips.map((chip) => (
-                      <CabBadge key={chip} tone="neutral" size="sm">
-                        {chip}
-                      </CabBadge>
-                    ))}
-                  </CabStack>
-                  {viewModel.protocolPositions.summary.hasShareLevelPositions ? (
-                    <CabText variant="caption" fontSize={12}>
-                      {t("protocolPositions.shareLevelNotice")}
-                    </CabText>
-                  ) : null}
-                  {viewModel.protocolPositions.coverageReasonCodes?.includes("recentProtocolReconstruction") ? (
-                    <CabText variant="caption" fontSize={12}>
-                      {t("protocolPositions.reconstructionNotice")}
-                    </CabText>
-                  ) : null}
-                  {renderProtocolPositionRows(viewModel.protocolPositions.rows, {
-                    locale,
-                    translate: t,
-                  })}
-                </CabStack>
-              ) : (
-                <CabEmptyState
-                  title={t("protocolPositions.emptyTitle")}
-                  description={t("protocolPositions.emptyDescription")}
-                />
-              )}
-            </CabStack>
-          </CabCard>
 
           <div
             style={{
@@ -847,45 +884,68 @@ export function OverviewComponent({
               gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
             }}
           >
-            <CabAreaChart
-              title={t("sections.chart")}
-              subtitle={buildSourceSubtitle(
-                viewModel.chart.source,
-                viewModel.chart.coverageStatus,
-                viewModel.chart.coverageReasonCodes,
-                t,
-              )}
-              data={chartData}
-              xKey="label"
-              series={[
-                { key: "totalValueUsd", label: t("charts:series.netPortfolioValue") },
-                {
-                  key: "deployedValueUsd",
-                  label: t("charts:series.deployedValue"),
-                  stroke: "#F2C14E",
-                  fill: "rgba(242, 193, 78, 0.18)",
-                },
-                {
-                  key: "idleValueUsd",
-                  label: t("charts:series.idleValue"),
-                  stroke: "#3B82F6",
-                  fill: "rgba(59, 130, 246, 0.15)",
-                },
-              ]}
-            />
+            {isInitialChartLoading ? (
+              <CabLoadingPanel label={t("states.loadingChart")} />
+            ) : !resolvedChartViewModel && chartErrorCode ? (
+              <CabErrorPanel
+                title={t("states.providerFailureTitle")}
+                description={t(`states.errors.${chartErrorCode}`, { defaultValue: t("states.providerFailureDescription") })}
+                retryLabel={t("actions.refresh")}
+                onRetry={onRefresh}
+              />
+            ) : (
+              <CabAreaChart
+                title={t("sections.chart")}
+                subtitle={buildSourceSubtitle(
+                  resolvedChartViewModel!.chart.source,
+                  resolvedChartViewModel!.chart.coverageStatus,
+                  resolvedChartViewModel!.chart.coverageReasonCodes,
+                  t,
+                )}
+                data={chartData}
+                xKey="label"
+                yAxisWidth={80}
+                yTickFormatter={(value) => formatCompactAxisNumber(value, locale)}
+                series={[
+                  { key: "totalValueUsd", label: t("charts:series.netPortfolioValue") },
+                  {
+                    key: "deployedValueUsd",
+                    label: t("charts:series.deployedValue"),
+                    stroke: "#F2C14E",
+                    fill: "rgba(242, 193, 78, 0.18)",
+                  },
+                  {
+                    key: "idleValueUsd",
+                    label: t("charts:series.idleValue"),
+                    stroke: "#3B82F6",
+                    fill: "rgba(59, 130, 246, 0.15)",
+                  },
+                ]}
+              />
+            )}
 
+            {isInitialChartLoading ? (
+              <CabLoadingPanel label={t("states.loadingDistribution")} />
+            ) : !resolvedChartViewModel && chartErrorCode ? (
+            <CabErrorPanel
+              title={t("states.providerFailureTitle")}
+              description={t(`states.errors.${chartErrorCode}`, { defaultValue: t("states.providerFailureDescription") })}
+              retryLabel={t("actions.refresh")}
+              onRetry={onRefresh}
+            />
+            ) : (
             <CabCard density="spacious">
               <CabStack gap="$3">
                 <CabSectionHeader
                   title={t("sections.distribution")}
                   subtitle={buildSourceSubtitle(
-                    viewModel.distribution.source,
-                    viewModel.distribution.coverageStatus,
-                    viewModel.distribution.coverageReasonCodes,
+                    resolvedChartViewModel!.distribution.source,
+                    resolvedChartViewModel!.distribution.coverageStatus,
+                    resolvedChartViewModel!.distribution.coverageReasonCodes,
                     t,
                   )}
                 />
-                {viewModel.distribution.slices.length === 0 ? (
+                {resolvedChartViewModel!.distribution.slices.length === 0 ? (
                   <CabEmptyState
                     title={t("states.emptyDistributionTitle")}
                     description={t("states.emptyDistributionDescription")}
@@ -896,7 +956,7 @@ export function OverviewComponent({
                       data={distributionChartData}
                       height={280}
                     />
-                    {viewModel.distribution.slices.map((slice) => (
+                    {resolvedChartViewModel!.distribution.slices.map((slice) => (
                       <CabCard key={`${slice.dimension}-${slice.label}`} density="default">
                         <CabStack row justifyContent="space-between" alignItems="center">
                           <CabStack row alignItems="center" gap="$2">
@@ -924,14 +984,73 @@ export function OverviewComponent({
                     ))}
                   </CabStack>
                 )}
-                {viewModel.distribution.exclusions ? (
+                {resolvedChartViewModel!.distribution.exclusions ? (
                   <CabText variant="caption" fontSize={12}>
-                    {buildExclusionMessage(viewModel.distribution.exclusions, t, locale)}
+                    {buildExclusionMessage(resolvedChartViewModel!.distribution.exclusions, t, locale)}
                   </CabText>
                 ) : null}
               </CabStack>
             </CabCard>
+            )}
           </div>
+
+          {isInitialProtocolPositionsLoading ? (
+            <CabLoadingPanel label={t("states.loadingProtocolPositions")} />
+          ) : !resolvedProtocolPositionsViewModel && protocolPositionsErrorCode ? (
+            <CabErrorPanel
+              title={t("states.providerFailureTitle")}
+              description={t(`states.errors.${protocolPositionsErrorCode}`, { defaultValue: t("states.providerFailureDescription") })}
+              retryLabel={t("actions.refresh")}
+              onRetry={onRefresh}
+            />
+          ) : (
+            <CabCard density="spacious">
+              <CabStack gap="$3">
+                <CabSectionHeader
+                  title={t("sections.protocolPositions")}
+                  subtitle={buildSourceSubtitle(
+                    resolvedProtocolPositionsViewModel!.protocolPositions.source,
+                    resolvedProtocolPositionsViewModel!.coverage.status,
+                    resolvedProtocolPositionsViewModel!.protocolPositions.coverageReasonCodes,
+                    t,
+                  )}
+                />
+                <CabText variant="caption" fontSize={12}>
+                  {protocolPositionsCoverageMessage}
+                </CabText>
+                {hasProtocolPositions ? (
+                  <CabStack gap="$2">
+                    <CabStack row gap="$2" flexWrap="wrap" alignItems="center">
+                      {protocolSummaryChips.map((chip) => (
+                        <CabBadge key={chip} tone="neutral" size="sm">
+                          {chip}
+                        </CabBadge>
+                      ))}
+                    </CabStack>
+                    {resolvedProtocolPositionsViewModel!.protocolPositions.summary.hasShareLevelPositions ? (
+                      <CabText variant="caption" fontSize={12}>
+                        {t("protocolPositions.shareLevelNotice")}
+                      </CabText>
+                    ) : null}
+                    {resolvedProtocolPositionsViewModel!.protocolPositions.coverageReasonCodes?.includes("recentProtocolReconstruction") ? (
+                      <CabText variant="caption" fontSize={12}>
+                        {t("protocolPositions.reconstructionNotice")}
+                      </CabText>
+                    ) : null}
+                    {renderProtocolPositionRows(resolvedProtocolPositionsViewModel!.protocolPositions.rows, {
+                      locale,
+                      translate: t,
+                    })}
+                  </CabStack>
+                ) : (
+                  <CabEmptyState
+                    title={t("protocolPositions.emptyTitle")}
+                    description={t("protocolPositions.emptyDescription")}
+                  />
+                )}
+              </CabStack>
+            </CabCard>
+          )}
 
           <div
             style={{
@@ -940,129 +1059,155 @@ export function OverviewComponent({
               gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
             }}
           >
-            <CabCard density="spacious">
-              <CabStack gap="$3">
-                <CabSectionHeader
-                  title={t("sections.assets")}
-                  subtitle={buildSourceSubtitle(
-                    viewModel.assets.source,
-                    viewModel.assets.coverageStatus,
-                    viewModel.assets.coverageReasonCodes,
-                    t,
-                  )}
-                  actions={
-                    <CabStack row gap="$3" flexWrap="wrap" alignItems="center">
-                      <CabSwitch
-                        checked={showHiddenAssets}
-                        onCheckedChange={onToggleHiddenAssets}
-                        label={t("assets.showHiddenAssets")}
+            {isInitialSectionsLoading ? (
+              <CabLoadingPanel label={t("states.loadingAssets")} />
+            ) : !overviewViewModel && sectionsErrorCode ? (
+              <CabErrorPanel
+                title={t("states.providerFailureTitle")}
+                description={t(`states.errors.${sectionsErrorCode}`, { defaultValue: t("states.providerFailureDescription") })}
+                retryLabel={t("actions.refresh")}
+                onRetry={onRefresh}
+              />
+            ) : (
+              <CabCard density="spacious">
+                <CabStack gap="$3">
+                  <CabSectionHeader
+                    title={t("sections.assets")}
+                    subtitle={buildSourceSubtitle(
+                      resolvedOverviewViewModel.assets.source,
+                      resolvedOverviewViewModel.assets.coverageStatus,
+                      resolvedOverviewViewModel.assets.coverageReasonCodes,
+                      t,
+                    )}
+                    actions={
+                      <CabStack row gap="$3" flexWrap="wrap" alignItems="center">
+                        <CabSwitch
+                          checked={showHiddenAssets}
+                          onCheckedChange={onToggleHiddenAssets}
+                          label={t("assets.showHiddenAssets")}
+                        />
+                        <CabSwitch
+                          checked={showUnpricedAssets}
+                          onCheckedChange={onToggleUnpricedAssets}
+                          label={t("assets.showUnpricedAssets")}
+                        />
+                        <CabSwitch
+                          checked={showDustAssets}
+                          onCheckedChange={onToggleDustAssets}
+                          label={t("assets.showDustAssets")}
+                        />
+                      </CabStack>
+                    }
+                  />
+
+                  {visibleRenderableRows.length === 0 && hiddenRenderableRows.length === 0 ? (
+                    hasProtocolPositions ? (
+                      <CabEmptyState
+                        title={t("assets.protocolPositionsOnlyTitle")}
+                        description={t("assets.protocolPositionsOnlyDescription")}
                       />
-                      <CabSwitch
-                        checked={showUnpricedAssets}
-                        onCheckedChange={onToggleUnpricedAssets}
-                        label={t("assets.showUnpricedAssets")}
+                    ) : (
+                      <CabEmptyState
+                        title={t("assets.filteredEmptyTitle")}
+                        description={t("assets.filteredEmptyDescription")}
                       />
-                      <CabSwitch
-                        checked={showDustAssets}
-                        onCheckedChange={onToggleDustAssets}
-                        label={t("assets.showDustAssets")}
-                      />
-                    </CabStack>
-                  }
-                />
-                
-                {visibleRenderableRows.length === 0 && hiddenRenderableRows.length === 0 ? (
-                  hasProtocolPositions ? (
+                    )
+                  ) : visibleRenderableRows.length === 0 && hiddenRenderableRows.length > 0 && !showHiddenAssets ? (
                     <CabEmptyState
-                      title={t("assets.protocolPositionsOnlyTitle")}
-                      description={t("assets.protocolPositionsOnlyDescription")}
+                      title={t("assets.hiddenOnlyTitle")}
+                      description={t("assets.hiddenOnlyDescription")}
                     />
                   ) : (
-                    <CabEmptyState
-                      title={t("assets.filteredEmptyTitle")}
-                      description={t("assets.filteredEmptyDescription")}
-                    />
-                  )
-                ) : visibleRenderableRows.length === 0 && hiddenRenderableRows.length > 0 && !showHiddenAssets ? (
-                  <CabEmptyState
-                    title={t("assets.hiddenOnlyTitle")}
-                    description={t("assets.hiddenOnlyDescription")}
-                  />
-                ) : (
-                  <CabStack gap="$2">
-                    {renderAssetRows(visibleRenderableRows, { locale, translate: t })}
-                    {showHiddenAssets && hiddenRenderableRows.length > 0 ? (
-                      <CabStack gap="$2">
-                        <CabSectionHeader
-                          title={t("assets.hiddenInspectionTitle")}
-                          subtitle={t("assets.hiddenInspectionDescription")}
-                        />
-                        {renderAssetRows(hiddenRenderableRows, { locale, translate: t })}
-                      </CabStack>
-                    ) : null}
-                  </CabStack>
-                )}
-              </CabStack>
-            </CabCard>
-
-            <CabCard density="spacious">
-              <CabStack gap="$3">
-                <CabSectionHeader
-                  title={t("sections.activity")}
-                  subtitle={buildSourceSubtitle(
-                    viewModel.activity.source,
-                    viewModel.activity.coverageStatus,
-                    viewModel.activity.coverageReasonCodes,
-                    t,
+                    <CabStack gap="$2">
+                      {renderAssetRows(visibleRenderableRows, { locale, translate: t })}
+                      {showHiddenAssets && hiddenRenderableRows.length > 0 ? (
+                        <CabStack gap="$2">
+                          <CabSectionHeader
+                            title={t("assets.hiddenInspectionTitle")}
+                            subtitle={t("assets.hiddenInspectionDescription")}
+                          />
+                          {renderAssetRows(hiddenRenderableRows, { locale, translate: t })}
+                        </CabStack>
+                      ) : null}
+                    </CabStack>
                   )}
-                />
-                {viewModel.activity.items.length === 0 ? (
-                  <CabEmptyState
-                    title={t("states.emptyActivityTitle")}
-                    description={t("states.emptyActivityDescription")}
+                </CabStack>
+              </CabCard>
+            )}
+
+            {isInitialActivityLoading ? (
+              <CabLoadingPanel label={t("states.loadingActivity")} />
+            ) : !activityViewModel && activityErrorCode ? (
+              <CabErrorPanel
+                title={t("states.providerFailureTitle")}
+                description={t(`states.errors.${activityErrorCode}`, { defaultValue: t("states.providerFailureDescription") })}
+                retryLabel={t("actions.refresh")}
+                onRetry={onRefresh}
+              />
+            ) : (
+              <CabCard density="spacious">
+                <CabStack gap="$3">
+                  <CabSectionHeader
+                    title={t("sections.activity")}
+                    subtitle={buildSourceSubtitle(
+                      activityViewModel!.source,
+                      activityViewModel!.coverageStatus,
+                      activityViewModel!.coverageReasonCodes,
+                      t,
+                    )}
                   />
-                ) : (
-                  <CabStack gap="$2">
-                    {viewModel.activity.items.map((item) => (
-                      <CabCard key={item.id} density="default">
-                        <CabStack row justifyContent="space-between" alignItems="center" gap="$3">
-                          <CabStack gap="$1">
-                            <CabText variant="label">{t(item.labelKey, { defaultValue: t("activity.unclassified") })}</CabText>
-                            <CabText variant="caption" fontSize={12}>
-                              {formatDateTime(item.occurredAt, locale)}
+                  {activityViewModel!.items.length === 0 ? (
+                    <CabEmptyState
+                      title={t("states.emptyActivityTitle")}
+                      description={t("states.emptyActivityDescription")}
+                    />
+                  ) : (
+                    <CabStack gap="$2">
+                      {activityViewModel!.items.map((item) => (
+                        <CabCard key={item.id} density="default">
+                          <CabStack row justifyContent="space-between" alignItems="center" gap="$3">
+                            <CabStack gap="$1">
+                              <CabText variant="label">{t(item.labelKey, { defaultValue: t("activity.unclassified") })}</CabText>
+                              <CabText variant="caption" fontSize={12}>
+                                {formatDateTime(item.occurredAt, locale)}
+                              </CabText>
+                            </CabStack>
+                            <CabText variant="caption" fontSize={12} textAlign="right">
+                              {item.txHash ? formatWalletAddressLabel(item.txHash) : t("states.unavailableValue")}
                             </CabText>
                           </CabStack>
-                          <CabText variant="caption" fontSize={12} textAlign="right">
-                            {item.txHash ? formatWalletAddressLabel(item.txHash) : t("states.unavailableValue")}
-                          </CabText>
-                        </CabStack>
-                      </CabCard>
-                    ))}
-                  </CabStack>
-                )}
-              </CabStack>
-            </CabCard>
+                        </CabCard>
+                      ))}
+                    </CabStack>
+                  )}
+                </CabStack>
+              </CabCard>
+            )}
           </div>
 
-          <CabCard density="spacious">
-            <CabSectionHeader
-              title={t("summary.title")}
-              subtitle={t(viewModel.summary.modeLabelKey)}
-            />
-            <CabStack row justifyContent="space-between" alignItems="center" flexWrap="wrap" gap="$3">
-              <CabText variant="label">
-                {t("summary.wallet")}: {formattedWalletAddress}
-              </CabText>
-              <CabText variant="label">
-                {t("summary.chain")}: {viewModel.summary.chainLabel}
-              </CabText>
-              <CabText variant="label">
-                {t("summary.lastRefreshed")}: {viewModel.summary.lastRefreshedAt
-                  ? formatRelativeTime(viewModel.summary.lastRefreshedAt, locale)
-                  : t("states.unavailableValue")}
-              </CabText>
-            </CabStack>
-          </CabCard>
+          {isInitialShellLoading ? (
+            <CabLoadingPanel label={t("states.loadingTitle")} />
+          ) : (
+            <CabCard density="spacious">
+              <CabSectionHeader
+                title={t("summary.title")}
+                subtitle={t(resolvedShellViewModel.summary.modeLabelKey)}
+              />
+              <CabStack row justifyContent="space-between" alignItems="center" flexWrap="wrap" gap="$3">
+                <CabText variant="label">
+                  {t("summary.wallet")}: {formattedWalletAddress}
+                </CabText>
+                <CabText variant="label">
+                  {t("summary.chain")}: {resolvedShellViewModel.summary.chainLabel}
+                </CabText>
+                <CabText variant="label">
+                  {t("summary.lastRefreshed")}: {resolvedShellViewModel.summary.lastRefreshedAt
+                    ? formatRelativeTime(resolvedShellViewModel.summary.lastRefreshedAt, locale)
+                    : t("states.unavailableValue")}
+                </CabText>
+              </CabStack>
+            </CabCard>
+          )}
         </CabStack>
       </ConnectedShell>
     </section>
