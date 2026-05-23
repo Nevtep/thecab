@@ -30,9 +30,28 @@ export type OverviewTrustCoverageReasonCode =
   | "dustAssetsHidden"
   | "valuationPartial";
 
+export type ProtocolPositionCoverageReasonCode =
+  | "protocolPositionsPresent"
+  | "recentProtocolReconstruction"
+  | "protocolValuationPartial"
+  | "strategyShareLevelOnly"
+  | "governanceValueUnavailable"
+  | "positionMetadataIncomplete";
+
 export type OverviewCoverageReasonCode =
   | ExistingOverviewCoverageReasonCode
-  | OverviewTrustCoverageReasonCode;
+  | OverviewTrustCoverageReasonCode
+  | ProtocolPositionCoverageReasonCode;
+
+export type ProtocolPositionFamily =
+  | "manual_deposit"
+  | "strategy_exposure"
+  | "governance_lock"
+  | "staked_lp";
+
+export type ProtocolPositionCoverageStatus = "full" | "share_level" | "partial" | "unknown";
+
+export type ProtocolPositionValueStatus = "current" | "estimated" | "unavailable";
 
 export type TokenTrustStatus =
   | "trusted"
@@ -129,7 +148,7 @@ export type OverviewViewModel = {
     coverageStatus: OverviewCoverageStatus;
     coverageReasonCodes: OverviewCoverageReasonCode[] | null;
     slices: Array<{
-      dimension: "pool" | "token" | "strategy" | "idle" | "governance";
+      dimension: "manual_deposit" | "staked_lp" | "strategy" | "idle" | "governance";
       label: string;
       valueUsd: number;
       coverageStatus: OverviewCoverageStatus | null;
@@ -159,6 +178,52 @@ export type OverviewViewModel = {
     }>;
     hiddenSummary: HiddenAssetSummary | null;
     defaultVisibleCount: number;
+  };
+  protocolPositions: {
+    source: "recent_provider_data" | "partial_fallback";
+    coverageStatus: "full" | "partial" | "unknown";
+    coverageReasonCodes: ProtocolPositionCoverageReasonCode[] | null;
+    rows: Array<{
+      positionKey: string;
+      chainId: number;
+      walletAddress: string;
+      family: ProtocolPositionFamily;
+      protocol: string;
+      label: string;
+      status: "active" | "locked" | "staked" | "unknown";
+      coverageStatus: ProtocolPositionCoverageStatus;
+      coverageReasonCodes: ProtocolPositionCoverageReasonCode[];
+      valueUsd: number | null;
+      valueStatus: ProtocolPositionValueStatus;
+      valueUpdatedAt: string | null;
+      primaryTokenSymbol: string | null;
+      secondaryTokenSymbol: string | null;
+      primaryTokenAmount: number | null;
+      secondaryTokenAmount: number | null;
+      poolLabel: string | null;
+      strategyLabel: string | null;
+      governanceLabel: string | null;
+      tokenId: string | null;
+      metadata: {
+        protocolSurface: string | null;
+        wrapperAddress: string | null;
+        positionContractAddress: string | null;
+        lockEndAt: string | null;
+        feeTierLabel: string | null;
+      };
+    }>;
+    summary: {
+      totalCount: number;
+      familyCounts: {
+        manualDeposit: number;
+        strategyExposure: number;
+        governanceLock: number;
+        stakedLp: number;
+      };
+      hasPartialValuation: boolean;
+      hasShareLevelPositions: boolean;
+      lastRefreshedAt: string | null;
+    };
   };
   activity: {
     source: "recent_provider_data" | "partial_fallback";

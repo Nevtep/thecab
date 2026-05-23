@@ -1,6 +1,7 @@
 {
   "series": {
     "netPortfolioValue": "Net portfolio value",
+    "deployedValue": "Deployed value",
     "idleValue": "Idle value"
   }
 }

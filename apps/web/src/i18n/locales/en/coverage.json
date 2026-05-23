@@ -18,6 +18,12 @@
     "providerTrustSignalsMissing": "Some provider trust signals are missing",
     "metadataIncomplete": "Some assets have incomplete metadata",
     "dustAssetsHidden": "Dust-sized low-confidence assets were hidden",
-    "valuationPartial": "Portfolio valuation is partial"
+    "valuationPartial": "Portfolio valuation is partial",
+    "protocolPositionsPresent": "Protocol positions were detected in recent Overview data",
+    "recentProtocolReconstruction": "Recent protocol reconstruction was used within the latest 30 days",
+    "protocolValuationPartial": "Some protocol positions have partial or unavailable valuation",
+    "strategyShareLevelOnly": "Some strategy positions are only available at share level",
+    "governanceValueUnavailable": "Governance locks remain visible even without a defendable USD value",
+    "positionMetadataIncomplete": "Some protocol positions have incomplete metadata"
   }
 }

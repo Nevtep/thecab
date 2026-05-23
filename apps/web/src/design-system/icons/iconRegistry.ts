@@ -2,6 +2,7 @@ import {
   AlertTriangle,
   Activity,
   BarChart3,
+  ChevronDown,
   CircleHelp,
   Compass,
   Landmark,
@@ -28,6 +29,7 @@ export const cabIconRegistry = {
   governance: Landmark,
   navigation: Compass,
   settings: Settings,
+  chevronDown: ChevronDown,
 } as const satisfies Record<string, LucideIcon>;
 
 export type CabIconName = keyof typeof cabIconRegistry;

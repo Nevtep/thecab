@@ -18,6 +18,12 @@
     "providerTrustSignalsMissing": "Faltan algunas señales de confianza del proveedor",
     "metadataIncomplete": "Algunos activos tienen metadatos incompletos",
     "dustAssetsHidden": "Se ocultaron activos de baja confianza con valor de polvo",
-    "valuationPartial": "La valoración de la cartera es parcial"
+    "valuationPartial": "La valoración de la cartera es parcial",
+    "protocolPositionsPresent": "Se detectaron posiciones de protocolo en los datos recientes del Resumen",
+    "recentProtocolReconstruction": "Se utilizó reconstrucción reciente de protocolo dentro de los últimos 30 días",
+    "protocolValuationPartial": "Algunas posiciones de protocolo tienen valoración parcial o no disponible",
+    "strategyShareLevelOnly": "Algunas posiciones de estrategia solo están disponibles a nivel de participación",
+    "governanceValueUnavailable": "Los bloqueos de gobernanza siguen visibles incluso sin un valor USD defendible",
+    "positionMetadataIncomplete": "Algunas posiciones de protocolo tienen metadatos incompletos"
   }
 }

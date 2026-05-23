@@ -5,11 +5,13 @@ import { useTranslation } from "react-i18next";
 import {
   CabAnalysisCta,
   CabAnalysisStatusBadge,
+  CabAccordion,
   CabAreaChart,
   CabBadge,
   CabButton,
   CabCard,
   CabDashboardGrid,
+  CabDonutChart,
   CabEmptyState,
   CabErrorPanel,
   CabIcon,
@@ -136,6 +138,7 @@ function renderAssetRows(
     const trustStatusLabel = input.translate(getOverviewTrustStatusLabelKey(row.trustStatus));
     const trustReasonLabels = getOverviewTrustReasonLabelKeys(row.trustReasonCodes).map((labelKey) =>
       input.translate(labelKey),
+    CabDonutChart,
     );
 
     return (
@@ -192,6 +195,276 @@ function renderAssetRows(
       </CabCard>
     );
   });
+}
+
+function buildProtocolCoverageMessage(
+  status: OverviewViewModel["protocolPositions"]["coverageStatus"],
+  reasonCodes: OverviewViewModel["protocolPositions"]["coverageReasonCodes"],
+  translate: (key: string) => string,
+) {
+  const reasonLabels = getOverviewCoverageReasonLabelKeys(reasonCodes).map((labelKey) => translate(labelKey));
+
+  return [translate(`protocolPositions.coverageStatus.${status}`), ...reasonLabels].join(" · ");
+}
+
+function getProtocolPositionTone(
+  family: OverviewViewModel["protocolPositions"]["rows"][number]["family"],
+) {
+  switch (family) {
+    case "manual_deposit":
+      return "info" as const;
+    case "strategy_exposure":
+      return "success" as const;
+    case "governance_lock":
+      return "warning" as const;
+    case "staked_lp":
+      return "neutral" as const;
+  }
+}
+
+function getProtocolValueLabel(
+  row: OverviewViewModel["protocolPositions"]["rows"][number],
+  locale: string,
+  translate: (key: string, options?: Record<string, unknown>) => string,
+) {
+  if (row.valueUsd === null) {
+    return translate(`protocolPositions.valueStatus.${row.valueStatus}`);
+  }
+
+  return translate("protocolPositions.positionValue", {
+    value: formatUsd(row.valueUsd, locale),
+    status: translate(`protocolPositions.valueStatus.${row.valueStatus}`),
+  });
+}
+
+function formatProtocolTokenAmount(amount: number, locale: string) {
+  const maximumFractionDigits = amount >= 1_000 ? 2 : amount >= 1 ? 4 : 6;
+
+  return new Intl.NumberFormat(locale, {
+    maximumFractionDigits,
+  }).format(amount);
+}
+
+function getDistributionSliceLabel(
+  slice: OverviewViewModel["distribution"]["slices"][number],
+  translate: (key: string) => string,
+) {
+  switch (slice.dimension) {
+    case "idle":
+      return translate("distribution.slices.idle");
+    case "manual_deposit":
+      return translate("distribution.slices.manualDeposits");
+    case "strategy":
+      return translate("distribution.slices.automatedStrategies");
+    case "governance":
+      return translate("distribution.slices.governanceLocks");
+    case "staked_lp":
+      return translate("distribution.slices.stakedLp");
+  }
+}
+
+function getDistributionSliceColor(
+  dimension: OverviewViewModel["distribution"]["slices"][number]["dimension"],
+) {
+  switch (dimension) {
+    case "idle":
+      return "#4b5563";
+    case "manual_deposit":
+      return "#1d4ed8";
+    case "strategy":
+      return "#059669";
+    case "governance":
+      return "#d97706";
+    case "staked_lp":
+      return "#7c3aed";
+  }
+}
+
+type ProtocolPositionRow = OverviewViewModel["protocolPositions"]["rows"][number];
+
+type ProtocolPositionGroup = {
+  key: string;
+  label: string;
+  rows: ProtocolPositionRow[];
+  totalValueUsd: number | null;
+};
+
+function buildProtocolPoolGroupLabel(
+  row: ProtocolPositionRow,
+  translate: (key: string, options?: Record<string, unknown>) => string,
+) {
+  if (row.poolLabel && row.metadata.feeTierLabel) {
+    return translate("protocolPositions.poolGroupLabel", {
+      pool: row.poolLabel,
+      feeTier: row.metadata.feeTierLabel,
+    });
+  }
+
+  return row.poolLabel ?? row.label;
+}
+
+function groupProtocolPositionRows(rows: ProtocolPositionRow[]) {
+  const groups = new Map<string, { label: string; rows: ProtocolPositionRow[] }>();
+
+  for (const row of rows) {
+    const label = buildProtocolPoolGroupLabel(row, (key, options) => {
+      if (key === "protocolPositions.poolGroupLabel") {
+        return `${String(options?.pool ?? "")} · ${String(options?.feeTier ?? "")}`;
+      }
+
+      return row.poolLabel ?? row.label;
+    });
+    const key = row.poolLabel
+      ? `${row.poolLabel.toLowerCase()}::${row.metadata.feeTierLabel ?? "unknown"}`
+      : row.positionKey;
+    const existingGroup = groups.get(key);
+
+    if (existingGroup) {
+      existingGroup.rows.push(row);
+      continue;
+    }
+
+    groups.set(key, {
+      label,
+      rows: [row],
+    });
+  }
+
+  return Array.from(groups.entries())
+    .map(([key, group]): ProtocolPositionGroup => ({
+      key,
+      label: group.label,
+      rows: group.rows,
+      totalValueUsd: group.rows.some((row) => row.valueUsd === null)
+        ? null
+        : group.rows.reduce((total, row) => total + (row.valueUsd ?? 0), 0),
+    }))
+    .sort((left, right) => {
+      const leftValue = left.totalValueUsd ?? -1;
+      const rightValue = right.totalValueUsd ?? -1;
+
+      if (rightValue !== leftValue) {
+        return rightValue - leftValue;
+      }
+
+      return left.label.localeCompare(right.label);
+    });
+}
+
+function getProtocolAccordionHeaderLabel(
+  row: ProtocolPositionRow,
+  translate: (key: string, options?: Record<string, unknown>) => string,
+) {
+  return row.tokenId
+    ? translate("protocolPositions.accordionTokenId", { value: row.tokenId })
+    : row.label;
+}
+
+function renderProtocolPositionRows(
+  rows: OverviewViewModel["protocolPositions"]["rows"],
+  input: {
+    locale: string;
+    translate: (key: string, options?: Record<string, unknown>) => string;
+  },
+) {
+  const groups = groupProtocolPositionRows(rows);
+
+  return groups.map((group) => (
+    <CabCard key={group.key} density="default">
+      <CabStack gap="$3">
+        <CabStack row justifyContent="space-between" alignItems="center" gap="$3">
+          <CabStack gap="$1">
+            <CabText variant="label">{group.label}</CabText>
+            <CabText variant="caption" fontSize={12}>
+              {input.translate("protocolPositions.poolGroupCount", { count: group.rows.length })}
+            </CabText>
+          </CabStack>
+          <CabText variant="label">
+            {formatCurrencyValue(group.totalValueUsd, input.locale, input.translate("states.unavailableValue"))}
+          </CabText>
+        </CabStack>
+        <CabAccordion
+          items={group.rows.map((row) => {
+            const familyLabel = input.translate(`protocolPositions.families.${row.family}`);
+            const statusLabel = input.translate(`protocolPositions.positionStatus.${row.status}`);
+            const coverageReasonLabels = row.coverageReasonCodes.map((reasonCode) =>
+              input.translate(`coverage:reasons.${reasonCode}`),
+            );
+            const tokenAmountBits = [
+              row.primaryTokenSymbol && row.primaryTokenAmount !== null
+                ? `${row.primaryTokenSymbol} ${formatProtocolTokenAmount(row.primaryTokenAmount, input.locale)}`
+                : null,
+              row.secondaryTokenSymbol && row.secondaryTokenAmount !== null
+                ? `${row.secondaryTokenSymbol} ${formatProtocolTokenAmount(row.secondaryTokenAmount, input.locale)}`
+                : null,
+            ].filter((value): value is string => Boolean(value));
+            const metadataBits = [
+              tokenAmountBits.length > 0 ? tokenAmountBits.join(" · ") : null,
+              row.strategyLabel,
+              row.governanceLabel,
+              row.metadata.lockEndAt
+                ? input.translate("protocolPositions.lockEndAt", {
+                    value: formatDateTime(row.metadata.lockEndAt, input.locale),
+                  })
+                : null,
+            ].filter((value): value is string => Boolean(value));
+
+            return {
+              value: row.positionKey,
+              header: (
+                <CabStack row justifyContent="space-between" alignItems="center" gap="$3" width="100%">
+                  <CabText variant="label">{getProtocolAccordionHeaderLabel(row, input.translate)}</CabText>
+                  <CabText variant="label">
+                    {formatCurrencyValue(row.valueUsd, input.locale, input.translate("states.unavailableValue"))}
+                  </CabText>
+                </CabStack>
+              ),
+              content: (
+                <CabStack gap="$2">
+                  <CabStack row alignItems="center" gap="$2" flexWrap="wrap">
+                    <CabText variant="label">{row.label}</CabText>
+                    <CabBadge tone={getProtocolPositionTone(row.family)} size="sm">
+                      {familyLabel}
+                    </CabBadge>
+                    <CabBadge tone="neutral" size="sm">
+                      {statusLabel}
+                    </CabBadge>
+                  </CabStack>
+                  <CabText variant="caption" fontSize={12}>
+                    {metadataBits.length > 0
+                      ? metadataBits.join(" · ")
+                      : input.translate("protocolPositions.metadataUnavailable")}
+                  </CabText>
+                  <CabStack row justifyContent="space-between" alignItems="flex-start" gap="$3">
+                    <CabStack gap="$1" flex={1}>
+                      <CabText variant="caption" fontSize={12}>
+                        {getProtocolValueLabel(row, input.locale, input.translate)}
+                      </CabText>
+                      <CabText variant="caption" fontSize={12}>
+                        {input.translate(`protocolPositions.coverageStatus.${row.coverageStatus}`)}
+                      </CabText>
+                      {row.valueUpdatedAt ? (
+                        <CabText variant="caption" fontSize={12}>
+                          {input.translate("protocolPositions.valueUpdatedAt", {
+                            value: formatDateTime(row.valueUpdatedAt, input.locale),
+                          })}
+                        </CabText>
+                      ) : null}
+                    </CabStack>
+                  </CabStack>
+                  {coverageReasonLabels.length > 0 ? (
+                    <CabText variant="caption" fontSize={12}>
+                      {coverageReasonLabels.join(" · ")}
+                    </CabText>
+                  ) : null}
+                </CabStack>
+              ),
+            };
+          })}
+        />
+      </CabStack>
+    </CabCard>
+  ));
 }
 
 export function OverviewComponent({
@@ -301,6 +574,7 @@ export function OverviewComponent({
         ? new Intl.DateTimeFormat(locale, { hour: "numeric" }).format(new Date(point.capturedAt))
         : new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" }).format(new Date(point.capturedAt)),
     totalValueUsd: point.totalValueUsd,
+    deployedValueUsd: point.deployedValueUsd,
     idleValueUsd: point.idleValueUsd,
   }));
   const totalDistributionUsd = viewModel.distribution.slices.reduce(
@@ -337,6 +611,37 @@ export function OverviewComponent({
 
     return true;
   });
+  const protocolPositionsCoverageMessage = buildProtocolCoverageMessage(
+    viewModel.protocolPositions.coverageStatus,
+    viewModel.protocolPositions.coverageReasonCodes,
+    t,
+  );
+  const distributionChartData = viewModel.distribution.slices.map((slice) => ({
+    label: getDistributionSliceLabel(slice, t),
+    value: slice.valueUsd,
+    color: getDistributionSliceColor(slice.dimension),
+  }));
+  const hasProtocolPositions = viewModel.protocolPositions.rows.length > 0;
+  const protocolSummaryChips = [
+    t("protocolPositions.summary.totalCount", {
+      count: viewModel.protocolPositions.summary.totalCount,
+    }),
+    viewModel.protocolPositions.summary.familyCounts.manualDeposit > 0
+      ? t("protocolPositions.summary.manualDepositCount", {
+          count: viewModel.protocolPositions.summary.familyCounts.manualDeposit,
+        })
+      : null,
+    viewModel.protocolPositions.summary.familyCounts.strategyExposure > 0
+      ? t("protocolPositions.summary.strategyExposureCount", {
+          count: viewModel.protocolPositions.summary.familyCounts.strategyExposure,
+        })
+      : null,
+    viewModel.protocolPositions.summary.familyCounts.governanceLock > 0
+      ? t("protocolPositions.summary.governanceLockCount", {
+          count: viewModel.protocolPositions.summary.familyCounts.governanceLock,
+        })
+      : null,
+  ].filter((value): value is string => Boolean(value));
 
   return (
     <section data-overview-root>
@@ -488,6 +793,53 @@ export function OverviewComponent({
             </CabText>
           ) : null}
 
+          <CabCard density="spacious">
+            <CabStack gap="$3">
+              <CabSectionHeader
+                title={t("sections.protocolPositions")}
+                subtitle={buildSourceSubtitle(
+                  viewModel.protocolPositions.source,
+                  viewModel.coverage.status,
+                  viewModel.protocolPositions.coverageReasonCodes,
+                  t,
+                )}
+              />
+              <CabText variant="caption" fontSize={12}>
+                {protocolPositionsCoverageMessage}
+              </CabText>
+              {hasProtocolPositions ? (
+                <CabStack gap="$2">
+                  <CabStack row gap="$2" flexWrap="wrap" alignItems="center">
+                    {protocolSummaryChips.map((chip) => (
+                      <CabBadge key={chip} tone="neutral" size="sm">
+                        {chip}
+                      </CabBadge>
+                    ))}
+                  </CabStack>
+                  {viewModel.protocolPositions.summary.hasShareLevelPositions ? (
+                    <CabText variant="caption" fontSize={12}>
+                      {t("protocolPositions.shareLevelNotice")}
+                    </CabText>
+                  ) : null}
+                  {viewModel.protocolPositions.coverageReasonCodes?.includes("recentProtocolReconstruction") ? (
+                    <CabText variant="caption" fontSize={12}>
+                      {t("protocolPositions.reconstructionNotice")}
+                    </CabText>
+                  ) : null}
+                  {renderProtocolPositionRows(viewModel.protocolPositions.rows, {
+                    locale,
+                    translate: t,
+                  })}
+                </CabStack>
+              ) : (
+                <CabEmptyState
+                  title={t("protocolPositions.emptyTitle")}
+                  description={t("protocolPositions.emptyDescription")}
+                />
+              )}
+            </CabStack>
+          </CabCard>
+
           <div
             style={{
               display: "grid",
@@ -505,7 +857,21 @@ export function OverviewComponent({
               )}
               data={chartData}
               xKey="label"
-              series={[{ key: "totalValueUsd", label: t("charts:series.netPortfolioValue") }]}
+              series={[
+                { key: "totalValueUsd", label: t("charts:series.netPortfolioValue") },
+                {
+                  key: "deployedValueUsd",
+                  label: t("charts:series.deployedValue"),
+                  stroke: "#F2C14E",
+                  fill: "rgba(242, 193, 78, 0.18)",
+                },
+                {
+                  key: "idleValueUsd",
+                  label: t("charts:series.idleValue"),
+                  stroke: "#3B82F6",
+                  fill: "rgba(59, 130, 246, 0.15)",
+                },
+              ]}
             />
 
             <CabCard density="spacious">
@@ -526,10 +892,25 @@ export function OverviewComponent({
                   />
                 ) : (
                   <CabStack gap="$2">
+                    <CabDonutChart
+                      data={distributionChartData}
+                      height={280}
+                    />
                     {viewModel.distribution.slices.map((slice) => (
                       <CabCard key={`${slice.dimension}-${slice.label}`} density="default">
                         <CabStack row justifyContent="space-between" alignItems="center">
-                          <CabText variant="label">{slice.label}</CabText>
+                          <CabStack row alignItems="center" gap="$2">
+                            <div
+                              style={{
+                                width: 10,
+                                height: 10,
+                                borderRadius: 999,
+                                backgroundColor: getDistributionSliceColor(slice.dimension),
+                                flexShrink: 0,
+                              }}
+                            />
+                            <CabText variant="label">{getDistributionSliceLabel(slice, t)}</CabText>
+                          </CabStack>
                           <CabStack alignItems="flex-end" gap="$1">
                             <CabText variant="label">{formatUsd(slice.valueUsd, locale)}</CabText>
                             <CabText variant="caption" fontSize={12}>
@@ -591,10 +972,17 @@ export function OverviewComponent({
                 />
                 
                 {visibleRenderableRows.length === 0 && hiddenRenderableRows.length === 0 ? (
-                  <CabEmptyState
-                    title={t("assets.filteredEmptyTitle")}
-                    description={t("assets.filteredEmptyDescription")}
-                  />
+                  hasProtocolPositions ? (
+                    <CabEmptyState
+                      title={t("assets.protocolPositionsOnlyTitle")}
+                      description={t("assets.protocolPositionsOnlyDescription")}
+                    />
+                  ) : (
+                    <CabEmptyState
+                      title={t("assets.filteredEmptyTitle")}
+                      description={t("assets.filteredEmptyDescription")}
+                    />
+                  )
                 ) : visibleRenderableRows.length === 0 && hiddenRenderableRows.length > 0 && !showHiddenAssets ? (
                   <CabEmptyState
                     title={t("assets.hiddenOnlyTitle")}

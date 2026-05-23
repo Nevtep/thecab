@@ -3,6 +3,10 @@ import type {
   TokenTrustReasonCode,
   TokenTrustStatus,
 } from "@/server/asset-trust/assetTrust.types";
+import type {
+  OverviewProtocolPositionsBlock,
+  ProtocolPositionCoverageReasonCode,
+} from "@/server/protocol-positions/protocolPositions.types";
 
 export const OVERVIEW_RANGES = ["24h", "7d", "30d"] as const;
 
@@ -20,7 +24,8 @@ export type ExistingOverviewCoverageReasonCode =
 
 export type OverviewCoverageReasonCode =
   | ExistingOverviewCoverageReasonCode
-  | OverviewTrustCoverageReasonCode;
+  | OverviewTrustCoverageReasonCode
+  | ProtocolPositionCoverageReasonCode;
 
 export type OverviewMode = "recent_view";
 
@@ -102,7 +107,7 @@ export type OverviewChart = OverviewBlockProvenance & {
 
 export type OverviewDistribution = OverviewBlockProvenance & {
   slices: Array<{
-    dimension: "pool" | "token" | "strategy" | "idle" | "governance";
+    dimension: "manual_deposit" | "staked_lp" | "strategy" | "idle" | "governance";
     label: string;
     valueUsd: number;
     coverageStatus: OverviewCoverageStatus | null;
@@ -171,5 +176,6 @@ export type OverviewResponse = {
   chart: OverviewChart;
   distribution: OverviewDistribution;
   assets: OverviewAssets;
+  protocolPositions: OverviewProtocolPositionsBlock;
   activity: OverviewActivity;
 };

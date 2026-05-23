@@ -92,6 +92,21 @@ function sanitizeOverviewResponse(overview: OverviewResponse): OverviewResponse 
           }
         : null,
     },
+    protocolPositions: {
+      ...overview.protocolPositions,
+      coverageReasonCodes: overview.protocolPositions.coverageReasonCodes
+        ? [...overview.protocolPositions.coverageReasonCodes]
+        : null,
+      rows: overview.protocolPositions.rows.map((row) => ({
+        ...row,
+        coverageReasonCodes: [...row.coverageReasonCodes],
+        metadata: { ...row.metadata },
+      })),
+      summary: {
+        ...overview.protocolPositions.summary,
+        familyCounts: { ...overview.protocolPositions.summary.familyCounts },
+      },
+    },
     activity: {
       ...overview.activity,
       coverageReasonCodes: overview.activity.coverageReasonCodes

@@ -11,9 +11,11 @@ import {
   getCurrentTokenPricesByAddress,
   getHistoricalTokenPricesByAddress,
 } from "@/server/providers/alchemy";
-import { getWalletHistory, getWalletTokens } from "@/server/providers/moralis";
+import { getWalletDefiPositions, getWalletHistory, getWalletTokens } from "@/server/providers/moralis";
+import { detectProtocolPositions } from "@/server/protocol-positions/detectProtocolPositions";
 import {
   readKnownProtocolContracts,
+  readOverviewPortfolioSnapshots,
   insertOverviewCoverageReport,
   insertOverviewPortfolioSnapshot,
   insertOverviewRawProviderRecord,
@@ -137,6 +139,24 @@ export function createEmptyRecentOverviewResponse(input: OverviewRequest): Overv
       hiddenSummary: null,
       defaultVisibleCount: 0,
     },
+    protocolPositions: {
+      source: "partial_fallback",
+      coverageStatus: "unknown",
+      coverageReasonCodes: null,
+      rows: [],
+      summary: {
+        totalCount: 0,
+        familyCounts: {
+          manualDeposit: 0,
+          strategyExposure: 0,
+          governanceLock: 0,
+          stakedLp: 0,
+        },
+        hasPartialValuation: false,
+        hasShareLevelPositions: false,
+        lastRefreshedAt: null,
+      },
+    },
     activity: {
       source: "recent_provider_data",
       coverageStatus: "recent",
@@ -207,12 +227,39 @@ function buildChartPoints(
   bucketTimestamps: string[],
   seriesByToken: Map<string, Map<string, number>>,
   tokenBalances: Array<{ tokenAddress: string; balance: number }>,
+  snapshotValuesByBucket: Map<string, {
+    totalValueUsd: number | null;
+    deployedValueUsd: number | null;
+    idleValueUsd: number | null;
+  }>,
+  hasProtocolPositions: boolean,
 ) {
   let hasPartialHistory = false;
 
   const points: OverviewChartPoint[] = bucketTimestamps.map((bucketTimestamp) => {
-    let totalValueUsd = 0;
-    let hasAnyValue = false;
+    const snapshotPoint = snapshotValuesByBucket.get(bucketTimestamp);
+    if (snapshotPoint) {
+      const totalValueUsd =
+        snapshotPoint.totalValueUsd ??
+        (snapshotPoint.idleValueUsd === null && snapshotPoint.deployedValueUsd === null
+          ? null
+          : (snapshotPoint.idleValueUsd ?? 0) + (snapshotPoint.deployedValueUsd ?? 0));
+
+      return {
+        capturedAt: bucketTimestamp,
+        totalValueUsd,
+        deployedValueUsd: snapshotPoint.deployedValueUsd,
+        idleValueUsd: snapshotPoint.idleValueUsd,
+        rewardValueUsd: null,
+      };
+    }
+
+    if (hasProtocolPositions) {
+      hasPartialHistory = true;
+    }
+
+    let idleValueUsd = 0;
+    let hasIdleValue = false;
 
     for (const tokenBalance of tokenBalances) {
       const priceByBucket = seriesByToken.get(tokenBalance.tokenAddress);
@@ -223,15 +270,15 @@ function buildChartPoints(
         continue;
       }
 
-      totalValueUsd += tokenBalance.balance * historicalPriceUsd;
-      hasAnyValue = true;
+      idleValueUsd += tokenBalance.balance * historicalPriceUsd;
+      hasIdleValue = true;
     }
 
     return {
       capturedAt: bucketTimestamp,
-      totalValueUsd: hasAnyValue ? totalValueUsd : null,
+      totalValueUsd: hasIdleValue ? idleValueUsd : null,
       deployedValueUsd: null,
-      idleValueUsd: hasAnyValue ? totalValueUsd : null,
+      idleValueUsd: hasIdleValue ? idleValueUsd : null,
       rewardValueUsd: null,
     };
   });
@@ -285,6 +332,50 @@ function toBucketTimestamp(timestamp: string, granularity: "hour" | "day") {
   return floorDateToGranularity(new Date(timestamp), granularity).toISOString();
 }
 
+function buildSnapshotValueLookup(input: {
+  granularity: "hour" | "day";
+  snapshotRows: Array<{
+    capturedAt: Date;
+    totalValueUsd: string;
+    deployedValueUsd: string | null;
+    idleValueUsd: string | null;
+  }>;
+  currentPoint: {
+    capturedAt: Date;
+    totalValueUsd: number | null;
+    deployedValueUsd: number | null;
+    idleValueUsd: number | null;
+  };
+}) {
+  const snapshotValuesByBucket = new Map<string, {
+    totalValueUsd: number | null;
+    deployedValueUsd: number | null;
+    idleValueUsd: number | null;
+  }>();
+
+  for (const row of input.snapshotRows) {
+    const bucketTimestamp = toBucketTimestamp(row.capturedAt.toISOString(), input.granularity);
+    snapshotValuesByBucket.set(bucketTimestamp, {
+      totalValueUsd: asNumber(row.totalValueUsd),
+      deployedValueUsd: asNumber(row.deployedValueUsd),
+      idleValueUsd: asNumber(row.idleValueUsd),
+    });
+  }
+
+  const currentBucketTimestamp = toBucketTimestamp(
+    input.currentPoint.capturedAt.toISOString(),
+    input.granularity,
+  );
+
+  snapshotValuesByBucket.set(currentBucketTimestamp, {
+    totalValueUsd: input.currentPoint.totalValueUsd,
+    deployedValueUsd: input.currentPoint.deployedValueUsd,
+    idleValueUsd: input.currentPoint.idleValueUsd,
+  });
+
+  return snapshotValuesByBucket;
+}
+
 function calculatePercentChange(currentValue: number | null, previousValue: number | null) {
   if (currentValue === null || previousValue === null || previousValue === 0) {
     return null;
@@ -322,6 +413,35 @@ function sanitizeMoralisTokenForPersistence(token: MoralisTokenRecord) {
   };
 }
 
+function sanitizeMoralisHistoryForPersistence(record: MoralisHistoryRecord) {
+  return {
+    hash: asString(record.hash) ?? asString(record.transaction_hash),
+    category: asString(record.category),
+    methodLabel: asString(record.method_label),
+    summary: asString(record.summary),
+    fromAddress: asString(record.from_address)?.toLowerCase() ?? null,
+    toAddress: asString(record.to_address)?.toLowerCase() ?? null,
+    fromAddressLabel: asString(record.from_address_label),
+    toAddressLabel: asString(record.to_address_label),
+    nftTransferCount: Array.isArray(record.nft_transfers) ? record.nft_transfers.length : 0,
+    erc20TransferCount: Array.isArray(record.erc20_transfers) ? record.erc20_transfers.length : 0,
+    blockTimestamp: asString(record.block_timestamp) ?? asString(record.block_time),
+  };
+}
+
+function sanitizeMoralisDefiPositionForPersistence(position: Record<string, unknown>) {
+  const keys = Object.keys(position).slice(0, 24);
+  const labels = keys
+    .map((key) => (typeof position[key] === "string" ? asString(position[key]) : null))
+    .filter((value): value is string => Boolean(value))
+    .slice(0, 8);
+
+  return {
+    keys,
+    labels,
+  };
+}
+
 function sumNullableUsd(values: Array<number | null>) {
   const pricedValues = values.filter((value): value is number => value !== null);
   if (pricedValues.length === 0) {
@@ -329,6 +449,16 @@ function sumNullableUsd(values: Array<number | null>) {
   }
 
   return pricedValues.reduce((sum, value) => sum + value, 0);
+}
+
+function toOverviewCoverageStatus(
+  status: OverviewResponse["protocolPositions"]["coverageStatus"],
+): OverviewResponse["distribution"]["slices"][number]["coverageStatus"] {
+  if (status === "full") {
+    return "recent";
+  }
+
+  return status;
 }
 
 function buildHiddenAssetReasonCodes(rows: TrustHydratedAssetRow[]): OverviewTrustCoverageReasonCode[] {
@@ -501,12 +631,16 @@ function getHistoricalBaselinePrice(
 
 export async function getRecentOverview(input: OverviewRequest): Promise<OverviewResponse> {
   const response = createEmptyRecentOverviewResponse(input);
-  const [tokensResult, historyResult, latestRun, freshness, protocolMetadata] = await Promise.all([
+  const [tokensResult, historyResult, defiPositionsResult, latestRun, freshness, protocolMetadata] = await Promise.all([
     getWalletTokens(input.walletAddress, input.chainId).then(
       (value) => ({ status: "fulfilled" as const, value }),
       (error) => ({ status: "rejected" as const, reason: sanitizeProviderError(error) }),
     ),
-    getWalletHistory(input.walletAddress, input.chainId, 10).then(
+    getWalletHistory(input.walletAddress, input.chainId, 50).then(
+      (value) => ({ status: "fulfilled" as const, value }),
+      (error) => ({ status: "rejected" as const, reason: sanitizeProviderError(error) }),
+    ),
+    getWalletDefiPositions(input.walletAddress, input.chainId).then(
       (value) => ({ status: "fulfilled" as const, value }),
       (error) => ({ status: "rejected" as const, reason: sanitizeProviderError(error) }),
     ),
@@ -515,7 +649,11 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
     readKnownProtocolContracts({ chainId: input.chainId }),
   ]);
 
-  if (tokensResult.status === "rejected" && historyResult.status === "rejected") {
+  if (
+    tokensResult.status === "rejected" &&
+    historyResult.status === "rejected" &&
+    defiPositionsResult.status === "rejected"
+  ) {
     throw new Error("PROVIDER_REQUEST_FAILED");
   }
 
@@ -546,6 +684,7 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
 
   const tokens = tokensResult.status === "fulfilled" ? (tokensResult.value.result ?? []) : [];
   const history = historyResult.status === "fulfilled" ? (historyResult.value.result ?? []) : [];
+  const defiPositions = defiPositionsResult.status === "fulfilled" ? defiPositionsResult.value : [];
 
   const tokenPricingContexts = tokens.map((token) => {
     const tokenAddress = asString(token.token_address)?.toLowerCase() ?? null;
@@ -589,8 +728,25 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
       chainId: input.chainId,
       provider: "moralis",
       endpoint: "/wallets/:walletAddress/history",
-      requestJson: { walletAddress: input.walletAddress, chainId: input.chainId, limit: 10 },
-      responseJson: { resultCount: history.length },
+      requestJson: { walletAddress: input.walletAddress, chainId: input.chainId, limit: 50 },
+      responseJson: {
+        resultCount: history.length,
+        items: history.slice(0, 20).map((item) => sanitizeMoralisHistoryForPersistence(item as MoralisHistoryRecord)),
+      },
+    });
+  }
+
+  if (defiPositionsResult.status === "fulfilled") {
+    await insertOverviewRawProviderRecord({
+      walletAddress: input.walletAddress,
+      chainId: input.chainId,
+      provider: "moralis",
+      endpoint: "/wallets/:walletAddress/defi/positions",
+      requestJson: { walletAddress: input.walletAddress, chainId: input.chainId },
+      responseJson: {
+        resultCount: defiPositions.length,
+        items: defiPositions.slice(0, 20).map((position) => sanitizeMoralisDefiPositionForPersistence(position)),
+      },
     });
   }
 
@@ -657,6 +813,12 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
 
   const bucketConfig = getRecentOverviewBucketConfig(input.range);
   const bucketTimestamps = buildBucketTimestamps(input.range, now);
+  const historicalSnapshotRows = await readOverviewPortfolioSnapshots({
+    walletAddress: input.walletAddress,
+    chainId: input.chainId,
+    startAt: new Date(bucketTimestamps[0] ?? now.toISOString()),
+    endAt: now,
+  });
 
   if (uniqueTokenAddresses.length > 0) {
     const historicalPriceResults: PromiseSettledResult<void>[] = [];
@@ -818,9 +980,80 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
   const hiddenAssetRows = hydratedAssetRows.filter((row) => row.assetRow.isHiddenByDefault);
   const visibleAssetRows = hydratedAssetRows.filter((row) => !row.assetRow.isHiddenByDefault);
   const pricedVisibleAssetRows = visibleAssetRows.filter((row) => row.assetRow.valueUsd !== null);
-  const totalValueUsd = sumNullableUsd(pricedVisibleAssetRows.map((row) => row.assetRow.valueUsd));
+  const idleValueUsd = sumNullableUsd(pricedVisibleAssetRows.map((row) => row.assetRow.valueUsd));
   const hiddenAssetReasonCodes = buildHiddenAssetReasonCodes(hiddenAssetRows);
   const exclusionSummary = buildExclusionSummary(hiddenAssetRows, visibleAssetRows);
+  const protocolPositions = await detectProtocolPositions({
+    walletAddress: input.walletAddress,
+    chainId: input.chainId,
+    protocolContracts: protocolMetadata,
+    walletTokens: tokens,
+    defiPositions,
+    history,
+    now,
+  });
+  if (protocolPositions.artifacts.manualCurrentState) {
+    await insertOverviewRawProviderRecord({
+      walletAddress: input.walletAddress,
+      chainId: input.chainId,
+      provider: "alchemy",
+      endpoint: "/rpc/aerodrome/manual-positions",
+      requestJson: {
+        walletAddress: input.walletAddress,
+        chainId: input.chainId,
+      },
+      responseJson: protocolPositions.artifacts.manualCurrentState,
+    });
+  }
+  if (protocolPositions.artifacts.mellowCurrentState) {
+    await insertOverviewRawProviderRecord({
+      walletAddress: input.walletAddress,
+      chainId: input.chainId,
+      provider: "alchemy",
+      endpoint: "/rpc/mellow/strategy-wrappers",
+      requestJson: {
+        walletAddress: input.walletAddress,
+        chainId: input.chainId,
+      },
+      responseJson: protocolPositions.artifacts.mellowCurrentState,
+    });
+  }
+  const manualDepositsValueUsd = sumNullableUsd(
+    protocolPositions.block.rows
+      .filter((row) => row.family === "manual_deposit")
+      .map((row) => row.valueUsd),
+  );
+  const automatedStrategiesValueUsd = sumNullableUsd(
+    protocolPositions.block.rows
+      .filter((row) => row.family === "strategy_exposure")
+      .map((row) => row.valueUsd),
+  );
+  const governanceValueUsd = sumNullableUsd(
+    protocolPositions.block.rows
+      .filter((row) => row.family === "governance_lock")
+      .map((row) => row.valueUsd),
+  );
+  const residualAttributedValueUsd = sumNullableUsd(
+    protocolPositions.block.rows
+      .filter((row) => row.family === "staked_lp")
+      .map((row) => row.valueUsd),
+  );
+  const deployedValueUsd = sumNullableUsd(protocolPositions.block.rows.map((row) => row.valueUsd));
+  const totalValueUsd =
+    idleValueUsd === null && deployedValueUsd === null
+      ? null
+      : (idleValueUsd ?? 0) + (deployedValueUsd ?? 0);
+
+  const snapshotValuesByBucket = buildSnapshotValueLookup({
+    granularity: bucketConfig.granularity,
+    snapshotRows: historicalSnapshotRows,
+    currentPoint: {
+      capturedAt: now,
+      totalValueUsd,
+      deployedValueUsd,
+      idleValueUsd,
+    },
+  });
 
   const chartSeries = buildChartPoints(
     bucketTimestamps,
@@ -838,6 +1071,8 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
         balance: Number.parseFloat(row.assetRow.balance),
       }))
       .filter((row) => row.tokenAddress.length > 0),
+    snapshotValuesByBucket,
+    protocolPositions.block.rows.length > 0,
   );
 
   const firstChartValue = chartSeries.points.find((point) => point.totalValueUsd !== null)?.totalValueUsd ?? null;
@@ -848,21 +1083,29 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
   const providerPartial =
     tokensResult.status === "rejected" ||
     historyResult.status === "rejected" ||
+    defiPositionsResult.status === "rejected" ||
+    protocolPositions.providerPartial ||
     priceFetchFailed ||
     historicalPriceFetchFailed;
   const missingPrices = assetRows.some((row) => row.priceUsd === null);
   const chartPartial = chartSeries.hasPartialHistory || chartSeries.points.some((point) => point.totalValueUsd === null);
-  const uniqueCoverageReasonCodes = buildCoverageReasonCodes(hydratedAssetRows, {
-    providerPartial,
-    chartPartial,
-    hasRecentActivity: history.length > 0,
-  });
+  const uniqueCoverageReasonCodes = Array.from(
+    new Set([
+      ...buildCoverageReasonCodes(hydratedAssetRows, {
+        providerPartial,
+        chartPartial,
+        hasRecentActivity: history.length > 0,
+      }),
+      ...(protocolPositions.block.coverageReasonCodes ?? []),
+    ]),
+  );
   const coverageStatus =
     providerPartial ||
     missingPrices ||
     hiddenAssetRows.length > 0 ||
     Boolean(exclusionSummary) ||
-    chartPartial
+    chartPartial ||
+    (protocolPositions.block.rows.length > 0 && protocolPositions.block.coverageStatus !== "full")
       ? "partial"
       : "recent";
 
@@ -885,9 +1128,14 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
     coverageStatus,
     coverageReasonCodes: uniqueCoverageReasonCodes,
     netPortfolioValueUsd: totalValueUsd,
-    deployedValueUsd: null,
-    idleValueUsd: totalValueUsd,
-    changeOverSelectedPeriodPct: calculatePercentChange(lastChartValue, firstChartValue),
+    deployedValueUsd,
+    idleValueUsd,
+    changeOverSelectedPeriodPct:
+      protocolPositions.block.rows.length > 0 ? null : calculatePercentChange(lastChartValue, firstChartValue),
+    manualDepositsValueUsd,
+    automatedStrategiesValueUsd,
+    residualAttributedValueUsd,
+    governanceValueUsd,
     exclusions: exclusionSummary,
   };
 
@@ -899,22 +1147,59 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
     points: chartSeries.points,
   };
 
+  const distributionSlices: OverviewResponse["distribution"]["slices"] = [];
+
+  if (idleValueUsd && idleValueUsd > 0) {
+    distributionSlices.push({
+      dimension: "idle",
+      label: "Idle assets",
+      valueUsd: idleValueUsd,
+      coverageStatus,
+    });
+  }
+
+  if (manualDepositsValueUsd && manualDepositsValueUsd > 0) {
+    distributionSlices.push({
+      dimension: "manual_deposit",
+      label: "Manual deposits",
+      valueUsd: manualDepositsValueUsd,
+      coverageStatus: toOverviewCoverageStatus(protocolPositions.block.coverageStatus),
+    });
+  }
+
+  if (automatedStrategiesValueUsd && automatedStrategiesValueUsd > 0) {
+    distributionSlices.push({
+      dimension: "strategy",
+      label: "Automated strategies",
+      valueUsd: automatedStrategiesValueUsd,
+      coverageStatus: toOverviewCoverageStatus(protocolPositions.block.coverageStatus),
+    });
+  }
+
+  if (governanceValueUsd && governanceValueUsd > 0) {
+    distributionSlices.push({
+      dimension: "governance",
+      label: "Governance locks",
+      valueUsd: governanceValueUsd,
+      coverageStatus: toOverviewCoverageStatus(protocolPositions.block.coverageStatus),
+    });
+  }
+
+  if (residualAttributedValueUsd && residualAttributedValueUsd > 0) {
+    distributionSlices.push({
+      dimension: "staked_lp",
+      label: "Staked LP",
+      valueUsd: residualAttributedValueUsd,
+      coverageStatus: toOverviewCoverageStatus(protocolPositions.block.coverageStatus),
+    });
+  }
+
   response.distribution = {
     ...response.distribution,
     coverageStatus,
     coverageReasonCodes: uniqueCoverageReasonCodes,
     exclusions: exclusionSummary,
-    slices:
-      totalValueUsd && totalValueUsd > 0
-        ? [
-            {
-              dimension: "idle",
-              label: "Idle assets",
-              valueUsd: totalValueUsd,
-              coverageStatus,
-            },
-          ]
-        : [],
+    slices: distributionSlices,
   };
 
   response.assets = {
@@ -936,6 +1221,8 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
         : null,
     defaultVisibleCount: visibleAssetRows.length,
   };
+
+  response.protocolPositions = protocolPositions.block;
 
   response.activity = {
     ...response.activity,
@@ -970,6 +1257,12 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
       reasonCodes: uniqueCoverageReasonCodes,
       range: input.range,
       classifierVersion: ASSET_TRUST_CLASSIFIER_VERSION,
+      protocolPositions: {
+        summary: protocolPositions.block.summary,
+        coverageReasonCodes: protocolPositions.block.coverageReasonCodes,
+        usedRecentReconstruction: protocolPositions.usedRecentReconstruction,
+        evidenceSummary: protocolPositions.evidenceSummary,
+      },
       trustInputHydration: {
         source: "normalized_overview_response",
         totalAssets: hydratedAssetRows.length,
@@ -987,12 +1280,18 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
       chainId: input.chainId,
       capturedAt: now,
       totalValueUsd: String(totalValueUsd),
-      deployedValueUsd: null,
-      idleValueUsd: totalValueUsd !== null ? String(totalValueUsd) : null,
+      deployedValueUsd: deployedValueUsd !== null ? String(deployedValueUsd) : null,
+      idleValueUsd: idleValueUsd !== null ? String(idleValueUsd) : null,
       metadataJson: {
         range: input.range,
         source: "recent_provider_data",
         classifierVersion: ASSET_TRUST_CLASSIFIER_VERSION,
+        protocolPositions: {
+          summary: protocolPositions.block.summary,
+          coverageReasonCodes: protocolPositions.block.coverageReasonCodes,
+          usedRecentReconstruction: protocolPositions.usedRecentReconstruction,
+          evidenceSummary: protocolPositions.evidenceSummary,
+        },
         hiddenSummary: response.assets.hiddenSummary,
         exclusions: exclusionSummary,
         trustInputs: hydratedAssetRows.map((row) => row.trustInput),

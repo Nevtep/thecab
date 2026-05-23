@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
 
 import { getDb } from "@/server/db/client";
 import {
@@ -159,6 +159,42 @@ export async function upsertOverviewPricePoint(
   return row;
 }
 
+export async function readLatestOverviewPricePoints(input: {
+  chainId: number;
+  tokenAddresses: string[];
+}) {
+  if (input.tokenAddresses.length === 0) {
+    return [];
+  }
+
+  const db = getDb();
+  const normalizedAddresses = Array.from(new Set(input.tokenAddresses.map((address) => address.toLowerCase())));
+  const rows = await db
+    .select({
+      tokenAddress: pricePoints.tokenAddress,
+      priceUsd: pricePoints.priceUsd,
+      pricedAt: pricePoints.pricedAt,
+      confidence: pricePoints.confidence,
+    })
+    .from(pricePoints)
+    .where(
+      and(
+        eq(pricePoints.chainId, input.chainId),
+        inArray(pricePoints.tokenAddress, normalizedAddresses),
+      ),
+    )
+    .orderBy(desc(pricePoints.pricedAt));
+
+  const latestRows = new Map<string, (typeof rows)[number]>();
+  for (const row of rows) {
+    if (!latestRows.has(row.tokenAddress)) {
+      latestRows.set(row.tokenAddress, row);
+    }
+  }
+
+  return Array.from(latestRows.values());
+}
+
 export async function getLatestOverviewCoverageReport(input: ScopedWalletInput, scope = "overview") {
   const db = getDb();
   const rows = await db
@@ -227,6 +263,31 @@ export async function getLatestOverviewPortfolioSnapshot(input: ScopedWalletInpu
     .limit(1);
 
   return rows[0] ?? null;
+}
+
+export async function readOverviewPortfolioSnapshots(input: ScopedWalletInput & {
+  startAt: Date;
+  endAt: Date;
+}) {
+  const db = getDb();
+
+  return db
+    .select({
+      capturedAt: portfolioSnapshots.capturedAt,
+      totalValueUsd: portfolioSnapshots.totalValueUsd,
+      deployedValueUsd: portfolioSnapshots.deployedValueUsd,
+      idleValueUsd: portfolioSnapshots.idleValueUsd,
+    })
+    .from(portfolioSnapshots)
+    .where(
+      and(
+        eq(portfolioSnapshots.walletAddress, input.walletAddress.toLowerCase()),
+        eq(portfolioSnapshots.chainId, input.chainId),
+        gte(portfolioSnapshots.capturedAt, input.startAt),
+        lte(portfolioSnapshots.capturedAt, input.endAt),
+      ),
+    )
+    .orderBy(portfolioSnapshots.capturedAt);
 }
 
 export async function readKnownProtocolContracts(input: Pick<OverviewRequest, "chainId">) {

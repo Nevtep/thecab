@@ -69,6 +69,7 @@ export function CabAreaChart<T extends Record<string, unknown>>({
               <Area
                 key={item.key}
                 dataKey={item.key as never}
+                name={item.label}
                 type="monotone"
                 stroke={stroke}
                 fill={item.fill ?? defaultFill}

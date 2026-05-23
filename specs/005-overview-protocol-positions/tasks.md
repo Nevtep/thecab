@@ -13,9 +13,9 @@
 
 **Purpose**: Create the dedicated protocol-position module and reserve the existing Overview extension points.
 
-- [ ] T001 Create the backend protocol-position module file skeleton in apps/web/src/server/protocol-positions/protocolPositions.types.ts, apps/web/src/server/protocol-positions/detectProtocolPositions.ts, apps/web/src/server/protocol-positions/reconstructRecentPositionState.ts, and apps/web/src/server/protocol-positions/protocolMetadata.ts
-- [ ] T002 [P] Add empty `protocolPositions` block scaffolding to the recent Overview response in apps/web/src/server/overview/getRecentOverview.ts
-- [ ] T003 [P] Add `protocolPositions` cloning and sanitization scaffolding to the existing Overview route in apps/web/src/app/api/wallet/overview/route.ts
+- [X] T001 Create the backend protocol-position module file skeleton in apps/web/src/server/protocol-positions/protocolPositions.types.ts, apps/web/src/server/protocol-positions/detectProtocolPositions.ts, apps/web/src/server/protocol-positions/reconstructRecentPositionState.ts, and apps/web/src/server/protocol-positions/protocolMetadata.ts
+- [X] T002 [P] Add empty `protocolPositions` block scaffolding to the recent Overview response in apps/web/src/server/overview/getRecentOverview.ts
+- [X] T003 [P] Add `protocolPositions` cloning and sanitization scaffolding to the existing Overview route in apps/web/src/app/api/wallet/overview/route.ts
 
 ---
 
@@ -25,13 +25,13 @@
 
 **⚠️ CRITICAL**: No user story work should begin until this phase is complete.
 
-- [ ] T004 Define protocol-position family, coverage, value-treatment, evidence, and identity primitives in apps/web/src/server/protocol-positions/protocolPositions.types.ts
-- [ ] T005 [P] Extend the server Overview response contract with `protocolPositions` and protocol-position coverage reason unions in apps/web/src/server/overview/overview.types.ts
-- [ ] T006 [P] Extend the feature-side Overview view-model with `protocolPositions`, row metadata, and summary fields in apps/web/src/features/overview/overview.types.ts
-- [ ] T007 [P] Preserve the Overview-scoped query contract while carrying `protocolPositions` through apps/web/src/queries/keys.ts and apps/web/src/features/overview/overview.queries.ts
-- [ ] T008 [P] Extend Overview response normalization and ordering for `protocolPositions` in apps/web/src/features/overview/overview.mappers.ts
-- [ ] T009 Define approved Aerodrome, Mellow, and governance surface helpers plus chain-scoped identity builders in apps/web/src/server/protocol-positions/protocolMetadata.ts
-- [ ] T010 Add repository helpers for protocol-position evidence pointers, coverage metadata, and snapshot metadata persistence in apps/web/src/server/overview/overview.repository.ts
+- [X] T004 Define protocol-position family, coverage, value-treatment, evidence, and identity primitives in apps/web/src/server/protocol-positions/protocolPositions.types.ts
+- [X] T005 [P] Extend the server Overview response contract with `protocolPositions` and protocol-position coverage reason unions in apps/web/src/server/overview/overview.types.ts
+- [X] T006 [P] Extend the feature-side Overview view-model with `protocolPositions`, row metadata, and summary fields in apps/web/src/features/overview/overview.types.ts
+- [X] T007 [P] Preserve the Overview-scoped query contract while carrying `protocolPositions` through apps/web/src/queries/keys.ts and apps/web/src/features/overview/overview.queries.ts
+- [X] T008 [P] Extend Overview response normalization and ordering for `protocolPositions` in apps/web/src/features/overview/overview.mappers.ts
+- [X] T009 Define approved Aerodrome, Mellow, and governance surface helpers plus chain-scoped identity builders in apps/web/src/server/protocol-positions/protocolMetadata.ts
+- [X] T010 Add repository helpers for protocol-position evidence pointers, coverage metadata, and snapshot metadata persistence in apps/web/src/server/overview/overview.repository.ts
 
 **Checkpoint**: Shared contract and backend-owned protocol-position foundations are ready.
 
@@ -45,12 +45,12 @@
 
 ### Implementation for User Story 1
 
-- [ ] T011 [US1] Implement manual Aerodrome position detection from wallet ownership, NFT evidence, and approved current-state reads in apps/web/src/server/protocol-positions/detectProtocolPositions.ts
-- [ ] T012 [US1] Implement Mellow strategy exposure detection from official strategy metadata plus wrapper and staking evidence in apps/web/src/server/protocol-positions/detectProtocolPositions.ts
-- [ ] T013 [US1] Implement governance lock detection from approved governance surfaces in apps/web/src/server/protocol-positions/detectProtocolPositions.ts
-- [ ] T014 [US1] Assemble `protocolPositions.rows`, `protocolPositions.summary`, and block-level source metadata in apps/web/src/server/overview/getRecentOverview.ts
-- [ ] T015 [US1] Enforce approved-family-only protocol-position inclusion so unrelated wallet NFTs and generic NFT inventory never enter `protocolPositions.rows` unless positively classified in apps/web/src/server/protocol-positions/detectProtocolPositions.ts and apps/web/src/server/overview/getRecentOverview.ts
-- [ ] T016 [US1] Extend the `/api/wallet/overview` response sanitization to return `protocolPositions` without leaking raw provider fields in apps/web/src/app/api/wallet/overview/route.ts
+- [X] T011 [US1] Implement manual Aerodrome position detection from wallet ownership, NFT evidence, and approved current-state reads in apps/web/src/server/protocol-positions/detectProtocolPositions.ts
+- [X] T012 [US1] Implement Mellow strategy exposure detection from official strategy metadata plus wrapper and staking evidence in apps/web/src/server/protocol-positions/detectProtocolPositions.ts
+- [X] T013 [US1] Implement governance lock detection from approved governance surfaces in apps/web/src/server/protocol-positions/detectProtocolPositions.ts
+- [X] T014 [US1] Assemble `protocolPositions.rows`, `protocolPositions.summary`, and block-level source metadata in apps/web/src/server/overview/getRecentOverview.ts
+- [X] T015 [US1] Enforce approved-family-only protocol-position inclusion so unrelated wallet NFTs and generic NFT inventory never enter `protocolPositions.rows` unless positively classified in apps/web/src/server/protocol-positions/detectProtocolPositions.ts and apps/web/src/server/overview/getRecentOverview.ts
+- [X] T016 [US1] Extend the `/api/wallet/overview` response sanitization to return `protocolPositions` without leaking raw provider fields in apps/web/src/app/api/wallet/overview/route.ts
 
 **Checkpoint**: The backend can return visible protocol positions for the three Stage 1 families.
 
@@ -64,11 +64,11 @@
 
 ### Implementation for User Story 2
 
-- [ ] T017 [US2] Keep wallet-asset trust filtering separate while deriving manual-deposit, strategy, and governance metric groups from protocol-position evidence in apps/web/src/server/overview/getRecentOverview.ts
-- [ ] T018 [P] [US2] Normalize `protocolPositions` rows and summary for the feature view model in apps/web/src/features/overview/overview.mappers.ts
-- [ ] T019 [US2] Thread `protocolPositions` through Overview container state without changing the existing Overview query path in apps/web/src/features/overview/Overview.container.tsx
-- [ ] T020 [US2] Render a dedicated protocol-positions section separated from wallet assets in apps/web/src/features/overview/Overview.component.tsx
-- [ ] T021 [US2] Ensure protocol positions prevent misleading zero-only or empty-dashboard states while preserving the existing analysis CTA and recent-view posture in apps/web/src/features/overview/Overview.component.tsx
+- [X] T017 [US2] Keep wallet-asset trust filtering separate while deriving manual-deposit, strategy, and governance metric groups from protocol-position evidence in apps/web/src/server/overview/getRecentOverview.ts
+- [X] T018 [P] [US2] Normalize `protocolPositions` rows and summary for the feature view model in apps/web/src/features/overview/overview.mappers.ts
+- [X] T019 [US2] Thread `protocolPositions` through Overview container state without changing the existing Overview query path in apps/web/src/features/overview/Overview.container.tsx
+- [X] T020 [US2] Render a dedicated protocol-positions section separated from wallet assets in apps/web/src/features/overview/Overview.component.tsx
+- [X] T021 [US2] Ensure protocol positions prevent misleading zero-only or empty-dashboard states while preserving the existing analysis CTA and recent-view posture in apps/web/src/features/overview/Overview.component.tsx
 
 **Checkpoint**: Overview classification is honest at both the API and UI layer.
 
@@ -82,11 +82,11 @@
 
 ### Implementation for User Story 3
 
-- [ ] T022 [US3] Implement the bounded 30-day reconstruction helper and hard stop logic in apps/web/src/server/protocol-positions/reconstructRecentPositionState.ts
-- [ ] T023 [US3] Integrate bounded reconstruction into detection only when direct current-state reads are insufficient in apps/web/src/server/protocol-positions/detectProtocolPositions.ts
-- [ ] T024 [US3] Populate row-level `coverageStatus`, `coverageReasonCodes`, `valueStatus`, and non-fabricated metric degradation in apps/web/src/server/overview/getRecentOverview.ts
-- [ ] T025 [P] [US3] Extend protocol-position coverage and value-treatment normalization in apps/web/src/features/overview/overview.mappers.ts
-- [ ] T026 [P] [US3] Render share-level, partial, unknown, estimated, and unavailable value states plus explicit bounded-reconstruction messaging that distinguishes recent protocol evidence from full one-year reconstruction in apps/web/src/features/overview/Overview.component.tsx and apps/web/src/i18n/locales/en/overview.json and apps/web/src/i18n/locales/es/overview.json
+- [X] T022 [US3] Implement the bounded 30-day reconstruction helper and hard stop logic in apps/web/src/server/protocol-positions/reconstructRecentPositionState.ts
+- [X] T023 [US3] Integrate bounded reconstruction into detection only when direct current-state reads are insufficient in apps/web/src/server/protocol-positions/detectProtocolPositions.ts
+- [X] T024 [US3] Populate row-level `coverageStatus`, `coverageReasonCodes`, `valueStatus`, and non-fabricated metric degradation in apps/web/src/server/overview/getRecentOverview.ts
+- [X] T025 [P] [US3] Extend protocol-position coverage and value-treatment normalization in apps/web/src/features/overview/overview.mappers.ts
+- [X] T026 [P] [US3] Render share-level, partial, unknown, estimated, and unavailable value states plus explicit bounded-reconstruction messaging that distinguishes recent protocol evidence from full one-year reconstruction in apps/web/src/features/overview/Overview.component.tsx and apps/web/src/i18n/locales/en/overview.json and apps/web/src/i18n/locales/es/overview.json
 
 **Checkpoint**: Partial protocol coverage is visible and explicit instead of hidden or overstated.
 
@@ -100,10 +100,10 @@
 
 ### Implementation for User Story 4
 
-- [ ] T027 [US4] Finalize chain-scoped deterministic position keys for manual deposits, strategy exposure, and governance locks in apps/web/src/server/protocol-positions/protocolMetadata.ts and apps/web/src/server/protocol-positions/detectProtocolPositions.ts
-- [ ] T028 [US4] Deduplicate overlapping provider and protocol signals so each visible position resolves to exactly one primary family in apps/web/src/server/protocol-positions/detectProtocolPositions.ts
-- [ ] T029 [US4] Persist materially relevant provider or RPC artifacts to `raw_provider_records` and store bounded-reconstruction explainability metadata through existing persistence surfaces in apps/web/src/server/overview/overview.repository.ts and apps/web/src/server/overview/getRecentOverview.ts
-- [ ] T030 [US4] Preserve the `GET /api/wallet/overview` extension shape and chain-scoped identity fields for later reuse in apps/web/src/server/overview/overview.types.ts and apps/web/src/app/api/wallet/overview/route.ts
+- [X] T027 [US4] Finalize chain-scoped deterministic position keys for manual deposits, strategy exposure, and governance locks in apps/web/src/server/protocol-positions/protocolMetadata.ts and apps/web/src/server/protocol-positions/detectProtocolPositions.ts
+- [X] T028 [US4] Deduplicate overlapping provider and protocol signals so each visible position resolves to exactly one primary family in apps/web/src/server/protocol-positions/detectProtocolPositions.ts
+- [X] T029 [US4] Persist materially relevant provider or RPC artifacts to `raw_provider_records` and store bounded-reconstruction explainability metadata through existing persistence surfaces in apps/web/src/server/overview/overview.repository.ts and apps/web/src/server/overview/getRecentOverview.ts
+- [X] T030 [US4] Preserve the `GET /api/wallet/overview` extension shape and chain-scoped identity fields for later reuse in apps/web/src/server/overview/overview.types.ts and apps/web/src/app/api/wallet/overview/route.ts
 
 **Checkpoint**: Protocol-position identities and evidence are compatible with later analytics sections without widening Stage 1 scope.
 
@@ -117,10 +117,10 @@
 
 ### Implementation for User Story 5
 
-- [ ] T031 [P] [US5] Add English protocol-position headings, family labels, helper descriptions, empty states, value-treatment copy, and bounded-reconstruction explanation copy in apps/web/src/i18n/locales/en/overview.json
-- [ ] T032 [P] [US5] Add Spanish parity for protocol-position headings, family labels, helper descriptions, empty states, value-treatment copy, and bounded-reconstruction explanation copy in apps/web/src/i18n/locales/es/overview.json
-- [ ] T033 [P] [US5] Add shared protocol-position coverage reason labels in apps/web/src/i18n/locales/en/coverage.json and apps/web/src/i18n/locales/es/coverage.json
-- [ ] T034 [US5] Wire translated protocol-position copy and locale-aware formatting into apps/web/src/features/overview/Overview.component.tsx
+- [X] T031 [P] [US5] Add English protocol-position headings, family labels, helper descriptions, empty states, value-treatment copy, and bounded-reconstruction explanation copy in apps/web/src/i18n/locales/en/overview.json
+- [X] T032 [P] [US5] Add Spanish parity for protocol-position headings, family labels, helper descriptions, empty states, value-treatment copy, and bounded-reconstruction explanation copy in apps/web/src/i18n/locales/es/overview.json
+- [X] T033 [P] [US5] Add shared protocol-position coverage reason labels in apps/web/src/i18n/locales/en/coverage.json and apps/web/src/i18n/locales/es/coverage.json
+- [X] T034 [US5] Wire translated protocol-position copy and locale-aware formatting into apps/web/src/features/overview/Overview.component.tsx
 
 **Checkpoint**: Protocol-position UX is fully localized for Stage 1.
 
@@ -130,13 +130,13 @@
 
 **Purpose**: Run the required quality gates and feature-specific runtime validations.
 
-- [ ] T035 Run EN/ES parity validation for touched Overview and Coverage namespaces through apps/web/scripts/check-i18n-parity.ts using `cd apps/web && pnpm i18n:check`
-- [ ] T036 Run TypeScript validation for protocol-position changes through apps/web/tsconfig.json using `cd apps/web && pnpm typecheck`
-- [ ] T037 Run lint validation for protocol-position changes through apps/web/eslint.config.mjs using `cd apps/web && pnpm lint`
-- [ ] T038 Run production build validation for Overview protocol positions through apps/web/package.json using `cd apps/web && pnpm build`
-- [ ] T039 Validate browser-provider boundaries remain intact with `cd apps/web && rg "@/server/providers|moralis|alchemy" src/features src/app --glob '!**/api/**'`
-- [ ] T040 Validate bounded reconstruction stays within 30 days, unrelated NFTs stay excluded from `protocolPositions.rows`, and route sanitization strips raw provider fields in apps/web/src/server/protocol-positions/reconstructRecentPositionState.ts, apps/web/src/server/protocol-positions/detectProtocolPositions.ts, and apps/web/src/app/api/wallet/overview/route.ts
-- [ ] T041 Run a direct Overview smoke path with a syntactically valid wallet address against apps/web/src/server/overview/getRecentOverview.ts or apps/web/src/app/api/wallet/overview/route.ts using loaded local env from apps/web/.env.local
+- [X] T035 Run EN/ES parity validation for touched Overview and Coverage namespaces through apps/web/scripts/check-i18n-parity.ts using `cd apps/web && pnpm i18n:check`
+- [X] T036 Run TypeScript validation for protocol-position changes through apps/web/tsconfig.json using `cd apps/web && pnpm typecheck`
+- [X] T037 Run lint validation for protocol-position changes through apps/web/eslint.config.mjs using `cd apps/web && pnpm lint`
+- [X] T038 Run production build validation for Overview protocol positions through apps/web/package.json using `cd apps/web && pnpm build`
+- [X] T039 Validate browser-provider boundaries remain intact with `cd apps/web && rg "@/server/providers|moralis|alchemy" src/features src/app --glob '!**/api/**'`
+- [X] T040 Validate bounded reconstruction stays within 30 days, unrelated NFTs stay excluded from `protocolPositions.rows`, and route sanitization strips raw provider fields in apps/web/src/server/protocol-positions/reconstructRecentPositionState.ts, apps/web/src/server/protocol-positions/detectProtocolPositions.ts, and apps/web/src/app/api/wallet/overview/route.ts
+- [X] T041 Run a direct Overview smoke path with a syntactically valid wallet address against apps/web/src/server/overview/getRecentOverview.ts or apps/web/src/app/api/wallet/overview/route.ts using loaded local env from apps/web/.env.local
 
 ---
 

@@ -32,12 +32,22 @@
   "sections": {
     "chart": "Portfolio evolution",
     "distribution": "Capital distribution",
+    "protocolPositions": "Protocol positions",
     "assets": "Assets",
     "activity": "Recent activity"
   },
   "sources": {
     "recent_provider_data": "Recent provider data",
     "partial_fallback": "Partial fallback"
+  },
+  "distribution": {
+    "slices": {
+      "idle": "Idle assets",
+      "manualDeposits": "Manual deposits",
+      "automatedStrategies": "Automated strategies",
+      "governanceLocks": "Governance locks",
+      "stakedLp": "Staked LP"
+    }
   },
   "status": {
     "not_analyzed": "Not analyzed",
@@ -103,8 +113,58 @@
     "filteredUnpricedEmptyDescription": "Turn on the unpriced asset switch to inspect rows without prices. Default totals stay unchanged.",
     "filteredEmptyTitle": "The current asset filters hide all rows",
     "filteredEmptyDescription": "Adjust the insecure, unpriced, or dust-value switches to inspect more rows. Default totals stay unchanged.",
+    "protocolPositionsOnlyTitle": "Current capital is deployed through protocol positions",
+    "protocolPositionsOnlyDescription": "Wallet assets can be empty while protocol positions remain visible above. This Overview keeps both surfaces separate.",
     "exclusionsSummary": "{{count}} assets are excluded from default totals. Excluded priced value: {{value}}.",
     "noSecurityGuarantee": "Trust labels help triage visibility. They are not a security guarantee."
+  },
+  "protocolPositions": {
+    "emptyTitle": "No protocol positions detected",
+    "emptyDescription": "Manual deposits, strategy exposure, and governance locks will appear here when recent provider evidence supports them.",
+    "reconstructionNotice": "Recent protocol reconstruction is capped to the latest 30 days. It improves current-state visibility, not full one-year history.",
+    "shareLevelNotice": "Share-level positions are shown when the wallet clearly has strategy exposure but current position decomposition is incomplete.",
+    "metadataUnavailable": "Position metadata is incomplete",
+    "accordionTokenId": "Token #{{value}}",
+    "poolGroupLabel": "{{pool}} · {{feeTier}}",
+    "positionValue": "{{value}} · {{status}}",
+    "tokenId": "Token ID {{value}}",
+    "lockEndAt": "Lock ends {{value}}",
+    "valueUpdatedAt": "Value updated {{value}}",
+    "poolGroupCount_one": "1 position in this group",
+    "poolGroupCount_other": "{{count}} positions in this group",
+    "coverageStatus": {
+      "full": "Current coverage",
+      "share_level": "Share-level coverage",
+      "partial": "Partial current coverage",
+      "unknown": "Unknown current coverage"
+    },
+    "valueStatus": {
+      "current": "current value",
+      "estimated": "estimated value",
+      "unavailable": "value unavailable"
+    },
+    "positionStatus": {
+      "active": "Active",
+      "locked": "Locked",
+      "staked": "Staked",
+      "unknown": "Unknown"
+    },
+    "families": {
+      "manual_deposit": "Manual deposit",
+      "strategy_exposure": "Strategy exposure",
+      "governance_lock": "Governance lock",
+      "staked_lp": "Staked LP"
+    },
+    "summary": {
+      "totalCount_one": "1 position",
+      "totalCount_other": "{{count}} positions",
+      "manualDepositCount_one": "1 manual deposit",
+      "manualDepositCount_other": "{{count}} manual deposits",
+      "strategyExposureCount_one": "1 strategy exposure",
+      "strategyExposureCount_other": "{{count}} strategy exposures",
+      "governanceLockCount_one": "1 governance lock",
+      "governanceLockCount_other": "{{count}} governance locks"
+    }
   },
   "actions": {
     "refresh": "Refresh",

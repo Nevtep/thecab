@@ -32,12 +32,22 @@
   "sections": {
     "chart": "Evolución de la cartera",
     "distribution": "Distribución de capital",
+    "protocolPositions": "Posiciones de protocolo",
     "assets": "Activos",
     "activity": "Actividad reciente"
   },
   "sources": {
     "recent_provider_data": "Datos recientes de proveedores",
     "partial_fallback": "Fallback parcial"
+  },
+  "distribution": {
+    "slices": {
+      "idle": "Activos idle",
+      "manualDeposits": "Depósitos manuales",
+      "automatedStrategies": "Estrategias automatizadas",
+      "governanceLocks": "Bloqueos de gobernanza",
+      "stakedLp": "LP en staking"
+    }
   },
   "status": {
     "not_analyzed": "Sin analizar",
@@ -103,8 +113,58 @@
     "filteredUnpricedEmptyDescription": "Activa el switch de activos sin precio para inspeccionar filas sin precios. Los totales por defecto no cambian.",
     "filteredEmptyTitle": "Los filtros actuales de activos ocultan todas las filas",
     "filteredEmptyDescription": "Ajusta los switches de activos inseguros, sin precio o con valor de polvo para inspeccionar más filas. Los totales por defecto no cambian.",
+    "protocolPositionsOnlyTitle": "El capital actual está desplegado mediante posiciones de protocolo",
+    "protocolPositionsOnlyDescription": "Los activos de la wallet pueden estar vacíos mientras las posiciones de protocolo siguen visibles arriba. Este Resumen mantiene ambas superficies separadas.",
     "exclusionsSummary": "{{count}} activos están excluidos de los totales por defecto. Valor con precio excluido: {{value}}.",
     "noSecurityGuarantee": "Las etiquetas de confianza ayudan a priorizar la visibilidad. No son una garantía de seguridad."
+  },
+  "protocolPositions": {
+    "emptyTitle": "No se detectaron posiciones de protocolo",
+    "emptyDescription": "Los depósitos manuales, la exposición a estrategias y los bloqueos de gobernanza aparecerán aquí cuando la evidencia reciente de proveedores los respalde.",
+    "reconstructionNotice": "La reconstrucción reciente de protocolo está limitada a los últimos 30 días. Mejora la visibilidad del estado actual, no un historial completo de un año.",
+    "shareLevelNotice": "Las posiciones a nivel de participación se muestran cuando la wallet claramente tiene exposición a una estrategia pero la descomposición actual de la posición es incompleta.",
+    "metadataUnavailable": "Los metadatos de la posición están incompletos",
+    "accordionTokenId": "Token #{{value}}",
+    "poolGroupLabel": "{{pool}} · {{feeTier}}",
+    "positionValue": "{{value}} · {{status}}",
+    "tokenId": "Token ID {{value}}",
+    "lockEndAt": "El bloqueo termina {{value}}",
+    "valueUpdatedAt": "Valor actualizado {{value}}",
+    "poolGroupCount_one": "1 posición en este grupo",
+    "poolGroupCount_other": "{{count}} posiciones en este grupo",
+    "coverageStatus": {
+      "full": "Cobertura actual",
+      "share_level": "Cobertura a nivel de participación",
+      "partial": "Cobertura actual parcial",
+      "unknown": "Cobertura actual desconocida"
+    },
+    "valueStatus": {
+      "current": "valor actual",
+      "estimated": "valor estimado",
+      "unavailable": "valor no disponible"
+    },
+    "positionStatus": {
+      "active": "Activa",
+      "locked": "Bloqueada",
+      "staked": "En staking",
+      "unknown": "Desconocida"
+    },
+    "families": {
+      "manual_deposit": "Depósito manual",
+      "strategy_exposure": "Exposición a estrategia",
+      "governance_lock": "Bloqueo de gobernanza",
+      "staked_lp": "LP en staking"
+    },
+    "summary": {
+      "totalCount_one": "1 posición",
+      "totalCount_other": "{{count}} posiciones",
+      "manualDepositCount_one": "1 depósito manual",
+      "manualDepositCount_other": "{{count}} depósitos manuales",
+      "strategyExposureCount_one": "1 exposición a estrategia",
+      "strategyExposureCount_other": "{{count}} exposiciones a estrategia",
+      "governanceLockCount_one": "1 bloqueo de gobernanza",
+      "governanceLockCount_other": "{{count}} bloqueos de gobernanza"
+    }
   },
   "actions": {
     "refresh": "Actualizar",

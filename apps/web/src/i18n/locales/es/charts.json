@@ -1,6 +1,7 @@
 {
   "series": {
     "netPortfolioValue": "Valor neto de la cartera",
+    "deployedValue": "Valor desplegado",
     "idleValue": "Valor idle"
   }
 }

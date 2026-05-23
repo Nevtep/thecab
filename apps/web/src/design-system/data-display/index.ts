@@ -1,4 +1,5 @@
 export * from "@/design-system/data-display/CabAnalysisStatusBadge";
+export * from "@/design-system/data-display/CabAccordion";
 export * from "@/design-system/data-display/CabChartPanel";
 export * from "@/design-system/data-display/CabCoverageBadge";
 export * from "@/design-system/data-display/CabDataPanel";

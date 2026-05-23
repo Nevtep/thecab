@@ -115,6 +115,25 @@ export function mapOverviewResponseToViewModel(response: OverviewViewModel): Ove
           }
         : null,
     },
+    protocolPositions: {
+      ...response.protocolPositions,
+      coverageReasonCodes: dedupeReasonCodes(response.protocolPositions.coverageReasonCodes),
+      rows: [...response.protocolPositions.rows]
+        .map((row) => ({
+          ...row,
+          coverageReasonCodes: dedupeRequiredReasonCodes(row.coverageReasonCodes),
+        }))
+        .sort((left, right) => {
+          const leftValue = left.valueUsd ?? -1;
+          const rightValue = right.valueUsd ?? -1;
+
+          if (rightValue !== leftValue) {
+            return rightValue - leftValue;
+          }
+
+          return left.label.localeCompare(right.label);
+        }),
+    },
     activity: {
       ...response.activity,
       coverageReasonCodes: dedupeReasonCodes(response.activity.coverageReasonCodes),
