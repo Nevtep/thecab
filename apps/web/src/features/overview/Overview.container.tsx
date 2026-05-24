@@ -1,7 +1,6 @@
 "use client";
 
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 
 import { OverviewComponent } from "@/features/overview/Overview.component";
 import {
@@ -17,7 +16,6 @@ import {
   useOverviewProtocolPositionsQuery,
   useOverviewQuery,
   useOverviewShellQuery,
-  useStartAnalysisMutation,
   useWarmOverviewMutation,
 } from "@/queries/hooks";
 import { SUPPORTED_CHAIN_ID } from "@/wallet/supportedChains";
@@ -26,7 +24,6 @@ import { useCabWallet } from "@/wallet/useCabWallet";
 const ENABLE_OVERVIEW_WARMUP = false;
 
 export function OverviewContainer() {
-  const queryClient = useQueryClient();
   const { address, chainId, status, isConnected, isAuthenticated, isSupportedChain, connect, disconnect, switchToSupportedChain } = useCabWallet();
   const [screenState, setScreenState] = useState(() =>
     createInitialOverviewScreenState(address?.toLowerCase() ?? null, chainId ?? null),
@@ -100,7 +97,6 @@ export function OverviewContainer() {
       chainId: resolvedChainId,
     },
   );
-  const startAnalysisMutation = useStartAnalysisMutation();
   const warmOverviewMutation = useWarmOverviewMutation();
 
   const shellViewModel = useMemo(
@@ -198,28 +194,6 @@ export function OverviewContainer() {
     void analysisStatusQuery.refetch();
   }
 
-  async function handleStartAnalysis() {
-    if (!walletAddress) {
-      return;
-    }
-
-    await startAnalysisMutation.mutateAsync({
-      walletAddress,
-      chainId: resolvedChainId,
-      mode: "full_history",
-    });
-
-    await Promise.all([
-      shellQuery.refetch(),
-      overviewQuery.refetch(),
-      chartQuery.refetch(),
-      activityQuery.refetch(),
-      protocolPositionsQuery.refetch(),
-      analysisStatusQuery.refetch(),
-      queryClient.invalidateQueries(),
-    ]);
-  }
-
   return (
     <OverviewComponent
       chainId={resolvedChainId}
@@ -251,14 +225,12 @@ export function OverviewContainer() {
       chartErrorCode={chartErrorCode}
       activityErrorCode={activityErrorCode}
       protocolPositionsErrorCode={protocolPositionsErrorCode}
-      isStartingAnalysis={startAnalysisMutation.isPending}
       isWarmingSnapshots={warmOverviewMutation.isPending}
       onConnect={() => void connect()}
       onDisconnect={() => void disconnect()}
       onSwitchChain={() => void switchToSupportedChain()}
       onRefresh={handleRefresh}
       onRangeChange={handleRangeChange}
-      onStartAnalysis={() => void handleStartAnalysis()}
       onToggleHiddenAssets={(checked) => setShowHiddenAssets(checked)}
       onToggleUnpricedAssets={(checked) => setShowUnpricedAssets(checked)}
       onToggleDustAssets={(checked) => setShowDustAssets(checked)}

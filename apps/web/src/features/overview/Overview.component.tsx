@@ -79,14 +79,12 @@ type OverviewComponentProps = {
   chartErrorCode: string | null;
   activityErrorCode: string | null;
   protocolPositionsErrorCode: string | null;
-  isStartingAnalysis: boolean;
   isWarmingSnapshots: boolean;
   onConnect: () => void;
   onDisconnect: () => void;
   onSwitchChain: () => void;
   onRefresh: () => void;
   onRangeChange: (range: OverviewRange) => void;
-  onStartAnalysis: () => void;
   onToggleHiddenAssets: (checked: boolean) => void;
   onToggleUnpricedAssets: (checked: boolean) => void;
   onToggleDustAssets: (checked: boolean) => void;
@@ -153,10 +151,16 @@ function renderAssetRows(
   },
 ) {
   return rows.map((row) => {
-    const trustStatusLabel = input.translate(getOverviewTrustStatusLabelKey(row.trustStatus));
-    const trustReasonLabels = getOverviewTrustReasonLabelKeys(row.trustReasonCodes).map((labelKey) =>
-      input.translate(labelKey),
-    );
+    const hasCurrentSpotPrice = row.priceUsd !== null;
+    const displayedTrustStatus = !hasCurrentSpotPrice && row.trustStatus === "priced"
+      ? "unknown"
+      : row.trustStatus;
+    const trustStatusLabel = input.translate(getOverviewTrustStatusLabelKey(displayedTrustStatus));
+    const trustReasonLabels = getOverviewTrustReasonLabelKeys(
+      !hasCurrentSpotPrice
+        ? row.trustReasonCodes.filter((reasonCode) => reasonCode !== "hasReliablePrice")
+        : row.trustReasonCodes,
+    ).map((labelKey) => input.translate(labelKey));
 
     return (
       <CabCard key={`${row.tokenAddress ?? row.symbol}-${row.balance}-${row.isHiddenByDefault}`} density="default">
@@ -167,7 +171,7 @@ function renderAssetRows(
                 <CabText variant="label">{row.symbol}</CabText>
                 <CabTooltip label={trustReasonLabels.join(" · ") || trustStatusLabel}>
                   <span>
-                    <CabBadge tone={getOverviewTrustBadgeTone(row.trustStatus)} size="sm">
+                    <CabBadge tone={getOverviewTrustBadgeTone(displayedTrustStatus)} size="sm">
                       {trustStatusLabel}
                     </CabBadge>
                   </span>
@@ -567,14 +571,12 @@ export function OverviewComponent({
   chartErrorCode,
   activityErrorCode,
   protocolPositionsErrorCode,
-  isStartingAnalysis,
   isWarmingSnapshots,
   onConnect,
   onDisconnect,
   onSwitchChain,
   onRefresh,
   onRangeChange,
-  onStartAnalysis,
   onToggleHiddenAssets,
   onToggleUnpricedAssets,
   onToggleDustAssets,
@@ -757,24 +759,66 @@ export function OverviewComponent({
         })
       : null,
   ].filter((value): value is string => Boolean(value)) : [];
+  const analysisStatusCard = isInitialShellLoading ? (
+    <CabCard density="spacious">
+      <CabText variant="caption" fontSize={12}>
+        {t("states.loadingAnalysis")}
+      </CabText>
+    </CabCard>
+  ) : (
+    <CabCard density="spacious">
+      <CabStack gap="$3">
+        <CabSectionHeader
+          title={t("analysis:title")}
+          subtitle={t(`analysis:messages.${activeAnalysis.status}`)}
+          actions={
+            <CabAnalysisStatusBadge
+              status={mapOverviewAnalysisStatusToBadgeStatus(activeAnalysis.status)}
+              label={analysisStatusLabel}
+            />
+          }
+        />
+        {isWarmingSnapshots ? (
+          <CabText variant="caption" fontSize={12}>
+            {t("states.loadingWarmup30d")}
+          </CabText>
+        ) : null}
+        {activeAnalysis.lastSuccessfulRunAt ? (
+          <CabText variant="caption" fontSize={12}>
+            {t("analysis:lastSuccessfulRunAt", {
+              value: formatDateTime(activeAnalysis.lastSuccessfulRunAt, locale),
+            })}
+          </CabText>
+        ) : null}
+        {activeAnalysis.lastError ? (
+          <CabStack gap="$1">
+            <CabText variant="caption" fontSize={12}>
+              {t("analysis:fallback.recentViewAvailable")}
+            </CabText>
+            <CabText variant="caption" fontSize={12}>
+              {activeAnalysis.lastError}
+            </CabText>
+          </CabStack>
+        ) : null}
+        {showAnalysisAction ? (
+          <CabAnalysisCta
+            label={analysisActionLabel}
+            disabled
+          />
+        ) : null}
+      </CabStack>
+    </CabCard>
+  );
 
   return (
     <section data-overview-root>
       <ConnectedShell
-        menuLabel={t("navigation:a11y.openMenu")}
-        closeMenuLabel={t("navigation:a11y.closeMenu")}
         sidebar={
           <CabSidebar
             header={
-              <CabStack gap="$3">
-                <CabText variant="heading" fontSize={18}>
-                  {t("title")}
-                </CabText>
-                <CabAnalysisStatusBadge
-                  status={mapOverviewAnalysisStatusToBadgeStatus(activeAnalysis.status)}
-                  label={analysisStatusLabel}
-                />
-              </CabStack>
+              <CabText variant="heading" fontSize={18}>
+                {t("title")}
+              </CabText>
             }
             footer={
               <CabText variant="caption" fontSize={12}>
@@ -825,6 +869,7 @@ export function OverviewComponent({
                 </CabText>
               </CabStack>
             </CabCard>
+            {analysisStatusCard}
           </CabSidebar>
         }
         topBar={
@@ -841,54 +886,6 @@ export function OverviewComponent({
         }
       >
         <CabStack gap="$4">
-          {isInitialShellLoading ? (
-            <CabLoadingPanel label={t("states.loadingAnalysis")} />
-          ) : (
-            <CabCard density="spacious">
-              <CabStack gap="$3">
-                <CabSectionHeader
-                  title={t("analysis:title")}
-                  subtitle={t(`analysis:messages.${activeAnalysis.status}`)}
-                  actions={
-                    <CabAnalysisStatusBadge
-                      status={mapOverviewAnalysisStatusToBadgeStatus(activeAnalysis.status)}
-                      label={analysisStatusLabel}
-                    />
-                  }
-                />
-                {isWarmingSnapshots ? (
-                  <CabText variant="caption" fontSize={12}>
-                    {t("states.loadingWarmup30d")}
-                  </CabText>
-                ) : null}
-                {activeAnalysis.lastSuccessfulRunAt ? (
-                  <CabText variant="caption" fontSize={12}>
-                    {t("analysis:lastSuccessfulRunAt", {
-                      value: formatDateTime(activeAnalysis.lastSuccessfulRunAt, locale),
-                    })}
-                  </CabText>
-                ) : null}
-                {activeAnalysis.lastError ? (
-                  <CabStack gap="$1">
-                    <CabText variant="caption" fontSize={12}>
-                      {t("analysis:fallback.recentViewAvailable")}
-                    </CabText>
-                    <CabText variant="caption" fontSize={12}>
-                      {activeAnalysis.lastError}
-                    </CabText>
-                  </CabStack>
-                ) : null}
-                {showAnalysisAction ? (
-                  <CabAnalysisCta
-                    label={isStartingAnalysis ? t("analysis:actions.starting") : analysisActionLabel}
-                    disabled={isStartingAnalysis}
-                    onPress={onStartAnalysis}
-                  />
-                ) : null}
-              </CabStack>
-            </CabCard>
-          )}
-
           {!isInitialShellLoading && baseViewModel?.coverage.status === "partial" ? (
             <CabPartialCoverageNotice
               title={t("coverage:noticeTitle")}
