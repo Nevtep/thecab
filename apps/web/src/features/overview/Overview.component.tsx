@@ -962,6 +962,7 @@ export function OverviewComponent({
                   />
                 }
                 notice={isChartRefreshing ? t("states.updatingChartRange", { range: t(`ranges.${range}`) }) : undefined}
+                loadingLabel={isChartRefreshing ? t("states.updatingChartRange", { range: t(`ranges.${range}`) }) : undefined}
                 data={chartData}
                 xKey="label"
                 yAxisWidth={80}

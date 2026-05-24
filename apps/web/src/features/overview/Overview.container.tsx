@@ -108,6 +108,10 @@ export function OverviewContainer() {
     () => chartQuery.data ?? null,
     [chartQuery.data],
   );
+  const isChartRefreshing =
+    chartQuery.fetchStatus === "fetching" &&
+    chartViewModel !== null &&
+    chartViewModel.chart.range !== screenState.range;
   const activityViewModel = useMemo(
     () => activityQuery.data?.activity ?? overviewQuery.data?.activity ?? null,
     [activityQuery.data, overviewQuery.data],
@@ -216,7 +220,7 @@ export function OverviewContainer() {
       isShellLoading={shellQuery.isLoading}
       isOverviewSectionsLoading={overviewQuery.isLoading}
       isChartLoading={chartQuery.isLoading}
-      isChartRefreshing={chartQuery.isFetching && !!chartQuery.data}
+      isChartRefreshing={isChartRefreshing}
       isActivityLoading={activityQuery.isLoading}
       isProtocolPositionsLoading={protocolPositionsQuery.isLoading}
       isRefreshing={shellQuery.isFetching || overviewQuery.isFetching || chartQuery.isFetching || activityQuery.isFetching || protocolPositionsQuery.isFetching}

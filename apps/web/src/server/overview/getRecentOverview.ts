@@ -105,7 +105,7 @@ export function createEmptyRecentOverviewResponse(input: OverviewRequest): Overv
       chainId: input.chainId,
       chainLabel: chain.name,
       lastRefreshedAt: null,
-      modeLabelKey: "overview.mode.recentView",
+      modeLabelKey: "mode.recentView",
     },
     metrics: {
       source: "recent_provider_data",

@@ -98,6 +98,7 @@ export function CabButton({
   const sizeStyle = buttonSizeStyles[resolvedSize];
 
   const variant = variantStyles[tone];
+  const isDisabled = props.disabled === true;
 
   return (
     <Button
@@ -109,8 +110,14 @@ export function CabButton({
       paddingVertical={sizeStyle.paddingVertical}
       gap={sizeStyle.gap}
       justifyContent="center"
-      cursor="pointer"
+      cursor={isDisabled ? "not-allowed" : "pointer"}
       pressStyle={{ opacity: 0.88, scale: 0.98 }}
+      disabledStyle={{
+        backgroundColor: "rgba(26, 34, 51, 0.92)",
+        borderColor: "rgba(107, 122, 152, 0.32)",
+        color: cabColors.text.muted,
+        opacity: 0.72,
+      }}
       focusVisibleStyle={{
         outlineColor: cabColors.brand.signalTeal,
         outlineWidth: 2,
