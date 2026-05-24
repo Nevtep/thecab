@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 
 import { SUPPORTED_CHAIN_ID } from "@/server/chains";
 import { getCurrentTokenPricesByAddress } from "@/server/providers/alchemy";
-import { getWalletDefiPositions, getWalletHistory } from "@/server/providers/moralis";
+import { getWalletDefiPositions, getWalletHistory, getWalletTokens } from "@/server/providers/moralis";
 
 function loadLocalEnvFile() {
   const envFilePath = resolve(process.cwd(), ".env.local");
@@ -24,7 +24,7 @@ function loadLocalEnvFile() {
 
     const key = trimmedLine.slice(0, separatorIndex).trim();
     const value = trimmedLine.slice(separatorIndex + 1).trim().replace(/^['"]|['"]$/g, "");
-    if (!process.env[key] || key === "TEST_ADDRESS") {
+    if (!process.env[key]) {
       process.env[key] = value;
     }
   }
@@ -45,7 +45,8 @@ function getTestWalletAddress() {
 async function main() {
   const sampleWallet = getTestWalletAddress();
 
-  const [history, defiPositions, prices] = await Promise.all([
+  const [tokens, history, defiPositions, prices] = await Promise.all([
+    getWalletTokens(sampleWallet, SUPPORTED_CHAIN_ID),
     getWalletHistory(sampleWallet, SUPPORTED_CHAIN_ID, 5),
     getWalletDefiPositions(sampleWallet, SUPPORTED_CHAIN_ID),
     getCurrentTokenPricesByAddress(SUPPORTED_CHAIN_ID, [
@@ -58,6 +59,7 @@ async function main() {
       {
         ok: true,
         walletAddress: sampleWallet,
+        tokenCount: tokens.result?.length ?? 0,
         historyCount: history.result?.length ?? 0,
         defiPositionsCount: defiPositions.length,
         priceCount: prices.data?.length ?? 0,

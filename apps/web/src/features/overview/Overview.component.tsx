@@ -653,7 +653,7 @@ export function OverviewComponent({
     );
   }
 
-  const baseViewModel = shellViewModel ?? overviewViewModel;
+  const baseViewModel = overviewViewModel ?? shellViewModel;
   const resolvedProtocolPositionsViewModel = protocolPositionsViewModel;
   const resolvedChartViewModel = chartViewModel;
   const isInitialShellLoading = isWalletPending || (isShellLoading && !baseViewModel);
