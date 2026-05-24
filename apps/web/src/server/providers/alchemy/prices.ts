@@ -1,21 +1,38 @@
+import { randomUUID } from "node:crypto";
+
 import { getAlchemyNetwork } from "@/server/chains";
+import { getRedisClient } from "@/server/cache/redis";
 import { getEnv } from "@/server/env";
+import {
+  insertProviderCachedResponse,
+  readProviderCachedResponse,
+} from "@/server/providers/provider-cache.repository";
 
 const PRICES_API_BASE = "https://api.g.alchemy.com/prices/v1";
 const CURRENT_PRICE_MEMORY_TTL_MS = 60 * 1000;
+const CURRENT_PRICE_TOKEN_NOT_FOUND_TTL_MS = 24 * 60 * 60 * 1000;
+const MAX_CURRENT_PRICE_ADDRESSES_PER_REQUEST = 25;
 const HISTORICAL_PRICE_MEMORY_TTL_MS = 10 * 60 * 1000;
+const HISTORICAL_PRICE_TOKEN_NOT_FOUND_TTL_MS = 24 * 60 * 60 * 1000;
 const ALCHEMY_HOURLY_REQUEST_LIMIT = 260;
+const ALCHEMY_PROVIDER_INFLIGHT_TTL_SECONDS = 20;
+const ALCHEMY_PROVIDER_WAIT_TIMEOUT_MS = 20 * 1000;
+const ALCHEMY_PROVIDER_WAIT_INTERVAL_MS = 250;
 
 type TokenAddressInput = {
   network: string;
   address: string;
 };
 
+type AlchemyPriceByAddressItem = {
+  network?: string;
+  address: string;
+  prices?: Array<{ value: string; currency: string; lastUpdatedAt: string }>;
+  error?: { message?: string };
+};
+
 type AlchemyPriceByAddressResult = {
-  data?: Array<{
-    address: string;
-    prices?: Array<{ value: string; currency: string; lastUpdatedAt: string }>;
-  }>;
+  data?: AlchemyPriceByAddressItem[];
 };
 
 type AlchemyHistoricalPricePoint = {
@@ -64,6 +81,38 @@ function writeCachedValue<T>(cache: Map<string, TimedCacheEntry<T>>, key: string
   });
 }
 
+function waitForDuration(durationMs: number) {
+  return new Promise((resolve) => setTimeout(resolve, durationMs));
+}
+
+async function waitForDistributedCachedResponse<T>(input: {
+  provider: string;
+  endpoint: string;
+  chainId: number;
+  cacheKey: string;
+  maxAgeMs: number;
+}) {
+  const waitStartedAt = Date.now();
+  while (Date.now() - waitStartedAt < ALCHEMY_PROVIDER_WAIT_TIMEOUT_MS) {
+    const cachedResponse = await readProviderCachedResponse<T>({
+      provider: input.provider,
+      endpoint: input.endpoint,
+      chainId: input.chainId,
+      walletAddress: null,
+      cacheKey: input.cacheKey,
+      maxAgeMs: input.maxAgeMs,
+    });
+
+    if (cachedResponse !== null) {
+      return cachedResponse;
+    }
+
+    await waitForDuration(ALCHEMY_PROVIDER_WAIT_INTERVAL_MS);
+  }
+
+  return null;
+}
+
 function consumeAlchemyBudget() {
   const now = Date.now();
   if (now - alchemyBudgetWindowStartedAt >= 60 * 60 * 1000) {
@@ -88,6 +137,115 @@ function normalizePriceAddresses(addresses: string[]) {
   );
 }
 
+function buildHistoricalTokenNotFoundCacheKey(chainId: number, address: string) {
+  return `${chainId}:${address.toLowerCase()}:token-not-found`;
+}
+
+function buildCurrentPriceTokenNotFoundCacheKey(chainId: number, address: string) {
+  return `${chainId}:${address.toLowerCase()}:price-not-found`;
+}
+
+function buildEmptyCurrentPriceItem(chainId: number, address: string): AlchemyPriceByAddressItem {
+  const normalizedAddress = address.toLowerCase();
+
+  return {
+    network: getAlchemyNetwork(chainId),
+    address: normalizedAddress,
+    prices: [],
+    error: {
+      message: `Price not found for ${getAlchemyNetwork(chainId)}:${normalizedAddress}`,
+    },
+  };
+}
+
+function hasCurrentPrices(item: AlchemyPriceByAddressItem) {
+  return Array.isArray(item.prices) && item.prices.length > 0;
+}
+
+async function readCurrentPriceTokenNotFoundFlags(chainId: number, addresses: string[]) {
+  const results = await Promise.all(
+    addresses.map(async (address) => {
+      const cached = await readProviderCachedResponse<{ notFound: true }>({
+        provider: "alchemy",
+        endpoint: "/prices/tokens/by-address/not-found",
+        chainId,
+        walletAddress: null,
+        cacheKey: buildCurrentPriceTokenNotFoundCacheKey(chainId, address),
+        maxAgeMs: CURRENT_PRICE_TOKEN_NOT_FOUND_TTL_MS,
+      });
+
+      return [address, cached?.notFound === true] as const;
+    }),
+  );
+
+  return {
+    flaggedAddresses: results.filter(([, isNotFound]) => isNotFound).map(([address]) => address),
+    candidateAddresses: results.filter(([, isNotFound]) => !isNotFound).map(([address]) => address),
+  };
+}
+
+async function cacheCurrentPriceTokenNotFound(chainId: number, address: string) {
+  await insertProviderCachedResponse({
+    provider: "alchemy",
+    endpoint: "/prices/tokens/by-address/not-found",
+    chainId,
+    walletAddress: null,
+    cacheKey: buildCurrentPriceTokenNotFoundCacheKey(chainId, address),
+    payload: { notFound: true },
+    ttlMs: CURRENT_PRICE_TOKEN_NOT_FOUND_TTL_MS,
+  });
+}
+
+function buildEmptyHistoricalPriceResult(input: {
+  chainId: number;
+  address: string;
+}): AlchemyHistoricalPriceResult {
+  return {
+    network: getAlchemyNetwork(input.chainId),
+    address: input.address.toLowerCase(),
+    currency: "USD",
+    data: [],
+  };
+}
+
+function isHistoricalTokenNotFoundError(status: number, body: string) {
+  if (status !== 400) {
+    return false;
+  }
+
+  try {
+    const parsed = JSON.parse(body) as { error?: { message?: string } };
+    return parsed.error?.message?.includes("Token not found:") === true;
+  } catch {
+    return body.includes("Token not found:");
+  }
+}
+
+async function readHistoricalTokenNotFoundFlag(chainId: number, address: string) {
+  const cached = await readProviderCachedResponse<{ notFound: true }>({
+    provider: "alchemy",
+    endpoint: "/prices/tokens/historical/not-found",
+    chainId,
+    walletAddress: null,
+    cacheKey: buildHistoricalTokenNotFoundCacheKey(chainId, address),
+    maxAgeMs: HISTORICAL_PRICE_TOKEN_NOT_FOUND_TTL_MS,
+  });
+
+  return cached?.notFound === true;
+}
+
+async function cacheHistoricalTokenNotFound(chainId: number, address: string) {
+  await insertProviderCachedResponse({
+    provider: "alchemy",
+    endpoint: "/prices/tokens/historical/not-found",
+    chainId,
+    walletAddress: null,
+    cacheKey: buildHistoricalTokenNotFoundCacheKey(chainId, address),
+    payload: { notFound: true },
+    ttlMs: HISTORICAL_PRICE_TOKEN_NOT_FOUND_TTL_MS,
+  });
+}
+
 export async function getCurrentTokenPricesByAddress(
   chainId: number,
   addresses: string[],
@@ -103,17 +261,102 @@ export async function getCurrentTokenPricesByAddress(
     return cachedResponse;
   }
 
+  const { flaggedAddresses, candidateAddresses } = await readCurrentPriceTokenNotFoundFlags(
+    chainId,
+    normalizedAddresses,
+  );
+  const flaggedResponseItems = flaggedAddresses.map((address) => buildEmptyCurrentPriceItem(chainId, address));
+
+  if (candidateAddresses.length === 0) {
+    const flaggedOnlyResponse = { data: flaggedResponseItems } satisfies AlchemyPriceByAddressResult;
+    writeCachedValue(currentPriceResponseCache, requestKey, flaggedOnlyResponse, CURRENT_PRICE_MEMORY_TTL_MS);
+    return flaggedOnlyResponse;
+  }
+
   const inFlightResponse = currentPriceInFlight.get(requestKey);
   if (inFlightResponse) {
     return inFlightResponse;
   }
 
+  const persistedResponse = await readProviderCachedResponse<AlchemyPriceByAddressResult>({
+    provider: "alchemy",
+    endpoint: "/prices/tokens/by-address",
+    chainId,
+    walletAddress: null,
+    cacheKey: requestKey,
+    maxAgeMs: CURRENT_PRICE_MEMORY_TTL_MS,
+  });
+
+  if (persistedResponse !== null) {
+    writeCachedValue(currentPriceResponseCache, requestKey, persistedResponse, CURRENT_PRICE_MEMORY_TTL_MS);
+    return persistedResponse;
+  }
+
+  const redisClient = getRedisClient();
+  const inflightKey = `alchemy-prices:current:${chainId}:${requestKey}`;
+  const lockOwner = randomUUID();
+
+  if (redisClient) {
+    const lockAcquired = await redisClient.set(inflightKey, lockOwner, {
+      nx: true,
+      ex: ALCHEMY_PROVIDER_INFLIGHT_TTL_SECONDS,
+    });
+
+    if (!lockAcquired) {
+      const distributedResponse = await waitForDistributedCachedResponse<AlchemyPriceByAddressResult>({
+        provider: "alchemy",
+        endpoint: "/prices/tokens/by-address",
+        chainId,
+        cacheKey: requestKey,
+        maxAgeMs: CURRENT_PRICE_MEMORY_TTL_MS,
+      });
+
+      if (distributedResponse !== null) {
+        writeCachedValue(currentPriceResponseCache, requestKey, distributedResponse, CURRENT_PRICE_MEMORY_TTL_MS);
+        return distributedResponse;
+      }
+    }
+  }
+
   const requestPromise = (async () => {
+    if (candidateAddresses.length > MAX_CURRENT_PRICE_ADDRESSES_PER_REQUEST) {
+      const combinedResponse = {
+        data: [...flaggedResponseItems],
+      } satisfies AlchemyPriceByAddressResult;
+
+      for (
+        let batchStart = 0;
+        batchStart < candidateAddresses.length;
+        batchStart += MAX_CURRENT_PRICE_ADDRESSES_PER_REQUEST
+      ) {
+        const addressBatch = candidateAddresses.slice(
+          batchStart,
+          batchStart + MAX_CURRENT_PRICE_ADDRESSES_PER_REQUEST,
+        );
+
+        const batchResponse = await getCurrentTokenPricesByAddress(chainId, addressBatch);
+        combinedResponse.data?.push(...(batchResponse.data ?? []));
+      }
+
+      writeCachedValue(currentPriceResponseCache, requestKey, combinedResponse, CURRENT_PRICE_MEMORY_TTL_MS);
+      await insertProviderCachedResponse({
+        provider: "alchemy",
+        endpoint: "/prices/tokens/by-address",
+        chainId,
+        walletAddress: null,
+        cacheKey: requestKey,
+        payload: combinedResponse,
+        ttlMs: CURRENT_PRICE_MEMORY_TTL_MS,
+      });
+
+      return combinedResponse;
+    }
+
     consumeAlchemyBudget();
 
     const env = getEnv();
     const url = `${PRICES_API_BASE}/${env.ALCHEMY_API_KEY}/tokens/by-address`;
-    const tokens: TokenAddressInput[] = normalizedAddresses.map((address) => ({
+    const tokens: TokenAddressInput[] = candidateAddresses.map((address) => ({
       network: getAlchemyNetwork(chainId),
       address,
     }));
@@ -133,9 +376,30 @@ export async function getCurrentTokenPricesByAddress(
     }
 
     const parsed = (await response.json()) as AlchemyPriceByAddressResult;
-    writeCachedValue(currentPriceResponseCache, requestKey, parsed, CURRENT_PRICE_MEMORY_TTL_MS);
+    const parsedItems = parsed.data ?? [];
 
-    return parsed;
+    await Promise.all(
+      parsedItems
+        .filter((item) => !hasCurrentPrices(item))
+        .map((item) => cacheCurrentPriceTokenNotFound(chainId, item.address)),
+    );
+
+    const combinedResponse = {
+      data: [...flaggedResponseItems, ...parsedItems],
+    } satisfies AlchemyPriceByAddressResult;
+
+    writeCachedValue(currentPriceResponseCache, requestKey, combinedResponse, CURRENT_PRICE_MEMORY_TTL_MS);
+    await insertProviderCachedResponse({
+      provider: "alchemy",
+      endpoint: "/prices/tokens/by-address",
+      chainId,
+      walletAddress: null,
+      cacheKey: requestKey,
+      payload: combinedResponse,
+      ttlMs: CURRENT_PRICE_MEMORY_TTL_MS,
+    });
+
+    return combinedResponse;
   })();
 
   currentPriceInFlight.set(requestKey, requestPromise);
@@ -144,6 +408,12 @@ export async function getCurrentTokenPricesByAddress(
     return await requestPromise;
   } finally {
     currentPriceInFlight.delete(requestKey);
+    if (redisClient) {
+      const currentLockOwner = await redisClient.get<string>(inflightKey);
+      if (currentLockOwner === lockOwner) {
+        await redisClient.del(inflightKey);
+      }
+    }
   }
 }
 
@@ -163,9 +433,65 @@ export async function getHistoricalTokenPricesByAddress(
     return cachedResponse;
   }
 
+  const emptyHistoricalPriceResult = buildEmptyHistoricalPriceResult({
+    chainId,
+    address: normalizedAddress,
+  });
+
+  const tokenNotFoundFlag = await readHistoricalTokenNotFoundFlag(chainId, normalizedAddress);
+  if (tokenNotFoundFlag) {
+    writeCachedValue(
+      historicalPriceResponseCache,
+      requestKey,
+      emptyHistoricalPriceResult,
+      HISTORICAL_PRICE_MEMORY_TTL_MS,
+    );
+    return emptyHistoricalPriceResult;
+  }
+
   const inFlightResponse = historicalPriceInFlight.get(requestKey);
   if (inFlightResponse) {
     return inFlightResponse;
+  }
+
+  const persistedResponse = await readProviderCachedResponse<AlchemyHistoricalPriceResult>({
+    provider: "alchemy",
+    endpoint: "/prices/tokens/historical",
+    chainId,
+    walletAddress: null,
+    cacheKey: requestKey,
+    maxAgeMs: HISTORICAL_PRICE_MEMORY_TTL_MS,
+  });
+
+  if (persistedResponse !== null) {
+    writeCachedValue(historicalPriceResponseCache, requestKey, persistedResponse, HISTORICAL_PRICE_MEMORY_TTL_MS);
+    return persistedResponse;
+  }
+
+  const redisClient = getRedisClient();
+  const inflightKey = `alchemy-prices:historical:${chainId}:${requestKey}`;
+  const lockOwner = randomUUID();
+
+  if (redisClient) {
+    const lockAcquired = await redisClient.set(inflightKey, lockOwner, {
+      nx: true,
+      ex: ALCHEMY_PROVIDER_INFLIGHT_TTL_SECONDS,
+    });
+
+    if (!lockAcquired) {
+      const distributedResponse = await waitForDistributedCachedResponse<AlchemyHistoricalPriceResult>({
+        provider: "alchemy",
+        endpoint: "/prices/tokens/historical",
+        chainId,
+        cacheKey: requestKey,
+        maxAgeMs: HISTORICAL_PRICE_MEMORY_TTL_MS,
+      });
+
+      if (distributedResponse !== null) {
+        writeCachedValue(historicalPriceResponseCache, requestKey, distributedResponse, HISTORICAL_PRICE_MEMORY_TTL_MS);
+        return distributedResponse;
+      }
+    }
   }
 
   const requestPromise = (async () => {
@@ -190,11 +516,41 @@ export async function getHistoricalTokenPricesByAddress(
 
     if (!response.ok) {
       const body = await response.text();
+      if (isHistoricalTokenNotFoundError(response.status, body)) {
+        await cacheHistoricalTokenNotFound(chainId, normalizedAddress);
+        writeCachedValue(
+          historicalPriceResponseCache,
+          requestKey,
+          emptyHistoricalPriceResult,
+          HISTORICAL_PRICE_MEMORY_TTL_MS,
+        );
+        await insertProviderCachedResponse({
+          provider: "alchemy",
+          endpoint: "/prices/tokens/historical",
+          chainId,
+          walletAddress: null,
+          cacheKey: requestKey,
+          payload: emptyHistoricalPriceResult,
+          ttlMs: HISTORICAL_PRICE_MEMORY_TTL_MS,
+        });
+
+        return emptyHistoricalPriceResult;
+      }
+
       throw new Error(`ALCHEMY_HISTORICAL_PRICES_FAILED:${response.status}:${body}`);
     }
 
     const parsed = (await response.json()) as AlchemyHistoricalPriceResult;
     writeCachedValue(historicalPriceResponseCache, requestKey, parsed, HISTORICAL_PRICE_MEMORY_TTL_MS);
+    await insertProviderCachedResponse({
+      provider: "alchemy",
+      endpoint: "/prices/tokens/historical",
+      chainId,
+      walletAddress: null,
+      cacheKey: requestKey,
+      payload: parsed,
+      ttlMs: HISTORICAL_PRICE_MEMORY_TTL_MS,
+    });
 
     return parsed;
   })();
@@ -205,5 +561,11 @@ export async function getHistoricalTokenPricesByAddress(
     return await requestPromise;
   } finally {
     historicalPriceInFlight.delete(requestKey);
+    if (redisClient) {
+      const currentLockOwner = await redisClient.get<string>(inflightKey);
+      if (currentLockOwner === lockOwner) {
+        await redisClient.del(inflightKey);
+      }
+    }
   }
 }

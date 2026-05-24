@@ -23,6 +23,8 @@ import {
 import { SUPPORTED_CHAIN_ID } from "@/wallet/supportedChains";
 import { useCabWallet } from "@/wallet/useCabWallet";
 
+const ENABLE_OVERVIEW_WARMUP = false;
+
 export function OverviewContainer() {
   const queryClient = useQueryClient();
   const { address, chainId, status, isConnected, isAuthenticated, isSupportedChain, connect, disconnect, switchToSupportedChain } = useCabWallet();
@@ -137,6 +139,7 @@ export function OverviewContainer() {
 
   useEffect(() => {
     if (
+      !ENABLE_OVERVIEW_WARMUP ||
       !walletAddress ||
       !isConnected ||
       !isSupportedChain ||

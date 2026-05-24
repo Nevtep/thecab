@@ -24,13 +24,13 @@ import styles from "@/app/page.module.css";
 export default function Home() {
   const { t } = useTranslation("landing");
   const router = useRouter();
-  const { isAuthenticated, isSupportedChain } = useCabWallet();
+  const { isAuthenticated, isAuthReady, isSupportedChain } = useCabWallet();
 
   useEffect(() => {
-    if (isAuthenticated && isSupportedChain) {
+    if (isAuthReady && isAuthenticated && isSupportedChain) {
       router.replace("/overview");
     }
-  }, [isAuthenticated, isSupportedChain, router]);
+  }, [isAuthenticated, isAuthReady, isSupportedChain, router]);
 
   return (
     <DisconnectedShell

@@ -7,6 +7,10 @@ import {
 
 import { getCurrentTokenPricesByAddress } from "@/server/providers/alchemy";
 import { alchemyRpc } from "@/server/providers/alchemy/rpc";
+import {
+  insertProviderCachedResponse,
+  readProviderCachedResponse,
+} from "@/server/providers/provider-cache.repository";
 import { readLatestOverviewPricePoints } from "@/server/overview/overview.repository";
 import {
   AERODROME_CL_POSITION_MANAGER_ADDRESS,
@@ -110,6 +114,7 @@ const slot0Selector = "0x3850c7bd";
 const slot0AbiParameters = parseAbiParameters(
   "uint160 sqrtPriceX96, int24 tick, uint16 observationIndex, uint16 observationCardinality, uint16 observationCardinalityNext, bool unlocked",
 );
+const INVALID_AERODROME_POSITION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 
 type PriceEntry = {
   priceUsd: number;
@@ -187,6 +192,48 @@ async function readSlot0(address: string) {
     sqrtPriceX96,
     tick,
   };
+}
+
+function buildInvalidPositionTokenCacheKey(chainId: number, tokenId: string) {
+  return `aerodrome-manual-position-invalid:${chainId}:${tokenId}`;
+}
+
+function isInvalidPositionIdError(error: unknown) {
+  return error instanceof Error && error.message.includes("execution reverted: ID");
+}
+
+async function readInvalidPositionTokenIds(chainId: number, tokenIds: string[]) {
+  const results = await Promise.all(
+    tokenIds.map(async (tokenId) => {
+      const cached = await readProviderCachedResponse<{ invalid: true }>({
+        provider: "alchemy",
+        endpoint: "/rpc/aerodrome/manual-position-invalid",
+        chainId,
+        walletAddress: null,
+        cacheKey: buildInvalidPositionTokenCacheKey(chainId, tokenId),
+        maxAgeMs: INVALID_AERODROME_POSITION_TOKEN_TTL_MS,
+      });
+
+      return [tokenId, cached?.invalid === true] as const;
+    }),
+  );
+
+  return {
+    cachedInvalidTokenIds: results.filter(([, isInvalid]) => isInvalid).map(([tokenId]) => tokenId),
+    candidateTokenIds: results.filter(([, isInvalid]) => !isInvalid).map(([tokenId]) => tokenId),
+  };
+}
+
+async function cacheInvalidPositionTokenId(chainId: number, tokenId: string) {
+  await insertProviderCachedResponse({
+    provider: "alchemy",
+    endpoint: "/rpc/aerodrome/manual-position-invalid",
+    chainId,
+    walletAddress: null,
+    cacheKey: buildInvalidPositionTokenCacheKey(chainId, tokenId),
+    payload: { invalid: true },
+    ttlMs: INVALID_AERODROME_POSITION_TOKEN_TTL_MS,
+  });
 }
 
 function getSqrtRatioAtTick(tick: number) {
@@ -341,6 +388,26 @@ export async function readAerodromeManualPositions(input: {
       };
     }
 
+    const { cachedInvalidTokenIds, candidateTokenIds } = await readInvalidPositionTokenIds(
+      input.chainId,
+      tokenIds,
+    );
+    tokenIds = candidateTokenIds;
+
+    if (tokenIds.length === 0) {
+      return {
+        rows: [],
+        providerPartial: false,
+        failedTokenIds: cachedInvalidTokenIds,
+        artifacts: {
+          tokenIds: requestedTokenIds,
+          failedTokenIds: cachedInvalidTokenIds,
+          priceAddresses: [],
+          positions: [],
+        },
+      };
+    }
+
     const factoryAddress = String(await ethCall({
       address: positionManagerAddress,
       abi: positionManagerFactoryAbi,
@@ -398,15 +465,22 @@ export async function readAerodromeManualPositions(input: {
               sqrtPriceX96,
             } satisfies ManualPositionRpcState,
           };
-        } catch {
+        } catch (error) {
+          if (isInvalidPositionIdError(error)) {
+            await cacheInvalidPositionTokenId(input.chainId, tokenId);
+          }
+
           return { tokenId, state: null };
         }
       }),
     );
 
-    const failedTokenIds = positionStateResults
+    const failedTokenIds = [
+      ...cachedInvalidTokenIds,
+      ...positionStateResults
       .filter((result): result is { tokenId: string; state: null } => result.state === null)
-      .map((result) => result.tokenId);
+      .map((result) => result.tokenId),
+    ];
     const positionStates = positionStateResults
       .flatMap((result) => (result.state ? [result.state] : []));
 

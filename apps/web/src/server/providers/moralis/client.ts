@@ -1,3 +1,6 @@
+import { randomUUID } from "node:crypto";
+
+import { getRedisClient } from "@/server/cache/redis";
 import { getMoralisChain } from "@/server/chains";
 import { getEnv } from "@/server/env";
 import {
@@ -8,6 +11,9 @@ import {
 const BASE_URL = "https://deep-index.moralis.io/api/v2.2";
 const MORALIS_DEFAULT_CACHE_TTL_MS = 60 * 60 * 1000;
 const MORALIS_CURRENT_ASSETS_CACHE_TTL_MS = 30 * 1000;
+const MORALIS_INFLIGHT_TTL_SECONDS = 20;
+const MORALIS_WAIT_TIMEOUT_MS = 20 * 1000;
+const MORALIS_WAIT_INTERVAL_MS = 250;
 
 type MoralisCachePolicy = {
   ttlMs: number;
@@ -41,7 +47,7 @@ function getMoralisCachePolicy(path: string): MoralisCachePolicy {
   if (normalizedPath.includes("/tokens") || normalizedPath.includes("/nft")) {
     return {
       ttlMs: MORALIS_CURRENT_ASSETS_CACHE_TTL_MS,
-      persistToDb: false,
+      persistToDb: true,
     };
   }
 
@@ -70,6 +76,10 @@ function setMemoryCachedResponse(cacheKey: string, value: unknown, ttlMs: number
     value,
     expiresAt: Date.now() + Math.max(0, ttlMs),
   });
+}
+
+function waitForDuration(durationMs: number) {
+  return new Promise((resolve) => setTimeout(resolve, durationMs));
 }
 
 function extractWalletAddressFromPath(path: string): string | null {
@@ -122,6 +132,38 @@ export async function moralisGet<T>(
     }
   }
 
+  const redisClient = cachePolicy.ttlMs > 0 ? getRedisClient() : null;
+  const inflightKey = cachePolicy.ttlMs > 0 ? `moralis:inflight:${chainId}:${cacheKey}` : null;
+  const lockOwner = inflightKey ? randomUUID() : null;
+
+  if (cachePolicy.ttlMs > 0 && cachePolicy.persistToDb && redisClient && inflightKey && lockOwner) {
+    const lockAcquired = await redisClient.set(inflightKey, lockOwner, {
+      nx: true,
+      ex: MORALIS_INFLIGHT_TTL_SECONDS,
+    });
+
+    if (!lockAcquired) {
+      const waitStartedAt = Date.now();
+      while (Date.now() - waitStartedAt < MORALIS_WAIT_TIMEOUT_MS) {
+        const cachedResponse = await readProviderCachedResponse<T>({
+          provider: "moralis",
+          endpoint: path,
+          chainId,
+          walletAddress: extractWalletAddressFromPath(path),
+          cacheKey,
+          maxAgeMs: cachePolicy.ttlMs,
+        });
+
+        if (cachedResponse !== null) {
+          setMemoryCachedResponse(cacheKey, cachedResponse, cachePolicy.ttlMs);
+          return cachedResponse;
+        }
+
+        await waitForDuration(MORALIS_WAIT_INTERVAL_MS);
+      }
+    }
+  }
+
   const requestPromise = (async () => {
     const response = await fetch(url, {
       method: "GET",
@@ -166,6 +208,13 @@ export async function moralisGet<T>(
   } finally {
     if (cachePolicy.ttlMs > 0) {
       moralisInFlight.delete(cacheKey);
+    }
+
+    if (cachePolicy.ttlMs > 0 && redisClient && inflightKey && lockOwner) {
+      const currentLockOwner = await redisClient.get<string>(inflightKey);
+      if (currentLockOwner === lockOwner) {
+        await redisClient.del(inflightKey);
+      }
     }
   }
 }

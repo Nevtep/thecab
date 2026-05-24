@@ -50,7 +50,7 @@ const BASE_AERO_ADDRESS = "0x940181a94a35a4569e4529a3cdfb74e38fd98631";
 const BASE_USDC_ADDRESS = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
 const HISTORICAL_PRICE_BATCH_SIZE = 8;
 const CURRENT_PRICE_CACHE_TTL_MS = 10 * 60 * 1000;
-const MAX_ALCHEMY_CURRENT_PRICE_ADDRESSES_PER_REQUEST = 40;
+const MAX_ALCHEMY_CURRENT_PRICE_ADDRESSES_PER_REQUEST = 25;
 const MAX_ALCHEMY_HISTORICAL_ADDRESSES_PER_REQUEST = 24;
 const DUST_VALUE_THRESHOLD_USD = 1;
 
@@ -1103,13 +1103,24 @@ async function hydrateCurrentPriceLookup(input: {
     return false;
   }
 
-  const boundedMissingAddresses = missingAddresses.slice(0, MAX_ALCHEMY_CURRENT_PRICE_ADDRESSES_PER_REQUEST);
-  const skippedAddresses = new Set(missingAddresses.slice(boundedMissingAddresses.length));
-  let priceFetchFailed = skippedAddresses.size > 0;
+  let priceFetchFailed = false;
 
-  if (boundedMissingAddresses.length > 0) {
+  for (
+    let batchStart = 0;
+    batchStart < missingAddresses.length;
+    batchStart += MAX_ALCHEMY_CURRENT_PRICE_ADDRESSES_PER_REQUEST
+  ) {
+    const addressBatch = missingAddresses.slice(
+      batchStart,
+      batchStart + MAX_ALCHEMY_CURRENT_PRICE_ADDRESSES_PER_REQUEST,
+    );
+
+    if (addressBatch.length === 0) {
+      continue;
+    }
+
     try {
-      const prices = await getCurrentTokenPricesByAddress(input.chainId, boundedMissingAddresses);
+      const prices = await getCurrentTokenPricesByAddress(input.chainId, addressBatch);
       await insertOverviewRawProviderRecord({
         walletAddress: input.walletAddress,
         chainId: input.chainId,
@@ -1117,9 +1128,9 @@ async function hydrateCurrentPriceLookup(input: {
         endpoint: "/prices/v1/tokens/by-address",
         requestJson: {
           chainId: input.chainId,
-          addresses: boundedMissingAddresses,
+          addresses: addressBatch,
           maxAddressesPerRequest: MAX_ALCHEMY_CURRENT_PRICE_ADDRESSES_PER_REQUEST,
-          skippedAddressCount: skippedAddresses.size,
+          batchSize: addressBatch.length,
         },
         responseJson: { resultCount: prices.data?.length ?? 0 },
       });
