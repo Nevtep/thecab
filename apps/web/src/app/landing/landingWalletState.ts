@@ -1,7 +1,6 @@
 type LandingWalletSnapshot = {
   isConnected: boolean;
   isSupportedChain: boolean;
-  walletConnectConfigured: boolean;
   isAuthenticated: boolean;
   isAuthenticating: boolean;
 };

@@ -61,7 +61,6 @@ export function LandingWalletCta({ continueTargetId, placement, variant = "card"
     });
 
     if (state.kind === "disconnected" || state.kind === "awaitingSignature") {
-      if (!walletConnectConfigured) return;
       await connect();
       return;
     }
