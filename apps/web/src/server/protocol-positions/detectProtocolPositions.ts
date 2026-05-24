@@ -180,6 +180,14 @@ function createCurrentPositionRow(input: {
       positionContractAddress,
       lockEndAt: family === "governance_lock" ? extractLockEndAt(input.position) : null,
       feeTierLabel: null,
+      rangeLowerTick: null,
+      rangeUpperTick: null,
+      currentTick: null,
+      isInRange: null,
+      rangeLowerPrice: null,
+      rangeUpperPrice: null,
+      rangeQuoteTokenSymbol: null,
+      rangeDisplayFractionDigits: null,
     },
   };
 }
@@ -263,6 +271,14 @@ function promoteReconstructedStakedRows(input: {
       metadata: {
         ...row.metadata,
         feeTierLabel: manualRow.metadata.feeTierLabel,
+        rangeLowerTick: manualRow.metadata.rangeLowerTick,
+        rangeUpperTick: manualRow.metadata.rangeUpperTick,
+        currentTick: manualRow.metadata.currentTick,
+        isInRange: manualRow.metadata.isInRange,
+        rangeLowerPrice: manualRow.metadata.rangeLowerPrice,
+        rangeUpperPrice: manualRow.metadata.rangeUpperPrice,
+        rangeQuoteTokenSymbol: manualRow.metadata.rangeQuoteTokenSymbol,
+        rangeDisplayFractionDigits: manualRow.metadata.rangeDisplayFractionDigits,
       },
     } satisfies OverviewProtocolPosition];
   });

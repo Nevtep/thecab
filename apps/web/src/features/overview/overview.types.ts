@@ -210,6 +210,14 @@ export type OverviewViewModel = {
         positionContractAddress: string | null;
         lockEndAt: string | null;
         feeTierLabel: string | null;
+        rangeLowerTick: number | null;
+        rangeUpperTick: number | null;
+        currentTick: number | null;
+        isInRange: boolean | null;
+        rangeLowerPrice: number | null;
+        rangeUpperPrice: number | null;
+        rangeQuoteTokenSymbol: string | null;
+        rangeDisplayFractionDigits: number | null;
       };
     }>;
     summary: {

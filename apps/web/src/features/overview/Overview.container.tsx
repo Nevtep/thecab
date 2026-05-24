@@ -242,6 +242,7 @@ export function OverviewContainer() {
       isShellLoading={shellQuery.isLoading}
       isOverviewSectionsLoading={overviewQuery.isLoading}
       isChartLoading={chartQuery.isLoading}
+      isChartRefreshing={chartQuery.isFetching && !!chartQuery.data}
       isActivityLoading={activityQuery.isLoading}
       isProtocolPositionsLoading={protocolPositionsQuery.isLoading}
       isRefreshing={shellQuery.isFetching || overviewQuery.isFetching || chartQuery.isFetching || activityQuery.isFetching || protocolPositionsQuery.isFetching}

@@ -43,6 +43,9 @@ type MellowWrapperState = {
   strategyLabel: string;
   tokenId: string | null;
   feeTierLabel: string | null;
+  tickLower: number | null;
+  tickUpper: number | null;
+  currentTick: number | null;
   shareBalanceRaw: bigint;
   token0Address: string;
   token1Address: string;
@@ -235,6 +238,28 @@ function formatFeeTierLabel(tickSpacing: number | null) {
     : null;
 }
 
+function isPositionInRange(currentTick: number | null, tickLower: number | null, tickUpper: number | null) {
+  return currentTick !== null && tickLower !== null && tickUpper !== null
+    ? currentTick >= tickLower && currentTick < tickUpper
+    : null;
+}
+
+function convertTickToToken1Price(tick: number, token0Decimals: number, token1Decimals: number) {
+  return Math.pow(1.0001, tick) * 10 ** (token0Decimals - token1Decimals);
+}
+
+function resolveRangeDisplayFractionDigits(token1Decimals: number | null, quoteTokenPriceUsd: number | null) {
+  if (token1Decimals === null) {
+    return null;
+  }
+
+  if (quoteTokenPriceUsd !== null && Number.isFinite(quoteTokenPriceUsd) && quoteTokenPriceUsd > 0) {
+    return Math.max(0, Math.min(token1Decimals, Math.ceil(Math.log10(quoteTokenPriceUsd)) + 2));
+  }
+
+  return Math.max(0, token1Decimals - 1);
+}
+
 function selectPrimaryPositionInfo(
   positions: MellowWrapperPositionInfo[],
   currentTick: number | null,
@@ -354,6 +379,9 @@ export async function readMellowStrategyPositions(input: {
             strategyLabel,
             tokenId,
             feeTierLabel: formatFeeTierLabel(tickSpacing),
+            tickLower: selectedInfo?.tickLower ?? null,
+            tickUpper: selectedInfo?.tickUpper ?? null,
+            currentTick,
             shareBalanceRaw: BigInt(balanceRaw),
             token0Address,
             token1Address,
@@ -434,6 +462,18 @@ export async function readMellowStrategyPositions(input: {
         ? token0ValueUsd + token1ValueUsd
         : null;
       const strategyLabel = state.strategyLabel;
+      const rangeLowerPrice =
+        token0Metadata.decimals !== null && token1Metadata.decimals !== null && state.tickLower !== null
+          ? convertTickToToken1Price(state.tickLower, token0Metadata.decimals, token1Metadata.decimals)
+          : null;
+      const rangeUpperPrice =
+        token0Metadata.decimals !== null && token1Metadata.decimals !== null && state.tickUpper !== null
+          ? convertTickToToken1Price(state.tickUpper, token0Metadata.decimals, token1Metadata.decimals)
+          : null;
+      const rangeDisplayFractionDigits = resolveRangeDisplayFractionDigits(
+        token1Metadata.decimals,
+        price1?.priceUsd ?? null,
+      );
       const reasonCodes = buildMetadataReasonCodes({
         family: "strategy_exposure",
         valueUsd,
@@ -486,6 +526,14 @@ export async function readMellowStrategyPositions(input: {
           positionContractAddress: state.wrapperAddress,
           lockEndAt: null,
           feeTierLabel: state.feeTierLabel,
+          rangeLowerTick: state.tickLower,
+          rangeUpperTick: state.tickUpper,
+          currentTick: state.currentTick,
+          isInRange: isPositionInRange(state.currentTick, state.tickLower, state.tickUpper),
+          rangeLowerPrice,
+          rangeUpperPrice,
+          rangeQuoteTokenSymbol: secondaryTokenSymbol,
+          rangeDisplayFractionDigits,
         },
       } satisfies OverviewProtocolPosition;
     });

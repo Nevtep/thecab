@@ -125,6 +125,8 @@
     "shareLevelNotice": "Share-level positions are shown when the wallet clearly has strategy exposure but current position decomposition is incomplete.",
     "metadataUnavailable": "Position metadata is incomplete",
     "accordionTokenId": "Token #{{value}}",
+    "rangeLabel": "Range {{lower}} to {{upper}} {{quoteToken}}",
+    "rangeSummary": "{{status}} · {{range}}",
     "poolGroupLabel": "{{pool}} · {{feeTier}}",
     "positionValue": "{{value}} · {{status}}",
     "tokenId": "Token ID {{value}}",
@@ -148,6 +150,11 @@
       "locked": "Locked",
       "staked": "Staked",
       "unknown": "Unknown"
+    },
+    "rangeStatus": {
+      "active": "Active",
+      "inactive": "Inactive",
+      "unknown": "Range unknown"
     },
     "families": {
       "manual_deposit": "Manual deposit",
@@ -179,6 +186,7 @@
     "loadingMetrics": "Loading portfolio metrics",
     "loadingProtocolPositions": "Loading protocol positions",
     "loadingChart": "Loading portfolio evolution",
+    "updatingChartRange": "Updating the {{range}} portfolio evolution view...",
     "loadingDistribution": "Loading capital distribution",
     "loadingAssets": "Loading assets",
     "loadingActivity": "Loading recent activity",

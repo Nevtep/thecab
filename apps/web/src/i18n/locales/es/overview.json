@@ -125,6 +125,8 @@
     "shareLevelNotice": "Las posiciones a nivel de participación se muestran cuando la wallet claramente tiene exposición a una estrategia pero la descomposición actual de la posición es incompleta.",
     "metadataUnavailable": "Los metadatos de la posición están incompletos",
     "accordionTokenId": "Token #{{value}}",
+    "rangeLabel": "Rango {{lower}} a {{upper}} {{quoteToken}}",
+    "rangeSummary": "{{status}} · {{range}}",
     "poolGroupLabel": "{{pool}} · {{feeTier}}",
     "positionValue": "{{value}} · {{status}}",
     "tokenId": "Token ID {{value}}",
@@ -148,6 +150,11 @@
       "locked": "Bloqueada",
       "staked": "En staking",
       "unknown": "Desconocida"
+    },
+    "rangeStatus": {
+      "active": "Activa",
+      "inactive": "Inactiva",
+      "unknown": "Rango desconocido"
     },
     "families": {
       "manual_deposit": "Depósito manual",
@@ -179,6 +186,7 @@
     "loadingMetrics": "Cargando las métricas de la cartera",
     "loadingProtocolPositions": "Cargando las posiciones de protocolo",
     "loadingChart": "Cargando la evolución de la cartera",
+    "updatingChartRange": "Actualizando la vista de evolución de la cartera de {{range}}...",
     "loadingDistribution": "Cargando la distribución de capital",
     "loadingAssets": "Cargando los activos",
     "loadingActivity": "Cargando la actividad reciente",

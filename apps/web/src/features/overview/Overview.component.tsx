@@ -70,6 +70,7 @@ type OverviewComponentProps = {
   isShellLoading: boolean;
   isOverviewSectionsLoading: boolean;
   isChartLoading: boolean;
+  isChartRefreshing: boolean;
   isActivityLoading: boolean;
   isProtocolPositionsLoading: boolean;
   isRefreshing: boolean;
@@ -261,6 +262,13 @@ function formatProtocolTokenAmount(amount: number, locale: string) {
   }).format(amount);
 }
 
+function formatProtocolRangeValue(value: number, locale: string, fractionDigits: number | null) {
+  return new Intl.NumberFormat(locale, {
+    minimumFractionDigits: fractionDigits ?? 0,
+    maximumFractionDigits: fractionDigits ?? 6,
+  }).format(value);
+}
+
 function getDistributionSliceLabel(
   slice: OverviewViewModel["distribution"]["slices"][number],
   translate: (key: string) => string,
@@ -376,6 +384,45 @@ function getProtocolAccordionHeaderLabel(
     : row.label;
 }
 
+function getProtocolAccordionHeaderRangeLabel(
+  row: ProtocolPositionRow,
+  input: {
+    locale: string;
+    translate: (key: string, options?: Record<string, unknown>) => string;
+  },
+) {
+  if (
+    row.metadata.rangeLowerPrice === null ||
+    row.metadata.rangeUpperPrice === null ||
+    !row.metadata.rangeQuoteTokenSymbol
+  ) {
+    return null;
+  }
+
+  const statusKey = row.metadata.isInRange === true
+    ? "protocolPositions.rangeStatus.active"
+    : row.metadata.isInRange === false
+      ? "protocolPositions.rangeStatus.inactive"
+      : "protocolPositions.rangeStatus.unknown";
+
+  return input.translate("protocolPositions.rangeSummary", {
+    status: input.translate(statusKey),
+    range: input.translate("protocolPositions.rangeLabel", {
+      lower: formatProtocolRangeValue(
+        row.metadata.rangeLowerPrice,
+        input.locale,
+        row.metadata.rangeDisplayFractionDigits,
+      ),
+      upper: formatProtocolRangeValue(
+        row.metadata.rangeUpperPrice,
+        input.locale,
+        row.metadata.rangeDisplayFractionDigits,
+      ),
+      quoteToken: row.metadata.rangeQuoteTokenSymbol,
+    }),
+  });
+}
+
 function renderProtocolPositionRows(
   rows: OverviewViewModel["protocolPositions"]["rows"],
   input: {
@@ -429,7 +476,14 @@ function renderProtocolPositionRows(
               value: row.positionKey,
               header: (
                 <CabStack row justifyContent="space-between" alignItems="center" gap="$3" width="100%">
-                  <CabText variant="label">{getProtocolAccordionHeaderLabel(row, input.translate)}</CabText>
+                  <CabStack row alignItems="center" gap="$2" flexWrap="wrap">
+                    <CabText variant="label">{getProtocolAccordionHeaderLabel(row, input.translate)}</CabText>
+                    {getProtocolAccordionHeaderRangeLabel(row, input) ? (
+                      <CabText variant="caption" fontSize={12}>
+                        {getProtocolAccordionHeaderRangeLabel(row, input)}
+                      </CabText>
+                    ) : null}
+                  </CabStack>
                   <CabText variant="label">
                     {formatCurrencyValue(row.valueUsd, input.locale, input.translate("states.unavailableValue"))}
                   </CabText>
@@ -504,6 +558,7 @@ export function OverviewComponent({
   isShellLoading,
   isOverviewSectionsLoading,
   isChartLoading,
+  isChartRefreshing,
   isActivityLoading,
   isProtocolPositionsLoading,
   isRefreshing,
@@ -773,11 +828,6 @@ export function OverviewComponent({
         topBar={
           <CabTopNav title={t("title")}>
             <CabStack row gap="$2" flexWrap="wrap" alignItems="center">
-              <CabRangeSelector
-                options={rangeOptions}
-                selectedKey={range}
-                onSelect={(nextRange) => onRangeChange(nextRange as OverviewRange)}
-              />
               <CabButton tone="secondary" onPress={onRefresh} disabled={isRefreshing}>
                 {isRefreshing ? t("actions.refreshing") : t("actions.refresh")}
               </CabButton>
@@ -905,6 +955,14 @@ export function OverviewComponent({
                   resolvedChartViewModel.chart.coverageReasonCodes,
                   t,
                 )}
+                actions={
+                  <CabRangeSelector
+                    options={rangeOptions}
+                    selectedKey={range}
+                    onSelect={(nextRange) => onRangeChange(nextRange as OverviewRange)}
+                  />
+                }
+                notice={isChartRefreshing ? t("states.updatingChartRange", { range: t(`ranges.${range}`) }) : undefined}
                 data={chartData}
                 xKey="label"
                 yAxisWidth={80}
@@ -959,38 +1017,50 @@ export function OverviewComponent({
                     description={t("states.emptyDistributionDescription")}
                   />
                 ) : (
-                  <CabStack gap="$2">
-                    <CabDonutChart
-                      data={distributionChartData}
-                      height={280}
-                    />
-                    {resolvedChartViewModel.distribution.slices.map((slice) => (
-                      <CabCard key={`${slice.dimension}-${slice.label}`} density="default">
-                        <CabStack row justifyContent="space-between" alignItems="center">
-                          <CabStack row alignItems="center" gap="$2">
-                            <div
-                              style={{
-                                width: 10,
-                                height: 10,
-                                borderRadius: 999,
-                                backgroundColor: getDistributionSliceColor(slice.dimension),
-                                flexShrink: 0,
-                              }}
-                            />
-                            <CabText variant="label">{getDistributionSliceLabel(slice, t)}</CabText>
+                  <div
+                    style={{
+                      display: "grid",
+                      gap: 16,
+                      alignItems: "center",
+                      gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+                    }}
+                  >
+                    <div>
+                      <CabDonutChart
+                        data={distributionChartData}
+                        height={280}
+                        valueFormatter={(value) => formatUsd(value, locale)}
+                      />
+                    </div>
+                    <CabStack gap="$2">
+                      {resolvedChartViewModel.distribution.slices.map((slice) => (
+                        <CabCard key={`${slice.dimension}-${slice.label}`} density="default">
+                          <CabStack row justifyContent="space-between" alignItems="center">
+                            <CabStack row alignItems="center" gap="$2">
+                              <div
+                                style={{
+                                  width: 10,
+                                  height: 10,
+                                  borderRadius: 999,
+                                  backgroundColor: getDistributionSliceColor(slice.dimension),
+                                  flexShrink: 0,
+                                }}
+                              />
+                              <CabText variant="label">{getDistributionSliceLabel(slice, t)}</CabText>
+                            </CabStack>
+                            <CabStack alignItems="flex-end" gap="$1">
+                              <CabText variant="label">{formatUsd(slice.valueUsd, locale)}</CabText>
+                              <CabText variant="caption" fontSize={12}>
+                                {totalDistributionUsd > 0
+                                  ? formatPercent(slice.valueUsd / totalDistributionUsd, locale)
+                                  : t("states.unavailableValue")}
+                              </CabText>
+                            </CabStack>
                           </CabStack>
-                          <CabStack alignItems="flex-end" gap="$1">
-                            <CabText variant="label">{formatUsd(slice.valueUsd, locale)}</CabText>
-                            <CabText variant="caption" fontSize={12}>
-                              {totalDistributionUsd > 0
-                                ? formatPercent(slice.valueUsd / totalDistributionUsd, locale)
-                                : t("states.unavailableValue")}
-                            </CabText>
-                          </CabStack>
-                        </CabStack>
-                      </CabCard>
-                    ))}
-                  </CabStack>
+                        </CabCard>
+                      ))}
+                    </CabStack>
+                  </div>
                 )}
                 {resolvedChartViewModel.distribution.exclusions ? (
                   <CabText variant="caption" fontSize={12}>

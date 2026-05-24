@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import {
   Area,
   AreaChart,
@@ -29,6 +30,8 @@ export type CabAreaChartProps<T extends Record<string, unknown>> = {
   height?: number;
   yAxisWidth?: number;
   yTickFormatter?: (value: number) => string;
+  actions?: ReactNode;
+  notice?: string;
 };
 
 export function CabAreaChart<T extends Record<string, unknown>>({
@@ -40,9 +43,11 @@ export function CabAreaChart<T extends Record<string, unknown>>({
   height,
   yAxisWidth,
   yTickFormatter,
+  actions,
+  notice,
 }: CabAreaChartProps<T>) {
   return (
-    <CabChartFrame title={title} subtitle={subtitle} height={height}>
+    <CabChartFrame title={title} subtitle={subtitle} height={height} actions={actions} notice={notice}>
       <ResponsiveContainer>
         <AreaChart data={data} margin={{ top: 4, right: 8, bottom: 4, left: 2 }}>
           <CartesianGrid stroke={cabColors.surface.border} strokeDasharray="3 3" />

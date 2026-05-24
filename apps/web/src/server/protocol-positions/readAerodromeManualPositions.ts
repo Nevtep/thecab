@@ -302,6 +302,26 @@ function formatFeeTierLabel(tickSpacing: number | null) {
     : null;
 }
 
+function isPositionInRange(currentTick: number | null, tickLower: number, tickUpper: number) {
+  return currentTick !== null ? currentTick >= tickLower && currentTick < tickUpper : null;
+}
+
+function convertTickToToken1Price(tick: number, token0Decimals: number, token1Decimals: number) {
+  return Math.pow(1.0001, tick) * 10 ** (token0Decimals - token1Decimals);
+}
+
+function resolveRangeDisplayFractionDigits(token1Decimals: number | null, quoteTokenPriceUsd: number | null) {
+  if (token1Decimals === null) {
+    return null;
+  }
+
+  if (quoteTokenPriceUsd !== null && Number.isFinite(quoteTokenPriceUsd) && quoteTokenPriceUsd > 0) {
+    return Math.max(0, Math.min(token1Decimals, Math.ceil(Math.log10(quoteTokenPriceUsd)) + 2));
+  }
+
+  return Math.max(0, token1Decimals - 1);
+}
+
 async function readTokenMetadata(addresses: string[]) {
   const metadataEntries: Array<readonly [string, TokenMetadata]> = await Promise.all(
     addresses.map(async (address) => {
@@ -579,6 +599,18 @@ export async function readAerodromeManualPositions(input: {
         : Array.from(new Set([...reasonCodes, "positionMetadataIncomplete"]));
       const primaryTokenSymbol = token0Metadata.symbol;
       const secondaryTokenSymbol = token1Metadata.symbol;
+      const rangeLowerPrice =
+        token0Metadata.decimals !== null && token1Metadata.decimals !== null
+          ? convertTickToToken1Price(state.tickLower, token0Metadata.decimals, token1Metadata.decimals)
+          : null;
+      const rangeUpperPrice =
+        token0Metadata.decimals !== null && token1Metadata.decimals !== null
+          ? convertTickToToken1Price(state.tickUpper, token0Metadata.decimals, token1Metadata.decimals)
+          : null;
+      const rangeDisplayFractionDigits = resolveRangeDisplayFractionDigits(
+        token1Metadata.decimals,
+        price1?.priceUsd ?? null,
+      );
 
       return {
         positionKey: buildProtocolPositionKey({
@@ -624,6 +656,14 @@ export async function readAerodromeManualPositions(input: {
           positionContractAddress: positionManagerAddress,
           lockEndAt: null,
           feeTierLabel: formatFeeTierLabel(state.tickSpacing),
+          rangeLowerTick: state.tickLower,
+          rangeUpperTick: state.tickUpper,
+          currentTick: state.currentTick,
+          isInRange: isPositionInRange(state.currentTick, state.tickLower, state.tickUpper),
+          rangeLowerPrice,
+          rangeUpperPrice,
+          rangeQuoteTokenSymbol: secondaryTokenSymbol,
+          rangeDisplayFractionDigits,
         },
       } satisfies OverviewProtocolPosition;
     });

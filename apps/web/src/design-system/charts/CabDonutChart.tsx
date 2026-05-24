@@ -12,9 +12,10 @@ export type CabDonutChartProps = {
   title?: string;
   subtitle?: string;
   height?: number;
+  valueFormatter?: (value: number) => string;
 };
 
-export function CabDonutChart({ data, title, subtitle, height }: CabDonutChartProps) {
+export function CabDonutChart({ data, title, subtitle, height, valueFormatter }: CabDonutChartProps) {
   return (
     <CabChartFrame title={title} subtitle={subtitle} height={height}>
       <ResponsiveContainer>
@@ -28,6 +29,13 @@ export function CabDonutChart({ data, title, subtitle, height }: CabDonutChartPr
             ))}
           </Pie>
           <Tooltip
+            formatter={(value) => {
+              if (typeof value !== "number") {
+                return String(value);
+              }
+
+              return valueFormatter ? valueFormatter(value) : value;
+            }}
             contentStyle={{
               backgroundColor: cabColors.surface.elevatedSurface,
               border: `1px solid ${cabColors.surface.border}`,

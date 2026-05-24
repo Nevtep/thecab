@@ -53,7 +53,6 @@ const alchemyRpcMemoryCache = new Map<string, TimedCacheEntry<unknown>>();
 const alchemyRpcInFlight = new Map<string, Promise<unknown>>();
 
 function buildRpcCacheKey(method: string, params: unknown[], chainId: number) {
-  console.log("Building cache key for RPC method:", method, "with params:", params, "on chainId:", chainId);
   return createHash("sha256")
     .update(JSON.stringify({ method, params, chainId }))
     .digest("hex");
