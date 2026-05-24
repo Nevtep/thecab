@@ -18,7 +18,6 @@ import {
   CabIcon,
   CabLoadingPanel,
   CabMetricCard,
-  CabPartialCoverageNotice,
   CabRangeSelector,
   CabSectionHeader,
   CabSidebar,
@@ -92,6 +91,16 @@ type OverviewComponentProps = {
 
 function formatCurrencyValue(value: number | null, locale: string, fallbackLabel: string) {
   return value === null ? fallbackLabel : formatUsd(value, locale);
+}
+
+function sumKnownUsd(values: Array<number | null | undefined>) {
+  const knownValues = values.filter((value): value is number => typeof value === "number");
+
+  if (knownValues.length === 0) {
+    return null;
+  }
+
+  return knownValues.reduce((sum, value) => sum + value, 0);
 }
 
 function buildCoverageMessage(
@@ -738,6 +747,25 @@ export function OverviewComponent({
     value: slice.valueUsd,
     color: getDistributionSliceColor(slice.dimension),
   }));
+  const deployedValueFromProtocolPositions = sumKnownUsd(
+    resolvedProtocolPositionsViewModel?.protocolPositions.rows.map((row) => row.valueUsd) ?? [],
+  );
+  const deployedMetricValueUsd =
+    overviewViewModel?.metrics.deployedValueUsd ??
+    deployedValueFromProtocolPositions ??
+    shellViewModel?.metrics.deployedValueUsd ??
+    null;
+  const idleMetricValueUsd =
+    overviewViewModel?.metrics.idleValueUsd ?? shellViewModel?.metrics.idleValueUsd ?? null;
+  const netPortfolioMetricValueUsd =
+    overviewViewModel?.metrics.netPortfolioValueUsd ??
+    sumKnownUsd([idleMetricValueUsd, deployedMetricValueUsd]) ??
+    shellViewModel?.metrics.netPortfolioValueUsd ??
+    null;
+  const changeOverSelectedPeriodPct =
+    overviewViewModel?.metrics.changeOverSelectedPeriodPct ??
+    shellViewModel?.metrics.changeOverSelectedPeriodPct ??
+    null;
   const hasProtocolPositions = (resolvedProtocolPositionsViewModel?.protocolPositions.rows.length ?? 0) > 0;
   const protocolSummaryChips = resolvedProtocolPositionsViewModel ? [
     t("protocolPositions.summary.totalCount", {
@@ -886,13 +914,6 @@ export function OverviewComponent({
         }
       >
         <CabStack gap="$4">
-          {!isInitialShellLoading && baseViewModel?.coverage.status === "partial" ? (
-            <CabPartialCoverageNotice
-              title={t("coverage:noticeTitle")}
-              description={pageCoverageMessage}
-            />
-          ) : null}
-
           <CabDashboardGrid>
             {isInitialShellLoading ? (
               <>
@@ -904,16 +925,16 @@ export function OverviewComponent({
               <>
                 <CabMetricCard
                   label={t("metrics.netPortfolioValue")}
-                  value={formatCurrencyValue(resolvedShellViewModel.metrics.netPortfolioValueUsd, locale, t("states.unavailableValue"))}
-                  delta={resolvedShellViewModel.metrics.changeOverSelectedPeriodPct ?? undefined}
+                  value={formatCurrencyValue(netPortfolioMetricValueUsd, locale, t("states.unavailableValue"))}
+                  delta={changeOverSelectedPeriodPct ?? undefined}
                 />
                 <CabMetricCard
                   label={t("metrics.deployedValue")}
-                  value={formatCurrencyValue(resolvedShellViewModel.metrics.deployedValueUsd, locale, t("states.unavailableValue"))}
+                  value={formatCurrencyValue(deployedMetricValueUsd, locale, t("states.unavailableValue"))}
                 />
                 <CabMetricCard
                   label={t("metrics.idleValue")}
-                  value={formatCurrencyValue(resolvedShellViewModel.metrics.idleValueUsd, locale, t("states.unavailableValue"))}
+                  value={formatCurrencyValue(idleMetricValueUsd, locale, t("states.unavailableValue"))}
                 />
               </>
             )}
