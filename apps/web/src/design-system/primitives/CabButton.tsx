@@ -115,7 +115,6 @@ export function CabButton({
       disabledStyle={{
         backgroundColor: "rgba(26, 34, 51, 0.92)",
         borderColor: "rgba(107, 122, 152, 0.32)",
-        color: cabColors.text.muted,
         opacity: 0.72,
       }}
       focusVisibleStyle={{
