@@ -5,20 +5,28 @@
   align-items: start;
 }
 
+.layout > * {
+  min-width: 0;
+}
+
 .cards {
   display: grid;
   gap: 16px;
+  min-width: 0;
 }
 
 .card,
 .visualCard {
   display: flex;
   min-height: 100%;
+  min-width: 0;
 }
 
 .card > *,
 .visualCard > * {
   flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
 }
 
 .visualWrap {

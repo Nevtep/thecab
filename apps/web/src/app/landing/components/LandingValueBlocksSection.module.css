@@ -11,6 +11,18 @@
   height: 100%;
 }
 
+.sectionBackgroundFrame :global(img) {
+  object-position: center 68%;
+  transform: scale(1.24);
+  transform-origin: center 68%;
+}
+
+@media (min-width: 1025px) {
+  .sectionBackgroundFrame :global(img) {
+    transform: scale(1.34);
+  }
+}
+
 .sectionBackgroundTint {
   position: absolute;
   inset: 0;
@@ -23,7 +35,7 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: clamp(12px, 1.6vw, 18px);
-  align-items: stretch;
+  align-items: start;
 }
 
 .card {
@@ -36,10 +48,14 @@
 
 .card > * {
   flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
 }
 
 .imageWrap {
   position: relative;
+  width: 100%;
+  max-width: 100%;
   aspect-ratio: 1 / 1;
   border-radius: 18px;
   overflow: hidden;

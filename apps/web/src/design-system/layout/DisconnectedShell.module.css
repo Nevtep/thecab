@@ -32,14 +32,6 @@
   );
 }
 
-/* Avoid upscaling the 1672px-wide asset on very large viewports (reduces pixelation). */
-@media (min-width: 1680px) {
-  .backgroundLayer {
-    background-size: 1672px auto;
-    background-position: center center;
-  }
-}
-
 .content {
   position: relative;
   z-index: 1;

@@ -184,6 +184,10 @@
   align-items: stretch;
 }
 
+.staticPanel > * {
+  min-width: 0;
+}
+
 .staticVisual {
   position: relative;
   width: 100%;
@@ -198,6 +202,12 @@
   display: flex;
   align-items: center;
   background: rgba(9, 18, 31, 0.64);
+  min-width: 0;
+}
+
+.staticCopyCard > * {
+  min-width: 0;
+  width: 100%;
 }
 
 @media (max-width: 1180px) {

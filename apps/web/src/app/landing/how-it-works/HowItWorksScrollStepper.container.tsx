@@ -16,6 +16,7 @@ import { howItWorksSteps } from "@/app/landing/how-it-works/howItWorks.steps";
 gsap.registerPlugin(ScrollTrigger, useGSAP);
 
 const INTERACTIVE_QUERY = "(min-width: 960px)";
+const INTERACTIVE_HEIGHT_QUERY = "(max-height: 1400px)";
 const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 
 export function HowItWorksScrollStepperContainer() {
@@ -32,10 +33,11 @@ export function HowItWorksScrollStepperContainer() {
     }
 
     const desktopQuery = window.matchMedia(INTERACTIVE_QUERY);
+    const heightQuery = window.matchMedia(INTERACTIVE_HEIGHT_QUERY);
     const reducedMotionQuery = window.matchMedia(REDUCED_MOTION_QUERY);
 
     const updateMode = () => {
-      const nextInteractive = desktopQuery.matches && !reducedMotionQuery.matches;
+      const nextInteractive = desktopQuery.matches && heightQuery.matches && !reducedMotionQuery.matches;
       setInteractive(nextInteractive);
       if (!nextInteractive) {
         setActiveStepIndex(0);
@@ -44,10 +46,12 @@ export function HowItWorksScrollStepperContainer() {
 
     updateMode();
     desktopQuery.addEventListener("change", updateMode);
+    heightQuery.addEventListener("change", updateMode);
     reducedMotionQuery.addEventListener("change", updateMode);
 
     return () => {
       desktopQuery.removeEventListener("change", updateMode);
+      heightQuery.removeEventListener("change", updateMode);
       reducedMotionQuery.removeEventListener("change", updateMode);
     };
   }, []);
@@ -72,13 +76,16 @@ export function HowItWorksScrollStepperContainer() {
       setActiveStepIndex(0);
 
       const stepCount = steps.length;
+      const viewportHeight = trackRef.current.parentElement?.clientHeight ?? pinRef.current.clientHeight;
+      const scrollStepDistance = Math.max(420, Math.min(viewportHeight, 820));
+
       const tween = gsap.to(trackRef.current, {
         xPercent: -100 * (stepCount - 1),
         ease: "none",
         scrollTrigger: {
           trigger: pinRef.current,
           start: "top top",
-          end: () => `+=${window.innerHeight * (stepCount - 1)}`,
+          end: () => `+=${scrollStepDistance * (stepCount - 1)}`,
           pin: true,
           scrub: 0.8,
           anticipatePin: 1,

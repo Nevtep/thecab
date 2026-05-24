@@ -5,15 +5,22 @@
   align-items: start;
 }
 
+.layout > * {
+  min-width: 0;
+}
+
 .visualCard,
 .block {
   display: flex;
   min-height: 100%;
+  min-width: 0;
 }
 
 .visualCard > *,
 .block > * {
   flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
 }
 
 .visualWrap {
@@ -32,6 +39,7 @@
 .blocks {
   display: grid;
   gap: 16px;
+  min-width: 0;
 }
 
 .blockIndex {

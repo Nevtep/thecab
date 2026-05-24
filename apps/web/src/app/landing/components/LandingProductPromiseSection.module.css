@@ -31,6 +31,10 @@
 }
 
 .visualTint {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
   background:
     linear-gradient(180deg, rgba(3, 10, 20, 0.04) 0%, rgba(3, 10, 20, 0.35) 45%, rgba(3, 10, 20, 0.88) 100%),
     radial-gradient(circle at center, rgba(51, 226, 217, 0.1), transparent 52%);
@@ -43,23 +47,24 @@
   bottom: 0;
   z-index: 2;
   padding: clamp(12px, 2vw, 20px);
-  pointer-events: none;
 }
 
 .grid {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: clamp(10px, 1.2vw, 14px);
-  pointer-events: auto;
 }
 
 .card {
   display: flex;
   min-height: 100%;
+  min-width: 0;
 }
 
 .card > * {
   flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
   background: rgba(10, 18, 31, 0.82) !important;
   backdrop-filter: blur(10px);
   border-color: rgba(184, 199, 230, 0.16) !important;
@@ -80,7 +85,25 @@
 @media (max-width: 640px) {
   .visualWrap {
     aspect-ratio: auto;
-    min-height: 520px;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .visualMedia {
+    border-radius: 28px;
+    overflow: hidden;
+  }
+
+  .visualTint {
+    bottom: auto;
+    min-height: 220px;
+    border-radius: 28px;
+  }
+
+  .cardsOverlay {
+    position: relative;
+    inset: auto;
+    padding: 16px 0 0;
   }
 
   .grid {
