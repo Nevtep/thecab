@@ -1,6 +1,7 @@
 "use client";
 
 import type { PropsWithChildren, ReactNode } from "react";
+import { Spinner } from "tamagui";
 
 import { CabCard } from "@/design-system/primitives/CabCard";
 import { CabStack } from "@/design-system/primitives/CabStack";
@@ -13,6 +14,7 @@ export type CabChartFrameProps = PropsWithChildren<{
   height?: number;
   actions?: ReactNode;
   notice?: string;
+  loadingLabel?: string;
   /** Accessible name for the chart graphic */
   ariaLabel?: string;
   /** Screen-reader summary of the chart insight */
@@ -27,6 +29,7 @@ export function CabChartFrame({
   height = 280,
   actions, 
   notice,
+  loadingLabel,
   ariaLabel,
   summary,
   dataTable,
@@ -71,9 +74,40 @@ export function CabChartFrame({
         <div
           role="img"
           aria-label={accessibleName}
-          style={{ width: "100%", height }}
+          aria-busy={loadingLabel ? true : undefined}
+          style={{
+            width: "100%",
+            height,
+            position: "relative",
+          }}
         >
-          {children}
+          <div style={{ width: "100%", height: "100%", opacity: loadingLabel ? 0.42 : 1 }}>
+            {children}
+          </div>
+          {loadingLabel ? (
+            <div
+              role="status"
+              aria-live="polite"
+              aria-busy="true"
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                pointerEvents: "none",
+              }}
+            >
+              <CabCard density="default">
+                <CabStack row alignItems="center" gap="$2">
+                  <Spinner color={cabColors.brand.signalTeal} />
+                  <CabText variant="caption" fontSize={12} color={cabColors.text.secondary}>
+                    {loadingLabel}
+                  </CabText>
+                </CabStack>
+              </CabCard>
+            </div>
+          ) : null}
         </div>
         {dataTable ? (
           <div className="sr-only" aria-hidden={false}>

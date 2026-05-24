@@ -32,6 +32,7 @@ export type CabAreaChartProps<T extends Record<string, unknown>> = {
   yTickFormatter?: (value: number) => string;
   actions?: ReactNode;
   notice?: string;
+  loadingLabel?: string;
   ariaLabel?: string;
   summary?: string;
 };
@@ -47,6 +48,7 @@ export function CabAreaChart<T extends Record<string, unknown>>({
   yTickFormatter,
   actions,
   notice,
+  loadingLabel,
   ariaLabel,
   summary,
 }: CabAreaChartProps<T>) {
@@ -57,6 +59,7 @@ export function CabAreaChart<T extends Record<string, unknown>>({
       height={height}
       actions={actions} 
       notice={notice}
+      loadingLabel={loadingLabel}
       ariaLabel={ariaLabel ?? title}
       summary={summary ?? subtitle}
     >
