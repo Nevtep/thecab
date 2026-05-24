@@ -2,10 +2,12 @@ type LandingWalletSnapshot = {
   isConnected: boolean;
   isSupportedChain: boolean;
   walletConnectConfigured: boolean;
+  isAuthenticated: boolean;
+  isAuthenticating: boolean;
 };
 
 export type LandingWalletState = {
-  kind: "disconnected" | "connected" | "unsupported";
+  kind: "disconnected" | "awaitingSignature" | "connected" | "unsupported";
   primaryLabelKey: string;
   primaryTone: "primary" | "technical" | "warning";
   statusLabelKey: string;
@@ -16,6 +18,8 @@ export type LandingWalletState = {
 
 export function getLandingWalletState({
   isConnected,
+  isAuthenticated,
+  isAuthenticating,
   isSupportedChain,
   walletConnectConfigured,
 }: LandingWalletSnapshot): LandingWalletState {
@@ -41,6 +45,19 @@ export function getLandingWalletState({
       primaryTone: "warning",
       statusLabelKey: "landing:walletState.unsupportedChain",
       helperTextKey: "wallet:guidance.unsupportedBaseOnly",
+      secondaryLabelKey: "wallet:actions.disconnect",
+    };
+  }
+
+  if (!isAuthenticated) {
+    return {
+      kind: "awaitingSignature",
+      primaryLabelKey: "wallet:actions.signMessage",
+      primaryTone: "technical",
+      statusLabelKey: "landing:walletState.awaitingSignature",
+      helperTextKey: isAuthenticating
+        ? "wallet:guidance.awaitingSignaturePending"
+        : "wallet:guidance.awaitingSignature",
       secondaryLabelKey: "wallet:actions.disconnect",
     };
   }

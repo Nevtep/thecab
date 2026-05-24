@@ -116,6 +116,33 @@ export async function insertOverviewRawProviderRecord(
   return row;
 }
 
+export async function readLatestOverviewRawProviderRecord(input: ScopedWalletInput & {
+  provider: string;
+  endpoint: string;
+  maxAgeMs?: number;
+}) {
+  const db = getDb();
+  const filters = [
+    eq(rawProviderRecords.walletAddress, input.walletAddress.toLowerCase()),
+    eq(rawProviderRecords.chainId, input.chainId),
+    eq(rawProviderRecords.provider, input.provider),
+    eq(rawProviderRecords.endpoint, input.endpoint),
+  ];
+
+  if (typeof input.maxAgeMs === "number" && Number.isFinite(input.maxAgeMs) && input.maxAgeMs > 0) {
+    filters.push(gte(rawProviderRecords.createdAt, new Date(Date.now() - input.maxAgeMs)));
+  }
+
+  const rows = await db
+    .select()
+    .from(rawProviderRecords)
+    .where(and(...filters))
+    .orderBy(desc(rawProviderRecords.createdAt))
+    .limit(1);
+
+  return rows[0] ?? null;
+}
+
 export async function upsertOverviewPricePoint(
   input: ScopedWalletInput & {
     tokenAddress: string;

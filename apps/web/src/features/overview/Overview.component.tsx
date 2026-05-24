@@ -608,8 +608,6 @@ export function OverviewComponent({
   const isInitialProtocolPositionsLoading =
     isWalletPending || (isProtocolPositionsLoading && !resolvedProtocolPositionsViewModel);
   const resolvedShellViewModel = baseViewModel as OverviewViewModel;
-  const resolvedOverviewViewModel = overviewViewModel as OverviewViewModel;
-
   const pageCoverageMessage = baseViewModel
     ? buildCoverageMessage(
         baseViewModel.coverage.status,
@@ -893,13 +891,18 @@ export function OverviewComponent({
                 retryLabel={t("actions.refresh")}
                 onRetry={onRefresh}
               />
+            ) : !resolvedChartViewModel ? (
+              <CabEmptyState
+                title={t("states.emptyTitle")}
+                description={t("states.emptyDescription")}
+              />
             ) : (
               <CabAreaChart
                 title={t("sections.chart")}
                 subtitle={buildSourceSubtitle(
-                  resolvedChartViewModel!.chart.source,
-                  resolvedChartViewModel!.chart.coverageStatus,
-                  resolvedChartViewModel!.chart.coverageReasonCodes,
+                  resolvedChartViewModel.chart.source,
+                  resolvedChartViewModel.chart.coverageStatus,
+                  resolvedChartViewModel.chart.coverageReasonCodes,
                   t,
                 )}
                 data={chartData}
@@ -933,19 +936,24 @@ export function OverviewComponent({
               retryLabel={t("actions.refresh")}
               onRetry={onRefresh}
             />
+            ) : !resolvedChartViewModel ? (
+            <CabEmptyState
+              title={t("states.emptyTitle")}
+              description={t("states.emptyDescription")}
+            />
             ) : (
             <CabCard density="spacious">
               <CabStack gap="$3">
                 <CabSectionHeader
                   title={t("sections.distribution")}
                   subtitle={buildSourceSubtitle(
-                    resolvedChartViewModel!.distribution.source,
-                    resolvedChartViewModel!.distribution.coverageStatus,
-                    resolvedChartViewModel!.distribution.coverageReasonCodes,
+                    resolvedChartViewModel.distribution.source,
+                    resolvedChartViewModel.distribution.coverageStatus,
+                    resolvedChartViewModel.distribution.coverageReasonCodes,
                     t,
                   )}
                 />
-                {resolvedChartViewModel!.distribution.slices.length === 0 ? (
+                {resolvedChartViewModel.distribution.slices.length === 0 ? (
                   <CabEmptyState
                     title={t("states.emptyDistributionTitle")}
                     description={t("states.emptyDistributionDescription")}
@@ -956,7 +964,7 @@ export function OverviewComponent({
                       data={distributionChartData}
                       height={280}
                     />
-                    {resolvedChartViewModel!.distribution.slices.map((slice) => (
+                    {resolvedChartViewModel.distribution.slices.map((slice) => (
                       <CabCard key={`${slice.dimension}-${slice.label}`} density="default">
                         <CabStack row justifyContent="space-between" alignItems="center">
                           <CabStack row alignItems="center" gap="$2">
@@ -984,9 +992,9 @@ export function OverviewComponent({
                     ))}
                   </CabStack>
                 )}
-                {resolvedChartViewModel!.distribution.exclusions ? (
+                {resolvedChartViewModel.distribution.exclusions ? (
                   <CabText variant="caption" fontSize={12}>
-                    {buildExclusionMessage(resolvedChartViewModel!.distribution.exclusions, t, locale)}
+                    {buildExclusionMessage(resolvedChartViewModel.distribution.exclusions, t, locale)}
                   </CabText>
                 ) : null}
               </CabStack>
@@ -1003,15 +1011,20 @@ export function OverviewComponent({
               retryLabel={t("actions.refresh")}
               onRetry={onRefresh}
             />
+          ) : !resolvedProtocolPositionsViewModel ? (
+            <CabEmptyState
+              title={t("states.emptyTitle")}
+              description={t("states.emptyDescription")}
+            />
           ) : (
             <CabCard density="spacious">
               <CabStack gap="$3">
                 <CabSectionHeader
                   title={t("sections.protocolPositions")}
                   subtitle={buildSourceSubtitle(
-                    resolvedProtocolPositionsViewModel!.protocolPositions.source,
-                    resolvedProtocolPositionsViewModel!.coverage.status,
-                    resolvedProtocolPositionsViewModel!.protocolPositions.coverageReasonCodes,
+                    resolvedProtocolPositionsViewModel.protocolPositions.source,
+                    resolvedProtocolPositionsViewModel.coverage.status,
+                    resolvedProtocolPositionsViewModel.protocolPositions.coverageReasonCodes,
                     t,
                   )}
                 />
@@ -1027,17 +1040,17 @@ export function OverviewComponent({
                         </CabBadge>
                       ))}
                     </CabStack>
-                    {resolvedProtocolPositionsViewModel!.protocolPositions.summary.hasShareLevelPositions ? (
+                    {resolvedProtocolPositionsViewModel.protocolPositions.summary.hasShareLevelPositions ? (
                       <CabText variant="caption" fontSize={12}>
                         {t("protocolPositions.shareLevelNotice")}
                       </CabText>
                     ) : null}
-                    {resolvedProtocolPositionsViewModel!.protocolPositions.coverageReasonCodes?.includes("recentProtocolReconstruction") ? (
+                    {resolvedProtocolPositionsViewModel.protocolPositions.coverageReasonCodes?.includes("recentProtocolReconstruction") ? (
                       <CabText variant="caption" fontSize={12}>
                         {t("protocolPositions.reconstructionNotice")}
                       </CabText>
                     ) : null}
-                    {renderProtocolPositionRows(resolvedProtocolPositionsViewModel!.protocolPositions.rows, {
+                    {renderProtocolPositionRows(resolvedProtocolPositionsViewModel.protocolPositions.rows, {
                       locale,
                       translate: t,
                     })}
@@ -1068,15 +1081,20 @@ export function OverviewComponent({
                 retryLabel={t("actions.refresh")}
                 onRetry={onRefresh}
               />
+            ) : !overviewViewModel ? (
+              <CabEmptyState
+                title={t("states.emptyTitle")}
+                description={t("states.emptyDescription")}
+              />
             ) : (
               <CabCard density="spacious">
                 <CabStack gap="$3">
                   <CabSectionHeader
                     title={t("sections.assets")}
                     subtitle={buildSourceSubtitle(
-                      resolvedOverviewViewModel.assets.source,
-                      resolvedOverviewViewModel.assets.coverageStatus,
-                      resolvedOverviewViewModel.assets.coverageReasonCodes,
+                      overviewViewModel.assets.source,
+                      overviewViewModel.assets.coverageStatus,
+                      overviewViewModel.assets.coverageReasonCodes,
                       t,
                     )}
                     actions={
@@ -1144,26 +1162,31 @@ export function OverviewComponent({
                 retryLabel={t("actions.refresh")}
                 onRetry={onRefresh}
               />
+            ) : !activityViewModel ? (
+              <CabEmptyState
+                title={t("states.emptyTitle")}
+                description={t("states.emptyDescription")}
+              />
             ) : (
               <CabCard density="spacious">
                 <CabStack gap="$3">
                   <CabSectionHeader
                     title={t("sections.activity")}
                     subtitle={buildSourceSubtitle(
-                      activityViewModel!.source,
-                      activityViewModel!.coverageStatus,
-                      activityViewModel!.coverageReasonCodes,
+                      activityViewModel.source,
+                      activityViewModel.coverageStatus,
+                      activityViewModel.coverageReasonCodes,
                       t,
                     )}
                   />
-                  {activityViewModel!.items.length === 0 ? (
+                  {activityViewModel.items.length === 0 ? (
                     <CabEmptyState
                       title={t("states.emptyActivityTitle")}
                       description={t("states.emptyActivityDescription")}
                     />
                   ) : (
                     <CabStack gap="$2">
-                      {activityViewModel!.items.map((item) => (
+                      {activityViewModel.items.map((item) => (
                         <CabCard key={item.id} density="default">
                           <CabStack row justifyContent="space-between" alignItems="center" gap="$3">
                             <CabStack gap="$1">

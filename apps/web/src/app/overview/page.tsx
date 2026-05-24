@@ -8,15 +8,15 @@ import { useCabWallet } from "@/wallet/useCabWallet";
 
 export default function OverviewPage() {
   const router = useRouter();
-  const { status } = useCabWallet();
+  const { status, isAuthenticated } = useCabWallet();
 
   useEffect(() => {
-    if (status === "disconnected") {
+    if (status === "disconnected" || !isAuthenticated) {
       router.replace("/");
     }
-  }, [router, status]);
+  }, [isAuthenticated, router, status]);
 
-  if (status === "disconnected") {
+  if (status === "disconnected" || !isAuthenticated) {
     return null;
   }
 

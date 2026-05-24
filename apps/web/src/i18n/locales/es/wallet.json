@@ -6,6 +6,8 @@
   "guidance": {
     "configurationRequired": "Agregá un WalletConnect project id antes de probar el flujo de conexión.",
     "disconnected": "Conectá una wallet en Base para desbloquear la cabina y pedir análisis más profundo cuando lo necesites.",
+    "awaitingSignature": "Firmá el mensaje de verificación para confirmar el control de la wallet antes de entrar al cockpit.",
+    "awaitingSignaturePending": "Revisá tu wallet y completá la firma de verificación para continuar al cockpit.",
     "connectedBase": "Tu wallet está lista para el siguiente paso dentro del cockpit de The Cab.",
     "unsupportedBaseOnly": "The Cab v1 soporta flujos de wallet solo en Base mainnet. Cambiá de red para continuar."
   },
@@ -15,6 +17,7 @@
   "actions": {
     "connect": "Conectar wallet",
     "disconnect": "Desconectar",
+    "signMessage": "Firmar para continuar",
     "configureWalletConnect": "Configura el project id de WalletConnect"
   }
 }

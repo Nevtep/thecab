@@ -3,7 +3,7 @@ export type LandingTelemetryPlacement = "hero" | "finalCta";
 export type LandingTelemetryEvent = {
   event: "landing_wallet_cta_primary_click" | "landing_wallet_cta_secondary_click";
   placement: LandingTelemetryPlacement;
-  state: "disconnected" | "connected" | "unsupported";
+  state: "disconnected" | "awaitingSignature" | "connected" | "unsupported";
 };
 
 declare global {

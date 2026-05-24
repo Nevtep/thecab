@@ -211,6 +211,7 @@
   },
   "walletState": {
     "disconnected": "Wallet disconnected",
+    "awaitingSignature": "Wallet connected, signature required",
     "connectedBase": "Wallet connected on Base mainnet",
     "unsupportedChain": "Connected wallet is on an unsupported network"
   },

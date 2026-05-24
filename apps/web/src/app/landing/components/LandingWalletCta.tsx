@@ -31,6 +31,8 @@ export function LandingWalletCta({ continueTargetId, placement, variant = "card"
   const {
     address,
     isConnected,
+    isAuthenticated,
+    isAuthenticating,
     isSupportedChain,
     connect,
     disconnect,
@@ -43,6 +45,8 @@ export function LandingWalletCta({ continueTargetId, placement, variant = "card"
 
   const state = getLandingWalletState({
     isConnected,
+    isAuthenticated,
+    isAuthenticating,
     isSupportedChain,
     walletConnectConfigured,
   });
@@ -50,7 +54,7 @@ export function LandingWalletCta({ continueTargetId, placement, variant = "card"
   const accentColor =
     state.kind === "unsupported"
       ? cabColors.semantic.warning
-      : state.kind === "connected"
+      : state.kind === "connected" || state.kind === "awaitingSignature"
         ? cabColors.brand.signalTeal
         : cabColors.brand.cabGold;
 
@@ -61,7 +65,7 @@ export function LandingWalletCta({ continueTargetId, placement, variant = "card"
       state: state.kind,
     });
 
-    if (state.kind === "disconnected") {
+    if (state.kind === "disconnected" || state.kind === "awaitingSignature") {
       if (!walletConnectConfigured) return;
       await connect();
       return;
@@ -107,7 +111,7 @@ export function LandingWalletCta({ continueTargetId, placement, variant = "card"
             void handlePrimaryAction();
           }}
           tone={state.primaryTone}
-          disabled={state.isPrimaryDisabled}
+          disabled={state.isPrimaryDisabled || isAuthenticating}
         >
           {t(state.primaryLabelKey)}
         </CabButton>

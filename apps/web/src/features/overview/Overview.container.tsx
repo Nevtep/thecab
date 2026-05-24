@@ -25,7 +25,7 @@ import { useCabWallet } from "@/wallet/useCabWallet";
 
 export function OverviewContainer() {
   const queryClient = useQueryClient();
-  const { address, chainId, status, isConnected, isSupportedChain, connect, disconnect, switchToSupportedChain } = useCabWallet();
+  const { address, chainId, status, isConnected, isAuthenticated, isSupportedChain, connect, disconnect, switchToSupportedChain } = useCabWallet();
   const [screenState, setScreenState] = useState(() =>
     createInitialOverviewScreenState(address?.toLowerCase() ?? null, chainId ?? null),
   );
@@ -36,6 +36,8 @@ export function OverviewContainer() {
 
   const walletAddress = address?.toLowerCase() ?? null;
   const resolvedChainId = chainId ?? SUPPORTED_CHAIN_ID;
+  const isWalletReady = Boolean(walletAddress && isConnected && isAuthenticated && isSupportedChain);
+
   const shellQuery = useOverviewShellQuery(
     {
       walletAddress: walletAddress ?? "",
@@ -43,9 +45,13 @@ export function OverviewContainer() {
       range: screenState.range,
     },
     {
-      enabled: Boolean(walletAddress && isConnected && isSupportedChain),
+      enabled: isWalletReady,
     },
   );
+
+  const enableSecondarySlices = isWalletReady && shellQuery.isSuccess;
+  const enableTertiarySlices = enableSecondarySlices;
+
   const overviewQuery = useOverviewQuery(
     {
       walletAddress: walletAddress ?? "",
@@ -53,7 +59,7 @@ export function OverviewContainer() {
       range: screenState.range,
     },
     {
-      enabled: Boolean(walletAddress && isConnected && isSupportedChain),
+      enabled: enableSecondarySlices,
     },
   );
   const chartQuery = useOverviewChartQuery(
@@ -63,7 +69,7 @@ export function OverviewContainer() {
       range: screenState.range,
     },
     {
-      enabled: Boolean(walletAddress && isConnected && isSupportedChain),
+      enabled: enableSecondarySlices,
     },
   );
   const activityQuery = useOverviewActivityQuery(
@@ -73,7 +79,7 @@ export function OverviewContainer() {
       range: screenState.range,
     },
     {
-      enabled: Boolean(walletAddress && isConnected && isSupportedChain),
+      enabled: enableTertiarySlices,
     },
   );
   const protocolPositionsQuery = useOverviewProtocolPositionsQuery(
@@ -83,7 +89,7 @@ export function OverviewContainer() {
       range: screenState.range,
     },
     {
-      enabled: Boolean(walletAddress && isConnected && isSupportedChain),
+      enabled: enableTertiarySlices,
     },
   );
   const analysisStatusQuery = useAnalysisStatusQuery(
@@ -216,7 +222,7 @@ export function OverviewContainer() {
       chainId={resolvedChainId}
       walletAddress={walletAddress}
       walletStatus={status}
-      isConnected={isConnected}
+      isConnected={isConnected && isAuthenticated}
       isSupportedChain={isSupportedChain}
       range={screenState.range}
       shellViewModel={shellViewModel}
