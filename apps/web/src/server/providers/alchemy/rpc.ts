@@ -26,10 +26,23 @@ type JsonRpcResponse<T> = {
   };
 };
 
-const ALCHEMY_RPC_CACHE_TTL_MS = 30 * 1000;
+const ALCHEMY_RPC_CACHE_TTL_MS = 5 * 60 * 1000;
+const ALCHEMY_RPC_STABLE_LOOKUP_ETH_CALL_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const ALCHEMY_RPC_STABLE_ETH_CALL_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const ALCHEMY_RPC_INFLIGHT_TTL_SECONDS = 20;
 const ALCHEMY_RPC_WAIT_TIMEOUT_MS = 20 * 1000;
 const ALCHEMY_RPC_WAIT_INTERVAL_MS = 250;
+const IMMUTABLE_ETH_CALL_SELECTORS = new Set([
+  "0x16f0115b",
+  "0xc45a0155",
+  "0x0dfe1681",
+  "0xd21220a7",
+  "0x95d89b41",
+  "0x313ce567",
+]);
+const STABLE_LOOKUP_ETH_CALL_SELECTORS = new Set([
+  "0x28af8d0b",
+]);
 
 type TimedCacheEntry<T> = {
   expiresAt: number;
@@ -71,6 +84,37 @@ function waitForDuration(durationMs: number) {
   return new Promise((resolve) => setTimeout(resolve, durationMs));
 }
 
+function getEthCallSelector(params: unknown[]) {
+  const call = params[0];
+  if (!call || typeof call !== "object" || !("data" in call)) {
+    return null;
+  }
+
+  const data = call.data;
+  if (typeof data !== "string" || !data.startsWith("0x") || data.length < 10) {
+    return null;
+  }
+
+  return data.slice(0, 10).toLowerCase();
+}
+
+function resolveRpcCacheTtlMs(method: string, params: unknown[]) {
+  if (method !== "eth_call") {
+    return ALCHEMY_RPC_CACHE_TTL_MS;
+  }
+
+  const selector = getEthCallSelector(params);
+  if (selector && IMMUTABLE_ETH_CALL_SELECTORS.has(selector)) {
+    return ALCHEMY_RPC_STABLE_ETH_CALL_CACHE_TTL_MS;
+  }
+
+  if (selector && STABLE_LOOKUP_ETH_CALL_SELECTORS.has(selector)) {
+    return ALCHEMY_RPC_STABLE_LOOKUP_ETH_CALL_CACHE_TTL_MS;
+  }
+
+  return ALCHEMY_RPC_CACHE_TTL_MS;
+}
+
 export async function alchemyRpc<T>(
   method: string,
   params: unknown[] = [],
@@ -78,6 +122,7 @@ export async function alchemyRpc<T>(
 ): Promise<T> {
   const chainId = options?.chainId ?? SUPPORTED_CHAIN_ID;
   const cacheKey = buildRpcCacheKey(method, params, chainId);
+  const cacheTtlMs = resolveRpcCacheTtlMs(method, params);
   const memoryCachedResponse = getMemoryCachedResponse<T>(cacheKey);
   if (memoryCachedResponse !== null) {
     return memoryCachedResponse;
@@ -94,11 +139,11 @@ export async function alchemyRpc<T>(
     chainId,
     walletAddress: null,
     cacheKey,
-    maxAgeMs: ALCHEMY_RPC_CACHE_TTL_MS,
+    maxAgeMs: cacheTtlMs,
   });
 
   if (dbCachedResponse !== null) {
-    setMemoryCachedResponse(cacheKey, dbCachedResponse, ALCHEMY_RPC_CACHE_TTL_MS);
+    setMemoryCachedResponse(cacheKey, dbCachedResponse, cacheTtlMs);
     return dbCachedResponse;
   }
 
@@ -121,11 +166,11 @@ export async function alchemyRpc<T>(
           chainId,
           walletAddress: null,
           cacheKey,
-          maxAgeMs: ALCHEMY_RPC_CACHE_TTL_MS,
+          maxAgeMs: cacheTtlMs,
         });
 
         if (cachedResponse !== null) {
-          setMemoryCachedResponse(cacheKey, cachedResponse, ALCHEMY_RPC_CACHE_TTL_MS);
+          setMemoryCachedResponse(cacheKey, cachedResponse, cacheTtlMs);
           return cachedResponse;
         }
 
@@ -163,7 +208,7 @@ export async function alchemyRpc<T>(
     }
 
     const result = json.result as T;
-    setMemoryCachedResponse(cacheKey, result, ALCHEMY_RPC_CACHE_TTL_MS);
+    setMemoryCachedResponse(cacheKey, result, cacheTtlMs);
     await insertProviderCachedResponse({
       provider: "alchemy",
       endpoint: `/rpc/${method}`,
@@ -171,7 +216,7 @@ export async function alchemyRpc<T>(
       walletAddress: null,
       cacheKey,
       payload: result,
-      ttlMs: ALCHEMY_RPC_CACHE_TTL_MS,
+      ttlMs: cacheTtlMs,
     });
 
     return result;
