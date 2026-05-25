@@ -1,6 +1,8 @@
 "use client";
 
-import { CabCard, CabEmptyState, CabStack, CabText } from "@/design-system";
+import { CabCard, CabEmptyState, CabStack } from "@/design-system";
+import { cabColors } from "@/design-system/tokens";
+import { OverviewImpactMetricCard } from "@/features/overview/OverviewImpactMetricCard";
 import type { OverviewRange, OverviewViewModel } from "@/features/overview/overview.types";
 import {
   PortfolioEvolutionChart,
@@ -13,11 +15,17 @@ import {
   PortfolioEvolutionKpiStrip,
 } from "@/features/overview/portfolio-evolution/PortfolioEvolutionKpiStrip.component";
 import {
+  portfolioEvolutionEventIcons,
+  portfolioEvolutionEventMeta,
+  portfolioEvolutionSeriesMeta,
+} from "@/features/overview/portfolio-evolution/portfolioEvolution.meta";
+import {
   PortfolioEvolutionLegend,
   type PortfolioEvolutionSeriesKey,
 } from "@/features/overview/portfolio-evolution/PortfolioEvolutionLegend.component";
 import {
   buildPortfolioEvolutionModel,
+  type PortfolioEvolutionModel,
   type PortfolioEvolutionEventType,
 } from "@/features/overview/portfolio-evolution/portfolioEvolution.utils";
 import { formatRelativeTime, formatUsd } from "@/i18n/formatters";
@@ -26,6 +34,7 @@ import { useTranslation } from "react-i18next";
 
 type PortfolioEvolutionSectionProps = {
   viewModel: OverviewViewModel;
+  model?: PortfolioEvolutionModel | null;
   activity: OverviewViewModel["activity"] | null;
   range: OverviewRange;
   locale: string;
@@ -42,6 +51,7 @@ const defaultVisibleSeries: Record<PortfolioEvolutionSeriesKey, boolean> = {
 
 export function PortfolioEvolutionSection({
   viewModel,
+  model,
   activity,
   range,
   locale,
@@ -49,7 +59,7 @@ export function PortfolioEvolutionSection({
   onRangeChange,
 }: PortfolioEvolutionSectionProps) {
   const { t } = useTranslation(["overview"]);
-  const model = useMemo(
+  const computedModel = useMemo(
     () => buildPortfolioEvolutionModel({
       viewModel,
       activity,
@@ -58,17 +68,48 @@ export function PortfolioEvolutionSection({
     }),
     [activity, locale, range, viewModel],
   );
+  const resolvedModel = model ?? computedModel;
   const [visibleSeries, setVisibleSeries] = useState(defaultVisibleSeries);
   const [visibleEventTypes, setVisibleEventTypes] = useState<Partial<Record<PortfolioEvolutionEventType, boolean>>>({});
   const [hoveredCapturedAt, setHoveredCapturedAt] = useState<string | null>(null);
   const [selectedCapturedAt, setSelectedCapturedAt] = useState<string | null>(null);
 
   const filteredData = useMemo(
-    () => model.data.map((point) => ({
+    () => resolvedModel.data.map((point) => ({
       ...point,
       events: point.events.filter((event) => visibleEventTypes[event.type] ?? true),
     })),
-    [model.data, visibleEventTypes],
+    [resolvedModel.data, visibleEventTypes],
+  );
+  const capitalMovedSeries = useMemo(
+    () => filteredData.map((point, index) => {
+      if (index === 0) {
+        return 0;
+      }
+
+      const previous = filteredData[index - 1];
+      if (
+        previous?.deployedValueUsd === null ||
+        previous?.idleValueUsd === null ||
+        point.deployedValueUsd === null ||
+        point.idleValueUsd === null
+      ) {
+        return 0;
+      }
+
+      const deployedDelta = point.deployedValueUsd - previous.deployedValueUsd;
+      const idleDelta = point.idleValueUsd - previous.idleValueUsd;
+      if (deployedDelta === 0 || idleDelta === 0 || Math.sign(deployedDelta) === Math.sign(idleDelta)) {
+        return 0;
+      }
+
+      return Math.min(Math.abs(deployedDelta), Math.abs(idleDelta));
+    }),
+    [filteredData],
+  );
+  const eventDensitySeries = useMemo(
+    () => filteredData.map((point) => point.events.length),
+    [filteredData],
   );
   const selectedPoint = filteredData.find((point) => point.capturedAt === selectedCapturedAt) ?? null;
 
@@ -94,7 +135,7 @@ export function PortfolioEvolutionSection({
           onRangeChange={onRangeChange}
         />
 
-        <PortfolioEvolutionKpiStrip summary={model.summary} locale={locale} />
+        <PortfolioEvolutionKpiStrip summary={resolvedModel.summary} locale={locale} />
 
         <div
           style={{
@@ -107,7 +148,7 @@ export function PortfolioEvolutionSection({
             <CabStack gap="$3">
               <PortfolioEvolutionLegend
                 visibleSeries={visibleSeries}
-                availableEventTypes={model.availableEventTypes}
+                availableEventTypes={resolvedModel.availableEventTypes}
                 visibleEventTypes={visibleEventTypes}
                 onToggleSeries={(seriesKey) =>
                   setVisibleSeries((currentState) => ({
@@ -136,7 +177,7 @@ export function PortfolioEvolutionSection({
 
           <PortfolioEvolutionEventDetailsPanel
             selectedPoint={selectedPoint}
-            latestEventOccurredAt={model.footer.latestEvent?.occurredAt ?? null}
+            latestEventOccurredAt={resolvedModel.footer.latestEvent?.occurredAt ?? null}
             locale={locale}
             range={range}
           />
@@ -149,49 +190,39 @@ export function PortfolioEvolutionSection({
             gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
           }}
         >
-          <CabCard density="default">
-            <CabStack gap="$2">
-              <CabText variant="caption" fontSize={11}>
-                {t("portfolioEvolution.footer.accumulatedRewards")}
-              </CabText>
-              <CabText variant="label" fontSize={16} style={{ fontVariantNumeric: "tabular-nums" }}>
-                {model.footer.accumulatedRewardsUsd === null ? t("states.unavailableValue") : formatUsd(model.footer.accumulatedRewardsUsd, locale)}
-              </CabText>
-            </CabStack>
-          </CabCard>
-          <CabCard density="default">
-            <CabStack gap="$2">
-              <CabText variant="caption" fontSize={11}>
-                {t("portfolioEvolution.footer.capitalMoved")}
-              </CabText>
-              <CabText variant="label" fontSize={16} style={{ fontVariantNumeric: "tabular-nums" }}>
-                {model.footer.capitalMovedBetweenStatesUsd === null ? t("states.unavailableValue") : formatUsd(model.footer.capitalMovedBetweenStatesUsd, locale)}
-              </CabText>
-            </CabStack>
-          </CabCard>
-          <CabCard density="default">
-            <CabStack gap="$2">
-              <CabText variant="caption" fontSize={11}>
-                {t("portfolioEvolution.footer.latestEvent")}
-              </CabText>
-              <CabText variant="label" fontSize={16} style={{ fontVariantNumeric: "tabular-nums" }}>
-                {model.footer.latestEvent ? t(`portfolioEvolution.events.${model.footer.latestEvent.type === "move_to_idle" ? "moveToIdle" : model.footer.latestEvent.type}`) : t("states.unavailableValue")}
-              </CabText>
-              <CabText variant="caption" fontSize={11}>
-                {model.footer.latestEvent ? formatRelativeTime(model.footer.latestEvent.occurredAt, locale) : t("portfolioEvolution.footer.noEvents")}
-              </CabText>
-            </CabStack>
-          </CabCard>
-          <CabCard density="default">
-            <CabStack gap="$2">
-              <CabText variant="caption" fontSize={11}>
-                {t("portfolioEvolution.footer.maxIdle")}
-              </CabText>
-              <CabText variant="label" fontSize={16} style={{ fontVariantNumeric: "tabular-nums" }}>
-                {model.footer.maxIdleValueUsd === null ? t("states.unavailableValue") : formatUsd(model.footer.maxIdleValueUsd, locale)}
-              </CabText>
-            </CabStack>
-          </CabCard>
+          <OverviewImpactMetricCard
+            label={t("portfolioEvolution.footer.accumulatedRewards")}
+            value={resolvedModel.footer.accumulatedRewardsUsd === null ? t("states.unavailableValue") : formatUsd(resolvedModel.footer.accumulatedRewardsUsd, locale)}
+            iconName="rewards"
+            accentColor={portfolioEvolutionSeriesMeta.rewards.color}
+            series={filteredData.map((point) => point.cumulativeRewardValueUsd)}
+            size="compact"
+          />
+          <OverviewImpactMetricCard
+            label={t("portfolioEvolution.footer.capitalMoved")}
+            value={resolvedModel.footer.capitalMovedBetweenStatesUsd === null ? t("states.unavailableValue") : formatUsd(resolvedModel.footer.capitalMovedBetweenStatesUsd, locale)}
+            iconName="refreshCcw"
+            accentColor={cabColors.semantic.info}
+            series={capitalMovedSeries}
+            size="compact"
+          />
+          <OverviewImpactMetricCard
+            label={t("portfolioEvolution.footer.latestEvent")}
+            value={resolvedModel.footer.latestEvent ? t(`portfolioEvolution.events.${resolvedModel.footer.latestEvent.type === "move_to_idle" ? "moveToIdle" : resolvedModel.footer.latestEvent.type}`) : t("states.unavailableValue")}
+            iconName={resolvedModel.footer.latestEvent ? portfolioEvolutionEventIcons[resolvedModel.footer.latestEvent.type] : "activity"}
+            accentColor={resolvedModel.footer.latestEvent ? portfolioEvolutionEventMeta[resolvedModel.footer.latestEvent.type].color : cabColors.text.muted}
+            series={eventDensitySeries}
+            meta={resolvedModel.footer.latestEvent ? formatRelativeTime(resolvedModel.footer.latestEvent.occurredAt, locale) : t("portfolioEvolution.footer.noEvents")}
+            size="compact"
+          />
+          <OverviewImpactMetricCard
+            label={t("portfolioEvolution.footer.maxIdle")}
+            value={resolvedModel.footer.maxIdleValueUsd === null ? t("states.unavailableValue") : formatUsd(resolvedModel.footer.maxIdleValueUsd, locale)}
+            iconName="wallet"
+            accentColor={portfolioEvolutionSeriesMeta.idle.color}
+            series={filteredData.map((point) => point.idleValueUsd)}
+            size="compact"
+          />
         </div>
       </CabStack>
     </CabCard>

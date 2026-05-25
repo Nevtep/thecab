@@ -248,6 +248,7 @@ export function buildCapitalAllocationStatusBadges(
   translate: Translate,
 ) {
   const badges: CapitalAllocationStatusBadge[] = [];
+  const reasonCodes = distribution.coverageReasonCodes ?? [];
 
   switch (distribution.coverageStatus) {
     case "partial":
@@ -281,19 +282,19 @@ export function buildCapitalAllocationStatusBadges(
     });
   }
 
-  badges.push(
-    distribution.source === "analyzed_history"
-      ? {
-          key: "source-analyzed",
-          label: translate("distribution.statusBadges.analyzedHistory"),
-          tone: "success",
-        }
-      : {
-          key: "source-pending",
-          label: translate("distribution.statusBadges.historicalPending"),
-          tone: "neutral",
-        },
-  );
+  if (distribution.source === "analyzed_history") {
+    badges.push({
+      key: "source-analyzed",
+      label: translate("distribution.statusBadges.analyzedHistory"),
+      tone: "success",
+    });
+  } else if (reasonCodes.includes("analysisPending")) {
+    badges.push({
+      key: "source-pending",
+      label: translate("distribution.statusBadges.historicalPending"),
+      tone: "neutral",
+    });
+  }
 
   return badges;
 }

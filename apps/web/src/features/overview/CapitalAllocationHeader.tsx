@@ -32,13 +32,15 @@ export function CapitalAllocationHeader({ totalValueUsd, badges }: CapitalAlloca
         <CabText variant="caption" color={cabColors.text.secondary} fontSize={14}>
           {t("distribution.sectionSubtitle")}
         </CabText>
-        <CabStack row gap="$2" flexWrap="wrap">
-          {badges.map((badge) => (
-            <CabBadge key={badge.key} tone={badge.tone} size="md">
-              {badge.label}
-            </CabBadge>
-          ))}
-        </CabStack>
+        {badges.length > 0 ? (
+          <CabStack row gap="$2" flexWrap="wrap">
+            {badges.map((badge) => (
+              <CabBadge key={badge.key} tone={badge.tone} size="md">
+                {badge.label}
+              </CabBadge>
+            ))}
+          </CabStack>
+        ) : null}
       </CabStack>
 
       <div

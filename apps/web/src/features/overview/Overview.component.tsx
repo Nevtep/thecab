@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useSyncExternalStore } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -16,7 +16,6 @@ import {
   CabErrorPanel,
   CabIcon,
   CabLoadingPanel,
-  CabMetricCard,
   CabSectionHeader,
   CabSidebar,
   CabSidebarNavItem,
@@ -46,6 +45,9 @@ import {
   mapOverviewAnalysisStatusToBadgeStatus,
 } from "@/features/overview/overview.mappers";
 import { CapitalAllocationSection } from "@/features/overview/CapitalAllocationSection";
+import { OverviewImpactMetricCard } from "@/features/overview/OverviewImpactMetricCard";
+import { portfolioEvolutionSeriesMeta } from "@/features/overview/portfolio-evolution/portfolioEvolution.meta";
+import { buildPortfolioEvolutionModel } from "@/features/overview/portfolio-evolution/portfolioEvolution.utils";
 import { PortfolioEvolutionSection } from "@/features/overview/portfolio-evolution/PortfolioEvolutionSection.component";
 import type { OverviewRange, OverviewViewModel } from "@/features/overview/overview.types";
 import { SUPPORTED_CHAIN_ID } from "@/wallet/supportedChains";
@@ -579,6 +581,17 @@ export function OverviewComponent({
 
   const locale = i18n.language;
   const isWalletPending = walletStatus === "connecting" || walletStatus === "reconnecting";
+  const portfolioEvolutionModel = useMemo(
+    () => chartViewModel
+      ? buildPortfolioEvolutionModel({
+          viewModel: chartViewModel,
+          activity: activityViewModel,
+          range,
+          locale,
+        })
+      : null,
+    [activityViewModel, chartViewModel, locale, range],
+  );
 
   if (!isHydrated) {
     return (
@@ -890,22 +903,35 @@ export function OverviewComponent({
               </>
             ) : (
               <>
-                <CabMetricCard
+                <OverviewImpactMetricCard
                   label={t("metrics.netPortfolioValue")}
                   value={formatCurrencyValue(netPortfolioMetricValueUsd, locale, t("states.unavailableValue"))}
-                  delta={changeOverSelectedPeriodPct ?? undefined}
+                  iconName="dashboard"
+                  accentColor={portfolioEvolutionSeriesMeta.total.color}
+                  series={portfolioEvolutionModel?.data.map((point) => point.totalValueUsd) ?? []}
+                  meta={changeOverSelectedPeriodPct === null ? null : formatPercent(changeOverSelectedPeriodPct, locale)}
                 />
-                <CabMetricCard
+                <OverviewImpactMetricCard
                   label={t("metrics.deployedValue")}
                   value={formatCurrencyValue(deployedMetricValueUsd, locale, t("states.unavailableValue"))}
+                  iconName="arrowUpToLine"
+                  accentColor={portfolioEvolutionSeriesMeta.deployed.color}
+                  series={portfolioEvolutionModel?.data.map((point) => point.deployedValueUsd) ?? []}
                 />
-                <CabMetricCard
+                <OverviewImpactMetricCard
                   label={t("metrics.idleValue")}
                   value={formatCurrencyValue(idleMetricValueUsd, locale, t("states.unavailableValue"))}
+                  iconName="wallet"
+                  accentColor={portfolioEvolutionSeriesMeta.idle.color}
+                  series={portfolioEvolutionModel?.data.map((point) => point.idleValueUsd) ?? []}
                 />
-                <CabMetricCard
+                <OverviewImpactMetricCard
                   label={t("metrics.estimatedRealizedRewards")}
                   value={formatCurrencyValue(estimatedRealizedRewardsMetricValueUsd, locale, t("states.unavailableValue"))}
+                  iconName="rewards"
+                  accentColor={portfolioEvolutionSeriesMeta.rewards.color}
+                  series={portfolioEvolutionModel?.data.map((point) => point.cumulativeRewardValueUsd) ?? []}
+                  meta={portfolioEvolutionModel ? t("portfolioEvolution.tooltip.eventCount", { count: portfolioEvolutionModel.footer.markerCount }) : null}
                 />
               </>
             )}
@@ -940,6 +966,7 @@ export function OverviewComponent({
             ) : (
               <PortfolioEvolutionSection
                 viewModel={resolvedChartViewModel}
+                model={portfolioEvolutionModel}
                 activity={activityViewModel}
                 range={range}
                 locale={locale}

@@ -1,6 +1,7 @@
 "use client";
 
 import { CabRangeSelector, CabStack, CabText } from "@/design-system";
+import { cabColors } from "@/design-system/tokens";
 import type { OverviewRange, OverviewViewModel } from "@/features/overview/overview.types";
 import { useTranslation } from "react-i18next";
 
@@ -29,13 +30,13 @@ export function PortfolioEvolutionHeader({
     <CabStack gap="$3">
       <CabStack row justifyContent="space-between" alignItems="flex-start" gap="$3" flexWrap="wrap">
         <CabStack gap="$2" flex={1} minWidth={0}>
-          <CabText variant="label" fontSize={18}>
+          <CabText variant="label" color={cabColors.text.primary} fontSize={28}>
             {t("sections.chart")}
           </CabText>
-          <CabText variant="caption" fontSize={12}>
+          <CabText variant="caption" color={cabColors.text.secondary} fontSize={14}>
             {t("portfolioEvolution.subtitle")}
           </CabText>
-          <CabText variant="caption" fontSize={11}>
+          <CabText variant="caption" color={cabColors.text.muted} fontSize={11}>
             {t(`sources.${source}`)} · {t(`coverage.status.${coverageStatus}`)}
             {isRefreshing ? ` · ${t("states.updatingChartRange", { range: t(`ranges.${range}`) })}` : ""}
           </CabText>
