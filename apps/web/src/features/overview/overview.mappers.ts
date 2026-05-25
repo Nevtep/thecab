@@ -193,6 +193,30 @@ export function mapOverviewAnalysisStatusToBadgeStatus(
   return status;
 }
 
+export function getOverviewAnalysisAction(status: AnalysisSummary["status"]) {
+  if (status === "not_analyzed") {
+    return {
+      visible: true,
+      mode: "full_history" as const,
+      labelKey: "analysis:cta.start",
+    };
+  }
+
+  if (status === "ready" || status === "stale" || status === "failed") {
+    return {
+      visible: true,
+      mode: status === "failed" ? ("full_history" as const) : ("incremental" as const),
+      labelKey: "analysis:cta.startAgain",
+    };
+  }
+
+  return {
+    visible: false,
+    mode: null,
+    labelKey: null,
+  };
+}
+
 export function formatWalletAddressLabel(walletAddress: string) {
   return `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`;
 }

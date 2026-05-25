@@ -1,5 +1,6 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 
 import { OverviewComponent } from "@/features/overview/Overview.component";
@@ -17,14 +18,17 @@ import {
   useOverviewQuery,
   useOverviewShellQuery,
   useSettingsQuery,
+  useStartAnalysisMutation,
   useWarmOverviewMutation,
 } from "@/queries/hooks";
+import { queryKeys } from "@/queries/keys";
 import { SUPPORTED_CHAIN_ID } from "@/wallet/supportedChains";
 import { useCabWallet } from "@/wallet/useCabWallet";
 
 const ENABLE_OVERVIEW_WARMUP = false;
 
 export function OverviewContainer() {
+  const queryClient = useQueryClient();
   const { address, chainId, status, isConnected, isAuthenticated, isSupportedChain, connect, disconnect, switchToSupportedChain } = useCabWallet();
   const [screenState, setScreenState] = useState(() =>
     createInitialOverviewScreenState(address?.toLowerCase() ?? null, chainId ?? null),
@@ -108,6 +112,7 @@ export function OverviewContainer() {
       chainId: resolvedChainId,
     },
   );
+  const startAnalysisMutation = useStartAnalysisMutation();
   const warmOverviewMutation = useWarmOverviewMutation();
 
   const shellViewModel = useMemo(
@@ -230,6 +235,38 @@ export function OverviewContainer() {
     void analysisStatusQuery.refetch();
   }
 
+  async function invalidateOverviewSlices() {
+    if (!walletAddress) {
+      return;
+    }
+
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["overview", resolvedChainId, walletAddress] }),
+      queryClient.invalidateQueries({ queryKey: ["overview-shell", resolvedChainId, walletAddress] }),
+      queryClient.invalidateQueries({ queryKey: ["overview-activity", resolvedChainId, walletAddress] }),
+      queryClient.invalidateQueries({ queryKey: ["overview-chart", resolvedChainId, walletAddress] }),
+      queryClient.invalidateQueries({ queryKey: ["overview-protocol-positions", resolvedChainId, walletAddress] }),
+    ]);
+  }
+
+  async function handleStartAnalysis(mode: "full_history" | "incremental") {
+    if (!walletAddress) {
+      return;
+    }
+
+    await startAnalysisMutation.mutateAsync({
+      walletAddress,
+      chainId: resolvedChainId,
+      mode,
+    });
+
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.analysisStatus({ chainId: resolvedChainId, walletAddress }) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.settings({ chainId: resolvedChainId, walletAddress }) }),
+      invalidateOverviewSlices(),
+    ]);
+  }
+
   return (
     <OverviewComponent
       chainId={resolvedChainId}
@@ -256,6 +293,7 @@ export function OverviewContainer() {
       isActivityLoading={activityQuery.isLoading}
       isProtocolPositionsLoading={protocolPositionsQuery.isLoading}
       isRefreshing={shellQuery.isFetching || overviewQuery.isFetching || chartQuery.isFetching || activityQuery.isFetching || protocolPositionsQuery.isFetching}
+      isStartingAnalysis={startAnalysisMutation.isPending}
       errorCode={errorCode}
       sectionsErrorCode={sectionsErrorCode}
       chartErrorCode={chartErrorCode}
@@ -266,6 +304,7 @@ export function OverviewContainer() {
       onDisconnect={() => void disconnect()}
       onSwitchChain={() => void switchToSupportedChain()}
       onRefresh={handleRefresh}
+      onStartAnalysis={(mode) => void handleStartAnalysis(mode)}
       onRangeChange={handleRangeChange}
       onToggleHiddenAssets={(checked) => setShowHiddenAssets(checked)}
       onToggleUnpricedAssets={(checked) => setShowUnpricedAssets(checked)}

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  getOverviewAnalysisAction,
   getOverviewNavigationItems,
   mapOverviewResponseToViewModel,
 } from "@/features/overview/overview.mappers";
@@ -203,4 +204,22 @@ test("overview navigation requires analysis until the analysis becomes ready", (
 
   assert.equal(pendingItems[1]?.stateKey, "requiresAnalysis");
   assert.equal(readyItems[1]?.stateKey, "comingSoon");
+});
+
+test("overview analysis action is available for first run and reruns", () => {
+  assert.deepEqual(getOverviewAnalysisAction("not_analyzed"), {
+    visible: true,
+    mode: "full_history",
+    labelKey: "analysis:cta.start",
+  });
+  assert.deepEqual(getOverviewAnalysisAction("ready"), {
+    visible: true,
+    mode: "incremental",
+    labelKey: "analysis:cta.startAgain",
+  });
+  assert.deepEqual(getOverviewAnalysisAction("running"), {
+    visible: false,
+    mode: null,
+    labelKey: null,
+  });
 });

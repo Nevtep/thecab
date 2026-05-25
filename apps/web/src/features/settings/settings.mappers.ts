@@ -6,7 +6,7 @@ import type { SettingsResponse, SettingsViewModel } from "@/features/settings/se
 
 type Translate = (key: string, options?: Record<string, unknown>) => string;
 
-const ANALYSIS_ACTIONS_ENABLED = false;
+const ANALYSIS_ACTIONS_ENABLED = true;
 
 function getAnalysisBannerKey(status: SettingsResponse["diagnostics"]["analysis"]["status"]) {
   return `analysis:banner.${status}`;

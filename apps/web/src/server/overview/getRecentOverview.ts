@@ -26,6 +26,7 @@ import {
   upsertOverviewFreshness,
   upsertOverviewPricePoint,
 } from "@/server/overview/overview.repository";
+import { buildSnapshotValueLookup, toBucketTimestamp } from "@/server/overview/chart-snapshots";
 import type {
   OverviewChartPoint,
   OverviewCoverageReasonCode,
@@ -915,100 +916,6 @@ function buildBucketTimestamps(range: OverviewRange, referenceDate: Date) {
     const offset = config.bucketCount - index - 1;
     return new Date(alignedEndDate.getTime() - offset * bucketMs).toISOString();
   });
-}
-
-function toBucketTimestamp(timestamp: string, granularity: "hour" | "day") {
-  return floorDateToGranularity(new Date(timestamp), granularity).toISOString();
-}
-
-function buildSnapshotValueLookup(input: {
-  range: OverviewRange;
-  granularity: "hour" | "day";
-  snapshotRows: Array<{
-    capturedAt: Date;
-    totalValueUsd: string;
-    deployedValueUsd: string | null;
-    idleValueUsd: string | null;
-    metadataJson: Record<string, unknown>;
-  }>;
-  currentPoint: {
-    capturedAt: Date;
-    totalValueUsd: number | null;
-    deployedValueUsd: number | null;
-    idleValueUsd: number | null;
-  };
-}) {
-  const snapshotCandidatesByBucket = new Map<string, {
-    totalValueUsd: number | null;
-    deployedValueUsd: number | null;
-    idleValueUsd: number | null;
-    score: number;
-    capturedAtMs: number;
-  }>();
-
-  for (const row of input.snapshotRows) {
-    const totalValueUsd = asNumber(row.totalValueUsd);
-    const deployedValueUsd = asNumber(row.deployedValueUsd);
-    const idleValueUsd = asNumber(row.idleValueUsd);
-
-    if (totalValueUsd === null && deployedValueUsd === null && idleValueUsd === null) {
-      continue;
-    }
-
-    const bucketTimestamp = toBucketTimestamp(row.capturedAt.toISOString(), input.granularity);
-    const metadataJson = row.metadataJson ?? {};
-    const score =
-      (metadataJson.snapshotKind === "range_bucket" ? 8 : 0) +
-      (metadataJson.range === input.range ? 4 : 0) +
-      (row.deployedValueUsd !== null ? 3 : 0) +
-      (row.idleValueUsd !== null ? 2 : 0) +
-      (row.totalValueUsd !== null ? 1 : 0);
-    const nextCandidate = {
-      totalValueUsd,
-      deployedValueUsd,
-      idleValueUsd,
-      score,
-      capturedAtMs: row.capturedAt.getTime(),
-    };
-    const existingCandidate = snapshotCandidatesByBucket.get(bucketTimestamp);
-
-    if (
-      !existingCandidate ||
-      nextCandidate.score > existingCandidate.score ||
-      (nextCandidate.score === existingCandidate.score && nextCandidate.capturedAtMs > existingCandidate.capturedAtMs)
-    ) {
-      snapshotCandidatesByBucket.set(bucketTimestamp, nextCandidate);
-    }
-  }
-
-  const currentBucketTimestamp = toBucketTimestamp(
-    input.currentPoint.capturedAt.toISOString(),
-    input.granularity,
-  );
-
-  snapshotCandidatesByBucket.set(currentBucketTimestamp, {
-    totalValueUsd: input.currentPoint.totalValueUsd,
-    deployedValueUsd: input.currentPoint.deployedValueUsd,
-    idleValueUsd: input.currentPoint.idleValueUsd,
-    score: Number.MAX_SAFE_INTEGER,
-    capturedAtMs: input.currentPoint.capturedAt.getTime(),
-  });
-
-  const snapshotValuesByBucket = new Map<string, {
-    totalValueUsd: number | null;
-    deployedValueUsd: number | null;
-    idleValueUsd: number | null;
-  }>();
-
-  for (const [bucketTimestamp, candidate] of snapshotCandidatesByBucket.entries()) {
-    snapshotValuesByBucket.set(bucketTimestamp, {
-      totalValueUsd: candidate.totalValueUsd,
-      deployedValueUsd: candidate.deployedValueUsd,
-      idleValueUsd: candidate.idleValueUsd,
-    });
-  }
-
-  return snapshotValuesByBucket;
 }
 
 function fillMissingBucketPrices(

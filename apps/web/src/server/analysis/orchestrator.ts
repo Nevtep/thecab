@@ -52,7 +52,7 @@ export function planAnalysisSlices(input: {
   while (currentEnd > horizonStart) {
     const currentStart = currentEnd > horizonStart ? addUtcDays(currentEnd, -sliceDays) : horizonStart;
     const boundedStart = currentStart < horizonStart ? horizonStart : currentStart;
-    const isFullyCached = Boolean(cursorBoundary && currentEnd <= cursorBoundary);
+    const isFullyCached = input.mode === "incremental" && Boolean(cursorBoundary && currentEnd <= cursorBoundary);
 
     slices.push({
       sliceIndex,

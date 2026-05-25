@@ -27,6 +27,39 @@ export type PhaseDepositsTaskPayload = {
   chainId: number;
 };
 
+const MORALIS_HISTORY_PAGE_LIMIT = 100;
+const MORALIS_HISTORY_MAX_PAGES_PER_SLICE = 20;
+
+async function loadSliceHistory(
+  walletAddress: string,
+  chainId: number,
+  sliceStartUtc: Date,
+  sliceEndUtc: Date,
+) {
+  const records: Array<Record<string, unknown>> = [];
+  let cursor: string | undefined;
+
+  for (let pageIndex = 0; pageIndex < MORALIS_HISTORY_MAX_PAGES_PER_SLICE; pageIndex += 1) {
+    const response = await getWalletHistory(walletAddress, chainId, {
+      limit: MORALIS_HISTORY_PAGE_LIMIT,
+      cursor,
+      fromDate: sliceStartUtc.toISOString(),
+      toDate: sliceEndUtc.toISOString(),
+    });
+
+    const pageRecords = Array.isArray(response.result) ? response.result : [];
+    records.push(...pageRecords);
+
+    if (pageRecords.length < MORALIS_HISTORY_PAGE_LIMIT || typeof response.cursor !== "string" || response.cursor.length === 0) {
+      break;
+    }
+
+    cursor = response.cursor;
+  }
+
+  return records;
+}
+
 export const phaseDepositsTask = task({
   id: "phase-deposits",
   run: async (payload: PhaseDepositsTaskPayload) => {
@@ -51,9 +84,12 @@ export const phaseDepositsTask = task({
       getWalletTokens(payload.walletAddress, payload.chainId)
         .then((value) => ({ ok: true as const, value }))
         .catch((error) => ({ ok: false as const, error, coverageReason: getMoralisCoverageReason(error) })),
-      getWalletHistory(payload.walletAddress, payload.chainId, {
-        limit: 200,
-      })
+      loadSliceHistory(
+        payload.walletAddress,
+        payload.chainId,
+        slice.sliceStartUtc,
+        slice.sliceEndUtc,
+      )
         .then((value) => ({ ok: true as const, value }))
         .catch((error) => ({ ok: false as const, error, coverageReason: getMoralisCoverageReason(error) })),
       getWalletDefiPositions(payload.walletAddress, payload.chainId)
@@ -71,7 +107,7 @@ export const phaseDepositsTask = task({
     }
 
     const tokens = tokensResult.ok ? (tokensResult.value.result ?? []) : [];
-    const history = historyResult.ok ? (historyResult.value.result ?? []) : [];
+  const history = historyResult.ok ? historyResult.value : [];
     const defiPositions = defiPositionsResult.ok ? defiPositionsResult.value : [];
     const coverageReasons = new Set<string>();
 

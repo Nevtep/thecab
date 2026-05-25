@@ -87,7 +87,7 @@ test("mapSettingsResponseToViewModel preserves truthful coverage labels and disa
     "overview:coverage.reasons.missingPrices",
   ]);
   assert.equal(viewModel.analysisSection.primaryAction.kind, "update");
-  assert.equal(viewModel.analysisSection.primaryAction.disabled, true);
+  assert.equal(viewModel.analysisSection.primaryAction.disabled, false);
 });
 
 test("buildSettingsDiagnosticsRows omits unsupported diagnostics fields while preserving visible coverage rows", () => {

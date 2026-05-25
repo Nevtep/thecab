@@ -2,6 +2,7 @@ import { moralisGet } from "@/server/providers/moralis/client";
 
 type WalletHistoryResponse = {
   result?: Array<Record<string, unknown>>;
+  cursor?: string;
   page?: number;
   page_size?: number;
 };

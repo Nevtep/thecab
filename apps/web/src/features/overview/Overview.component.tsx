@@ -40,6 +40,7 @@ import {
 
 import {
   formatWalletAddressLabel,
+  getOverviewAnalysisAction,
   getOverviewCoverageReasonLabelKeys,
   getOverviewNavigationItems,
   getOverviewTrustBadgeTone,
@@ -75,6 +76,7 @@ type OverviewComponentProps = {
   isActivityLoading: boolean;
   isProtocolPositionsLoading: boolean;
   isRefreshing: boolean;
+  isStartingAnalysis: boolean;
   errorCode: string | null;
   sectionsErrorCode: string | null;
   chartErrorCode: string | null;
@@ -85,6 +87,7 @@ type OverviewComponentProps = {
   onDisconnect: () => void;
   onSwitchChain: () => void;
   onRefresh: () => void;
+  onStartAnalysis: (mode: "full_history" | "incremental") => void;
   onRangeChange: (range: OverviewRange) => void;
   onToggleHiddenAssets: (checked: boolean) => void;
   onToggleUnpricedAssets: (checked: boolean) => void;
@@ -577,6 +580,7 @@ export function OverviewComponent({
   isActivityLoading,
   isProtocolPositionsLoading,
   isRefreshing,
+  isStartingAnalysis,
   errorCode,
   sectionsErrorCode,
   chartErrorCode,
@@ -587,6 +591,7 @@ export function OverviewComponent({
   onDisconnect,
   onSwitchChain,
   onRefresh,
+  onStartAnalysis,
   onRangeChange,
   onToggleHiddenAssets,
   onToggleUnpricedAssets,
@@ -709,12 +714,7 @@ export function OverviewComponent({
     0,
   );
   const navigationItems = getOverviewNavigationItems(activeAnalysis.status);
-  const showAnalysisAction =
-    activeAnalysis.status === "not_analyzed" ||
-    activeAnalysis.status === "stale" ||
-    activeAnalysis.status === "failed";
-  const analysisActionLabel =
-    activeAnalysis.status === "not_analyzed" ? t("analysis:cta.start") : t("analysis:cta.startAgain");
+  const analysisAction = getOverviewAnalysisAction(activeAnalysis.status);
   const exclusionMessage = buildExclusionMessage(overviewViewModel?.metrics.exclusions ?? null, t, locale);
   const visibleRenderableRows = visibleAssetRows.filter((row) => {
     if (!showUnpricedAssets && row.priceUsd === null) {
@@ -836,10 +836,11 @@ export function OverviewComponent({
             </CabText>
           </CabStack>
         ) : null}
-        {showAnalysisAction ? (
+        {analysisAction.visible && analysisAction.mode ? (
           <CabAnalysisCta
-            label={analysisActionLabel}
-            disabled
+            label={t(analysisAction.labelKey)}
+            disabled={isStartingAnalysis}
+            onPress={() => onStartAnalysis(analysisAction.mode)}
           />
         ) : null}
       </CabStack>
