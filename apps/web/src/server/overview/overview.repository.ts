@@ -427,7 +427,7 @@ export async function readOverviewRealizedRewardEvents(input: ScopedWalletInput 
               else null
             end
           )
-        )::text as amount_usd,
+        ) as amount_usd,
         case when count(distinct am.token_address) = 1 then min(am.token_address) else null end as token_address,
         case when count(distinct am.token_address) = 1 then min(am.amount_raw) else null end as amount_raw
       from ledger_events le
