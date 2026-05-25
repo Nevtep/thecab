@@ -40,6 +40,15 @@ var cabColors = {
     signalTealMuted: "#1A8F98",
     signalTealGlow: "rgba(0, 224, 225, 0.22)"
   },
+  dataViz: {
+    slate: "#7E8AA6",
+    cobalt: "#2563EB",
+    emerald: "#00B874",
+    amber: "#F59E0B",
+    orange: "#F97316",
+    mint: "#14B8A6",
+    violet: "#8B5CF6"
+  },
   surface: {
     darkSurface: "#111A27",
     elevatedSurface: "#1A2233",

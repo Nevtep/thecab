@@ -1,3 +1,4 @@
+import { cabColors } from "@/design-system/tokens";
 import type { OverviewViewModel } from "@/features/overview/overview.types";
 
 type Translate = (key: string, options?: Record<string, unknown>) => string;
@@ -59,15 +60,15 @@ export function getDistributionSliceLabel(slice: DistributionSlice, translate: T
 export function getDistributionSliceColor(dimension: DistributionSlice["dimension"]) {
   switch (dimension) {
     case "idle":
-      return "#7E8AA6";
+      return cabColors.dataViz.slate;
     case "manual_deposit":
-      return "#2563EB";
+      return cabColors.dataViz.cobalt;
     case "strategy":
-      return "#00B874";
+      return cabColors.dataViz.emerald;
     case "governance":
-      return "#F59E0B";
+      return cabColors.dataViz.amber;
     case "staked_lp":
-      return "#8B5CF6";
+      return cabColors.dataViz.violet;
   }
 }
 
@@ -101,7 +102,14 @@ export function withAlpha(color: string, alpha: number) {
 }
 
 function getDistributionCompositionColor(index: number) {
-  const colors = ["#8B5CF6", "#00B874", "#2563EB", "#F59E0B", "#F97316", "#14B8A6"];
+  const colors = [
+    cabColors.dataViz.violet,
+    cabColors.dataViz.emerald,
+    cabColors.dataViz.cobalt,
+    cabColors.dataViz.amber,
+    cabColors.dataViz.orange,
+    cabColors.dataViz.mint,
+  ];
 
   return colors[index % colors.length];
 }

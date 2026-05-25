@@ -176,8 +176,38 @@ test("buildPortfolioEvolutionModel falls back to backend chart events for aero r
   });
 
   assert.equal(model.data[1]?.rewardValueUsd, 95.4);
+  assert.equal(model.data[0]?.rewardValueUsd, 0);
+  assert.equal(model.data[0]?.cumulativeRewardValueUsd, 0);
   assert.equal(model.data[1]?.cumulativeRewardValueUsd, 95.4);
   assert.equal(model.data[2]?.events[0]?.type, "rebalance");
   assert.equal(model.summary.accumulatedRewardsUsd, 95.4);
   assert.equal(model.summary.detectedRebalanceCount, 1);
+});
+
+test("buildPortfolioEvolutionModel normalizes rewards to zero across every bucket when rewards coverage is known", () => {
+  const viewModel = createViewModel();
+  viewModel.metrics.estimatedRealizedRewardsUsd = 0;
+  viewModel.chart.hasRewardMarkers = true;
+  viewModel.chart.points = viewModel.chart.points.map((point) => ({
+    ...point,
+    rewardValueUsd: null,
+  }));
+
+  const model = buildPortfolioEvolutionModel({
+    viewModel,
+    range: "7d",
+    locale: "es",
+    activity: null,
+  });
+
+  assert.equal(model.data.length, viewModel.chart.points.length);
+  assert.deepEqual(
+    model.data.map((point) => point.rewardValueUsd),
+    [0, 0, 0],
+  );
+  assert.deepEqual(
+    model.data.map((point) => point.cumulativeRewardValueUsd),
+    [0, 0, 0],
+  );
+  assert.equal(model.summary.accumulatedRewardsUsd, 0);
 });

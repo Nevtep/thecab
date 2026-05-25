@@ -4,10 +4,12 @@ import { useTranslation } from "react-i18next";
 
 import { CabCard, CabDonutChart, CabStack, CabText } from "@/design-system";
 import { cabColors } from "@/design-system/tokens";
+import { getOverviewTimeUnit } from "@/features/overview/overviewRange.utils";
 import type {
   CapitalAllocationSliceSummary,
   DistributionCompositionBreakdown,
 } from "@/features/overview/capitalAllocation.utils";
+import type { OverviewRange } from "@/features/overview/overview.types";
 import { withAlpha } from "@/features/overview/capitalAllocation.utils";
 import { formatPercent, formatUsd } from "@/i18n/formatters";
 
@@ -15,6 +17,7 @@ type ConcentricCapitalDonutProps = {
   items: CapitalAllocationSliceSummary[];
   selectedSlice: CapitalAllocationSliceSummary;
   selectedBreakdown: DistributionCompositionBreakdown | null;
+  range: OverviewRange;
   onSelectSlice: (key: string) => void;
 };
 
@@ -22,9 +25,11 @@ export function ConcentricCapitalDonut({
   items,
   selectedSlice,
   selectedBreakdown,
+  range,
   onSelectSlice,
 }: ConcentricCapitalDonutProps) {
   const { t, i18n } = useTranslation("overview");
+  const timeUnit = getOverviewTimeUnit(range);
 
   const innerData = selectedBreakdown
     ? selectedBreakdown.tokens.map((token) => ({
@@ -105,7 +110,7 @@ export function ConcentricCapitalDonut({
             {t("distribution.chart.title")}
           </CabText>
           <CabText variant="caption" fontSize={13} color={cabColors.text.muted}>
-            {t("distribution.chart.hint")}
+            {t(`distribution.chart.hint${timeUnit === "hour" ? "Hour" : "Day"}`)}
           </CabText>
         </CabStack>
 

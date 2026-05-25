@@ -7,7 +7,7 @@ export const portfolioEvolutionSeriesMeta: Record<PortfolioEvolutionSeriesKey, {
   total: { labelKey: "charts:series.netPortfolioValue", color: cabColors.brand.signalTeal },
   deployed: { labelKey: "charts:series.deployedValue", color: cabColors.brand.cabGold },
   idle: { labelKey: "charts:series.idleValue", color: cabColors.brand.electricBlue },
-  rewards: { labelKey: "charts:series.rewardsAccumulated", color: cabColors.semantic.warning },
+  rewards: { labelKey: "charts:series.rewardsAccumulated", color: cabColors.dataViz.violet },
 };
 
 export const portfolioEvolutionEventMeta: Record<

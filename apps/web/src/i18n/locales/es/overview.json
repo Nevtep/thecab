@@ -60,23 +60,30 @@
     },
     "selectedPoint": {
       "title": "Snapshot del punto seleccionado",
-      "empty": "Hacé clic en un punto del gráfico para inspeccionar este bucket",
-      "eventsTitle": "Eventos en este bucket",
-      "eventsCount_one": "{{count}} evento en este bucket",
-      "eventsCount_other": "{{count}} eventos en este bucket",
-      "noEvents": "No hay eventos del timeline en este bucket",
+      "emptyHour": "Hacé clic en un punto del gráfico para inspeccionar esta hora",
+      "emptyDay": "Hacé clic en un punto del gráfico para inspeccionar este día",
+      "eventsTitleHour": "Eventos en esta hora",
+      "eventsTitleDay": "Eventos en este día",
+      "eventsCountHour_one": "{{count}} evento en esta hora",
+      "eventsCountHour_other": "{{count}} eventos en esta hora",
+      "eventsCountDay_one": "{{count}} evento en este día",
+      "eventsCountDay_other": "{{count}} eventos en este día",
+      "noEventsHour": "No hay eventos del timeline en esta hora",
+      "noEventsDay": "No hay eventos del timeline en este día",
       "noEventDetail": "No hay detalle adicional disponible para este evento"
     },
     "tooltip": {
       "eventCount_one": "{{count}} evento",
       "eventCount_other": "{{count}} eventos",
-      "clickHint": "Hacé clic para inspeccionar el detalle completo del bucket"
+      "clickHintHour": "Hacé clic para inspeccionar el detalle completo de esta hora",
+      "clickHintDay": "Hacé clic para inspeccionar el detalle completo de este día"
     },
     "footer": {
       "accumulatedRewards": "Rewards acumuladas",
       "capitalMoved": "Capital movido entre estados",
       "latestEvent": "Último evento",
-      "maxIdle": "Máx. idle registrado"
+      "maxIdle": "Máx. idle registrado",
+      "noEvents": "No hay eventos del timeline"
     }
   },
   "sources": {
@@ -97,7 +104,8 @@
     },
     "chart": {
       "title": "Asignación de capital",
-      "hint": "Hacé clic en un segmento para inspeccionar el mix de activos subyacentes del bucket seleccionado.",
+      "hintHour": "Hacé clic en un segmento para inspeccionar el mix de activos subyacentes de la hora seleccionada.",
+      "hintDay": "Hacé clic en un segmento para inspeccionar el mix de activos subyacentes del día seleccionado.",
       "legendOuter": "Dona exterior: categorías principales de capital.",
       "legendInner": "Dona interior: activos subyacentes del segmento seleccionado."
     },

@@ -1,6 +1,7 @@
 "use client";
 
 import { CabCard, CabKpiStrip, CabStack, CabText } from "@/design-system";
+import { cabColors } from "@/design-system/tokens";
 import type { PortfolioEvolutionSummary } from "@/features/overview/portfolio-evolution/portfolioEvolution.utils";
 import { formatPercent, formatUsd } from "@/i18n/formatters";
 import { useTranslation } from "react-i18next";
@@ -74,7 +75,9 @@ export function PortfolioEvolutionKpiStrip({ summary, locale }: PortfolioEvoluti
                 fontSize={18}
                 style={{
                   color:
-                    item.tone === "success"
+                    item.key === "rewards"
+                      ? cabColors.dataViz.violet
+                      : item.tone === "success"
                       ? "#22C55E"
                       : item.tone === "danger"
                         ? "#EF4444"

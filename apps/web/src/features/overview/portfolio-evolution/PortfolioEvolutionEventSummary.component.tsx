@@ -2,11 +2,13 @@
 
 import { CabIcon, CabStack, CabText } from "@/design-system";
 import { cabColors } from "@/design-system/tokens";
+import { getOverviewTimeUnit } from "@/features/overview/overviewRange.utils";
 import {
   portfolioEvolutionEventIcons,
   portfolioEvolutionEventMeta,
   portfolioEvolutionEventOrder,
 } from "@/features/overview/portfolio-evolution/portfolioEvolution.meta";
+import type { OverviewRange } from "@/features/overview/overview.types";
 import type { PortfolioEvolutionMarker } from "@/features/overview/portfolio-evolution/portfolioEvolution.utils";
 import { formatRelativeTime } from "@/i18n/formatters";
 import { useMemo } from "react";
@@ -57,13 +59,16 @@ function buildGroupedSummary(events: PortfolioEvolutionMarker[]) {
 export function PortfolioEvolutionEventSummary({
   events,
   locale,
+  range,
   forceGrouped = false,
 }: {
   events: PortfolioEvolutionMarker[];
   locale: string;
+  range: OverviewRange;
   forceGrouped?: boolean;
 }) {
   const { t } = useTranslation(["overview"]);
+  const timeUnit = getOverviewTimeUnit(range);
   const orderedEvents = useMemo(
     () => [...events].sort((left, right) => right.occurredAt.localeCompare(left.occurredAt)),
     [events],
@@ -145,7 +150,7 @@ export function PortfolioEvolutionEventSummary({
       )}
       {isDenseBucket ? (
         <CabText variant="caption" fontSize={11} color={cabColors.brandExtended.signalTealUi}>
-          {t("portfolioEvolution.tooltip.clickHint")}
+          {t(`portfolioEvolution.tooltip.clickHint${timeUnit === "hour" ? "Hour" : "Day"}`)}
         </CabText>
       ) : null}
     </CabStack>

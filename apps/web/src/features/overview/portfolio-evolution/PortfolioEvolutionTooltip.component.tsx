@@ -2,9 +2,11 @@
 
 import { CabCard, CabStack, CabText } from "@/design-system";
 import { cabColors } from "@/design-system/tokens";
+import { getOverviewTimeUnit } from "@/features/overview/overviewRange.utils";
 import {
   portfolioEvolutionSeriesMeta,
 } from "@/features/overview/portfolio-evolution/portfolioEvolution.meta";
+import type { OverviewRange } from "@/features/overview/overview.types";
 import { PortfolioEvolutionEventSummary } from "@/features/overview/portfolio-evolution/PortfolioEvolutionEventSummary.component";
 import type { PortfolioEvolutionDatum } from "@/features/overview/portfolio-evolution/portfolioEvolution.utils";
 import { formatDateTime, formatUsd } from "@/i18n/formatters";
@@ -15,6 +17,7 @@ type PortfolioEvolutionTooltipProps = {
   payload?: Array<{ payload?: PortfolioEvolutionDatum }>;
   label?: string;
   locale: string;
+  range: OverviewRange;
 };
 
 function ColorDot({ color }: { color: string }) {
@@ -33,9 +36,10 @@ function ColorDot({ color }: { color: string }) {
   );
 }
 
-export function PortfolioEvolutionTooltip({ active, payload, locale }: PortfolioEvolutionTooltipProps) {
+export function PortfolioEvolutionTooltip({ active, payload, locale, range }: PortfolioEvolutionTooltipProps) {
   const { t } = useTranslation(["overview", "charts"]);
   const datum = payload?.[0]?.payload;
+  const timeUnit = getOverviewTimeUnit(range);
 
   if (!active || !datum) {
     return null;
@@ -59,6 +63,12 @@ export function PortfolioEvolutionTooltip({ active, payload, locale }: Portfolio
       label: t(portfolioEvolutionSeriesMeta.idle.labelKey),
       value: datum.idleValueUsd,
       color: portfolioEvolutionSeriesMeta.idle.color,
+    },
+    {
+      key: "rewardBucket",
+      label: t(`charts:series.rewards${timeUnit === "hour" ? "Hour" : "Day"}`),
+      value: datum.rewardValueUsd,
+      color: cabColors.dataViz.orange,
     },
     {
       key: "rewards",
@@ -94,6 +104,7 @@ export function PortfolioEvolutionTooltip({ active, payload, locale }: Portfolio
             <PortfolioEvolutionEventSummary
               events={datum.events}
               locale={locale}
+              range={range}
             />
           ) : null}
         </CabStack>

@@ -138,6 +138,7 @@ export function PortfolioEvolutionSection({
             selectedPoint={selectedPoint}
             latestEventOccurredAt={model.footer.latestEvent?.occurredAt ?? null}
             locale={locale}
+            range={range}
           />
         </div>
 
@@ -177,7 +178,7 @@ export function PortfolioEvolutionSection({
                 {model.footer.latestEvent ? t(`portfolioEvolution.events.${model.footer.latestEvent.type === "move_to_idle" ? "moveToIdle" : model.footer.latestEvent.type}`) : t("states.unavailableValue")}
               </CabText>
               <CabText variant="caption" fontSize={11}>
-                {model.footer.latestEvent ? formatRelativeTime(model.footer.latestEvent.occurredAt, locale) : t("portfolioEvolution.selectedPoint.noEvents")}
+                {model.footer.latestEvent ? formatRelativeTime(model.footer.latestEvent.occurredAt, locale) : t("portfolioEvolution.footer.noEvents")}
               </CabText>
             </CabStack>
           </CabCard>

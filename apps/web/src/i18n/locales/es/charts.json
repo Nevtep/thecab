@@ -3,6 +3,8 @@
     "netPortfolioValue": "Valor neto de la cartera",
     "deployedValue": "Valor desplegado",
     "idleValue": "Valor idle",
+    "rewardsHour": "Rewards de la hora",
+    "rewardsDay": "Rewards del día",
     "rewardsAccumulated": "Rewards acumuladas"
   }
 }

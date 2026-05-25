@@ -3,6 +3,8 @@
     "netPortfolioValue": "Net portfolio value",
     "deployedValue": "Deployed value",
     "idleValue": "Idle value",
+    "rewardsHour": "Hourly rewards",
+    "rewardsDay": "Daily rewards",
     "rewardsAccumulated": "Accumulated rewards"
   }
 }

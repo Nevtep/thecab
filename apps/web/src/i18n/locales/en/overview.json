@@ -60,23 +60,30 @@
     },
     "selectedPoint": {
       "title": "Selected point snapshot",
-      "empty": "Click a point in the chart to inspect this bucket",
-      "eventsTitle": "Events in this bucket",
-      "eventsCount_one": "{{count}} event in this bucket",
-      "eventsCount_other": "{{count}} events in this bucket",
-      "noEvents": "No timeline events in this bucket",
+      "emptyHour": "Click a point in the chart to inspect this hour",
+      "emptyDay": "Click a point in the chart to inspect this day",
+      "eventsTitleHour": "Events in this hour",
+      "eventsTitleDay": "Events in this day",
+      "eventsCountHour_one": "{{count}} event in this hour",
+      "eventsCountHour_other": "{{count}} events in this hour",
+      "eventsCountDay_one": "{{count}} event in this day",
+      "eventsCountDay_other": "{{count}} events in this day",
+      "noEventsHour": "No timeline events in this hour",
+      "noEventsDay": "No timeline events in this day",
       "noEventDetail": "No additional event detail available"
     },
     "tooltip": {
       "eventCount_one": "{{count}} event",
       "eventCount_other": "{{count}} events",
-      "clickHint": "Click to inspect the full bucket detail"
+      "clickHintHour": "Click to inspect the full hour detail",
+      "clickHintDay": "Click to inspect the full day detail"
     },
     "footer": {
       "accumulatedRewards": "Rewards accumulated",
       "capitalMoved": "Capital moved between states",
       "latestEvent": "Latest event",
-      "maxIdle": "Max idle value"
+      "maxIdle": "Max idle value",
+      "noEvents": "No timeline events"
     }
   },
   "sources": {
@@ -97,7 +104,8 @@
     },
     "chart": {
       "title": "Capital allocation",
-      "hint": "Click a segment to inspect the underlying asset mix of the selected bucket.",
+      "hintHour": "Click a segment to inspect the underlying asset mix of the selected hour.",
+      "hintDay": "Click a segment to inspect the underlying asset mix of the selected day.",
       "legendOuter": "Outer donut: main capital categories.",
       "legendInner": "Inner donut: underlying assets of the selected segment."
     },

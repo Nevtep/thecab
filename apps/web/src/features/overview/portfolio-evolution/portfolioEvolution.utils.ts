@@ -221,13 +221,20 @@ export function buildPortfolioEvolutionModel(input: {
     }
   }
 
+  const hasKnownRewardsSeries =
+    input.viewModel.metrics.estimatedRealizedRewardsUsd !== null ||
+    input.viewModel.chart.hasRewardMarkers ||
+    points.some((point) => point.rewardValueUsd !== null) ||
+    explicitChartEvents.some((event) => event.rewardValueUsd !== null);
+
   let cumulativeRewardValueUsd = 0;
   const data: PortfolioEvolutionDatum[] = points.map((point) => {
     const fallbackRewardValueUsd = rewardValueByBucket.get(point.capturedAt) ?? null;
-    const rewardValueUsd =
+    const resolvedRewardValueUsd =
       point.rewardValueUsd !== null && point.rewardValueUsd > 0
         ? point.rewardValueUsd
         : fallbackRewardValueUsd;
+    const rewardValueUsd = resolvedRewardValueUsd ?? (hasKnownRewardsSeries ? 0 : null);
     cumulativeRewardValueUsd = roundUsd(cumulativeRewardValueUsd + (rewardValueUsd ?? 0));
     const events = markerBuckets.get(point.capturedAt) ?? [];
     const markerAnchorValueUsd = Math.max(
@@ -243,8 +250,7 @@ export function buildPortfolioEvolutionModel(input: {
       deployedValueUsd: point.deployedValueUsd,
       idleValueUsd: point.idleValueUsd,
       rewardValueUsd,
-      cumulativeRewardValueUsd:
-        cumulativeRewardValueUsd > 0 || rewardValueUsd !== null ? cumulativeRewardValueUsd : null,
+      cumulativeRewardValueUsd: hasKnownRewardsSeries ? cumulativeRewardValueUsd : null,
       markerAnchorValueUsd: markerAnchorValueUsd > 0 ? markerAnchorValueUsd : null,
       events,
     };

@@ -15,14 +15,15 @@ import {
   buildDistributionCompositionBreakdown,
   buildIdleAssetBreakdown,
 } from "@/features/overview/capitalAllocation.utils";
-import type { OverviewViewModel } from "@/features/overview/overview.types";
+import type { OverviewRange, OverviewViewModel } from "@/features/overview/overview.types";
 
 type CapitalAllocationSectionProps = {
   distribution: OverviewViewModel["distribution"];
   assetRows: OverviewViewModel["assets"]["rows"];
+  range: OverviewRange;
 };
 
-export function CapitalAllocationSection({ distribution, assetRows }: CapitalAllocationSectionProps) {
+export function CapitalAllocationSection({ distribution, assetRows, range }: CapitalAllocationSectionProps) {
   const { t } = useTranslation("overview");
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
@@ -94,6 +95,7 @@ export function CapitalAllocationSection({ distribution, assetRows }: CapitalAll
             items={sliceSummaries}
             selectedSlice={selectedSlice}
             selectedBreakdown={selectedBreakdown}
+            range={range}
             onSelectSlice={setSelectedKey}
           />
 

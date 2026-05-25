@@ -2,11 +2,13 @@
 
 import { CabCard, CabStack, CabText, CabTxHash } from "@/design-system";
 import { cabColors } from "@/design-system/tokens";
+import { getOverviewTimeUnit } from "@/features/overview/overviewRange.utils";
 import {
   portfolioEvolutionEventMeta,
   portfolioEvolutionSeriesMeta,
 } from "@/features/overview/portfolio-evolution/portfolioEvolution.meta";
 import { EventGlyph } from "@/features/overview/portfolio-evolution/PortfolioEvolutionEventSummary.component";
+import type { OverviewRange } from "@/features/overview/overview.types";
 import type { PortfolioEvolutionDatum } from "@/features/overview/portfolio-evolution/portfolioEvolution.utils";
 import { formatDateTime, formatRelativeTime, formatUsd } from "@/i18n/formatters";
 import { useMemo } from "react";
@@ -16,14 +18,18 @@ type PortfolioEvolutionEventDetailsPanelProps = {
   selectedPoint: PortfolioEvolutionDatum | null;
   latestEventOccurredAt: string | null;
   locale: string;
+  range: OverviewRange;
 };
 
 export function PortfolioEvolutionEventDetailsPanel({
   selectedPoint,
   latestEventOccurredAt,
   locale,
+  range,
 }: PortfolioEvolutionEventDetailsPanelProps) {
   const { t } = useTranslation(["overview", "charts"]);
+  const timeUnit = getOverviewTimeUnit(range);
+  const timeUnitSuffix = timeUnit === "hour" ? "Hour" : "Day";
 
   const rows = selectedPoint ? [
     {
@@ -61,11 +67,11 @@ export function PortfolioEvolutionEventDetailsPanel({
             {t("portfolioEvolution.selectedPoint.title")}
           </CabText>
           <CabText variant="caption" fontSize={12} color={cabColors.text.secondary}>
-            {selectedPoint ? formatDateTime(selectedPoint.capturedAt, locale) : t("portfolioEvolution.selectedPoint.empty")}
+            {selectedPoint ? formatDateTime(selectedPoint.capturedAt, locale) : t(`portfolioEvolution.selectedPoint.empty${timeUnitSuffix}`)}
           </CabText>
           {selectedPoint ? (
             <CabText variant="mono" fontSize={11} color={cabColors.text.muted}>
-              {t("portfolioEvolution.selectedPoint.eventsCount", { count: orderedEvents.length })}
+              {t(`portfolioEvolution.selectedPoint.eventsCount${timeUnitSuffix}`, { count: orderedEvents.length })}
             </CabText>
           ) : null}
         </CabStack>
@@ -99,7 +105,7 @@ export function PortfolioEvolutionEventDetailsPanel({
 
         <CabStack gap="$2.5">
           <CabText variant="caption" fontSize={11} color={cabColors.text.muted}>
-            {t("portfolioEvolution.selectedPoint.eventsTitle")}
+            {t(`portfolioEvolution.selectedPoint.eventsTitle${timeUnitSuffix}`)}
           </CabText>
           {selectedPoint && orderedEvents.length > 0 ? (
             <div
@@ -145,7 +151,7 @@ export function PortfolioEvolutionEventDetailsPanel({
             </div>
           ) : (
             <CabText variant="caption" fontSize={12} color={cabColors.text.secondary}>
-              {t("portfolioEvolution.selectedPoint.noEvents")}
+              {t(`portfolioEvolution.selectedPoint.noEvents${timeUnitSuffix}`)}
             </CabText>
           )}
         </CabStack>

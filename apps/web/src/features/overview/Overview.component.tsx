@@ -965,6 +965,7 @@ export function OverviewComponent({
             ) : (
             <CapitalAllocationSection
               distribution={resolvedChartViewModel.distribution}
+              range={range}
               assetRows={(overviewViewModel?.assets.rows ?? [...visibleAssetRows, ...hiddenAssetRows])
                 .filter((row) => !row.isHiddenByDefault && row.priceUsd !== null && !isDustValueRow(row))}
             />
