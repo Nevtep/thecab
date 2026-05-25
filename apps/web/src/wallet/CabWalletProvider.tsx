@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, type PropsWithChildren, useCallback, useEffect, useMemo, useState } from "react";
+import { createContext, type PropsWithChildren, useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { stringToHex } from "viem";
 import { WagmiProvider, useAccount, useConnect, useDisconnect, useSwitchChain } from "wagmi";
@@ -69,9 +69,10 @@ function CabWalletStateProvider({ children }: PropsWithChildren) {
   const { connectAsync, connectors } = useConnect();
   const { disconnectAsync } = useDisconnect();
   const { switchChainAsync } = useSwitchChain();
-  const [authenticatedAddress, setAuthenticatedAddress] = useState<string | null>(null);
-  const [isAuthReady, setIsAuthReady] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const normalizedAddress = address?.toLowerCase() ?? null;
+  const persistedAuthenticatedAddress = readAuthenticatedAddressCookie();
+  const isAuthReady = status !== "connecting" && status !== "reconnecting";
 
   const requestSignature = useCallback(async (signerProvider: unknown, connectedAddress: string) => {
     if (
@@ -96,33 +97,8 @@ function CabWalletStateProvider({ children }: PropsWithChildren) {
     });
   }, [t]);
 
-  useEffect(() => {
-    if (status === "connecting" || status === "reconnecting") {
-      setIsAuthReady(false);
-      return;
-    }
-
-    if (!isConnected || !address) {
-      setAuthenticatedAddress(null);
-      setIsAuthReady(true);
-      return;
-    }
-
-    const normalizedAddress = address.toLowerCase();
-    const persistedAddress = readAuthenticatedAddressCookie();
-
-    setAuthenticatedAddress((currentAddress) => {
-      if (currentAddress === normalizedAddress || persistedAddress === normalizedAddress) {
-        return normalizedAddress;
-      }
-
-      return null;
-    });
-    setIsAuthReady(true);
-  }, [address, isConnected, status]);
-
   const connect = useCallback(async () => {
-    if (isConnected && address && authenticatedAddress === address.toLowerCase()) {
+    if (isConnected && address && readAuthenticatedAddressCookie() === address.toLowerCase()) {
       return;
     }
 
@@ -133,11 +109,9 @@ function CabWalletStateProvider({ children }: PropsWithChildren) {
         const signerProvider = await connector.getProvider();
         await requestSignature(signerProvider, address);
         writeAuthenticatedAddressCookie(address);
-        setAuthenticatedAddress(address.toLowerCase());
         return;
       } catch (error) {
         clearAuthenticatedAddressCookie();
-        setAuthenticatedAddress(null);
         await disconnectAsync();
         throw error;
       } finally {
@@ -176,21 +150,17 @@ function CabWalletStateProvider({ children }: PropsWithChildren) {
     try {
       await requestSignature(signerProvider, connectedAddress);
       writeAuthenticatedAddressCookie(connectedAddress);
-      setAuthenticatedAddress(connectedAddress.toLowerCase());
     } catch (error) {
       clearAuthenticatedAddressCookie();
-      setAuthenticatedAddress(null);
       await disconnectAsync();
       throw error;
     } finally {
       setIsAuthenticating(false);
     }
-  }, [address, authenticatedAddress, connectAsync, connector, connectors, disconnectAsync, isConnected, requestSignature]);
+  }, [address, connectAsync, connector, connectors, disconnectAsync, isConnected, requestSignature]);
 
   const disconnect = useCallback(() => {
     clearAuthenticatedAddressCookie();
-    setAuthenticatedAddress(null);
-    setIsAuthReady(true);
     setIsAuthenticating(false);
     void disconnectAsync();
   }, [disconnectAsync]);
@@ -205,7 +175,9 @@ function CabWalletStateProvider({ children }: PropsWithChildren) {
       chainId,
       status,
       isConnected,
-      isAuthenticated: Boolean(address && authenticatedAddress === address.toLowerCase()),
+      isAuthenticated: Boolean(
+        normalizedAddress && persistedAuthenticatedAddress === normalizedAddress,
+      ),
       isAuthReady,
       isAuthenticating,
       isSupportedChain: isSupportedChain(chainId),
@@ -214,7 +186,7 @@ function CabWalletStateProvider({ children }: PropsWithChildren) {
       disconnect,
       switchToSupportedChain,
     }),
-    [address, authenticatedAddress, chainId, connect, connector?.name, disconnect, isAuthReady, isAuthenticating, isConnected, status, switchToSupportedChain],
+    [address, chainId, connect, connector?.name, disconnect, isAuthReady, isAuthenticating, isConnected, normalizedAddress, persistedAuthenticatedAddress, status, switchToSupportedChain],
   );
 
   return <CabWalletContext.Provider value={value}>{children}</CabWalletContext.Provider>;

@@ -1,5 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 
+import type { AnalysisMode, AnalysisStatus } from "@/analysis/analysisStatus";
+import type { SettingsResponse, SettingsUpdateRequest } from "@/features/settings/settings.types";
 import {
   getOverviewActivityQueryOptions,
   getOverviewChartQueryOptions,
@@ -8,7 +10,6 @@ import {
   getOverviewShellQueryOptions,
 } from "@/features/overview/overview.queries";
 import type {
-  OverviewAnalysisStatus,
   OverviewQueryInput,
   OverviewRange,
 } from "@/features/overview/overview.types";
@@ -23,7 +24,7 @@ type WalletScopedInput = {
 type AnalysisStatusResponse = {
   walletAddress: string;
   chainId: number;
-  status: OverviewAnalysisStatus;
+  status: AnalysisStatus;
   runId: string | null;
   stage: string;
   progressPct: number;
@@ -36,7 +37,7 @@ type StartAnalysisResponse = {
   runId: string;
   walletAddress: string;
   chainId: number;
-  status: OverviewAnalysisStatus;
+  status: AnalysisStatus;
   stage: string;
   progressPct: number;
   lastSuccessfulRunAt: string | null;
@@ -86,14 +87,14 @@ export function useOverviewProtocolPositionsQuery(input: OverviewQueryInput, opt
   });
 }
 
-export function useAnalysisStatusQuery(input: WalletScopedInput) {
+export function useAnalysisStatusQuery(input: WalletScopedInput, options?: { enabled?: boolean }) {
   return useQuery<AnalysisStatusResponse>({
     queryKey: queryKeys.analysisStatus(input),
     queryFn: () =>
       apiClient(
         `/api/analysis/status?walletAddress=${input.walletAddress}&chainId=${input.chainId}`,
       ),
-    enabled: Boolean(input.walletAddress),
+    enabled: (options?.enabled ?? true) && Boolean(input.walletAddress),
     refetchInterval: (query) => {
       const data = query.state.data;
       if (!data) return 10_000;
@@ -104,8 +105,8 @@ export function useAnalysisStatusQuery(input: WalletScopedInput) {
 }
 
 export function useStartAnalysisMutation() {
-  return useMutation<StartAnalysisResponse, Error, WalletScopedInput & { mode?: "full_history" | "incremental" }>({
-    mutationFn: (input: WalletScopedInput & { mode?: "full_history" | "incremental" }) =>
+  return useMutation<StartAnalysisResponse, Error, WalletScopedInput & { mode?: AnalysisMode }>({
+    mutationFn: (input: WalletScopedInput & { mode?: AnalysisMode }) =>
       apiClient<StartAnalysisResponse>("/api/analysis/start", {
         method: "POST",
         body: {
@@ -199,18 +200,22 @@ export function useActivityQuery(input: WalletScopedInput) {
   });
 }
 
-export function useSettingsQuery(input: WalletScopedInput) {
-  return useQuery({
+export function useSettingsQuery(input: WalletScopedInput, options?: { enabled?: boolean }) {
+  return useQuery<SettingsResponse>({
     queryKey: queryKeys.settings(input),
-    queryFn: () => apiClient(`/api/settings?chainId=${input.chainId}`),
-    enabled: false,
+    queryFn: () =>
+      apiClient<SettingsResponse>(
+        `/api/settings?walletAddress=${input.walletAddress}&chainId=${input.chainId}`,
+      ),
+    enabled: (options?.enabled ?? true) && Boolean(input.walletAddress),
+    staleTime: 30_000,
   });
 }
 
 export function useUpdateSettingsMutation() {
-  return useMutation({
-    mutationFn: (payload: Record<string, unknown>) =>
-      apiClient("/api/settings", {
+  return useMutation<SettingsResponse, Error, SettingsUpdateRequest>({
+    mutationFn: (payload: SettingsUpdateRequest) =>
+      apiClient<SettingsResponse>("/api/settings", {
         method: "POST",
         body: payload,
       }),

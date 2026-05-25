@@ -12,7 +12,9 @@
   "actions": {
     "start": "Start analysis",
     "starting": "Starting analysis...",
-    "retry": "Retry analysis"
+    "retry": "Retry analysis",
+    "update": "Update analysis",
+    "updating": "Updating analysis..."
   },
   "messages": {
     "not_analyzed": "Run a manual analysis to unlock the canonical historical state later. Recent provider data remains available now.",

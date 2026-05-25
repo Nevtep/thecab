@@ -684,7 +684,7 @@ export async function getRecentOverviewCurrentState(input: OverviewRequest): Pro
     ...response.metrics,
     coverageStatus,
     coverageReasonCodes: uniqueCoverageReasonCodes,
-    netPortfolioValueUsd: idleValueUsd,
+    netPortfolioValueUsd: null,
     deployedValueUsd: null,
     idleValueUsd,
     exclusions: exclusionSummary,

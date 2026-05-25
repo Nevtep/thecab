@@ -12,9 +12,10 @@ export type CabRangeSelectorProps = {
   options: CabRangeSelectorOption[];
   selectedKey: string;
   onSelect: (key: string) => void;
+  disabled?: boolean;
 };
 
-export function CabRangeSelector({ options, selectedKey, onSelect }: CabRangeSelectorProps) {
+export function CabRangeSelector({ options, selectedKey, onSelect, disabled = false }: CabRangeSelectorProps) {
   return (
     <CabStack row gap="$2" flexWrap="wrap">
       {options.map((option) => (
@@ -22,6 +23,7 @@ export function CabRangeSelector({ options, selectedKey, onSelect }: CabRangeSel
           key={option.key}
           tone={selectedKey === option.key ? "primary" : "secondary"}
           controlSize="md"
+          disabled={disabled}
           onPress={() => onSelect(option.key)}
         >
           {option.label}

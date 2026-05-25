@@ -1,14 +1,10 @@
+import type { AnalysisStatus } from "@/analysis/analysisStatus";
+
 export type OverviewRange = "24h" | "7d" | "30d";
 
 export type OverviewMode = "recent_view";
 
-export type OverviewAnalysisStatus =
-  | "not_analyzed"
-  | "queued"
-  | "running"
-  | "ready"
-  | "stale"
-  | "failed";
+export type OverviewAnalysisStatus = AnalysisStatus;
 
 export type OverviewCoverageStatus = "recent" | "partial" | "unknown";
 

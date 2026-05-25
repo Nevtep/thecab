@@ -1,3 +1,4 @@
+import type { AnalysisStatus } from "@/analysis/analysisStatus";
 import type {
   OverviewTrustCoverageReasonCode,
   TokenTrustReasonCode,
@@ -33,13 +34,7 @@ export type OverviewDataSource = "recent_provider_data" | "partial_fallback";
 
 export type OverviewCoverageStatus = "recent" | "partial" | "unknown";
 
-export type OverviewAnalysisStatus =
-  | "not_analyzed"
-  | "queued"
-  | "running"
-  | "ready"
-  | "stale"
-  | "failed";
+export type OverviewAnalysisStatus = AnalysisStatus;
 
 export type OverviewBlockProvenance = {
   source: OverviewDataSource;

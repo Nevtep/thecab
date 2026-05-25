@@ -21,6 +21,7 @@ export type OverviewNavigationItem = {
     | "settings";
   iconName: CabIconName;
   labelKey: string;
+  href?: string;
   stateKey: "active" | "requiresAnalysis" | "comingSoon";
   disabled: boolean;
 };
@@ -188,16 +189,7 @@ export function getOverviewCoverageReasonLabelKeys(reasonCodes: OverviewCoverage
 export function mapOverviewAnalysisStatusToBadgeStatus(
   status: OverviewAnalysisStatus,
 ): CabAnalysisStatus {
-  switch (status) {
-    case "not_analyzed":
-      return "not_started";
-    case "queued":
-    case "running":
-    case "ready":
-    case "failed":
-    case "stale":
-      return status;
-  }
+  return status;
 }
 
 export function formatWalletAddressLabel(walletAddress: string) {
@@ -214,6 +206,7 @@ export function getOverviewNavigationItems(
       key: "overview",
       iconName: "dashboard",
       labelKey: "navigation:items.overview",
+      href: "/overview",
       stateKey: "active",
       disabled: false,
     },
@@ -263,8 +256,9 @@ export function getOverviewNavigationItems(
       key: "settings",
       iconName: "settings",
       labelKey: "navigation:items.settings",
-      stateKey: "comingSoon",
-      disabled: true,
+      href: "/settings",
+      stateKey: "active",
+      disabled: false,
     },
   ];
 }

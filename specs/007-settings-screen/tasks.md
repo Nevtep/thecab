@@ -13,8 +13,8 @@
 
 **Purpose**: Reserve the route, feature-module, and server-module implementation surfaces defined by the plan.
 
-- [ ] T001 Create the Settings route and feature-module file skeleton in apps/web/src/app/settings/page.tsx, apps/web/src/features/settings/Settings.container.tsx, apps/web/src/features/settings/Settings.component.tsx, apps/web/src/features/settings/settings.queries.ts, apps/web/src/features/settings/settings.mappers.ts, and apps/web/src/features/settings/settings.types.ts
-- [ ] T002 [P] Create the Settings server-module file skeleton in apps/web/src/app/api/settings/route.ts, apps/web/src/server/settings/settings.types.ts, apps/web/src/server/settings/settings.repository.ts, and apps/web/src/server/settings/settings.service.ts
+- [X] T001 Create the Settings route and feature-module file skeleton in apps/web/src/app/settings/page.tsx, apps/web/src/features/settings/Settings.container.tsx, apps/web/src/features/settings/Settings.component.tsx, apps/web/src/features/settings/settings.queries.ts, apps/web/src/features/settings/settings.mappers.ts, and apps/web/src/features/settings/settings.types.ts
+- [X] T002 [P] Create the Settings server-module file skeleton in apps/web/src/app/api/settings/route.ts, apps/web/src/server/settings/settings.types.ts, apps/web/src/server/settings/settings.repository.ts, and apps/web/src/server/settings/settings.service.ts
 
 ---
 
@@ -24,15 +24,15 @@
 
 **⚠️ CRITICAL**: No user story work should begin until this phase is complete.
 
-- [ ] T003 Add the shared canonical analysis vocabulary module in apps/web/src/analysis/analysisStatus.ts
-- [ ] T004 [P] Align the shared status consumers with the canonical analysis vocabulary in apps/web/src/design-system/data-display/CabAnalysisStatusBadge.tsx and apps/web/src/features/overview/overview.mappers.ts
-- [ ] T005 [P] Add the `user_preferences` schema and migration in apps/web/src/server/db/schema.ts and apps/web/src/server/db/migrations/
-- [ ] T006 [P] Define typed Settings request, response, and preference contracts in apps/web/src/server/settings/settings.types.ts and apps/web/src/features/settings/settings.types.ts
-- [ ] T007 Implement `readPreferences()` and `upsertPreferences()` for `user_preferences` in apps/web/src/server/settings/settings.repository.ts
-- [ ] T008 Implement Settings service composition for defaults, fixed-for-MVP metadata, and sanitized error handling in apps/web/src/server/settings/settings.service.ts
-- [ ] T009 Implement `GET /api/settings` and `POST /api/settings` with wallet auth, chain validation, and stable error codes in apps/web/src/app/api/settings/route.ts
-- [ ] T010 Tighten the shared Settings query and mutation hook contracts in apps/web/src/queries/hooks.ts
-- [ ] T011 [P] Add or extend tests for `normalizeLocale()` and locale-formatting helpers used by Settings in apps/web/src/i18n/config.ts, apps/web/src/i18n/formatters.ts, and the relevant test files
+- [X] T003 Add the shared canonical analysis vocabulary module in apps/web/src/analysis/analysisStatus.ts
+- [X] T004 [P] Align the shared status consumers with the canonical analysis vocabulary in apps/web/src/design-system/data-display/CabAnalysisStatusBadge.tsx and apps/web/src/features/overview/overview.mappers.ts
+- [X] T005 [P] Add the `user_preferences` schema and migration in apps/web/src/server/db/schema.ts and apps/web/src/server/db/migrations/
+- [X] T006 [P] Define typed Settings request, response, and preference contracts in apps/web/src/server/settings/settings.types.ts and apps/web/src/features/settings/settings.types.ts
+- [X] T007 Implement `readPreferences()` and `upsertPreferences()` for `user_preferences` in apps/web/src/server/settings/settings.repository.ts
+- [X] T008 Implement Settings service composition for defaults, fixed-for-MVP metadata, and sanitized error handling in apps/web/src/server/settings/settings.service.ts
+- [X] T009 Implement `GET /api/settings` and `POST /api/settings` with wallet auth, chain validation, and stable error codes in apps/web/src/app/api/settings/route.ts
+- [X] T010 Tighten the shared Settings query and mutation hook contracts in apps/web/src/queries/hooks.ts
+- [X] T011 [P] Add or extend tests for `normalizeLocale()` and locale-formatting helpers used by Settings in apps/web/src/i18n/config.ts, apps/web/src/i18n/formatters.ts, and the relevant test files
 
 **Checkpoint**: Shared Settings contracts, persistence, and status vocabulary are ready for story work.
 
@@ -46,11 +46,11 @@
 
 ### Implementation for User Story 1
 
-- [ ] T012 [P] [US1] Add feature-local Settings query wrappers and initial view-model scaffolding in apps/web/src/features/settings/settings.queries.ts and apps/web/src/features/settings/settings.mappers.ts
-- [ ] T013 [US1] Implement the auth-gated `/settings` App Router entry, including existing unsupported-chain handling for authenticated unsupported wallets, in apps/web/src/app/settings/page.tsx
-- [ ] T014 [US1] Implement the Settings container load path that waits for auth readiness but does not block on analysis readiness in apps/web/src/features/settings/Settings.container.tsx
-- [ ] T015 [US1] Implement the four-section connected Settings shell with existing design-system primitives in apps/web/src/features/settings/Settings.component.tsx
-- [ ] T016 [US1] Enable the connected Settings navigation item for authenticated supported wallets in apps/web/src/features/overview/overview.mappers.ts
+- [X] T012 [P] [US1] Add feature-local Settings query wrappers and initial view-model scaffolding in apps/web/src/features/settings/settings.queries.ts and apps/web/src/features/settings/settings.mappers.ts
+- [X] T013 [US1] Implement the auth-gated `/settings` App Router entry, including existing unsupported-chain handling for authenticated unsupported wallets, in apps/web/src/app/settings/page.tsx
+- [X] T014 [US1] Implement the Settings container load path that waits for auth readiness but does not block on analysis readiness in apps/web/src/features/settings/Settings.container.tsx
+- [X] T015 [US1] Implement the four-section connected Settings shell with existing design-system primitives in apps/web/src/features/settings/Settings.component.tsx
+- [X] T016 [US1] Enable the connected Settings navigation item for authenticated supported wallets in apps/web/src/features/overview/overview.mappers.ts
 
 **Checkpoint**: Connected users can reach a real `/settings` surface even when analysis is not ready.
 
@@ -64,11 +64,11 @@
 
 ### Implementation for User Story 2
 
-- [ ] T017 [US2] Map wallet summary state, address display, chain display, and connected-wallet actions in apps/web/src/features/settings/settings.mappers.ts and apps/web/src/features/settings/Settings.container.tsx
-- [ ] T018 [US2] Map canonical analysis actions by status using the existing analysis start and status hooks in apps/web/src/features/settings/settings.mappers.ts and apps/web/src/features/settings/Settings.container.tsx
-- [ ] T019 [US2] Reuse the existing warm Overview refresh path and query invalidation flow for the Wallet section in apps/web/src/features/settings/Settings.container.tsx
-- [ ] T020 [US2] Render Wallet and Analysis action controls, invalid-state disabling, and progress messaging in apps/web/src/features/settings/Settings.component.tsx
-- [ ] T021 [US2] Ensure Disconnect exits the connected experience cleanly through apps/web/src/app/settings/page.tsx and apps/web/src/features/settings/Settings.container.tsx
+- [X] T017 [US2] Map wallet summary state, address display, chain display, and connected-wallet actions in apps/web/src/features/settings/settings.mappers.ts and apps/web/src/features/settings/Settings.container.tsx
+- [X] T018 [US2] Map canonical analysis actions by status using the existing analysis start and status hooks in apps/web/src/features/settings/settings.mappers.ts and apps/web/src/features/settings/Settings.container.tsx
+- [X] T019 [US2] Reuse the existing warm Overview refresh path and query invalidation flow for the Wallet section in apps/web/src/features/settings/Settings.container.tsx
+- [X] T020 [US2] Render Wallet and Analysis action controls, invalid-state disabling, and progress messaging in apps/web/src/features/settings/Settings.component.tsx
+- [X] T021 [US2] Ensure Disconnect exits the connected experience cleanly through apps/web/src/app/settings/page.tsx and apps/web/src/features/settings/Settings.container.tsx
 
 **Checkpoint**: Settings drives wallet and analysis actions through the existing contracts without parallel infrastructure.
 
@@ -82,10 +82,10 @@
 
 ### Implementation for User Story 3
 
-- [ ] T022 [US3] Implement server-side preference defaulting and unsupported-value fallback rules for `languagePreference` and `defaultOverviewRange` in apps/web/src/server/settings/settings.service.ts
-- [ ] T023 [US3] Map Display-section preference state, mutation payloads, and post-success invalidation behavior in apps/web/src/features/settings/settings.mappers.ts, apps/web/src/features/settings/settings.queries.ts, and apps/web/src/features/settings/Settings.container.tsx
-- [ ] T024 [US3] Render the Display section controls plus fixed USD and Cab-dark indicators in apps/web/src/features/settings/Settings.component.tsx
-- [ ] T025 [US3] Apply in-session locale switching and Overview default-range invalidation after successful preference updates in apps/web/src/features/settings/Settings.container.tsx
+- [X] T022 [US3] Implement server-side preference defaulting and unsupported-value fallback rules for `languagePreference` and `defaultOverviewRange` in apps/web/src/server/settings/settings.service.ts
+- [X] T023 [US3] Map Display-section preference state, mutation payloads, and post-success invalidation behavior in apps/web/src/features/settings/settings.mappers.ts, apps/web/src/features/settings/settings.queries.ts, and apps/web/src/features/settings/Settings.container.tsx
+- [X] T024 [US3] Render the Display section controls plus fixed USD and Cab-dark indicators in apps/web/src/features/settings/Settings.component.tsx
+- [X] T025 [US3] Apply in-session locale switching and Overview default-range invalidation after successful preference updates in apps/web/src/features/settings/Settings.container.tsx
 
 **Checkpoint**: Stage 1 display preferences are honest, persisted correctly, and visibly honored by the product.
 
@@ -99,10 +99,10 @@
 
 ### Implementation for User Story 4
 
-- [ ] T026 [US4] Assemble derived diagnostics from analysis status, overview freshness, and coverage reason codes in apps/web/src/server/settings/settings.service.ts
-- [ ] T027 [US4] Map diagnostics freshness, run metadata, and coverage posture into the Settings view model in apps/web/src/features/settings/settings.mappers.ts
-- [ ] T028 [US4] Render the restrained Diagnostics section with omission of unsupported values in apps/web/src/features/settings/Settings.component.tsx
-- [ ] T029 [US4] Add explicit regression coverage for provider-partial, missing-price, and omitted-diagnostics rendering in the relevant Settings test files or validation harness
+- [X] T026 [US4] Assemble derived diagnostics from analysis status, overview freshness, and coverage reason codes in apps/web/src/server/settings/settings.service.ts
+- [X] T027 [US4] Map diagnostics freshness, run metadata, and coverage posture into the Settings view model in apps/web/src/features/settings/settings.mappers.ts
+- [X] T028 [US4] Render the restrained Diagnostics section with omission of unsupported values in apps/web/src/features/settings/Settings.component.tsx
+- [X] T029 [US4] Add explicit regression coverage for provider-partial, missing-price, and omitted-diagnostics rendering in the relevant Settings test files or validation harness
 
 **Checkpoint**: Diagnostics are auditable and truthful without exposing developer-only internals.
 
@@ -116,9 +116,9 @@
 
 ### Implementation for User Story 5
 
-- [ ] T030 [P] [US5] Add English Settings copy and required namespace additions in apps/web/src/i18n/locales/en/settings.json, apps/web/src/i18n/locales/en/navigation.json, apps/web/src/i18n/locales/en/analysis.json, apps/web/src/i18n/locales/en/coverage.json, apps/web/src/i18n/locales/en/wallet.json, apps/web/src/i18n/locales/en/common.json, and apps/web/src/i18n/locales/en/errors.json
-- [ ] T031 [P] [US5] Add Spanish parity for Settings and required namespace additions in apps/web/src/i18n/locales/es/settings.json, apps/web/src/i18n/locales/es/navigation.json, apps/web/src/i18n/locales/es/analysis.json, apps/web/src/i18n/locales/es/coverage.json, apps/web/src/i18n/locales/es/wallet.json, apps/web/src/i18n/locales/es/common.json, and apps/web/src/i18n/locales/es/errors.json
-- [ ] T032 [US5] Wire localized labels, helper text, status badges, and locale-aware formatting into apps/web/src/features/settings/Settings.component.tsx and apps/web/src/features/settings/settings.mappers.ts
+- [X] T030 [P] [US5] Add English Settings copy and required namespace additions in apps/web/src/i18n/locales/en/settings.json, apps/web/src/i18n/locales/en/navigation.json, apps/web/src/i18n/locales/en/analysis.json, apps/web/src/i18n/locales/en/coverage.json, apps/web/src/i18n/locales/en/wallet.json, apps/web/src/i18n/locales/en/common.json, and apps/web/src/i18n/locales/en/errors.json
+- [X] T031 [P] [US5] Add Spanish parity for Settings and required namespace additions in apps/web/src/i18n/locales/es/settings.json, apps/web/src/i18n/locales/es/navigation.json, apps/web/src/i18n/locales/es/analysis.json, apps/web/src/i18n/locales/es/coverage.json, apps/web/src/i18n/locales/es/wallet.json, apps/web/src/i18n/locales/es/common.json, and apps/web/src/i18n/locales/es/errors.json
+- [X] T032 [US5] Wire localized labels, helper text, status badges, and locale-aware formatting into apps/web/src/features/settings/Settings.component.tsx and apps/web/src/features/settings/settings.mappers.ts
 
 **Checkpoint**: Settings is fully localized for English and Spanish with no hardcoded product copy.
 
@@ -128,15 +128,15 @@
 
 **Purpose**: Run the required quality gates and final feature-specific validation for the Stage 1 Settings slice.
 
-- [ ] T033 Run EN/ES parity validation for Settings namespaces with apps/web/scripts/check-i18n-parity.ts using `cd apps/web && pnpm i18n:check`
-- [ ] T034 Run TypeScript validation for the Settings feature using `cd apps/web && pnpm typecheck`
-- [ ] T035 Run lint validation for the Settings feature using `cd apps/web && pnpm lint`
-- [ ] T036 Run production build validation for the connected Settings route using `cd apps/web && pnpm build`
-- [ ] T037 Validate browser-provider boundaries with `cd apps/web && rg "@/server/providers|moralis|alchemy|trigger" src/features/settings src/app/settings`
-- [ ] T038 Validate `GET /api/settings` and `POST /api/settings` against the contract in apps/web/src/app/api/settings/route.ts and specs/007-settings-screen/contracts/settings-api-contract.md
-- [ ] T039 Validate direct `/settings` visits on disconnected and unsupported-chain states through apps/web/src/app/settings/page.tsx and the existing unsupported-chain handling path
-- [ ] T040 Validate coverage-state rendering for provider-partial, missing-price, and omitted-diagnostics paths through apps/web/src/features/settings/Settings.component.tsx and apps/web/src/features/settings/settings.mappers.ts
-- [ ] T041 Validate direct-route gating, wallet actions, analysis actions, display preferences, and truthful diagnostics manually through apps/web/src/app/settings/page.tsx and apps/web/src/features/settings/Settings.container.tsx
+- [X] T033 Run EN/ES parity validation for Settings namespaces with apps/web/scripts/check-i18n-parity.ts using `cd apps/web && pnpm i18n:check`
+- [X] T034 Run TypeScript validation for the Settings feature using `cd apps/web && pnpm typecheck`
+- [X] T035 Run lint validation for the Settings feature using `cd apps/web && pnpm lint`
+- [X] T036 Run production build validation for the connected Settings route using `cd apps/web && pnpm build`
+- [X] T037 Validate browser-provider boundaries with `cd apps/web && rg "@/server/providers|moralis|alchemy|trigger" src/features/settings src/app/settings`
+- [X] T038 Validate `GET /api/settings` and `POST /api/settings` against the contract in apps/web/src/app/api/settings/route.ts and specs/007-settings-screen/contracts/settings-api-contract.md
+- [X] T039 Validate direct `/settings` visits on disconnected and unsupported-chain states through apps/web/src/app/settings/page.tsx and the existing unsupported-chain handling path
+- [X] T040 Validate coverage-state rendering for provider-partial, missing-price, and omitted-diagnostics paths through apps/web/src/features/settings/Settings.component.tsx and apps/web/src/features/settings/settings.mappers.ts
+- [X] T041 Validate direct-route gating, wallet actions, analysis actions, display preferences, and truthful diagnostics manually through apps/web/src/app/settings/page.tsx and apps/web/src/features/settings/Settings.container.tsx
 
 ---
 

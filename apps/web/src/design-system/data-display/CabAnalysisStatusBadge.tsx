@@ -1,11 +1,12 @@
 "use client";
 
+import type { AnalysisStatus } from "@/analysis/analysisStatus";
 import { CabBadge } from "@/design-system/primitives/CabBadge";
 
-export type CabAnalysisStatus = "not_started" | "queued" | "running" | "ready" | "failed" | "stale";
+export type CabAnalysisStatus = AnalysisStatus;
 
 const toneByStatus: Record<CabAnalysisStatus, "neutral" | "info" | "success" | "danger" | "warning"> = {
-  not_started: "neutral",
+  not_analyzed: "neutral",
   queued: "info",
   running: "info",
   ready: "success",

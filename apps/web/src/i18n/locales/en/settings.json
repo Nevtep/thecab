@@ -1,3 +1,57 @@
 {
-  "title": "TODO"
+  "title": "Settings",
+  "sections": {
+    "wallet": {
+      "title": "Wallet"
+    },
+    "analysis": {
+      "title": "Analysis"
+    },
+    "display": {
+      "title": "Display"
+    },
+    "diagnostics": {
+      "title": "Diagnostics"
+    }
+  },
+  "labels": {
+    "address": "Address",
+    "chain": "Chain",
+    "analysisStatus": "Analysis status",
+    "language": "Language",
+    "defaultOverviewRange": "Default Overview range",
+    "currency": "Currency",
+    "theme": "Theme",
+    "overviewFreshness": "Overview freshness",
+    "coverage": "Coverage",
+    "lastSuccessfulRun": "Last successful analysis",
+    "lastUpdated": "Last updated",
+    "runId": "Run ID"
+  },
+  "actions": {
+    "refreshOverview": "Refresh Overview data"
+  },
+  "fixed": {
+    "currencyValue": "USD",
+    "themeValue": "Cab Dark",
+    "helper": "Fixed for MVP"
+  },
+  "states": {
+    "loading": "Loading settings",
+    "errorTitle": "Settings are temporarily unavailable",
+    "errorDescription": "Settings data could not be loaded right now.",
+    "emptyTitle": "No settings data yet",
+    "emptyDescription": "Connect a supported wallet to load the current settings state.",
+    "unavailable": "Unavailable",
+    "errors": {
+      "SETTINGS_REQUEST_FAILED": "Settings data could not be loaded right now.",
+      "UNSUPPORTED_CHAIN": "This chain is not supported for Settings yet."
+    }
+  },
+  "diagnostics": {
+    "freshness": {
+      "recent_view": "Recent view",
+      "analyzed_view": "Analyzed view"
+    }
+  }
 }

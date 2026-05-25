@@ -12,7 +12,9 @@
   "actions": {
     "start": "Iniciar análisis",
     "starting": "Iniciando análisis...",
-    "retry": "Reintentar análisis"
+    "retry": "Reintentar análisis",
+    "update": "Actualizar análisis",
+    "updating": "Actualizando análisis..."
   },
   "messages": {
     "not_analyzed": "Ejecuta un análisis manual para desbloquear más adelante el estado histórico canónico. Los datos recientes del proveedor siguen disponibles ahora.",

@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
   index,
@@ -366,6 +367,27 @@ export const walletContexts = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).$defaultFn(now).notNull(),
   },
   (table) => [uniqueIndex("wallet_contexts_identity_uidx").on(table.chainId, table.walletAddress)],
+);
+
+export const userPreferences = pgTable(
+  "user_preferences",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    walletAddress: varchar("wallet_address", { length: 42 }).notNull(),
+    chainId: integer("chain_id"),
+    key: text("key").notNull(),
+    valueJson: jsonb("value_json").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).$defaultFn(now).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).$defaultFn(now).notNull(),
+  },
+  (table) => [
+    uniqueIndex("user_preferences_scope_key_uidx").on(
+      table.walletAddress,
+      sql`coalesce(${table.chainId}, -1)`,
+      table.key,
+    ),
+    index("user_preferences_wallet_idx").on(table.walletAddress, table.chainId),
+  ],
 );
 
 export type AnalysisRun = typeof analysisRuns.$inferSelect;

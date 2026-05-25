@@ -66,7 +66,7 @@ GET /api/settings?walletAddress={0x...}&chainId=8453
       "theme": "cab-dark"
     },
     "supportedLanguages": ["en", "es"],
-    "supportedOverviewRanges": ["7d", "30d", "90d", "all"],
+    "supportedOverviewRanges": ["24h", "7d", "30d"],
     "supportedAnalysisModes": ["full_history", "incremental"]
   }
 }
@@ -89,7 +89,7 @@ GET /api/settings?walletAddress={0x...}&chainId=8453
 All error bodies use:
 
 ```json
-{ "error": { "code": "VALIDATION_FAILED", "details": null } }
+{ "code": "VALIDATION_FAILED", "details": null }
 ```
 
 `details` is omitted or `null` in production; never leaks raw provider/DB messages.
@@ -109,7 +109,7 @@ Content-Type: application/json
   "chainId": 8453,
   "preferences": {
     "languagePreference": "es",            // optional
-    "defaultOverviewRange": "90d"          // optional
+    "defaultOverviewRange": "30d"          // optional
   }
 }
 ```

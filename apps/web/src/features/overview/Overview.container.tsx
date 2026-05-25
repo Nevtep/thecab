@@ -16,6 +16,7 @@ import {
   useOverviewProtocolPositionsQuery,
   useOverviewQuery,
   useOverviewShellQuery,
+  useSettingsQuery,
   useWarmOverviewMutation,
 } from "@/queries/hooks";
 import { SUPPORTED_CHAIN_ID } from "@/wallet/supportedChains";
@@ -32,10 +33,20 @@ export function OverviewContainer() {
   const [showUnpricedAssets, setShowUnpricedAssets] = useState(false);
   const [showDustAssets, setShowDustAssets] = useState(false);
   const warmedSnapshotKeysRef = useRef<Set<string>>(new Set());
+  const appliedPreferredRangeScopeRef = useRef<string | null>(null);
 
   const walletAddress = address?.toLowerCase() ?? null;
   const resolvedChainId = chainId ?? SUPPORTED_CHAIN_ID;
   const isWalletReady = Boolean(walletAddress && isConnected && isAuthenticated && isSupportedChain);
+  const settingsQuery = useSettingsQuery(
+    {
+      walletAddress: walletAddress ?? "",
+      chainId: resolvedChainId,
+    },
+    {
+      enabled: isWalletReady,
+    },
+  );
 
   const shellQuery = useOverviewShellQuery(
     {
@@ -136,6 +147,27 @@ export function OverviewContainer() {
     () => partitionOverviewAssetRows(overviewViewModel?.assets.rows ?? []),
     [overviewViewModel?.assets.rows],
   );
+
+  useEffect(() => {
+    if (!walletAddress || !settingsQuery.data) {
+      return;
+    }
+
+    const scopeKey = `${walletAddress}:${resolvedChainId}`;
+
+    if (appliedPreferredRangeScopeRef.current === scopeKey) {
+      return;
+    }
+
+    appliedPreferredRangeScopeRef.current = scopeKey;
+    startTransition(() => {
+      setScreenState({
+        walletAddress,
+        chainId: resolvedChainId,
+        range: normalizeOverviewRange(settingsQuery.data.preferences.defaultOverviewRange),
+      });
+    });
+  }, [resolvedChainId, settingsQuery.data, walletAddress]);
 
   useEffect(() => {
     if (

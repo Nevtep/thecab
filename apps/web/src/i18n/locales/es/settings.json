@@ -1,3 +1,57 @@
 {
-  "title": "PENDIENTE"
+  "title": "Configuracion",
+  "sections": {
+    "wallet": {
+      "title": "Billetera"
+    },
+    "analysis": {
+      "title": "Analisis"
+    },
+    "display": {
+      "title": "Visualizacion"
+    },
+    "diagnostics": {
+      "title": "Diagnosticos"
+    }
+  },
+  "labels": {
+    "address": "Direccion",
+    "chain": "Red",
+    "analysisStatus": "Estado del analisis",
+    "language": "Idioma",
+    "defaultOverviewRange": "Rango predeterminado de Overview",
+    "currency": "Moneda",
+    "theme": "Tema",
+    "overviewFreshness": "Estado de Overview",
+    "coverage": "Cobertura",
+    "lastSuccessfulRun": "Ultimo analisis exitoso",
+    "lastUpdated": "Ultima actualizacion",
+    "runId": "ID de ejecucion"
+  },
+  "actions": {
+    "refreshOverview": "Actualizar datos de Overview"
+  },
+  "fixed": {
+    "currencyValue": "USD",
+    "themeValue": "Cab Dark",
+    "helper": "Fijo para el MVP"
+  },
+  "states": {
+    "loading": "Cargando configuracion",
+    "errorTitle": "La configuracion no esta disponible temporalmente",
+    "errorDescription": "No se pudieron cargar los datos de configuracion en este momento.",
+    "emptyTitle": "Todavia no hay datos de configuracion",
+    "emptyDescription": "Conecta una billetera compatible para cargar el estado actual de configuracion.",
+    "unavailable": "No disponible",
+    "errors": {
+      "SETTINGS_REQUEST_FAILED": "No se pudieron cargar los datos de configuracion en este momento.",
+      "UNSUPPORTED_CHAIN": "Esta red todavia no es compatible con Configuracion."
+    }
+  },
+  "diagnostics": {
+    "freshness": {
+      "recent_view": "Vista reciente",
+      "analyzed_view": "Vista analizada"
+    }
+  }
 }

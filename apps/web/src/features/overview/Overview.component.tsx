@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -590,6 +591,7 @@ export function OverviewComponent({
   onToggleUnpricedAssets,
   onToggleDustAssets,
 }: OverviewComponentProps) {
+  const router = useRouter();
   const { t, i18n } = useTranslation(["overview", "navigation", "analysis", "coverage", "charts", "trust", "wallet"]);
   const isHydrated = useSyncExternalStore(
     () => () => undefined,
@@ -863,6 +865,7 @@ export function OverviewComponent({
                   state={item.stateKey}
                   stateLabel={item.stateKey === "active" ? undefined : t(`navigation:states.${item.stateKey}`)}
                   disabled={item.disabled}
+                  onPress={item.href ? () => router.push(item.href!) : undefined}
                 />
               ))}
             </CabStack>
