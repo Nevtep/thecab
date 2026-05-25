@@ -1,4 +1,4 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
-shell commands, and other important information, read specs/007-settings-screen/plan.md
+shell commands, and other important information, read specs/008-analysis-jobs/plan.md
 <!-- SPECKIT END -->
