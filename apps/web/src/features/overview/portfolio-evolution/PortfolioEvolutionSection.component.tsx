@@ -49,6 +49,18 @@ const defaultVisibleSeries: Record<PortfolioEvolutionSeriesKey, boolean> = {
   rewards: true,
 };
 
+function getPortfolioEvolutionEventLabelKeySuffix(eventType: PortfolioEvolutionEventType) {
+  if (eventType === "move_to_idle") {
+    return "moveToIdle";
+  }
+
+  if (eventType === "cash_out") {
+    return "cashOut";
+  }
+
+  return eventType;
+}
+
 export function PortfolioEvolutionSection({
   viewModel,
   model,
@@ -209,7 +221,7 @@ export function PortfolioEvolutionSection({
           />
           <OverviewImpactMetricCard
             label={t("portfolioEvolution.footer.latestEvent")}
-            value={resolvedModel.footer.latestEvent ? t(`portfolioEvolution.events.${resolvedModel.footer.latestEvent.type === "move_to_idle" ? "moveToIdle" : resolvedModel.footer.latestEvent.type}`) : t("states.unavailableValue")}
+            value={resolvedModel.footer.latestEvent ? t(`portfolioEvolution.events.${getPortfolioEvolutionEventLabelKeySuffix(resolvedModel.footer.latestEvent.type)}`) : t("states.unavailableValue")}
             iconName={resolvedModel.footer.latestEvent ? portfolioEvolutionEventIcons[resolvedModel.footer.latestEvent.type] : "activity"}
             accentColor={resolvedModel.footer.latestEvent ? portfolioEvolutionEventMeta[resolvedModel.footer.latestEvent.type].color : cabColors.text.muted}
             series={eventDensitySeries}

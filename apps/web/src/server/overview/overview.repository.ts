@@ -650,10 +650,25 @@ export async function readKnownProtocolContracts(input: Pick<OverviewRequest, "c
 }
 
 export async function readRecentOverviewAnalyzedActivity(input: ScopedWalletInput & {
+  startAt?: Date;
+  endAt?: Date;
   limit?: number;
 }) {
   const db = getDb();
-  const eventRows = await db
+  const filters = [
+    eq(ledgerEvents.walletAddress, input.walletAddress.toLowerCase()),
+    eq(ledgerEvents.chainId, input.chainId),
+  ];
+
+  if (input.startAt) {
+    filters.push(gte(ledgerEvents.occurredAt, input.startAt));
+  }
+
+  if (input.endAt) {
+    filters.push(lte(ledgerEvents.occurredAt, input.endAt));
+  }
+
+  const baseEventRowsQuery = db
     .select({
       id: ledgerEvents.id,
       txHash: ledgerEvents.txHash,
@@ -664,14 +679,12 @@ export async function readRecentOverviewAnalyzedActivity(input: ScopedWalletInpu
       metadataJson: ledgerEvents.metadataJson,
     })
     .from(ledgerEvents)
-    .where(
-      and(
-        eq(ledgerEvents.walletAddress, input.walletAddress.toLowerCase()),
-        eq(ledgerEvents.chainId, input.chainId),
-      ),
-    )
-    .orderBy(desc(ledgerEvents.occurredAt), desc(ledgerEvents.createdAt))
-    .limit(input.limit ?? 10);
+    .where(and(...filters))
+    .orderBy(desc(ledgerEvents.occurredAt), desc(ledgerEvents.createdAt));
+
+  const eventRows = typeof input.limit === "number" && Number.isFinite(input.limit) && input.limit > 0
+    ? await baseEventRowsQuery.limit(input.limit)
+    : await baseEventRowsQuery;
 
   if (eventRows.length === 0) {
     return [];

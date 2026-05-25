@@ -53,6 +53,7 @@
       "detectedRebalances": "Detected rebalances"
     },
     "events": {
+      "cashOut": "Cash out",
       "claim": "Claim",
       "rebalance": "Rebalance",
       "moveToIdle": "Move to idle",

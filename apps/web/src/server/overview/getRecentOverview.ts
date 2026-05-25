@@ -54,6 +54,37 @@ const OVERVIEW_ACTIVITY_LIMIT: Record<OverviewRange, number> = {
   "30d": 48,
 };
 
+export function buildOverviewAnalyzedActivityReadInput(input: {
+  surface: "activity" | "chart";
+  walletAddress: string;
+  chainId: number;
+  range: OverviewRange;
+  startAt?: Date;
+  endAt?: Date;
+}) {
+  const baseInput = {
+    walletAddress: input.walletAddress,
+    chainId: input.chainId,
+  };
+
+  if (input.surface === "activity") {
+    return {
+      ...baseInput,
+      limit: OVERVIEW_ACTIVITY_LIMIT[input.range],
+    };
+  }
+
+  if (!input.startAt || !input.endAt) {
+    throw new Error("OVERVIEW_CHART_ACTIVITY_RANGE_REQUIRED");
+  }
+
+  return {
+    ...baseInput,
+    startAt: input.startAt,
+    endAt: input.endAt,
+  };
+}
+
 const NATIVE_ETH_SENTINEL = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 const BASE_WETH_ADDRESS = "0x4200000000000000000000000000000000000006";
 const BASE_CBBTC_ADDRESS = "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf";
@@ -469,6 +500,10 @@ function mapOverviewActivityItemToChartEventType(input: {
 }) {
   if ((input.rewardValueUsd ?? 0) > 0 || input.classification === "claim") {
     return "claim" as const;
+  }
+
+  if (input.classification === "cash_out") {
+    return "cash_out" as const;
   }
 
   if (input.classification === "rebalance") {
@@ -938,9 +973,12 @@ export async function getRecentOverviewActivity(input: OverviewRequest): Promise
 
   if (canUseAnalyzedOverviewActivity(response.analysis.status)) {
     const analyzedActivityRows = await readRecentOverviewAnalyzedActivity({
-      walletAddress: input.walletAddress,
-      chainId: input.chainId,
-      limit: OVERVIEW_ACTIVITY_LIMIT[input.range],
+      ...buildOverviewAnalyzedActivityReadInput({
+        surface: "activity",
+        walletAddress: input.walletAddress,
+        chainId: input.chainId,
+        range: input.range,
+      }),
     });
 
     if (analyzedActivityRows.length > 0) {
@@ -2335,11 +2373,16 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
   response.analysis = createOverviewAnalysisState({ latestRun, freshness });
 
   const analyzedActivityRows = canUseAnalyzedOverviewActivity(response.analysis.status)
-    ? await readRecentOverviewAnalyzedActivity({
-        walletAddress: input.walletAddress,
-        chainId: input.chainId,
-        limit: OVERVIEW_ACTIVITY_LIMIT[input.range],
-      })
+    ? await readRecentOverviewAnalyzedActivity(
+        buildOverviewAnalyzedActivityReadInput({
+          surface: "chart",
+          walletAddress: input.walletAddress,
+          chainId: input.chainId,
+          range: input.range,
+          startAt: rangeStartAt,
+          endAt: now,
+        }),
+      )
     : [];
 
   const tokens = tokensResult.status === "fulfilled" ? (tokensResult.value.result ?? []) : [];

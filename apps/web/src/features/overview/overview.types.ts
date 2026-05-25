@@ -147,7 +147,7 @@ export type OverviewViewModel = {
     }>;
     events: Array<{
       id: string;
-      type: "claim" | "rebalance" | "move_to_idle" | "redeploy" | "lock" | "vote";
+      type: "cash_out" | "claim" | "rebalance" | "move_to_idle" | "redeploy" | "lock" | "vote";
       occurredAt: string;
       capturedAt: string;
       detail: string | null;

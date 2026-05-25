@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { resolveManualDepositMintTxHash } from "@/server/analysis/enginePersistence";
 import {
+  buildOverviewAnalyzedActivityReadInput,
   buildOverviewApprovalDetail,
   buildOverviewDepositMintDetail,
   buildOverviewRewardFallbackEvents,
@@ -114,4 +115,42 @@ test("buildOverviewRewardFallbackEvents emits claim markers for persisted reward
     txHash: "0xrewardtx",
     rewardValueUsd: 4807.318526677795,
   });
+});
+
+test("buildOverviewAnalyzedActivityReadInput keeps activity lists limited but charts range-bounded", () => {
+  const startAt = new Date("2026-05-01T00:00:00.000Z");
+  const endAt = new Date("2026-05-30T23:59:59.000Z");
+
+  assert.deepEqual(
+    buildOverviewAnalyzedActivityReadInput({
+      surface: "activity",
+      walletAddress: "0xabc",
+      chainId: 8453,
+      range: "30d",
+    }),
+    {
+      walletAddress: "0xabc",
+      chainId: 8453,
+      limit: 48,
+    },
+  );
+
+  for (const range of ["24h", "7d", "30d"] as const) {
+    assert.deepEqual(
+      buildOverviewAnalyzedActivityReadInput({
+        surface: "chart",
+        walletAddress: "0xabc",
+        chainId: 8453,
+        range,
+        startAt,
+        endAt,
+      }),
+      {
+        walletAddress: "0xabc",
+        chainId: 8453,
+        startAt,
+        endAt,
+      },
+    );
+  }
 });

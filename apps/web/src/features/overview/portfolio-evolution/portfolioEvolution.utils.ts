@@ -1,6 +1,7 @@
 import type { OverviewRange, OverviewViewModel } from "@/features/overview/overview.types";
 
 export type PortfolioEvolutionEventType =
+  | "cash_out"
   | "claim"
   | "rebalance"
   | "move_to_idle"
@@ -130,6 +131,10 @@ function buildMarkerBucketsFromChartEvents(
 function mapActivityItemToEventType(
   item: OverviewViewModel["activity"]["items"][number],
 ): PortfolioEvolutionEventType | null {
+  if (item.classification === "cash_out") {
+    return "cash_out";
+  }
+
   if (item.classification === "claim") {
     return "claim";
   }

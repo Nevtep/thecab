@@ -18,6 +18,11 @@ export const portfolioEvolutionEventMeta: Record<
     tone: "warning" | "info" | "success" | "neutral";
   }
 > = {
+  cash_out: {
+    labelKey: "overview:portfolioEvolution.events.cashOut",
+    color: cabColors.semantic.warning,
+    tone: "warning",
+  },
   claim: {
     labelKey: "overview:portfolioEvolution.events.claim",
     color: cabColors.brand.cabGold,
@@ -51,6 +56,7 @@ export const portfolioEvolutionEventMeta: Record<
 };
 
 export const portfolioEvolutionEventOrder: PortfolioEvolutionEventType[] = [
+  "cash_out",
   "claim",
   "redeploy",
   "move_to_idle",
@@ -60,6 +66,7 @@ export const portfolioEvolutionEventOrder: PortfolioEvolutionEventType[] = [
 ];
 
 export const portfolioEvolutionEventIcons: Record<PortfolioEvolutionEventType, CabIconName> = {
+  cash_out: "externalLink",
   claim: "coins",
   redeploy: "arrowUpToLine",
   move_to_idle: "arrowDownToLine",

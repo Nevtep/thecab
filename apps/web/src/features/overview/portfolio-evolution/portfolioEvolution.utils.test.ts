@@ -184,6 +184,33 @@ test("buildPortfolioEvolutionModel falls back to backend chart events for aero r
   assert.equal(model.summary.detectedRebalanceCount, 1);
 });
 
+test("buildPortfolioEvolutionModel preserves backend cash-out markers with detail and tx hash", () => {
+  const viewModel = createViewModel();
+  viewModel.chart.events = [
+    {
+      id: "cashout-27apr",
+      type: "cash_out",
+      occurredAt: "2026-05-20T15:55:25.000Z",
+      capturedAt: "2026-05-20T00:00:00.000Z",
+      detail: "Swapped rewards to USDC and transferred out",
+      txHash: "0xcashout",
+      rewardValueUsd: null,
+    },
+  ];
+
+  const model = buildPortfolioEvolutionModel({
+    viewModel,
+    range: "7d",
+    locale: "en",
+    activity: null,
+  });
+
+  assert.equal(model.data[2]?.events[0]?.type, "cash_out");
+  assert.equal(model.data[2]?.events[0]?.detail, "Swapped rewards to USDC and transferred out");
+  assert.equal(model.data[2]?.events[0]?.txHash, "0xcashout");
+  assert.deepEqual(model.availableEventTypes, ["cash_out"]);
+});
+
 test("buildPortfolioEvolutionModel normalizes rewards to zero across every bucket when rewards coverage is known", () => {
   const viewModel = createViewModel();
   viewModel.metrics.estimatedRealizedRewardsUsd = 0;
