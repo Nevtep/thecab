@@ -409,17 +409,42 @@ export async function readOverviewRealizedRewardEvents(input: ScopedWalletInput 
     from reward_events re
     left join lateral (
       select
-        am.token_address,
-        am.amount_raw,
-        am.amount_usd
+        sum(
+          coalesce(
+            am.amount_usd,
+            case
+              when priced_movement.price_usd is null or am.amount_raw is null then null
+              when am.token_address = '0x4200000000000000000000000000000000000006'
+              then (am.amount_raw::numeric / 1000000000000000000::numeric) * priced_movement.price_usd
+              when am.token_address = '0x940181a94a35a4569e4529a3cdfb74e38fd98631'
+              then (am.amount_raw::numeric / 1000000000000000000::numeric) * priced_movement.price_usd
+              when am.token_address = '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913'
+              then (am.amount_raw::numeric / 1000000::numeric) * priced_movement.price_usd
+              when am.token_address = '0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf'
+              then (am.amount_raw::numeric / 100000000::numeric) * priced_movement.price_usd
+              when am.token_address = '0x60a3e35cc302bfa44cb288bc5a4f316fdb1adb42'
+              then (am.amount_raw::numeric / 1000000::numeric) * priced_movement.price_usd
+              else null
+            end
+          )
+        )::text as amount_usd,
+        case when count(distinct am.token_address) = 1 then min(am.token_address) else null end as token_address,
+        case when count(distinct am.token_address) = 1 then min(am.amount_raw) else null end as amount_raw
       from ledger_events le
       join asset_movements am on am.ledger_event_id = le.id
+      left join lateral (
+        select pp.price_usd
+        from price_points pp
+        where pp.chain_id = re.chain_id
+          and pp.token_address = am.token_address
+          and pp.priced_at <= re.occurred_at
+        order by pp.priced_at desc
+        limit 1
+      ) priced_movement on true
       where le.chain_id = re.chain_id
         and le.tx_hash = re.tx_hash
         and am.wallet_address = re.wallet_address
         and am.direction_in = true
-      order by coalesce(am.amount_usd, 0) desc, coalesce(am.amount_raw::numeric, 0) desc
-      limit 1
     ) bm on true
     left join lateral (
       select pp.price_usd

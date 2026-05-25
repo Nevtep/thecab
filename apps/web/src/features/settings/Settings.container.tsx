@@ -1,7 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { SettingsComponent } from "@/features/settings/Settings.component";
@@ -13,10 +13,19 @@ import { useAnalysisStatusQuery, useSettingsQuery, useStartAnalysisMutation, use
 import { SUPPORTED_CHAIN_ID } from "@/wallet/supportedChains";
 import { useCabWallet } from "@/wallet/useCabWallet";
 
+function isPendingAnalysisStatus(status: string | null) {
+  return status === "queued" || status === "running";
+}
+
+function isSettledAnalysisStatus(status: string | null) {
+  return status === "ready" || status === "stale" || status === "failed" || status === "not_analyzed";
+}
+
 export function SettingsContainer() {
   const { t, i18n } = useTranslation(["settings", "navigation", "wallet", "analysis", "overview"]);
   const queryClient = useQueryClient();
   const [pendingPreferenceKey, setPendingPreferenceKey] = useState<"languagePreference" | "defaultOverviewRange" | null>(null);
+  const previousAnalysisStatusRef = useRef<string | null>(null);
   const {
     address,
     chainId,
@@ -87,6 +96,30 @@ export function SettingsContainer() {
     };
   }, [analysisStatusQuery.data, settingsQuery.data]);
 
+  useEffect(() => {
+    const nextStatus = analysisStatusQuery.data?.status ?? null;
+    const previousStatus = previousAnalysisStatusRef.current;
+
+    previousAnalysisStatusRef.current = nextStatus;
+
+    if (!walletAddress || !previousStatus || previousStatus === nextStatus) {
+      return;
+    }
+
+    if (!isPendingAnalysisStatus(previousStatus) || !isSettledAnalysisStatus(nextStatus)) {
+      return;
+    }
+
+    void Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["overview", resolvedChainId, walletAddress] }),
+      queryClient.invalidateQueries({ queryKey: ["overview-shell", resolvedChainId, walletAddress] }),
+      queryClient.invalidateQueries({ queryKey: ["overview-activity", resolvedChainId, walletAddress] }),
+      queryClient.invalidateQueries({ queryKey: ["overview-chart", resolvedChainId, walletAddress] }),
+      queryClient.invalidateQueries({ queryKey: ["overview-protocol-positions", resolvedChainId, walletAddress] }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.settings({ chainId: resolvedChainId, walletAddress }) }),
+    ]);
+  }, [analysisStatusQuery.data?.status, queryClient, resolvedChainId, walletAddress]);
+
   async function invalidateConnectedOverviewSlices() {
     if (!walletAddress) {
       return;
@@ -119,6 +152,7 @@ export function SettingsContainer() {
       queryClient.invalidateQueries({
         queryKey: queryKeys.settings({ chainId: resolvedChainId, walletAddress }),
       }),
+      invalidateConnectedOverviewSlices(),
     ]);
   }
 
