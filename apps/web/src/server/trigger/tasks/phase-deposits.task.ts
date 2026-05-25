@@ -30,6 +30,53 @@ export type PhaseDepositsTaskPayload = {
 const MORALIS_HISTORY_PAGE_LIMIT = 100;
 const MORALIS_HISTORY_MAX_PAGES_PER_SLICE = 20;
 
+function toLatestWalletTokenSnapshot(token: Record<string, unknown>) {
+  const tokenAddress = typeof token.token_address === "string"
+    ? token.token_address.toLowerCase()
+    : typeof token.tokenAddress === "string"
+      ? token.tokenAddress.toLowerCase()
+      : null;
+  const balanceRaw = typeof token.balance === "string"
+    ? token.balance
+    : typeof token.balanceRaw === "string"
+      ? token.balanceRaw
+      : null;
+  const decimals = typeof token.decimals === "number"
+    ? token.decimals
+    : typeof token.decimals === "string"
+      ? Number(token.decimals)
+      : null;
+
+  if (!tokenAddress || !balanceRaw) {
+    return null;
+  }
+
+  return {
+    tokenAddress,
+    balanceRaw,
+    decimals: Number.isFinite(decimals) ? decimals : null,
+    symbol: typeof token.symbol === "string" ? token.symbol : null,
+    name: typeof token.name === "string" ? token.name : null,
+    nativeToken: token.native_token === true || token.nativeToken === true,
+    possibleSpam: token.possible_spam === true || token.possibleSpam === true,
+    verifiedContract: token.verified_contract === true || token.verifiedContract === true,
+    usdPrice: typeof token.usd_price === "number"
+      ? token.usd_price
+      : typeof token.usd_price === "string" && token.usd_price.trim().length > 0
+        ? Number(token.usd_price)
+        : typeof token.usdPrice === "number"
+          ? token.usdPrice
+          : null,
+    usdValue: typeof token.usd_value === "number"
+      ? token.usd_value
+      : typeof token.usd_value === "string" && token.usd_value.trim().length > 0
+        ? Number(token.usd_value)
+        : typeof token.usdValue === "number"
+          ? token.usdValue
+          : null,
+  };
+}
+
 async function loadSliceHistory(
   walletAddress: string,
   chainId: number,
@@ -200,6 +247,10 @@ export const phaseDepositsTask = task({
       rewardCandidatesByHash.set(candidate.txHash.toLowerCase(), candidate);
     }
 
+    const latestWalletTokens = tokens
+      .map((token) => toLatestWalletTokenSnapshot(token))
+      .filter((token): token is NonNullable<typeof token> => token !== null);
+
     await persistRawProviderSnapshots({
       runId: payload.runId,
       sliceId: payload.sliceId,
@@ -210,7 +261,10 @@ export const phaseDepositsTask = task({
           provider: "moralis",
           endpoint: "/wallets/:walletAddress/tokens",
           requestJson: { walletAddress: payload.walletAddress, chainId: payload.chainId },
-          responseJson: { resultCount: tokens.length },
+          responseJson: {
+            resultCount: tokens.length,
+            tokens: latestWalletTokens,
+          },
         },
         {
           provider: "moralis",
@@ -271,6 +325,7 @@ export const phaseDepositsTask = task({
       chainId: payload.chainId,
       positions: mergedProtocolRows,
       manualArtifacts: aerodromeLifecycle.artifacts,
+      manualLifecycle: aerodromeLifecycle.lifecycle,
       mellowArtifacts: mellowAccounting.artifacts,
     });
     const persistedHistory = await persistSliceHistory({
@@ -295,48 +350,17 @@ export const phaseDepositsTask = task({
       });
     }
 
-    const latestWalletTokens = tokens
-      .map((token) => {
-        const tokenAddress = typeof token.token_address === "string" ? token.token_address.toLowerCase() : null;
-        const balanceRaw = typeof token.balance === "string" ? token.balance : null;
-        const decimals = typeof token.decimals === "number"
-          ? token.decimals
-          : typeof token.decimals === "string"
-            ? Number(token.decimals)
-            : null;
-        if (!tokenAddress || !balanceRaw) {
-          return null;
-        }
-
-        return {
-          tokenAddress,
-          balanceRaw,
-          decimals: Number.isFinite(decimals) ? decimals : null,
-          symbol: typeof token.symbol === "string" ? token.symbol : null,
-          name: typeof token.name === "string" ? token.name : null,
-          nativeToken: token.native_token === true,
-          possibleSpam: token.possible_spam === true,
-          verifiedContract: token.verified_contract === true,
-          usdPrice: typeof token.usd_price === "number"
-            ? token.usd_price
-            : typeof token.usd_price === "string" && token.usd_price.trim().length > 0
-              ? Number(token.usd_price)
-              : null,
-          usdValue: typeof token.usd_value === "number"
-            ? token.usd_value
-            : typeof token.usd_value === "string" && token.usd_value.trim().length > 0
-              ? Number(token.usd_value)
-              : null,
-        };
-      })
-      .filter((token): token is NonNullable<typeof token> => token !== null);
-
-    await mergeAnalysisRunMetadata(payload.runId, {
+    const metadataPatch: Record<string, unknown> = {
       latestPoolTotals: persistedPositions.poolTotals,
       latestRewardCandidates: Array.from(rewardCandidatesByHash.values()),
-      latestWalletTokens,
-      latestWalletTokensCapturedAt: now.toISOString(),
-    });
+    };
+
+    if (tokensResult.ok) {
+      metadataPatch.latestWalletTokens = latestWalletTokens;
+      metadataPatch.latestWalletTokensCapturedAt = now.toISOString();
+    }
+
+    await mergeAnalysisRunMetadata(payload.runId, metadataPatch);
 
     return {
       txCountSeen: persistedHistory.txCountSeen,

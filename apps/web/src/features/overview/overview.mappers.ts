@@ -86,6 +86,9 @@ export function mapOverviewResponseToViewModel(response: OverviewViewModel): Ove
     chart: {
       ...response.chart,
       coverageReasonCodes: dedupeReasonCodes(response.chart.coverageReasonCodes),
+      events: [...response.chart.events].sort((left, right) =>
+        left.occurredAt.localeCompare(right.occurredAt),
+      ),
       points: [...response.chart.points].sort((left, right) =>
         left.capturedAt.localeCompare(right.capturedAt),
       ),

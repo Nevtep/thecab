@@ -5,6 +5,7 @@ import {
   Area,
   AreaChart,
   CartesianGrid,
+  ReferenceDot,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -21,10 +22,18 @@ type CabAreaSeries<T extends Record<string, unknown>> = {
   fill?: string;
 };
 
+type CabAreaChartMarker<T extends Record<string, unknown>> = {
+  valueKey: keyof T & string;
+  yKey: keyof T & string;
+  color?: string;
+  radius?: number;
+};
+
 export type CabAreaChartProps<T extends Record<string, unknown>> = {
   data: T[];
   xKey: string;
   series: CabAreaSeries<T>[];
+  markers?: CabAreaChartMarker<T>[];
   title?: string;
   subtitle?: string;
   height?: number;
@@ -41,6 +50,7 @@ export function CabAreaChart<T extends Record<string, unknown>>({
   data,
   xKey,
   series,
+  markers,
   title,
   subtitle,
   height,
@@ -106,6 +116,37 @@ export function CabAreaChart<T extends Record<string, unknown>>({
               />
             );
           })}
+          {markers?.flatMap((marker) =>
+            data.map((datum, index) => {
+              const markerValue = datum[marker.valueKey];
+              const markerY = datum[marker.yKey];
+              const markerX = datum[xKey as keyof T];
+
+              if (
+                typeof markerValue !== "number" ||
+                !Number.isFinite(markerValue) ||
+                markerValue <= 0 ||
+                typeof markerY !== "number" ||
+                !Number.isFinite(markerY) ||
+                (typeof markerX !== "string" && typeof markerX !== "number")
+              ) {
+                return null;
+              }
+
+              const color = marker.color ?? cabColors.brand.cabGold;
+              return (
+                <ReferenceDot
+                  key={`${marker.valueKey}-${String(markerX)}-${index}`}
+                  x={markerX as never}
+                  y={markerY as never}
+                  r={marker.radius ?? 4}
+                  fill={color}
+                  stroke={color}
+                  ifOverflow="extendDomain"
+                />
+              );
+            }),
+          )}
         </AreaChart>
       </ResponsiveContainer>
     </CabChartFrame>

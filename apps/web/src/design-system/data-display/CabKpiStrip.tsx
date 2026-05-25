@@ -6,7 +6,7 @@ import { CabStack } from "@/design-system/primitives/CabStack";
 
 export function CabKpiStrip({ children }: { children: ReactNode }) {
   return (
-    <CabStack row gap="$3">
+    <CabStack row gap="$3" flexWrap="wrap">
       {children}
     </CabStack>
   );

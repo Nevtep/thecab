@@ -70,6 +70,7 @@ export function sanitizeOverviewResponse(overview: OverviewResponse): OverviewRe
       coverageReasonCodes: overview.chart.coverageReasonCodes
         ? [...overview.chart.coverageReasonCodes]
         : null,
+      events: overview.chart.events.map((event) => ({ ...event })),
       points: overview.chart.points.map((point) => ({ ...point })),
     },
     distribution: {

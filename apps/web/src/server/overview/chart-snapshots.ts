@@ -43,12 +43,14 @@ export function buildSnapshotValueLookup(input: {
     totalValueUsd: number | null;
     deployedValueUsd: number | null;
     idleValueUsd: number | null;
+    rewardValueUsd: number | null;
   };
 }) {
   const snapshotCandidatesByBucket = new Map<string, {
     totalValueUsd: number | null;
     deployedValueUsd: number | null;
     idleValueUsd: number | null;
+    rewardValueUsd: number | null;
     score: number;
     capturedAtMs: number;
   }>();
@@ -57,6 +59,7 @@ export function buildSnapshotValueLookup(input: {
     const totalValueUsd = asNumber(row.totalValueUsd);
     const deployedValueUsd = asNumber(row.deployedValueUsd);
     const idleValueUsd = asNumber(row.idleValueUsd);
+    const rewardValueUsd = asNumber((row.metadataJson ?? {}).rewardValueUsd as string | number | null | undefined);
 
     if (totalValueUsd === null && deployedValueUsd === null && idleValueUsd === null) {
       continue;
@@ -74,6 +77,7 @@ export function buildSnapshotValueLookup(input: {
       totalValueUsd,
       deployedValueUsd,
       idleValueUsd,
+      rewardValueUsd,
       score,
       capturedAtMs: row.capturedAt.getTime(),
     };
@@ -98,6 +102,7 @@ export function buildSnapshotValueLookup(input: {
       totalValueUsd: input.currentPoint.totalValueUsd,
       deployedValueUsd: input.currentPoint.deployedValueUsd,
       idleValueUsd: input.currentPoint.idleValueUsd,
+      rewardValueUsd: input.currentPoint.rewardValueUsd,
       score: Number.MAX_SAFE_INTEGER,
       capturedAtMs: input.currentPoint.capturedAt.getTime(),
     });
@@ -107,6 +112,7 @@ export function buildSnapshotValueLookup(input: {
     totalValueUsd: number | null;
     deployedValueUsd: number | null;
     idleValueUsd: number | null;
+    rewardValueUsd: number | null;
   }>();
 
   for (const [bucketTimestamp, candidate] of snapshotCandidatesByBucket.entries()) {
@@ -114,8 +120,31 @@ export function buildSnapshotValueLookup(input: {
       totalValueUsd: candidate.totalValueUsd,
       deployedValueUsd: candidate.deployedValueUsd,
       idleValueUsd: candidate.idleValueUsd,
+      rewardValueUsd: candidate.rewardValueUsd,
     });
   }
 
   return snapshotValuesByBucket;
+}
+
+export function buildRewardValueLookup(input: {
+  granularity: "hour" | "day";
+  rewardRows: Array<{
+    occurredAt: Date;
+    amountUsd: string | number | null;
+  }>;
+}) {
+  const rewardValuesByBucket = new Map<string, number>();
+
+  for (const row of input.rewardRows) {
+    const amountUsd = asNumber(row.amountUsd);
+    if (amountUsd === null || amountUsd <= 0) {
+      continue;
+    }
+
+    const bucketTimestamp = toBucketTimestamp(row.occurredAt.toISOString(), input.granularity);
+    rewardValuesByBucket.set(bucketTimestamp, (rewardValuesByBucket.get(bucketTimestamp) ?? 0) + amountUsd);
+  }
+
+  return rewardValuesByBucket;
 }

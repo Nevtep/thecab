@@ -36,12 +36,93 @@
     "assets": "Assets",
     "activity": "Recent activity"
   },
+  "portfolioEvolution": {
+    "subtitle": "Historical growth and key portfolio events",
+    "legend": {
+      "series": "Visible series",
+      "events": "Timeline events"
+    },
+    "kpis": {
+      "initialValue": "Initial value",
+      "finalValue": "Final value",
+      "absoluteChange": "Absolute change",
+      "changePct": "Change %",
+      "accumulatedRewards": "Accumulated rewards",
+      "detectedRebalances": "Detected rebalances"
+    },
+    "events": {
+      "claim": "Claim",
+      "rebalance": "Rebalance",
+      "moveToIdle": "Move to idle",
+      "redeploy": "Redeploy",
+      "lock": "Lock",
+      "vote": "Vote"
+    },
+    "selectedPoint": {
+      "title": "Selected point snapshot",
+      "empty": "Hover over the chart to inspect a point",
+      "eventsTitle": "Events in this bucket",
+      "noEvents": "No timeline events in this bucket",
+      "noEventDetail": "No additional event detail available"
+    },
+    "footer": {
+      "accumulatedRewards": "Rewards accumulated",
+      "capitalMoved": "Capital moved between states",
+      "latestEvent": "Latest event",
+      "maxIdle": "Max idle value"
+    }
+  },
   "sources": {
     "recent_provider_data": "Recent provider data",
     "partial_fallback": "Partial fallback",
     "analyzed_history": "Analyzed activity"
   },
   "distribution": {
+    "sectionSubtitle": "Current composition of valued capital in USD",
+    "kpiLabel": "Total valued capital",
+    "statusBadges": {
+      "coveragePartial": "Partial coverage",
+      "coverageRecent": "Recent coverage",
+      "coverageUnknown": "Unknown coverage",
+      "fallbackPartial": "Partial fallback",
+      "historicalPending": "Historical pending",
+      "analyzedHistory": "Analyzed history"
+    },
+    "chart": {
+      "title": "Capital allocation",
+      "hint": "Click a segment to inspect the underlying asset mix of the selected bucket.",
+      "legendOuter": "Outer donut: main capital categories.",
+      "legendInner": "Inner donut: underlying assets of the selected segment."
+    },
+    "summary": {
+      "title": "Distribution by category"
+    },
+    "assetsPanel": {
+      "title": "Underlying assets of: {{segment}}",
+      "idleTitle": "Idle assets",
+      "idleEmptyDescription": "No idle assets are currently included in default totals.",
+      "emptyTitle": "Underlying breakdown unavailable",
+      "emptyDescription": "Token-level composition is not available for this segment yet.",
+      "columns": {
+        "asset": "Asset",
+        "amount": "Amount",
+        "value": "Value (USD)"
+      },
+      "segmentTotal": "Segment total"
+    },
+    "footer": {
+      "excludedAssets": "{{count}} assets excluded from default totals",
+      "suspiciousAssets": "Suspicious assets excluded by default",
+      "lowConfidenceAssets": "Low-confidence assets hidden by default",
+      "excludedValuation": "{{value}} excluded priced value",
+      "excludedValuationUnavailable": "Excluded priced value unavailable",
+      "partialValuation": "Portfolio valuation is partial",
+      "currentCoverage": "Current coverage: {{status}}"
+    },
+    "center": {
+      "ofPortfolio": "of total portfolio",
+      "noBreakdown": "Breakdown unavailable"
+    },
     "slices": {
       "idle": "Idle assets",
       "manualDeposits": "Manual deposits",
@@ -51,6 +132,9 @@
     },
     "composition": {
       "idleDetailedBelow": "Idle assets remain detailed in the Assets section below.",
+      "chartTitle": "Token mix in {{segment}}",
+      "chartSubtitleEstimated": "The donut uses current estimated USD weight and the rows show total locked token amounts.",
+      "chartSubtitleAmounts": "The donut and rows show aggregated token amounts for this segment.",
       "tokenAmount": "{{symbol}} {{amount}}",
       "tokenAmountUnavailable": "{{symbol}} amount unavailable"
     }
@@ -96,11 +180,14 @@
   },
   "activity": {
     "unclassified": "Unclassified activity",
+    "openInExplorer": "Open transaction in explorer",
     "classifications": {
       "cashIn": "Cash in",
       "cashOut": "Cash out",
       "swap": "Swap",
       "rebalance": "Rebalance",
+      "airdrop": "Airdrop",
+      "approve": "Approve",
       "deposit": "Deposit",
       "withdraw": "Withdraw",
       "stake": "Stake",

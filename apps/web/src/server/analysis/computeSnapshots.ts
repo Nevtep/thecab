@@ -82,6 +82,10 @@ function dividePow10(rawAmount: string, decimals: number): number {
   return negative ? -value : value;
 }
 
+function fitsAnnualizedReturnPctColumn(value: number) {
+  return Number.isFinite(value) && Math.abs(value) < 1_000_000;
+}
+
 type ReconstructedDayMetric = {
   idleValueUsd: number;
   idleTokens: Array<{
@@ -369,8 +373,9 @@ export async function computeSnapshots(input: {
         const totalReturn = (totalValueUsd + metric.cumulativeCashOutUsd) / metric.cumulativeCashInUsd;
         if (totalReturn > 0) {
           const annualized = Math.pow(totalReturn, 365 / days) - 1;
-          if (Number.isFinite(annualized)) {
-            annualizedReturnPct = annualized * 100;
+          const annualizedReturnPctValue = annualized * 100;
+          if (fitsAnnualizedReturnPctColumn(annualizedReturnPctValue)) {
+            annualizedReturnPct = annualizedReturnPctValue;
           }
         }
       }

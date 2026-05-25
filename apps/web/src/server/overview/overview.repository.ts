@@ -1,17 +1,41 @@
-import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import { decodeFunctionData } from "viem";
 
 import { getDb } from "@/server/db/client";
 import {
   assetMovements,
   coverageReports,
+  deposits,
   ledgerEvents,
   portfolioSnapshots,
   pricePoints,
   protocolContracts,
+  pools,
   rawProviderRecords,
+  rewardEvents,
   walletContexts,
 } from "@/server/db/schema";
+import { alchemyRpc } from "@/server/providers/alchemy/rpc";
 import type { OverviewRequest } from "@/server/overview/overview.types";
+
+const erc721ApproveAbi = [
+  {
+    type: "function",
+    name: "approve",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "to", type: "address" },
+      { name: "tokenId", type: "uint256" },
+    ],
+    outputs: [],
+  },
+] as const;
+
+function normalizeAddress(value: unknown) {
+  return typeof value === "string" && /^0x[a-fA-F0-9]{40}$/.test(value)
+    ? value.toLowerCase()
+    : null;
+}
 
 type ScopedWalletInput = Pick<OverviewRequest, "walletAddress" | "chainId">;
 
@@ -354,6 +378,73 @@ export async function readOverviewPortfolioSnapshots(input: ScopedWalletInput & 
     .orderBy(portfolioSnapshots.capturedAt);
 }
 
+export async function readOverviewRealizedRewardEvents(input: ScopedWalletInput & {
+  startAt: Date;
+  endAt: Date;
+}) {
+  const db = getDb();
+
+  const result = await db.execute<{
+    occurredAt: Date;
+    amountUsd: string | null;
+    tokenAddress: string | null;
+    rewardType: string;
+    txHash: string;
+  }>(sql`
+    select
+      re.occurred_at as "occurredAt",
+      coalesce(
+        re.amount_usd,
+        bm.amount_usd,
+        case
+          when coalesce(re.token_address, bm.token_address) = '0x940181a94a35a4569e4529a3cdfb74e38fd98631'
+            and coalesce(re.amount_raw, bm.amount_raw) is not null
+            and pp.price_usd is not null
+          then (coalesce(re.amount_raw, bm.amount_raw)::numeric / 1000000000000000000::numeric) * pp.price_usd
+          else null
+        end
+      )::text as "amountUsd",
+      coalesce(re.token_address, bm.token_address) as "tokenAddress",
+      re.reward_type as "rewardType",
+      re.tx_hash as "txHash"
+    from reward_events re
+    left join lateral (
+      select
+        am.token_address,
+        am.amount_raw,
+        am.amount_usd
+      from ledger_events le
+      join asset_movements am on am.ledger_event_id = le.id
+      where le.chain_id = re.chain_id
+        and le.tx_hash = re.tx_hash
+        and am.wallet_address = re.wallet_address
+        and am.direction_in = true
+      order by coalesce(am.amount_usd, 0) desc, coalesce(am.amount_raw::numeric, 0) desc
+      limit 1
+    ) bm on true
+    left join lateral (
+      select pp.price_usd
+      from price_points pp
+      where pp.chain_id = re.chain_id
+        and pp.token_address = coalesce(re.token_address, bm.token_address)
+        and pp.priced_at <= re.occurred_at
+      order by pp.priced_at desc
+      limit 1
+    ) pp on true
+    where re.wallet_address = ${input.walletAddress.toLowerCase()}
+      and re.chain_id = ${input.chainId}
+      and re.is_accrual_snapshot = false
+      and re.occurred_at >= ${input.startAt}
+      and re.occurred_at <= ${input.endAt}
+    order by re.occurred_at asc
+  `);
+
+  return result.rows.map((row) => ({
+    ...row,
+    occurredAt: row.occurredAt instanceof Date ? row.occurredAt : new Date(row.occurredAt),
+  }));
+}
+
 export async function readKnownProtocolContracts(input: Pick<OverviewRequest, "chainId">) {
   const db = getDb();
   return db
@@ -396,9 +487,35 @@ export async function readRecentOverviewAnalyzedActivity(input: ScopedWalletInpu
     return [];
   }
 
+  const eventTargetAddresses = Array.from(new Set(
+    eventRows
+      .map((row) => normalizeAddress(row.metadataJson.toAddress))
+      .filter((address): address is string => Boolean(address)),
+  ));
+  const targetContractRows = eventTargetAddresses.length === 0
+    ? []
+    : await db
+      .select({
+        address: protocolContracts.address,
+        protocol: protocolContracts.protocol,
+        contractType: protocolContracts.contractType,
+        metadataJson: protocolContracts.metadataJson,
+      })
+      .from(protocolContracts)
+      .where(
+        and(
+          eq(protocolContracts.chainId, input.chainId),
+          inArray(protocolContracts.address, eventTargetAddresses),
+        ),
+      );
+  const targetContractsByAddress = new Map(
+    targetContractRows.map((row) => [row.address.toLowerCase(), row] as const),
+  );
+
   const movementRows = await db
     .select({
       ledgerEventId: assetMovements.ledgerEventId,
+      tokenAddress: assetMovements.tokenAddress,
       directionIn: assetMovements.directionIn,
       amountUsd: assetMovements.amountUsd,
       metadataJson: assetMovements.metadataJson,
@@ -411,6 +528,96 @@ export async function readRecentOverviewAnalyzedActivity(input: ScopedWalletInpu
       ),
     )
     .orderBy(assetMovements.ledgerEventId, assetMovements.movementIndex);
+
+  const depositRows = await db
+    .select({
+      mintTxHash: deposits.mintTxHash,
+      tokenId: deposits.tokenId,
+      metadataJson: deposits.metadataJson,
+      poolLabel: pools.label,
+    })
+    .from(deposits)
+    .leftJoin(pools, eq(deposits.poolId, pools.id))
+    .where(
+      and(
+        eq(deposits.walletAddress, input.walletAddress.toLowerCase()),
+        eq(deposits.chainId, input.chainId),
+        inArray(deposits.mintTxHash, eventRows.map((row) => row.txHash)),
+      ),
+    );
+
+  const genericApprovalRows = eventRows.filter((row) => {
+    if (row.classification !== "approve") {
+      return false;
+    }
+
+    const summary = typeof row.metadataJson.summary === "string"
+      ? row.metadataJson.summary.trim().toLowerCase()
+      : "";
+    if (summary !== "signed a transaction") {
+      return false;
+    }
+
+    const toAddress = normalizeAddress(row.metadataJson.toAddress);
+    const targetContract = toAddress ? targetContractsByAddress.get(toAddress) ?? null : null;
+    return Boolean(targetContract?.protocol === "aerodrome" && targetContract.contractType.toLowerCase().includes("position"));
+  });
+
+  const decodedApprovalRows = await Promise.all(genericApprovalRows.map(async (row) => {
+    try {
+      const tx = await alchemyRpc<{ input?: `0x${string}` | string | null }>(
+        "eth_getTransactionByHash",
+        [row.txHash],
+        { chainId: input.chainId },
+      );
+      if (!tx?.input || tx.input === "0x") {
+        return null;
+      }
+
+      const decoded = decodeFunctionData({
+        abi: erc721ApproveAbi,
+        data: tx.input as `0x${string}`,
+      });
+      const spenderAddress = normalizeAddress(decoded.args?.[0]);
+      const tokenId = typeof decoded.args?.[1] === "bigint" ? decoded.args[1].toString() : null;
+      if (!spenderAddress || !tokenId) {
+        return null;
+      }
+
+      return {
+        txHash: row.txHash.toLowerCase(),
+        spenderAddress,
+        tokenId,
+      };
+    } catch {
+      return null;
+    }
+  }));
+
+  const spenderAddresses = Array.from(new Set(
+    decodedApprovalRows
+      .filter((row): row is NonNullable<typeof row> => row !== null)
+      .map((row) => row.spenderAddress),
+  ));
+  const spenderContractRows = spenderAddresses.length === 0
+    ? []
+    : await db
+      .select({
+        address: protocolContracts.address,
+        protocol: protocolContracts.protocol,
+        contractType: protocolContracts.contractType,
+        metadataJson: protocolContracts.metadataJson,
+      })
+      .from(protocolContracts)
+      .where(
+        and(
+          eq(protocolContracts.chainId, input.chainId),
+          inArray(protocolContracts.address, spenderAddresses),
+        ),
+      );
+  const spenderContractsByAddress = new Map(
+    spenderContractRows.map((row) => [row.address.toLowerCase(), row] as const),
+  );
 
   const movementsByLedgerEventId = new Map<string, typeof movementRows>();
   for (const movement of movementRows) {
@@ -428,8 +635,53 @@ export async function readRecentOverviewAnalyzedActivity(input: ScopedWalletInpu
     movementsByLedgerEventId.set(ledgerEventId, [movement]);
   }
 
+  const depositsByMintTxHash = new Map(
+    depositRows
+      .filter((row): row is typeof row & { mintTxHash: string } => typeof row.mintTxHash === "string" && row.mintTxHash.length > 0)
+      .map((row) => [row.mintTxHash.toLowerCase(), row] as const),
+  );
+  const approvalContextByTxHash = new Map(
+    decodedApprovalRows
+      .filter((row): row is NonNullable<typeof row> => row !== null)
+      .flatMap((row) => {
+        const spenderContract = spenderContractsByAddress.get(row.spenderAddress) ?? null;
+        if (!spenderContract || spenderContract.protocol !== "aerodrome" || !spenderContract.contractType.toLowerCase().includes("gauge")) {
+          return [];
+        }
+
+        const poolLabel = typeof spenderContract.metadataJson.poolLabel === "string"
+          ? spenderContract.metadataJson.poolLabel
+          : null;
+
+        return [[row.txHash, {
+          tokenId: row.tokenId,
+          spenderAddress: row.spenderAddress,
+          spenderContractType: spenderContract.contractType,
+          protocol: spenderContract.protocol,
+          poolLabel,
+        }] as const];
+      }),
+  );
+
   return eventRows.map((row) => ({
     ...row,
     movements: movementsByLedgerEventId.get(row.id) ?? [],
+    depositContext: (() => {
+      const deposit = depositsByMintTxHash.get(row.txHash.toLowerCase());
+      if (!deposit) {
+        return null;
+      }
+
+      return {
+        tokenId: deposit.tokenId,
+        poolLabel: deposit.poolLabel ?? (typeof deposit.metadataJson.poolLabel === "string" ? deposit.metadataJson.poolLabel : null),
+        protocol: typeof deposit.metadataJson.protocol === "string" ? deposit.metadataJson.protocol : null,
+        primaryTokenSymbol:
+          typeof deposit.metadataJson.primaryTokenSymbol === "string" ? deposit.metadataJson.primaryTokenSymbol : null,
+        secondaryTokenSymbol:
+          typeof deposit.metadataJson.secondaryTokenSymbol === "string" ? deposit.metadataJson.secondaryTokenSymbol : null,
+      };
+    })(),
+    approvalContext: approvalContextByTxHash.get(row.txHash.toLowerCase()) ?? null,
   }));
 }

@@ -124,6 +124,13 @@ function buildLifecycleRecords(input: {
 
     const tokenId = extractLifecycleTokenId(record);
     const knownContracts = addresses.filter((address) => metadata.byAddress.has(address));
+    const touchesGauge = knownContracts.some((address) =>
+      metadata.byAddress.get(address)?.contractType.toLowerCase().includes("gauge"),
+    );
+    if (touchesGauge) {
+      continue;
+    }
+
     const positionManagerAddress = normalizeAddress(
       knownContracts.find((address) => metadata.byAddress.get(address)?.contractType.toLowerCase().includes("position"))
         ?? knownContracts[0]

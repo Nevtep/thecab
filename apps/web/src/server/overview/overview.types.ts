@@ -94,10 +94,21 @@ export type OverviewChartPoint = {
   rewardValueUsd: number | null;
 };
 
+export type OverviewChartEvent = {
+  id: string;
+  type: "claim" | "rebalance" | "move_to_idle" | "redeploy" | "lock" | "vote";
+  occurredAt: string;
+  capturedAt: string;
+  detail: string | null;
+  txHash: string | null;
+  rewardValueUsd: number | null;
+};
+
 export type OverviewChart = OverviewBlockProvenance & {
   range: OverviewRange;
   hasRewardMarkers: boolean;
   points: OverviewChartPoint[];
+  events: OverviewChartEvent[];
 };
 
 export type OverviewDistributionCompositionToken = {

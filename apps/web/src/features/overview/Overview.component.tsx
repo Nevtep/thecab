@@ -8,18 +8,15 @@ import {
   CabAnalysisCta,
   CabAnalysisStatusBadge,
   CabAccordion,
-  CabAreaChart,
   CabBadge,
   CabButton,
   CabCard,
   CabDashboardGrid,
-  CabDonutChart,
   CabEmptyState,
   CabErrorPanel,
   CabIcon,
   CabLoadingPanel,
   CabMetricCard,
-  CabRangeSelector,
   CabSectionHeader,
   CabSidebar,
   CabSidebarNavItem,
@@ -31,12 +28,12 @@ import {
   ConnectedShell,
 } from "@/design-system";
 import {
-  formatCompactAxisNumber,
   formatDateTime,
   formatPercent,
   formatRelativeTime,
   formatUsd,
 } from "@/i18n/formatters";
+import { getExplorerBaseUrl } from "@/chains/chains";
 
 import {
   formatWalletAddressLabel,
@@ -48,6 +45,8 @@ import {
   getOverviewTrustStatusLabelKey,
   mapOverviewAnalysisStatusToBadgeStatus,
 } from "@/features/overview/overview.mappers";
+import { CapitalAllocationSection } from "@/features/overview/CapitalAllocationSection";
+import { PortfolioEvolutionSection } from "@/features/overview/portfolio-evolution/PortfolioEvolutionSection.component";
 import type { OverviewRange, OverviewViewModel } from "@/features/overview/overview.types";
 import { SUPPORTED_CHAIN_ID } from "@/wallet/supportedChains";
 
@@ -106,6 +105,14 @@ function sumKnownUsd(values: Array<number | null | undefined>) {
   }
 
   return knownValues.reduce((sum, value) => sum + value, 0);
+}
+
+function buildTransactionExplorerUrl(txHash: string | null, chainId: number | null) {
+  if (!txHash || !chainId) {
+    return null;
+  }
+
+  return `${getExplorerBaseUrl(chainId)}/tx/${txHash}`;
 }
 
 function buildCoverageMessage(
@@ -285,106 +292,6 @@ function formatProtocolRangeValue(value: number, locale: string, fractionDigits:
     minimumFractionDigits: fractionDigits ?? 0,
     maximumFractionDigits: fractionDigits ?? 6,
   }).format(value);
-}
-
-function getDistributionSliceLabel(
-  slice: OverviewViewModel["distribution"]["slices"][number],
-  translate: (key: string) => string,
-) {
-  switch (slice.dimension) {
-    case "idle":
-      return translate("distribution.slices.idle");
-    case "manual_deposit":
-      return translate("distribution.slices.manualDeposits");
-    case "strategy":
-      return translate("distribution.slices.automatedStrategies");
-    case "governance":
-      return translate("distribution.slices.governanceLocks");
-    case "staked_lp":
-      return translate("distribution.slices.stakedLp");
-  }
-}
-
-function getDistributionSliceColor(
-  dimension: OverviewViewModel["distribution"]["slices"][number]["dimension"],
-) {
-  switch (dimension) {
-    case "idle":
-      return "#4b5563";
-    case "manual_deposit":
-      return "#1d4ed8";
-    case "strategy":
-      return "#059669";
-    case "governance":
-      return "#d97706";
-    case "staked_lp":
-      return "#7c3aed";
-  }
-}
-
-type DistributionSlice = OverviewViewModel["distribution"]["slices"][number];
-
-function formatDistributionCompositionToken(
-  token: NonNullable<DistributionSlice["composition"]>[number]["tokens"][number],
-  locale: string,
-  translate: (key: string, options?: Record<string, unknown>) => string,
-) {
-  if (token.amount === null) {
-    return translate("distribution.composition.tokenAmountUnavailable", {
-      symbol: token.symbol,
-    });
-  }
-
-  return translate("distribution.composition.tokenAmount", {
-    symbol: token.symbol,
-    amount: formatProtocolTokenAmount(token.amount, locale),
-  });
-}
-
-function renderDistributionSliceComposition(
-  slice: DistributionSlice,
-  input: {
-    locale: string;
-    translate: (key: string, options?: Record<string, unknown>) => string;
-  },
-) {
-  if (slice.composition?.length) {
-    return (
-      <CabStack gap="$2">
-        {slice.composition.map((entry) => (
-          <CabStack key={entry.positionKey} gap="$1">
-            <CabStack row justifyContent="space-between" alignItems="center" gap="$2">
-              <CabText variant="caption" fontSize={12}>
-                {entry.label}
-              </CabText>
-              {entry.valueUsd !== null ? (
-                <CabText variant="caption" fontSize={12}>
-                  {formatUsd(entry.valueUsd, input.locale)}
-                </CabText>
-              ) : null}
-            </CabStack>
-            {entry.tokens.length > 0 ? (
-              <CabText variant="caption" fontSize={12}>
-                {entry.tokens
-                  .map((token) => formatDistributionCompositionToken(token, input.locale, input.translate))
-                  .join(" · ")}
-              </CabText>
-            ) : null}
-          </CabStack>
-        ))}
-      </CabStack>
-    );
-  }
-
-  if (slice.dimension === "idle") {
-    return (
-      <CabText variant="caption" fontSize={12}>
-        {input.translate("distribution.composition.idleDetailedBelow")}
-      </CabText>
-    );
-  }
-
-  return null;
 }
 
 type ProtocolPositionRow = OverviewViewModel["protocolPositions"]["rows"][number];
@@ -672,10 +579,6 @@ export function OverviewComponent({
 
   const locale = i18n.language;
   const isWalletPending = walletStatus === "connecting" || walletStatus === "reconnecting";
-  const rangeOptions = ["24h", "7d", "30d"].map((option) => ({
-    key: option,
-    label: t(`ranges.${option}`),
-  }));
 
   if (!isHydrated) {
     return (
@@ -765,19 +668,7 @@ export function OverviewComponent({
   };
   const analysisStatusLabel = t(`analysis:status.${activeAnalysis.status}`);
   const formattedWalletAddress = walletAddress ? formatWalletAddressLabel(walletAddress) : t("states.unavailableValue");
-  const chartData = (resolvedChartViewModel?.chart.points ?? []).map((point) => ({
-    label:
-      resolvedChartViewModel?.chart.range === "24h"
-        ? new Intl.DateTimeFormat(locale, { hour: "numeric" }).format(new Date(point.capturedAt))
-        : new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" }).format(new Date(point.capturedAt)),
-    totalValueUsd: point.totalValueUsd,
-    deployedValueUsd: point.deployedValueUsd,
-    idleValueUsd: point.idleValueUsd,
-  }));
-  const totalDistributionUsd = (resolvedChartViewModel?.distribution.slices ?? []).reduce(
-    (sum, slice) => sum + slice.valueUsd,
-    0,
-  );
+  const openTransactionLabel = t("activity.openInExplorer");
   const navigationItems = getOverviewNavigationItems(activeAnalysis.status);
   const analysisAction = getOverviewAnalysisAction(activeAnalysis.status);
   const exclusionMessage = buildExclusionMessage(overviewViewModel?.metrics.exclusions ?? null, t, locale);
@@ -810,11 +701,6 @@ export function OverviewComponent({
         t,
       )
     : t("states.loadingProtocolPositions");
-  const distributionChartData = (resolvedChartViewModel?.distribution.slices ?? []).map((slice) => ({
-    label: getDistributionSliceLabel(slice, t),
-    value: slice.valueUsd,
-    color: getDistributionSliceColor(slice.dimension),
-  }));
   const deployedValueFromProtocolPositions = sumKnownUsd(
     resolvedProtocolPositionsViewModel?.protocolPositions.rows.map((row) => row.valueUsd) ?? [],
   );
@@ -829,6 +715,11 @@ export function OverviewComponent({
     overviewViewModel?.metrics.netPortfolioValueUsd ??
     sumKnownUsd([idleMetricValueUsd, deployedMetricValueUsd]) ??
     shellViewModel?.metrics.netPortfolioValueUsd ??
+    null;
+  const estimatedRealizedRewardsMetricValueUsd =
+    overviewViewModel?.metrics.estimatedRealizedRewardsUsd ??
+    resolvedChartViewModel?.metrics.estimatedRealizedRewardsUsd ??
+    shellViewModel?.metrics.estimatedRealizedRewardsUsd ??
     null;
   const changeOverSelectedPeriodPct =
     overviewViewModel?.metrics.changeOverSelectedPeriodPct ??
@@ -995,6 +886,7 @@ export function OverviewComponent({
                 <CabLoadingPanel label={t("states.loadingMetrics")} />
                 <CabLoadingPanel label={t("states.loadingMetrics")} />
                 <CabLoadingPanel label={t("states.loadingMetrics")} />
+                <CabLoadingPanel label={t("states.loadingMetrics")} />
               </>
             ) : (
               <>
@@ -1010,6 +902,10 @@ export function OverviewComponent({
                 <CabMetricCard
                   label={t("metrics.idleValue")}
                   value={formatCurrencyValue(idleMetricValueUsd, locale, t("states.unavailableValue"))}
+                />
+                <CabMetricCard
+                  label={t("metrics.estimatedRealizedRewards")}
+                  value={formatCurrencyValue(estimatedRealizedRewardsMetricValueUsd, locale, t("states.unavailableValue"))}
                 />
               </>
             )}
@@ -1042,42 +938,13 @@ export function OverviewComponent({
                 description={t("states.emptyDescription")}
               />
             ) : (
-              <CabAreaChart
-                title={t("sections.chart")}
-                subtitle={buildSourceSubtitle(
-                  resolvedChartViewModel.chart.source,
-                  resolvedChartViewModel.chart.coverageStatus,
-                  resolvedChartViewModel.chart.coverageReasonCodes,
-                  t,
-                )}
-                actions={
-                  <CabRangeSelector
-                    options={rangeOptions}
-                    selectedKey={range}
-                    onSelect={(nextRange) => onRangeChange(nextRange as OverviewRange)}
-                  />
-                }
-                notice={isChartRefreshing ? t("states.updatingChartRange", { range: t(`ranges.${range}`) }) : undefined}
-                loadingLabel={isChartRefreshing ? t("states.updatingChartRange", { range: t(`ranges.${range}`) }) : undefined}
-                data={chartData}
-                xKey="label"
-                yAxisWidth={80}
-                yTickFormatter={(value) => formatCompactAxisNumber(value, locale)}
-                series={[
-                  { key: "totalValueUsd", label: t("charts:series.netPortfolioValue") },
-                  {
-                    key: "deployedValueUsd",
-                    label: t("charts:series.deployedValue"),
-                    stroke: "#F2C14E",
-                    fill: "rgba(242, 193, 78, 0.18)",
-                  },
-                  {
-                    key: "idleValueUsd",
-                    label: t("charts:series.idleValue"),
-                    stroke: "#3B82F6",
-                    fill: "rgba(59, 130, 246, 0.15)",
-                  },
-                ]}
+              <PortfolioEvolutionSection
+                viewModel={resolvedChartViewModel}
+                activity={activityViewModel}
+                range={range}
+                locale={locale}
+                isRefreshing={isChartRefreshing}
+                onRangeChange={onRangeChange}
               />
             )}
 
@@ -1096,78 +963,11 @@ export function OverviewComponent({
               description={t("states.emptyDescription")}
             />
             ) : (
-            <CabCard density="spacious">
-              <CabStack gap="$3">
-                <CabSectionHeader
-                  title={t("sections.distribution")}
-                  subtitle={buildSourceSubtitle(
-                    resolvedChartViewModel.distribution.source,
-                    resolvedChartViewModel.distribution.coverageStatus,
-                    resolvedChartViewModel.distribution.coverageReasonCodes,
-                    t,
-                  )}
-                />
-                {resolvedChartViewModel.distribution.slices.length === 0 ? (
-                  <CabEmptyState
-                    title={t("states.emptyDistributionTitle")}
-                    description={t("states.emptyDistributionDescription")}
-                  />
-                ) : (
-                  <div
-                    style={{
-                      display: "grid",
-                      gap: 16,
-                      alignItems: "center",
-                      gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-                    }}
-                  >
-                    <div>
-                      <CabDonutChart
-                        data={distributionChartData}
-                        height={280}
-                        valueFormatter={(value) => formatUsd(value, locale)}
-                      />
-                    </div>
-                    <CabStack gap="$2">
-                      {resolvedChartViewModel.distribution.slices.map((slice) => (
-                        <CabCard key={`${slice.dimension}-${slice.label}`} density="default">
-                          <CabStack gap="$2">
-                            <CabStack row justifyContent="space-between" alignItems="center">
-                              <CabStack row alignItems="center" gap="$2">
-                                <div
-                                  style={{
-                                    width: 10,
-                                    height: 10,
-                                    borderRadius: 999,
-                                    backgroundColor: getDistributionSliceColor(slice.dimension),
-                                    flexShrink: 0,
-                                  }}
-                                />
-                                <CabText variant="label">{getDistributionSliceLabel(slice, t)}</CabText>
-                              </CabStack>
-                              <CabStack alignItems="flex-end" gap="$1">
-                                <CabText variant="label">{formatUsd(slice.valueUsd, locale)}</CabText>
-                                <CabText variant="caption" fontSize={12}>
-                                  {totalDistributionUsd > 0
-                                    ? formatPercent(slice.valueUsd / totalDistributionUsd, locale)
-                                    : t("states.unavailableValue")}
-                                </CabText>
-                              </CabStack>
-                            </CabStack>
-                            {renderDistributionSliceComposition(slice, { locale, translate: t })}
-                          </CabStack>
-                        </CabCard>
-                      ))}
-                    </CabStack>
-                  </div>
-                )}
-                {resolvedChartViewModel.distribution.exclusions ? (
-                  <CabText variant="caption" fontSize={12}>
-                    {buildExclusionMessage(resolvedChartViewModel.distribution.exclusions, t, locale)}
-                  </CabText>
-                ) : null}
-              </CabStack>
-            </CabCard>
+            <CapitalAllocationSection
+              distribution={resolvedChartViewModel.distribution}
+              assetRows={(overviewViewModel?.assets.rows ?? [...visibleAssetRows, ...hiddenAssetRows])
+                .filter((row) => !row.isHiddenByDefault && row.priceUsd !== null && !isDustValueRow(row))}
+            />
             )}
           </div>
 
@@ -1371,9 +1171,23 @@ export function OverviewComponent({
                                 {formatDateTime(item.occurredAt, locale)}
                               </CabText>
                             </CabStack>
-                            <CabText variant="caption" fontSize={12} textAlign="right">
-                              {item.txHash ? formatWalletAddressLabel(item.txHash) : t("states.unavailableValue")}
-                            </CabText>
+                            <CabStack row alignItems="center" gap="$2">
+                              <CabText variant="caption" fontSize={12} textAlign="right">
+                                {item.txHash ? formatWalletAddressLabel(item.txHash) : t("states.unavailableValue")}
+                              </CabText>
+                              {buildTransactionExplorerUrl(item.txHash, chainId) ? (
+                                <a
+                                  href={buildTransactionExplorerUrl(item.txHash, chainId) ?? undefined}
+                                  target="_blank"
+                                  rel="noreferrer noopener"
+                                  aria-label={openTransactionLabel}
+                                  title={openTransactionLabel}
+                                  style={{ display: "inline-flex", alignItems: "center" }}
+                                >
+                                  <CabIcon name="externalLink" tone="muted" size="sm" />
+                                </a>
+                              ) : null}
+                            </CabStack>
                           </CabStack>
                         </CabCard>
                       ))}

@@ -65,6 +65,7 @@ function createOverviewViewModel(input: {
       coverageReasonCodes: input.coverageReasonCodes,
       range: "7d",
       hasRewardMarkers: false,
+      events: [],
       points: [
         {
           capturedAt: "2026-05-24T00:00:00.000Z",

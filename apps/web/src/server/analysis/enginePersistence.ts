@@ -11,6 +11,7 @@ import {
   poolMetricsSnapshots,
   pools,
   portfolioSnapshots,
+  pricePoints,
   protocolContracts,
   rewardEvents,
   strategies,
@@ -57,6 +58,12 @@ type RawProviderSnapshot = {
   responseJson: Record<string, unknown>;
 };
 
+export type ManualDepositLifecycleRecord = {
+  txHash: string;
+  tokenId: string | null;
+  action: "mint" | "increaseLiquidity" | "decreaseLiquidity" | "collect";
+};
+
 export type SliceHistoryRecord = Record<string, unknown>;
 
 type SliceWindow = {
@@ -66,6 +73,19 @@ type SliceWindow = {
 
 export function asString(value: unknown) {
   return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+export function resolveManualDepositMintTxHash(input: {
+  tokenId: string;
+  lifecycle?: ManualDepositLifecycleRecord[];
+}) {
+  for (const record of input.lifecycle ?? []) {
+    if (record.action === "mint" && record.tokenId === input.tokenId) {
+      return record.txHash.toLowerCase();
+    }
+  }
+
+  return null;
 }
 
 function asRecordArray(value: unknown) {
@@ -265,6 +285,7 @@ export async function persistProtocolPositions(input: {
   chainId: number;
   positions: OverviewProtocolPosition[];
   manualArtifacts?: ManualPositionArtifacts;
+  manualLifecycle?: ManualDepositLifecycleRecord[];
   mellowArtifacts?: MellowWrapperArtifacts;
 }) {
   const db = getDb();
@@ -279,6 +300,10 @@ export async function persistProtocolPositions(input: {
   for (const position of input.positions) {
     if (position.family === "manual_deposit" && position.tokenId && position.metadata.positionContractAddress) {
       const manual = manualByTokenId.get(position.tokenId);
+      const mintTxHash = resolveManualDepositMintTxHash({
+        tokenId: position.tokenId,
+        lifecycle: input.manualLifecycle,
+      });
       let poolId: string | null = null;
 
       if (manual?.poolAddress) {
@@ -310,6 +335,7 @@ export async function persistProtocolPositions(input: {
           poolId,
           positionManagerAddress: position.metadata.positionContractAddress.toLowerCase(),
           tokenId: position.tokenId,
+          mintTxHash,
           status: "open",
           coverageStatus: position.coverageStatus,
           metadataJson: {
@@ -330,6 +356,7 @@ export async function persistProtocolPositions(input: {
           targetWhere: sql`${deposits.tokenId} is not null and ${deposits.positionManagerAddress} is not null`,
           set: {
             poolId,
+            mintTxHash: sql`coalesce(${mintTxHash}, ${deposits.mintTxHash})`,
             status: "open",
             coverageStatus: position.coverageStatus,
             metadataJson: {
@@ -575,6 +602,13 @@ export async function classifyRunLedgerEvents(input: {
   txHashes: string[];
   runId: string;
   spamTokenAddresses?: string[];
+  walletTokenSignals?: Array<{
+    tokenAddress: string;
+    possibleSpam?: boolean;
+    verifiedContract?: boolean;
+    usdPrice?: number | null;
+    usdValue?: number | null;
+  }>;
 }) {
   if (input.txHashes.length === 0) {
     return 0;
@@ -631,14 +665,48 @@ export async function classifyRunLedgerEvents(input: {
   }
 
   const spamSet = new Set((input.spamTokenAddresses ?? []).map((address) => address.toLowerCase()));
+  const walletTokenSignalMap = new Map(
+    (input.walletTokenSignals ?? [])
+      .map((signal) => ({
+        ...signal,
+        tokenAddress: signal.tokenAddress.toLowerCase(),
+      }))
+      .filter((signal) => signal.tokenAddress.length > 0)
+      .map((signal) => [signal.tokenAddress, signal] as const),
+  );
 
   const movementsByEventId = new Map<string, typeof movementRows>();
+  const movementTokenAddresses = new Set<string>();
   for (const movement of movementRows) {
     if (!movement.ledgerEventId) continue;
     const list = movementsByEventId.get(movement.ledgerEventId) ?? [];
     list.push(movement);
     movementsByEventId.set(movement.ledgerEventId, list);
+    movementTokenAddresses.add(movement.tokenAddress.toLowerCase());
   }
+
+  const pricedTokenRows = movementTokenAddresses.size === 0
+    ? []
+    : await db
+      .select({
+        tokenAddress: pricePoints.tokenAddress,
+        priceUsd: pricePoints.priceUsd,
+      })
+      .from(pricePoints)
+      .where(
+        and(
+          eq(pricePoints.chainId, input.chainId),
+          inArray(pricePoints.tokenAddress, Array.from(movementTokenAddresses)),
+        ),
+      );
+  const pricedTokenSet = new Set(
+    pricedTokenRows
+      .filter((row) => {
+        const price = asNumber(row.priceUsd);
+        return price !== null && price > 0;
+      })
+      .map((row) => row.tokenAddress.toLowerCase()),
+  );
 
   let updated = 0;
   for (const row of rows) {
@@ -653,11 +721,14 @@ export async function classifyRunLedgerEvents(input: {
         ? fromAddress
         : null;
     const counterpartyInfo = counterpartyAddress ? protocolMap.get(counterpartyAddress) ?? null : null;
+    const counterpartyContractType = counterpartyInfo?.contractType.toLowerCase() ?? "";
 
     const movements = movementsByEventId.get(row.id) ?? [];
     let netUsdIn = 0;
     let netUsdOut = 0;
     let hasSpamInflow = false;
+    let hasUntrustedInflow = false;
+    let hasValuelessInflow = false;
     let hasInflow = false;
     let hasOutflow = false;
     for (const movement of movements) {
@@ -667,8 +738,30 @@ export async function classifyRunLedgerEvents(input: {
         netUsdIn += Number.isFinite(usd) ? usd : 0;
         const tokenAddr = movement.tokenAddress.toLowerCase();
         const movementMeta = (movement.metadataJson ?? {}) as Record<string, unknown>;
-        if (spamSet.has(tokenAddr) || movementMeta.possibleSpam === true) {
+        const tokenSignal = walletTokenSignalMap.get(tokenAddr) ?? null;
+        const movementPossibleSpam = movementMeta.possibleSpam === true;
+        const tokenPossibleSpam = tokenSignal?.possibleSpam === true;
+        const movementVerified = typeof movementMeta.verifiedContract === "boolean"
+          ? movementMeta.verifiedContract
+          : null;
+        const tokenVerified = typeof tokenSignal?.verifiedContract === "boolean"
+          ? tokenSignal.verifiedContract
+          : null;
+        const verifiedContract = movementVerified !== null ? movementVerified : tokenVerified;
+        const hasPriceSignal =
+          movement.amountUsd !== null ||
+          pricedTokenSet.has(tokenAddr) ||
+          (typeof tokenSignal?.usdPrice === "number" && Number.isFinite(tokenSignal.usdPrice) && tokenSignal.usdPrice > 0) ||
+          (typeof tokenSignal?.usdValue === "number" && Number.isFinite(tokenSignal.usdValue) && tokenSignal.usdValue > 0);
+
+        if (spamSet.has(tokenAddr) || movementPossibleSpam || tokenPossibleSpam) {
           hasSpamInflow = true;
+        }
+        if (verifiedContract === false) {
+          hasUntrustedInflow = true;
+        }
+        if (!hasPriceSignal) {
+          hasValuelessInflow = true;
         }
       } else {
         hasOutflow = true;
@@ -676,6 +769,17 @@ export async function classifyRunLedgerEvents(input: {
       }
     }
     const netUsdFlow = netUsdIn - netUsdOut;
+    const isReceiveLike =
+      category === "token receive" ||
+      category === "receive" ||
+      (methodLabel === "transfer" && toAddress === walletAddress);
+    const isAirdropLikeMethod = new Set([
+      "airdrop",
+      "dispersetoken",
+      "dispersetokensimple",
+      "multisend",
+      "batchtransfer",
+    ]).has(methodLabel);
 
     const isAirdropTagged = category === "airdrop" || methodLabel === "airdrop";
     const isApprove = methodLabel === "approve" || category === "approve";
@@ -716,8 +820,19 @@ export async function classifyRunLedgerEvents(input: {
       classification = "claim";
     } else if (counterpartyInfo) {
       const isMellow = counterpartyInfo.protocol === "mellow";
+      const isGauge = counterpartyContractType.includes("gauge");
       const depositKey = isMellow ? "strategy_deposit" : "manual_deposit";
       const withdrawKey = isMellow ? "strategy_withdraw" : "manual_withdrawal";
+      const sentPositionLikeAssetToGauge =
+        isGauge &&
+        fromAddress === walletAddress &&
+        toAddress === counterpartyAddress &&
+        (category === "nft sale" || category === "nft send" || category === "burn");
+      const receivedPositionLikeAssetFromGauge =
+        isGauge &&
+        toAddress === walletAddress &&
+        fromAddress === counterpartyAddress &&
+        (category === "mint" || category === "nft receive");
 
       // Aerodrome CL Position Manager multicalls often expose methodLabel="deposit" even when
       // the underlying action is decreaseLiquidity + collect + burn. Trust category and the
@@ -729,32 +844,44 @@ export async function classifyRunLedgerEvents(input: {
         || category === "mint"
         || methodLabel === "multicall";
 
-      if (categoryOverridesMethod) {
+      if (sentPositionLikeAssetToGauge) {
+        classification = "stake";
+      } else if (receivedPositionLikeAssetFromGauge) {
+        classification = "unstake";
+      } else if (isGauge && depositMethods.has(methodLabel)) {
+        classification = "stake";
+      } else if (isGauge && withdrawMethods.has(methodLabel)) {
+        classification = "unstake";
+      } else if (isGauge && category === "deposit") {
+        classification = "stake";
+      } else if (isGauge && category === "withdraw") {
+        classification = "unstake";
+      } else if (categoryOverridesMethod) {
         if (netUsdFlow > 0 || (hasInflow && !hasOutflow)) {
-          classification = withdrawKey;
+          classification = isGauge ? "unstake" : withdrawKey;
         } else if (netUsdFlow < 0 || (hasOutflow && !hasInflow)) {
-          classification = depositKey;
+          classification = isGauge ? "stake" : depositKey;
         } else if (category === "nft sale" || category === "burn") {
-          classification = withdrawKey;
+          classification = isGauge ? "stake" : withdrawKey;
         } else if (category === "mint" || category === "nft send") {
-          classification = depositKey;
+          classification = isGauge ? "unstake" : depositKey;
         } else {
           classification = "other";
         }
       } else if (depositMethods.has(methodLabel)) {
-        classification = depositKey;
+        classification = isGauge ? "stake" : depositKey;
       } else if (withdrawMethods.has(methodLabel)) {
-        classification = withdrawKey;
+        classification = isGauge ? "unstake" : withdrawKey;
       } else if (category === "deposit") {
-        classification = depositKey;
+        classification = isGauge ? "stake" : depositKey;
       } else if (category === "withdraw") {
-        classification = withdrawKey;
+        classification = isGauge ? "unstake" : withdrawKey;
       } else {
         // Counterparty is a known protocol but the action is unclear; trust net flow.
         if (netUsdFlow > 0) {
-          classification = withdrawKey;
+          classification = isGauge ? "unstake" : withdrawKey;
         } else if (netUsdFlow < 0) {
-          classification = depositKey;
+          classification = isGauge ? "stake" : depositKey;
         } else {
           classification = "other";
         }
@@ -767,7 +894,7 @@ export async function classifyRunLedgerEvents(input: {
       classification = "manual_withdrawal";
     } else if (category === "nft send" && hasOutflow) {
       classification = "manual_deposit";
-    } else if (isAirdropTagged || hasSpamInflow) {
+    } else if (isAirdropTagged || hasSpamInflow || (!counterpartyInfo && isReceiveLike && (isAirdropLikeMethod || hasUntrustedInflow || hasValuelessInflow))) {
       classification = "airdrop";
     } else if (category === "token receive" || category === "receive") {
       classification = "cash_in";

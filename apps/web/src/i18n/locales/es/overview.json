@@ -36,12 +36,93 @@
     "assets": "Activos",
     "activity": "Actividad reciente"
   },
+  "portfolioEvolution": {
+    "subtitle": "Crecimiento histórico y eventos clave del portfolio",
+    "legend": {
+      "series": "Series visibles",
+      "events": "Eventos del timeline"
+    },
+    "kpis": {
+      "initialValue": "Valor inicial",
+      "finalValue": "Valor final",
+      "absoluteChange": "Variación absoluta",
+      "changePct": "Variación %",
+      "accumulatedRewards": "Rewards acumuladas",
+      "detectedRebalances": "Rebalances detectados"
+    },
+    "events": {
+      "claim": "Claim",
+      "rebalance": "Rebalance",
+      "moveToIdle": "Move to idle",
+      "redeploy": "Redeploy",
+      "lock": "Lock",
+      "vote": "Vote"
+    },
+    "selectedPoint": {
+      "title": "Snapshot del punto seleccionado",
+      "empty": "Pasá por el gráfico para inspeccionar un punto",
+      "eventsTitle": "Eventos en este bucket",
+      "noEvents": "No hay eventos del timeline en este bucket",
+      "noEventDetail": "No hay detalle adicional disponible para este evento"
+    },
+    "footer": {
+      "accumulatedRewards": "Rewards acumuladas",
+      "capitalMoved": "Capital movido entre estados",
+      "latestEvent": "Último evento",
+      "maxIdle": "Máx. idle registrado"
+    }
+  },
   "sources": {
     "recent_provider_data": "Datos recientes de proveedores",
     "partial_fallback": "Fallback parcial",
     "analyzed_history": "Actividad analizada"
   },
   "distribution": {
+    "sectionSubtitle": "Composición actual del capital valorizado en USD",
+    "kpiLabel": "Capital total valorizado",
+    "statusBadges": {
+      "coveragePartial": "Cobertura parcial",
+      "coverageRecent": "Cobertura reciente",
+      "coverageUnknown": "Cobertura desconocida",
+      "fallbackPartial": "Fallback parcial",
+      "historicalPending": "Histórico pendiente",
+      "analyzedHistory": "Historial analizado"
+    },
+    "chart": {
+      "title": "Asignación de capital",
+      "hint": "Hacé clic en un segmento para inspeccionar el mix de activos subyacentes del bucket seleccionado.",
+      "legendOuter": "Dona exterior: categorías principales de capital.",
+      "legendInner": "Dona interior: activos subyacentes del segmento seleccionado."
+    },
+    "summary": {
+      "title": "Distribución por categoría"
+    },
+    "assetsPanel": {
+      "title": "Activos subyacentes de: {{segment}}",
+      "idleTitle": "Activos idle",
+      "idleEmptyDescription": "Actualmente no hay activos idle incluidos en los totales por defecto.",
+      "emptyTitle": "Breakdown subyacente no disponible",
+      "emptyDescription": "La composición a nivel de token todavía no está disponible para este segmento.",
+      "columns": {
+        "asset": "Activo",
+        "amount": "Cantidad",
+        "value": "Valor (USD)"
+      },
+      "segmentTotal": "Total del segmento"
+    },
+    "footer": {
+      "excludedAssets": "{{count}} activos excluidos de los totales por defecto",
+      "suspiciousAssets": "Activos sospechosos excluidos por defecto",
+      "lowConfidenceAssets": "Activos de baja confianza ocultos por defecto",
+      "excludedValuation": "{{value}} de valor excluido con precio",
+      "excludedValuationUnavailable": "Valor excluido con precio no disponible",
+      "partialValuation": "La valoración de la cartera es parcial",
+      "currentCoverage": "Cobertura actual: {{status}}"
+    },
+    "center": {
+      "ofPortfolio": "del total del portfolio",
+      "noBreakdown": "Breakdown no disponible"
+    },
     "slices": {
       "idle": "Activos idle",
       "manualDeposits": "Depósitos manuales",
@@ -51,6 +132,9 @@
     },
     "composition": {
       "idleDetailedBelow": "Los activos idle siguen detallados en la sección de Activos de abajo.",
+      "chartTitle": "Mix de tokens en {{segment}}",
+      "chartSubtitleEstimated": "La dona usa el peso estimado en USD actual y las filas muestran los totales bloqueados por token.",
+      "chartSubtitleAmounts": "La dona y las filas muestran los montos agregados por token para este segmento.",
       "tokenAmount": "{{symbol}} {{amount}}",
       "tokenAmountUnavailable": "{{symbol}} cantidad no disponible"
     }
@@ -96,11 +180,14 @@
   },
   "activity": {
     "unclassified": "Actividad sin clasificar",
+    "openInExplorer": "Abrir transacción en el explorador",
     "classifications": {
       "cashIn": "Cash in",
       "cashOut": "Cash out",
       "swap": "Swap",
       "rebalance": "Rebalance",
+      "airdrop": "Airdrop",
+      "approve": "Aprobación",
       "deposit": "Depósito",
       "withdraw": "Retiro",
       "stake": "Stake",

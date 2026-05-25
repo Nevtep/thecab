@@ -145,6 +145,15 @@ export type OverviewViewModel = {
       idleValueUsd: number | null;
       rewardValueUsd: number | null;
     }>;
+    events: Array<{
+      id: string;
+      type: "claim" | "rebalance" | "move_to_idle" | "redeploy" | "lock" | "vote";
+      occurredAt: string;
+      capturedAt: string;
+      detail: string | null;
+      txHash: string | null;
+      rewardValueUsd: number | null;
+    }>;
   };
   distribution: {
     source: "recent_provider_data" | "partial_fallback" | "analyzed_history";

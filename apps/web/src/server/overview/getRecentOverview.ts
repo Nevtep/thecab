@@ -20,6 +20,7 @@ import {
   readRecentOverviewAnalyzedActivity,
   readOverviewPricePointsInRange,
   readOverviewPortfolioSnapshots,
+  readOverviewRealizedRewardEvents,
   insertOverviewCoverageReport,
   insertOverviewPortfolioSnapshot,
   insertOverviewRawProviderRecord,
@@ -27,7 +28,7 @@ import {
   upsertOverviewFreshness,
   upsertOverviewPricePoint,
 } from "@/server/overview/overview.repository";
-import { buildSnapshotValueLookup, toBucketTimestamp } from "@/server/overview/chart-snapshots";
+import { buildRewardValueLookup, buildSnapshotValueLookup, toBucketTimestamp } from "@/server/overview/chart-snapshots";
 import type {
   OverviewChartPoint,
   OverviewCoverageReasonCode,
@@ -43,6 +44,12 @@ const OVERVIEW_BUCKET_CONFIG: Record<OverviewRange, { granularity: "hour" | "day
   "24h": { granularity: "hour", bucketCount: 24 },
   "7d": { granularity: "day", bucketCount: 7 },
   "30d": { granularity: "day", bucketCount: 30 },
+};
+
+const OVERVIEW_ACTIVITY_LIMIT: Record<OverviewRange, number> = {
+  "24h": 16,
+  "7d": 28,
+  "30d": 48,
 };
 
 const NATIVE_ETH_SENTINEL = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
@@ -68,9 +75,18 @@ function canUseAnalyzedOverviewActivity(status: OverviewResponse["analysis"]["st
   return status === "ready" || status === "stale";
 }
 
+type OverviewDepositActivityContext = NonNullable<
+  Awaited<ReturnType<typeof readRecentOverviewAnalyzedActivity>>[number]["depositContext"]
+>;
+
+type OverviewApprovalActivityContext = NonNullable<
+  Awaited<ReturnType<typeof readRecentOverviewAnalyzedActivity>>[number]["approvalContext"]
+>;
+
 function summarizeActivityMovementSymbols(
   movements: Array<{
     directionIn: boolean;
+    amountUsd: string | number | null;
     metadataJson: Record<string, unknown>;
   }>,
 ) {
@@ -99,11 +115,59 @@ function summarizeActivityMovementSymbols(
   return segments.length > 0 ? segments.join(" · ") : null;
 }
 
+function sumMovementUsd(
+  movements: Array<{
+    directionIn: boolean;
+    amountUsd: string | number | null;
+  }>,
+  directionIn: boolean,
+) {
+  return movements.reduce((sum, movement) => {
+    if (movement.directionIn !== directionIn) {
+      return sum;
+    }
+
+    return sum + (asNumber(movement.amountUsd) ?? 0);
+  }, 0);
+}
+
+function isAeroMovement(input: {
+  tokenAddress: string | null;
+  metadataJson: Record<string, unknown>;
+}) {
+  const normalizedAddress = input.tokenAddress?.toLowerCase() ?? null;
+  const normalizedSymbol = asString(input.metadataJson.symbol)?.trim().toLowerCase() ?? null;
+  const normalizedName = asString(input.metadataJson.name)?.trim().toLowerCase() ?? null;
+
+  return normalizedAddress === BASE_AERO_ADDRESS || normalizedSymbol === "aero" || normalizedName === "aerodrome";
+}
+
+function resolveAeroRewardValueUsd(
+  movements: Array<{
+    tokenAddress: string;
+    directionIn: boolean;
+    amountUsd: string | number | null;
+    metadataJson: Record<string, unknown>;
+  }>,
+) {
+  const rewardValueUsd = movements.reduce((sum, movement) => {
+    if (!movement.directionIn || !isAeroMovement(movement)) {
+      return sum;
+    }
+
+    return sum + (asNumber(movement.amountUsd) ?? 0);
+  }, 0);
+
+  return rewardValueUsd > 0 ? rewardValueUsd : null;
+}
+
 function resolveOverviewActivityDisplayClassification(input: {
   classification: string | null;
   metadataJson: Record<string, unknown>;
   movements: Array<{
     directionIn: boolean;
+    amountUsd: string | number | null;
+    metadataJson: Record<string, unknown>;
   }>;
 }) {
   const text = [
@@ -117,13 +181,45 @@ function resolveOverviewActivityDisplayClassification(input: {
     .toLowerCase();
   const hasIncoming = input.movements.some((movement) => movement.directionIn);
   const hasOutgoing = input.movements.some((movement) => !movement.directionIn);
+  const incomingUsd = sumMovementUsd(input.movements, true);
+  const outgoingUsd = sumMovementUsd(input.movements, false);
+  const grossUsd = incomingUsd + outgoingUsd;
+  const netUsd = Math.abs(incomingUsd - outgoingUsd);
+  const hasBalancedMixedFlow = hasIncoming && hasOutgoing && grossUsd > 0 && netUsd <= grossUsd * 0.35;
 
   if (text.includes("rebalance") || input.classification?.startsWith("rebalance_")) {
     return "rebalance";
   }
 
+  if (text.includes("airdrop") || input.classification === "airdrop") {
+    return "airdrop";
+  }
+
+  if (text.includes("approve") || input.classification === "approve") {
+    return "approve";
+  }
+
   if (text.includes("claim") || text.includes("collect") || input.classification === "claim") {
     return "claim";
+  }
+
+  if (
+    hasBalancedMixedFlow &&
+    !text.includes("swap") &&
+    !text.includes("approve") &&
+    !text.includes("airdrop") &&
+    [
+      "manual_deposit",
+      "strategy_deposit",
+      "manual_withdrawal",
+      "strategy_withdraw",
+      "deposit",
+      "withdraw",
+      "stake",
+      "unstake",
+    ].includes(input.classification ?? "")
+  ) {
+    return "rebalance";
   }
 
   if (text.includes("unstake")) {
@@ -184,6 +280,10 @@ function getOverviewActivityLabelKey(classification: string) {
       return "overview:activity.classifications.swap";
     case "rebalance":
       return "overview:activity.classifications.rebalance";
+    case "airdrop":
+      return "overview:activity.classifications.airdrop";
+    case "approve":
+      return "overview:activity.classifications.approve";
     case "deposit":
       return "overview:activity.classifications.deposit";
     case "withdraw":
@@ -201,20 +301,90 @@ function getOverviewActivityLabelKey(classification: string) {
   }
 }
 
+export function buildOverviewDepositMintDetail(input: {
+  classification: string;
+  depositContext: OverviewDepositActivityContext | null;
+}) {
+  if (input.classification !== "deposit" || !input.depositContext) {
+    return null;
+  }
+
+  if (input.depositContext.protocol !== "aerodrome" || !input.depositContext.tokenId) {
+    return null;
+  }
+
+  const symbolPair = [input.depositContext.primaryTokenSymbol, input.depositContext.secondaryTokenSymbol]
+    .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
+    .join(" / ");
+  const poolLabel = input.depositContext.poolLabel?.trim() || symbolPair || null;
+
+  return poolLabel ? `${poolLabel} · #${input.depositContext.tokenId}` : `#${input.depositContext.tokenId}`;
+}
+
+export function buildOverviewApprovalDetail(input: {
+  classification: string;
+  approvalContext: OverviewApprovalActivityContext | null;
+}) {
+  if (input.classification !== "approve" || !input.approvalContext) {
+    return null;
+  }
+
+  if (
+    input.approvalContext.protocol !== "aerodrome"
+    || !input.approvalContext.spenderContractType.toLowerCase().includes("gauge")
+    || !input.approvalContext.tokenId
+  ) {
+    return null;
+  }
+
+  const poolLabel = input.approvalContext.poolLabel?.trim() || null;
+  return poolLabel
+    ? `Approved LP NFT #${input.approvalContext.tokenId} for ${poolLabel} gauge`
+    : `Approved LP NFT #${input.approvalContext.tokenId} for gauge`;
+}
+
 function buildOverviewAnalyzedActivityDetail(input: {
+  classification: string;
   metadataJson: Record<string, unknown>;
+  depositContext: OverviewDepositActivityContext | null;
+  approvalContext: OverviewApprovalActivityContext | null;
   movements: Array<{
     directionIn: boolean;
+    amountUsd: string | number | null;
     metadataJson: Record<string, unknown>;
   }>;
 }) {
+  const depositMintDetail = buildOverviewDepositMintDetail({
+    classification: input.classification,
+    depositContext: input.depositContext,
+  });
+  if (depositMintDetail) {
+    return depositMintDetail;
+  }
+
+  const approvalDetail = buildOverviewApprovalDetail({
+    classification: input.classification,
+    approvalContext: input.approvalContext,
+  });
+  if (approvalDetail) {
+    return approvalDetail;
+  }
+
   const summary = asString(input.metadataJson.summary)?.trim();
-  if (summary) {
+  const category = asString(input.metadataJson.category)?.trim();
+  const normalizedCategory = category?.toLowerCase() ?? null;
+  const summaryLooksMisleadingForGaugeStaking =
+    input.classification === "stake"
+      ? normalizedCategory === "nft sale" || normalizedCategory === "nft send" || normalizedCategory === "burn"
+      : input.classification === "unstake"
+        ? normalizedCategory === "mint" || normalizedCategory === "nft receive"
+        : false;
+
+  if (summary && !summaryLooksMisleadingForGaugeStaking) {
     return summary;
   }
 
   const methodLabel = asString(input.metadataJson.methodLabel)?.trim();
-  const category = asString(input.metadataJson.category)?.trim();
   const movementSummary = summarizeActivityMovementSymbols(input.movements);
 
   return [methodLabel ?? category ?? null, movementSummary]
@@ -245,7 +415,10 @@ function buildOverviewActivityFromAnalyzedRows(input: {
         classification,
         labelKey: getOverviewActivityLabelKey(classification),
         detail: buildOverviewAnalyzedActivityDetail({
+          classification,
           metadataJson: row.metadataJson,
+          depositContext: row.depositContext,
+          approvalContext: row.approvalContext,
           movements: row.movements,
         }),
         txHash: row.txHash,
@@ -257,6 +430,134 @@ function buildOverviewActivityFromAnalyzedRows(input: {
       } satisfies OverviewResponse["activity"]["items"][number];
     }),
   };
+}
+
+function mapOverviewActivityItemToChartEventType(input: {
+  classification: string | null;
+  eventType: string;
+  detail: string | null;
+  rewardValueUsd: number | null;
+}) {
+  if ((input.rewardValueUsd ?? 0) > 0 || input.classification === "claim") {
+    return "claim" as const;
+  }
+
+  if (input.classification === "rebalance") {
+    return "rebalance" as const;
+  }
+
+  if (input.classification === "deposit" || input.classification === "stake") {
+    return "redeploy" as const;
+  }
+
+  if (input.classification === "withdraw" || input.classification === "unstake") {
+    return "move_to_idle" as const;
+  }
+
+  if (input.classification === "governance") {
+    const text = `${input.eventType} ${input.detail ?? ""}`.toLowerCase();
+    if (text.includes("vote")) {
+      return "vote" as const;
+    }
+
+    if (text.includes("lock")) {
+      return "lock" as const;
+    }
+  }
+
+  return null;
+}
+
+function isCoreRebalanceSwapCandidate(input: {
+  row: Awaited<ReturnType<typeof readRecentOverviewAnalyzedActivity>>[number];
+  rows: Awaited<ReturnType<typeof readRecentOverviewAnalyzedActivity>>;
+  classification: string;
+}) {
+  if (input.classification !== "swap") {
+    return false;
+  }
+
+  const movementSymbols = Array.from(new Set(
+    input.row.movements
+      .map((movement) => asString(movement.metadataJson.symbol)?.trim().toLowerCase() ?? null)
+      .filter((symbol): symbol is string => Boolean(symbol)),
+  ));
+  const coreSymbols = new Set(["usdc", "weth", "eth", "cbbtc", "aero"]);
+
+  if (movementSymbols.length < 2 || movementSymbols.some((symbol) => !coreSymbols.has(symbol))) {
+    return false;
+  }
+
+  return input.rows.some((candidate) => {
+    if (candidate.id === input.row.id) {
+      return false;
+    }
+
+    const candidateClassification = resolveOverviewActivityDisplayClassification({
+      classification: candidate.classification,
+      metadataJson: candidate.metadataJson,
+      movements: candidate.movements,
+    });
+    if (!["deposit", "withdraw", "stake", "unstake", "rebalance"].includes(candidateClassification)) {
+      return false;
+    }
+
+    const deltaMs = Math.abs(candidate.occurredAt.getTime() - input.row.occurredAt.getTime());
+    return deltaMs <= 20 * 60 * 1000;
+  });
+}
+
+function buildOverviewChartEvents(input: {
+  rows: Awaited<ReturnType<typeof readRecentOverviewAnalyzedActivity>>;
+  range: OverviewRange;
+  rewardValueByTxHash?: Map<string, number>;
+}) {
+  const granularity = getRecentOverviewBucketConfig(input.range).granularity;
+
+  return input.rows.flatMap((row) => {
+    const baseClassification = resolveOverviewActivityDisplayClassification({
+      classification: row.classification,
+      metadataJson: row.metadataJson,
+      movements: row.movements,
+    });
+    const classification = isCoreRebalanceSwapCandidate({
+      row,
+      rows: input.rows,
+      classification: baseClassification,
+    })
+      ? "rebalance"
+      : baseClassification;
+    const detail = buildOverviewAnalyzedActivityDetail({
+      classification,
+      metadataJson: row.metadataJson,
+      depositContext: row.depositContext,
+      approvalContext: row.approvalContext,
+      movements: row.movements,
+    });
+    const rewardValueUsd = classification === "claim"
+      ? input.rewardValueByTxHash?.get(row.txHash.toLowerCase()) ?? resolveAeroRewardValueUsd(row.movements)
+      : null;
+    const type = mapOverviewActivityItemToChartEventType({
+      classification,
+      eventType: row.eventType,
+      detail,
+      rewardValueUsd,
+    });
+
+    if (!type) {
+      return [];
+    }
+
+    return [{
+      id: row.id,
+      type,
+      occurredAt: row.occurredAt.toISOString(),
+      capturedAt: toBucketTimestamp(row.occurredAt.toISOString(), granularity),
+      detail,
+      txHash: row.txHash,
+      rewardValueUsd,
+    }] satisfies OverviewResponse["chart"]["events"];
+  });
 }
 
 function buildDistributionCompositionLabel(
@@ -372,6 +673,7 @@ export function createEmptyRecentOverviewResponse(input: OverviewRequest): Overv
       range: input.range,
       hasRewardMarkers: false,
       points: [],
+      events: [],
     },
     distribution: {
       source: "partial_fallback",
@@ -539,7 +841,7 @@ export async function getRecentOverviewActivity(input: OverviewRequest): Promise
     const analyzedActivityRows = await readRecentOverviewAnalyzedActivity({
       walletAddress: input.walletAddress,
       chainId: input.chainId,
-      limit: 10,
+      limit: OVERVIEW_ACTIVITY_LIMIT[input.range],
     });
 
     if (analyzedActivityRows.length > 0) {
@@ -770,7 +1072,10 @@ export async function getRecentOverviewChart(input: OverviewRequest): Promise<Ov
 
 export async function getRecentOverviewCurrentState(input: OverviewRequest): Promise<OverviewResponse> {
   const response = createEmptyRecentOverviewResponse(input);
-  const [tokensResult, latestRun, freshness, protocolMetadata] = await Promise.all([
+  const now = new Date();
+  const bucketTimestamps = buildBucketTimestamps(input.range, now);
+  const rangeStartAt = new Date(bucketTimestamps[0] ?? now.toISOString());
+  const [tokensResult, latestRun, freshness, protocolMetadata, realizedRewardRows] = await Promise.all([
     getWalletTokens(input.walletAddress, input.chainId).then(
       (value) => ({ status: "fulfilled" as const, value }),
       (error) => ({ status: "rejected" as const, reason: sanitizeProviderError(error) }),
@@ -778,14 +1083,19 @@ export async function getRecentOverviewCurrentState(input: OverviewRequest): Pro
     getLatestAnalysisRun(input.walletAddress, input.chainId),
     readOverviewFreshness(input),
     readKnownProtocolContracts({ chainId: input.chainId }),
+    readOverviewRealizedRewardEvents({
+      walletAddress: input.walletAddress,
+      chainId: input.chainId,
+      startAt: rangeStartAt,
+      endAt: now,
+    }),
   ]);
 
   if (tokensResult.status === "rejected") {
     return getRecentOverviewCurrentStateFallback(input);
   }
-
-  const now = new Date();
   const tokens = tokensResult.value.result ?? [];
+  const estimatedRealizedRewardsUsd = sumRewardEventValueUsd(realizedRewardRows);
   response.analysis = createOverviewAnalysisState({ latestRun, freshness });
 
   await insertOverviewRawProviderRecord({
@@ -949,6 +1259,7 @@ export async function getRecentOverviewCurrentState(input: OverviewRequest): Pro
     netPortfolioValueUsd: null,
     deployedValueUsd: null,
     idleValueUsd,
+    estimatedRealizedRewardsUsd,
     exclusions: exclusionSummary,
   };
   response.assets = {
@@ -981,6 +1292,7 @@ export async function getRecentOverviewCurrentState(input: OverviewRequest): Pro
           label: "Idle assets",
           valueUsd: idleValueUsd,
           coverageStatus,
+          composition: null,
         }]
       : [],
   };
@@ -1065,7 +1377,9 @@ function buildChartPoints(
     totalValueUsd: number | null;
     deployedValueUsd: number | null;
     idleValueUsd: number | null;
+    rewardValueUsd: number | null;
   }>,
+  rewardValuesByBucket: Map<string, number>,
   estimatedDeployedValueByBucket: Map<string, number | null>,
   hasProtocolPositions: boolean,
   hasPartialProtocolHistory: boolean,
@@ -1095,7 +1409,15 @@ function buildChartPoints(
         totalValueUsd,
         deployedValueUsd,
         idleValueUsd: snapshotPoint.idleValueUsd,
-        rewardValueUsd: null,
+        rewardValueUsd:
+          (() => {
+            const derivedRewardValueUsd = rewardValuesByBucket.get(bucketTimestamp) ?? null;
+            if (derivedRewardValueUsd !== null && derivedRewardValueUsd > 0) {
+              return derivedRewardValueUsd;
+            }
+
+            return snapshotPoint.rewardValueUsd ?? null;
+          })(),
       };
     }
 
@@ -1130,7 +1452,7 @@ function buildChartPoints(
       totalValueUsd,
       deployedValueUsd: estimatedDeployedValueUsd,
       idleValueUsd: hasIdleValue ? idleValueUsd : null,
-      rewardValueUsd: null,
+      rewardValueUsd: rewardValuesByBucket.get(bucketTimestamp) ?? null,
     };
   });
 
@@ -1761,6 +2083,10 @@ function sumNullableUsd(values: Array<number | null>) {
   return pricedValues.reduce((sum, value) => sum + value, 0);
 }
 
+function sumRewardEventValueUsd(values: Array<{ amountUsd: string | number | null }>) {
+  return values.reduce((sum, row) => sum + (asNumber(row.amountUsd) ?? 0), 0);
+}
+
 function toOverviewCoverageStatus(
   status: OverviewResponse["protocolPositions"]["coverageStatus"],
 ): OverviewResponse["distribution"]["slices"][number]["coverageStatus"] {
@@ -1894,13 +2220,27 @@ async function getRecentOverviewChartFallback(input: OverviewRequest): Promise<O
   const now = new Date();
   const bucketConfig = getRecentOverviewBucketConfig(input.range);
   const bucketTimestamps = buildBucketTimestamps(input.range, now);
-  const historicalSnapshotRows = await readOverviewPortfolioSnapshots({
-    walletAddress: input.walletAddress,
-    chainId: input.chainId,
-    startAt: new Date(bucketTimestamps[0] ?? now.toISOString()),
-    endAt: now,
-  });
+  const rangeStartAt = new Date(bucketTimestamps[0] ?? now.toISOString());
+  const [historicalSnapshotRows, realizedRewardRows] = await Promise.all([
+    readOverviewPortfolioSnapshots({
+      walletAddress: input.walletAddress,
+      chainId: input.chainId,
+      startAt: rangeStartAt,
+      endAt: now,
+    }),
+    readOverviewRealizedRewardEvents({
+      walletAddress: input.walletAddress,
+      chainId: input.chainId,
+      startAt: rangeStartAt,
+      endAt: now,
+    }),
+  ]);
   const coverageReasonCodes = buildProviderPartialReasonCodes(response.coverage.reasonCodes);
+  const rewardValuesByBucket = buildRewardValueLookup({
+    granularity: bucketConfig.granularity,
+    rewardRows: realizedRewardRows,
+  });
+  const estimatedRealizedRewardsUsd = sumRewardEventValueUsd(realizedRewardRows);
   const snapshotValuesByBucket = buildSnapshotValueLookup({
     range: input.range,
     granularity: bucketConfig.granularity,
@@ -1910,6 +2250,7 @@ async function getRecentOverviewChartFallback(input: OverviewRequest): Promise<O
       totalValueUsd: response.metrics.netPortfolioValueUsd,
       deployedValueUsd: response.metrics.deployedValueUsd,
       idleValueUsd: response.metrics.idleValueUsd,
+      rewardValueUsd: rewardValuesByBucket.get(toBucketTimestamp(now.toISOString(), bucketConfig.granularity)) ?? null,
     },
   });
   const chartPoints: OverviewChartPoint[] = bucketTimestamps.map((bucketTimestamp) => {
@@ -1920,9 +2261,18 @@ async function getRecentOverviewChartFallback(input: OverviewRequest): Promise<O
       totalValueUsd: snapshot?.totalValueUsd ?? null,
       deployedValueUsd: snapshot?.deployedValueUsd ?? null,
       idleValueUsd: snapshot?.idleValueUsd ?? null,
-      rewardValueUsd: null,
+      rewardValueUsd:
+        (() => {
+          const derivedRewardValueUsd = rewardValuesByBucket.get(bucketTimestamp) ?? null;
+          if (derivedRewardValueUsd !== null && derivedRewardValueUsd > 0) {
+            return derivedRewardValueUsd;
+          }
+
+          return snapshot?.rewardValueUsd ?? null;
+        })(),
     };
   });
+  const hasRewardMarkers = chartPoints.some((point) => (point.rewardValueUsd ?? 0) > 0);
   const hasChartValues = chartPoints.some((point) =>
     point.totalValueUsd !== null || point.deployedValueUsd !== null || point.idleValueUsd !== null,
   );
@@ -1934,6 +2284,7 @@ async function getRecentOverviewChartFallback(input: OverviewRequest): Promise<O
       label: "Idle assets",
       valueUsd: response.metrics.idleValueUsd,
       coverageStatus: "partial",
+      composition: null,
     });
   }
 
@@ -1943,6 +2294,7 @@ async function getRecentOverviewChartFallback(input: OverviewRequest): Promise<O
       label: "Deployed positions",
       valueUsd: response.metrics.deployedValueUsd,
       coverageStatus: "partial",
+      composition: null,
     });
   }
 
@@ -1962,6 +2314,7 @@ async function getRecentOverviewChartFallback(input: OverviewRequest): Promise<O
     ...response.metrics,
     coverageStatus: "partial",
     coverageReasonCodes,
+    estimatedRealizedRewardsUsd,
   };
   response.chart = {
     ...response.chart,
@@ -1969,7 +2322,9 @@ async function getRecentOverviewChartFallback(input: OverviewRequest): Promise<O
     coverageStatus: "partial",
     coverageReasonCodes,
     range: input.range,
+    hasRewardMarkers,
     points: hasChartValues ? chartPoints : [],
+    events: [],
   };
   response.distribution = {
     ...response.distribution,
@@ -2093,7 +2448,11 @@ function getHistoricalBaselinePrice(
 
 export async function getRecentOverview(input: OverviewRequest): Promise<OverviewResponse> {
   const response = createEmptyRecentOverviewResponse(input);
-  const [tokensResult, historyResult, defiPositionsResult, latestRun, freshness, protocolMetadata] = await Promise.all([
+  const now = new Date();
+  const bucketConfig = getRecentOverviewBucketConfig(input.range);
+  const bucketTimestamps = buildBucketTimestamps(input.range, now);
+  const rangeStartAt = new Date(bucketTimestamps[0] ?? now.toISOString());
+  const [tokensResult, historyResult, defiPositionsResult, latestRun, freshness, protocolMetadata, realizedRewardRows] = await Promise.all([
     getWalletTokens(input.walletAddress, input.chainId).then(
       (value) => ({ status: "fulfilled" as const, value }),
       (error) => ({ status: "rejected" as const, reason: sanitizeProviderError(error) }),
@@ -2109,6 +2468,12 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
     getLatestAnalysisRun(input.walletAddress, input.chainId),
     readOverviewFreshness(input),
     readKnownProtocolContracts({ chainId: input.chainId }),
+    readOverviewRealizedRewardEvents({
+      walletAddress: input.walletAddress,
+      chainId: input.chainId,
+      startAt: rangeStartAt,
+      endAt: now,
+    }),
   ]);
 
   if (
@@ -2118,21 +2483,20 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
   ) {
     throw new Error("PROVIDER_REQUEST_FAILED");
   }
-
-  const now = new Date();
   response.analysis = createOverviewAnalysisState({ latestRun, freshness });
 
   const analyzedActivityRows = canUseAnalyzedOverviewActivity(response.analysis.status)
     ? await readRecentOverviewAnalyzedActivity({
         walletAddress: input.walletAddress,
         chainId: input.chainId,
-        limit: 10,
+        limit: OVERVIEW_ACTIVITY_LIMIT[input.range],
       })
     : [];
 
   const tokens = tokensResult.status === "fulfilled" ? (tokensResult.value.result ?? []) : [];
   const history = historyResult.status === "fulfilled" ? (historyResult.value.result ?? []) : [];
   const defiPositions = defiPositionsResult.status === "fulfilled" ? defiPositionsResult.value : [];
+  const estimatedRealizedRewardsUsd = sumRewardEventValueUsd(realizedRewardRows);
 
   const tokenPricingContexts = tokens.map((token) => {
     const tokenAddress = asString(token.token_address)?.toLowerCase() ?? null;
@@ -2226,12 +2590,10 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
     priceLookup,
   });
 
-  const bucketConfig = getRecentOverviewBucketConfig(input.range);
-  const bucketTimestamps = buildBucketTimestamps(input.range, now);
   const historicalSnapshotRows = await readOverviewPortfolioSnapshots({
     walletAddress: input.walletAddress,
     chainId: input.chainId,
-    startAt: new Date(bucketTimestamps[0] ?? now.toISOString()),
+    startAt: rangeStartAt,
     endAt: now,
   });
 
@@ -2445,8 +2807,18 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
       totalValueUsd,
       deployedValueUsd,
       idleValueUsd,
+      rewardValueUsd: null,
     },
   });
+  const rewardValuesByBucket = buildRewardValueLookup({
+    granularity: bucketConfig.granularity,
+    rewardRows: realizedRewardRows,
+  });
+  const rewardValueByTxHash = new Map(
+    realizedRewardRows
+      .filter((row) => (asNumber(row.amountUsd) ?? 0) > 0)
+      .map((row) => [row.txHash.toLowerCase(), asNumber(row.amountUsd) ?? 0] as const),
+  );
 
   const chartSeries = buildChartPoints(
     bucketTimestamps,
@@ -2465,10 +2837,12 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
       }))
       .filter((row) => row.tokenAddress.length > 0),
     snapshotValuesByBucket,
+    rewardValuesByBucket,
     historicalProtocolValues.estimatedDeployedValueByBucket,
     protocolPositions.block.rows.length > 0,
     historicalProtocolValues.hasPartialHistory,
   );
+  const hasRewardMarkers = chartSeries.points.some((point) => (point.rewardValueUsd ?? 0) > 0);
 
   const firstChartValue = chartSeries.points.find((point) => point.totalValueUsd !== null)?.totalValueUsd ?? null;
   const lastChartValue = [...chartSeries.points]
@@ -2527,6 +2901,7 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
     idleValueUsd,
     changeOverSelectedPeriodPct:
       protocolPositions.block.rows.length > 0 ? null : calculatePercentChange(lastChartValue, firstChartValue),
+    estimatedRealizedRewardsUsd,
     manualDepositsValueUsd,
     automatedStrategiesValueUsd,
     residualAttributedValueUsd,
@@ -2539,7 +2914,13 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
     source: chartPartial ? "partial_fallback" : "recent_provider_data",
     coverageStatus: chartPartial ? "partial" : coverageStatus,
     coverageReasonCodes: chartPartial ? uniqueCoverageReasonCodes : uniqueCoverageReasonCodes,
+    hasRewardMarkers,
     points: chartSeries.points,
+    events: buildOverviewChartEvents({
+      rows: analyzedActivityRows,
+      range: input.range,
+      rewardValueByTxHash,
+    }),
   };
 
   await Promise.all(
@@ -2559,6 +2940,7 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
             snapshotKind: "range_bucket",
             coverageStatus: response.chart.coverageStatus,
             coverageReasonCodes: uniqueCoverageReasonCodes,
+            rewardValueUsd: point.rewardValueUsd,
           },
         }),
       ),
