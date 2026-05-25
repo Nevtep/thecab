@@ -6,7 +6,7 @@ import {
   readRunSliceCoverage,
 } from "@/server/analysis/analysis-run.repository";
 import { listRunSlices } from "@/server/analysis/analysis-slice.repository";
-import { computeSnapshots } from "@/server/analysis/computeSnapshots";
+import { computeSnapshots, type WalletTokenSnapshot } from "@/server/analysis/computeSnapshots";
 import { upsertProcessingCursor } from "@/server/analysis/processing-cursor.repository";
 import { upsertOverviewFreshness } from "@/server/overview/overview.repository";
 
@@ -30,6 +30,25 @@ export const phaseFinalizeTask = task({
 
     const capturedAt = new Date();
     const slices = await listRunSlices(payload.runId);
+    const walletTokensRaw = Array.isArray(run.metadataJson.latestWalletTokens)
+      ? (run.metadataJson.latestWalletTokens as unknown[])
+      : [];
+    const walletTokens: WalletTokenSnapshot[] = walletTokensRaw
+      .filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
+      .map((item) => ({
+        tokenAddress: String(item.tokenAddress ?? "").toLowerCase(),
+        balanceRaw: String(item.balanceRaw ?? "0"),
+        decimals: typeof item.decimals === "number" ? item.decimals : null,
+        symbol: typeof item.symbol === "string" ? item.symbol : null,
+        name: typeof item.name === "string" ? item.name : null,
+        nativeToken: item.nativeToken === true,
+        possibleSpam: item.possibleSpam === true,
+        verifiedContract: item.verifiedContract === true,
+        usdPrice: typeof item.usdPrice === "number" ? item.usdPrice : null,
+        usdValue: typeof item.usdValue === "number" ? item.usdValue : null,
+      }))
+      .filter((token) => token.tokenAddress.length > 0);
+
     const snapshot = await computeSnapshots({
       walletAddress: payload.walletAddress,
       chainId: payload.chainId,
@@ -44,6 +63,7 @@ export const phaseFinalizeTask = task({
             valueUsd: Number(item.valueUsd ?? 0),
           }))
         : [],
+      walletTokens,
     });
     const sliceCoverage = await readRunSliceCoverage(payload.runId);
 

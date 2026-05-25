@@ -38,7 +38,8 @@
   },
   "sources": {
     "recent_provider_data": "Recent provider data",
-    "partial_fallback": "Partial fallback"
+    "partial_fallback": "Partial fallback",
+    "analyzed_history": "Analyzed activity"
   },
   "distribution": {
     "slices": {
@@ -47,6 +48,11 @@
       "automatedStrategies": "Automated strategies",
       "governanceLocks": "Governance locks",
       "stakedLp": "Staked LP"
+    },
+    "composition": {
+      "idleDetailedBelow": "Idle assets remain detailed in the Assets section below.",
+      "tokenAmount": "{{symbol}} {{amount}}",
+      "tokenAmountUnavailable": "{{symbol}} amount unavailable"
     }
   },
   "status": {
@@ -89,7 +95,20 @@
     }
   },
   "activity": {
-    "unclassified": "Unclassified activity"
+    "unclassified": "Unclassified activity",
+    "classifications": {
+      "cashIn": "Cash in",
+      "cashOut": "Cash out",
+      "swap": "Swap",
+      "rebalance": "Rebalance",
+      "deposit": "Deposit",
+      "withdraw": "Withdraw",
+      "stake": "Stake",
+      "unstake": "Unstake",
+      "claim": "Claim",
+      "governance": "Governance",
+      "other": "Other"
+    }
   },
   "assets": {
     "positionValue": "Position value: {{value}}",

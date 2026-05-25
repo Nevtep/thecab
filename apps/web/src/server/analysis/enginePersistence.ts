@@ -11,6 +11,7 @@ import {
   poolMetricsSnapshots,
   pools,
   portfolioSnapshots,
+  protocolContracts,
   rewardEvents,
   strategies,
   strategyExposures,
@@ -171,6 +172,8 @@ function buildAssetMovementRows(input: {
         name: asString(record.token_name) ?? asString(record.name),
         fromAddress,
         toAddress,
+        possibleSpam: record.possible_spam === true || record.verified_contract === false,
+        verifiedContract: record.verified_contract === true,
       },
     }];
   });
@@ -571,52 +574,212 @@ export async function classifyRunLedgerEvents(input: {
   chainId: number;
   txHashes: string[];
   runId: string;
+  spamTokenAddresses?: string[];
 }) {
   if (input.txHashes.length === 0) {
     return 0;
   }
 
   const db = getDb();
-  const rows = await db
-    .select({
-      id: ledgerEvents.id,
-      metadataJson: ledgerEvents.metadataJson,
-    })
-    .from(ledgerEvents)
-    .where(
-      and(
-        eq(ledgerEvents.walletAddress, input.walletAddress.toLowerCase()),
-        eq(ledgerEvents.chainId, input.chainId),
-        inArray(ledgerEvents.txHash, input.txHashes.map((txHash) => txHash.toLowerCase())),
+  const walletAddress = input.walletAddress.toLowerCase();
+  const txHashesLower = input.txHashes.map((txHash) => txHash.toLowerCase());
+  const [rows, protocolContractRows, movementRows] = await Promise.all([
+    db
+      .select({
+        id: ledgerEvents.id,
+        txHash: ledgerEvents.txHash,
+        metadataJson: ledgerEvents.metadataJson,
+      })
+      .from(ledgerEvents)
+      .where(
+        and(
+          eq(ledgerEvents.walletAddress, walletAddress),
+          eq(ledgerEvents.chainId, input.chainId),
+          inArray(ledgerEvents.txHash, txHashesLower),
+        ),
       ),
-    );
+    db
+      .select({
+        address: protocolContracts.address,
+        protocol: protocolContracts.protocol,
+        contractType: protocolContracts.contractType,
+      })
+      .from(protocolContracts)
+      .where(eq(protocolContracts.chainId, input.chainId)),
+    db
+      .select({
+        ledgerEventId: assetMovements.ledgerEventId,
+        tokenAddress: assetMovements.tokenAddress,
+        directionIn: assetMovements.directionIn,
+        amountUsd: assetMovements.amountUsd,
+        metadataJson: assetMovements.metadataJson,
+      })
+      .from(assetMovements)
+      .innerJoin(ledgerEvents, eq(assetMovements.ledgerEventId, ledgerEvents.id))
+      .where(
+        and(
+          eq(assetMovements.walletAddress, walletAddress),
+          eq(assetMovements.chainId, input.chainId),
+          inArray(ledgerEvents.txHash, txHashesLower),
+        ),
+      ),
+  ]);
+
+  const protocolMap = new Map<string, { protocol: string; contractType: string }>();
+  for (const row of protocolContractRows) {
+    protocolMap.set(row.address.toLowerCase(), { protocol: row.protocol, contractType: row.contractType });
+  }
+
+  const spamSet = new Set((input.spamTokenAddresses ?? []).map((address) => address.toLowerCase()));
+
+  const movementsByEventId = new Map<string, typeof movementRows>();
+  for (const movement of movementRows) {
+    if (!movement.ledgerEventId) continue;
+    const list = movementsByEventId.get(movement.ledgerEventId) ?? [];
+    list.push(movement);
+    movementsByEventId.set(movement.ledgerEventId, list);
+  }
 
   let updated = 0;
   for (const row of rows) {
-    const text = [
-      asString(row.metadataJson.category),
-      asString(row.metadataJson.methodLabel),
-      asString(row.metadataJson.summary),
-    ]
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase();
+    const category = asString(row.metadataJson.category)?.toLowerCase() ?? "";
+    const methodLabel = asString(row.metadataJson.methodLabel)?.toLowerCase() ?? "";
+    const summary = asString(row.metadataJson.summary)?.toLowerCase() ?? "";
+    const fromAddress = asString(row.metadataJson.fromAddress)?.toLowerCase() ?? null;
+    const toAddress = asString(row.metadataJson.toAddress)?.toLowerCase() ?? null;
+    const counterpartyAddress = fromAddress === walletAddress
+      ? toAddress
+      : toAddress === walletAddress
+        ? fromAddress
+        : null;
+    const counterpartyInfo = counterpartyAddress ? protocolMap.get(counterpartyAddress) ?? null : null;
 
-    const classification = text.includes("reward") || text.includes("claim") || text.includes("collect")
-      ? "claim"
-      : text.includes("swap") && (text.includes("deposit") || text.includes("mint"))
-        ? "rebalance_deposit"
-        : text.includes("swap") && (text.includes("withdraw") || text.includes("burn") || text.includes("decrease"))
-          ? "rebalance_withdraw"
-          : (text.includes("mellow") || text.includes("strategy")) && (text.includes("withdraw") || text.includes("unstake") || text.includes("burn"))
-            ? "strategy_withdraw"
-            : (text.includes("mellow") || text.includes("strategy")) && (text.includes("deposit") || text.includes("stake") || text.includes("mint"))
-              ? "strategy_deposit"
-              : text.includes("withdraw") || text.includes("unstake") || text.includes("burn") || text.includes("decrease")
-                ? "manual_withdrawal"
-                : text.includes("deposit") || text.includes("stake") || text.includes("mint") || text.includes("increase")
-                  ? "manual_deposit"
-                  : "other";
+    const movements = movementsByEventId.get(row.id) ?? [];
+    let netUsdIn = 0;
+    let netUsdOut = 0;
+    let hasSpamInflow = false;
+    let hasInflow = false;
+    let hasOutflow = false;
+    for (const movement of movements) {
+      const usd = movement.amountUsd ? Number(movement.amountUsd) : 0;
+      if (movement.directionIn) {
+        hasInflow = true;
+        netUsdIn += Number.isFinite(usd) ? usd : 0;
+        const tokenAddr = movement.tokenAddress.toLowerCase();
+        const movementMeta = (movement.metadataJson ?? {}) as Record<string, unknown>;
+        if (spamSet.has(tokenAddr) || movementMeta.possibleSpam === true) {
+          hasSpamInflow = true;
+        }
+      } else {
+        hasOutflow = true;
+        netUsdOut += Number.isFinite(usd) ? usd : 0;
+      }
+    }
+    const netUsdFlow = netUsdIn - netUsdOut;
+
+    const isAirdropTagged = category === "airdrop" || methodLabel === "airdrop";
+    const isApprove = methodLabel === "approve" || category === "approve";
+    const isSwap = category.includes("swap") || methodLabel.includes("swap");
+    const claimMethods = new Set(["getrewards", "getreward", "claim", "claimfees", "claimrewards", "collect"]);
+    const depositMethods = new Set([
+      "deposit",
+      "mint",
+      "stake",
+      "increaseliquidity",
+      "addliquidity",
+      "lock",
+      "createlock",
+      "wrap",
+    ]);
+    const withdrawMethods = new Set([
+      "withdraw",
+      "redeem",
+      "unstake",
+      "decreaseliquidity",
+      "removeliquidity",
+      "burn",
+      "unwrap",
+    ]);
+
+    let classification: string;
+
+    if (isApprove) {
+      classification = "approve";
+    } else if (isSwap) {
+      classification = "swap";
+    } else if (!isAirdropTagged && (
+      claimMethods.has(methodLabel)
+      || summary.includes("reward")
+      || summary.includes("claimed")
+      || category.includes("reward")
+    )) {
+      classification = "claim";
+    } else if (counterpartyInfo) {
+      const isMellow = counterpartyInfo.protocol === "mellow";
+      const depositKey = isMellow ? "strategy_deposit" : "manual_deposit";
+      const withdrawKey = isMellow ? "strategy_withdraw" : "manual_withdrawal";
+
+      // Aerodrome CL Position Manager multicalls often expose methodLabel="deposit" even when
+      // the underlying action is decreaseLiquidity + collect + burn. Trust category and the
+      // signed net USD flow over Moralis' methodLabel for these ambiguous cases.
+      const categoryOverridesMethod =
+        category === "nft sale"
+        || category === "nft send"
+        || category === "burn"
+        || category === "mint"
+        || methodLabel === "multicall";
+
+      if (categoryOverridesMethod) {
+        if (netUsdFlow > 0 || (hasInflow && !hasOutflow)) {
+          classification = withdrawKey;
+        } else if (netUsdFlow < 0 || (hasOutflow && !hasInflow)) {
+          classification = depositKey;
+        } else if (category === "nft sale" || category === "burn") {
+          classification = withdrawKey;
+        } else if (category === "mint" || category === "nft send") {
+          classification = depositKey;
+        } else {
+          classification = "other";
+        }
+      } else if (depositMethods.has(methodLabel)) {
+        classification = depositKey;
+      } else if (withdrawMethods.has(methodLabel)) {
+        classification = withdrawKey;
+      } else if (category === "deposit") {
+        classification = depositKey;
+      } else if (category === "withdraw") {
+        classification = withdrawKey;
+      } else {
+        // Counterparty is a known protocol but the action is unclear; trust net flow.
+        if (netUsdFlow > 0) {
+          classification = withdrawKey;
+        } else if (netUsdFlow < 0) {
+          classification = depositKey;
+        } else {
+          classification = "other";
+        }
+      }
+    } else if (category === "mint" || category === "deposit") {
+      classification = "manual_deposit";
+    } else if (category === "burn" || category === "withdraw") {
+      classification = "manual_withdrawal";
+    } else if (category === "nft sale" && hasInflow) {
+      classification = "manual_withdrawal";
+    } else if (category === "nft send" && hasOutflow) {
+      classification = "manual_deposit";
+    } else if (isAirdropTagged || hasSpamInflow) {
+      classification = "airdrop";
+    } else if (category === "token receive" || category === "receive") {
+      classification = "cash_in";
+    } else if (category === "token send" || category === "send") {
+      classification = "cash_out";
+    } else if (methodLabel === "transfer" && toAddress === walletAddress) {
+      classification = "cash_in";
+    } else if (methodLabel === "transfer" && fromAddress === walletAddress) {
+      classification = "cash_out";
+    } else {
+      classification = "other";
+    }
 
     await db
       .update(ledgerEvents)
@@ -749,6 +912,12 @@ export async function persistResolvedRewardEvents(input: {
           },
         },
       });
+
+    await enrichRewardEventsFromMovements({
+      chainId: input.chainId,
+      walletAddress,
+      txHashes: input.claims.map((claim) => claim.txHash.toLowerCase()),
+    });
   }
 
   if (input.accrualSnapshots.length > 0) {
@@ -798,6 +967,48 @@ export async function persistResolvedRewardEvents(input: {
     accrualSnapshotCount: input.accrualSnapshots.length,
     accrualSnapshotDayUtc,
   };
+}
+
+async function enrichRewardEventsFromMovements(input: {
+  chainId: number;
+  walletAddress: string;
+  txHashes: string[];
+}) {
+  if (input.txHashes.length === 0) {
+    return;
+  }
+
+  const db = getDb();
+  // For each tx hash, pick the inbound movement to the wallet with the largest USD value (or raw amount fallback).
+  // Update reward_events rows for that tx with token_address / amount_raw / amount_usd.
+  await db.execute(sql`
+    WITH best_movement AS (
+      SELECT DISTINCT ON (le.tx_hash)
+        le.tx_hash,
+        am.token_address,
+        am.amount_raw,
+        am.amount_usd
+      FROM ${ledgerEvents} le
+      JOIN ${assetMovements} am ON am.ledger_event_id = le.id
+      WHERE am.wallet_address = ${input.walletAddress}
+        AND am.chain_id = ${input.chainId}
+        AND am.direction_in = true
+        AND le.tx_hash = ANY(${input.txHashes})
+      ORDER BY le.tx_hash, COALESCE(am.amount_usd, 0) DESC, COALESCE(am.amount_raw::numeric, 0) DESC
+    )
+    UPDATE ${rewardEvents} re
+    SET
+      token_address = bm.token_address,
+      amount_raw = bm.amount_raw,
+      amount_usd = bm.amount_usd,
+      metadata_json = COALESCE(re.metadata_json, '{}'::jsonb) || jsonb_build_object('enrichedFromMovement', true)
+    FROM best_movement bm
+    WHERE re.tx_hash = bm.tx_hash
+      AND re.chain_id = ${input.chainId}
+      AND re.wallet_address = ${input.walletAddress}
+      AND re.is_accrual_snapshot = false
+      AND (re.token_address IS NULL OR re.amount_raw IS NULL)
+  `);
 }
 
 export async function persistCurrentSnapshots(input: {

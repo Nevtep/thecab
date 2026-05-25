@@ -31,11 +31,21 @@ export const phaseActivityTask = task({
         .from(processedTxs)
         .where(and(eq(processedTxs.firstRunId, payload.runId)));
 
+    const walletTokensRaw = Array.isArray(run.metadataJson.latestWalletTokens)
+      ? (run.metadataJson.latestWalletTokens as unknown[])
+      : [];
+    const spamTokenAddresses = walletTokensRaw
+      .filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
+      .filter((item) => item.possibleSpam === true || item.verifiedContract === false)
+      .map((item) => String(item.tokenAddress ?? "").toLowerCase())
+      .filter((address) => address.length > 0);
+
     const classifiedCount = await classifyRunLedgerEvents({
       walletAddress: payload.walletAddress,
       chainId: payload.chainId,
       txHashes: txRows.map((row) => row.txHash),
       runId: payload.runId,
+      spamTokenAddresses,
     });
 
     const attribution = await classifyResidualAttribution({

@@ -295,9 +295,47 @@ export const phaseDepositsTask = task({
       });
     }
 
+    const latestWalletTokens = tokens
+      .map((token) => {
+        const tokenAddress = typeof token.token_address === "string" ? token.token_address.toLowerCase() : null;
+        const balanceRaw = typeof token.balance === "string" ? token.balance : null;
+        const decimals = typeof token.decimals === "number"
+          ? token.decimals
+          : typeof token.decimals === "string"
+            ? Number(token.decimals)
+            : null;
+        if (!tokenAddress || !balanceRaw) {
+          return null;
+        }
+
+        return {
+          tokenAddress,
+          balanceRaw,
+          decimals: Number.isFinite(decimals) ? decimals : null,
+          symbol: typeof token.symbol === "string" ? token.symbol : null,
+          name: typeof token.name === "string" ? token.name : null,
+          nativeToken: token.native_token === true,
+          possibleSpam: token.possible_spam === true,
+          verifiedContract: token.verified_contract === true,
+          usdPrice: typeof token.usd_price === "number"
+            ? token.usd_price
+            : typeof token.usd_price === "string" && token.usd_price.trim().length > 0
+              ? Number(token.usd_price)
+              : null,
+          usdValue: typeof token.usd_value === "number"
+            ? token.usd_value
+            : typeof token.usd_value === "string" && token.usd_value.trim().length > 0
+              ? Number(token.usd_value)
+              : null,
+        };
+      })
+      .filter((token): token is NonNullable<typeof token> => token !== null);
+
     await mergeAnalysisRunMetadata(payload.runId, {
       latestPoolTotals: persistedPositions.poolTotals,
       latestRewardCandidates: Array.from(rewardCandidatesByHash.values()),
+      latestWalletTokens,
+      latestWalletTokensCapturedAt: now.toISOString(),
     });
 
     return {

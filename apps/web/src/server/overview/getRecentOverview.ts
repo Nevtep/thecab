@@ -17,6 +17,7 @@ import {
   getLatestOverviewPortfolioSnapshot,
   readLatestOverviewPricePoints,
   readKnownProtocolContracts,
+  readRecentOverviewAnalyzedActivity,
   readOverviewPricePointsInRange,
   readOverviewPortfolioSnapshots,
   insertOverviewCoverageReport,
@@ -62,6 +63,247 @@ type TrustHydratedAssetRow = {
   trustInput: AssetTrustClassifierInput;
   knownProtocolConflict: boolean;
 };
+
+function canUseAnalyzedOverviewActivity(status: OverviewResponse["analysis"]["status"]) {
+  return status === "ready" || status === "stale";
+}
+
+function summarizeActivityMovementSymbols(
+  movements: Array<{
+    directionIn: boolean;
+    metadataJson: Record<string, unknown>;
+  }>,
+) {
+  const incomingSymbols = Array.from(
+    new Set(
+      movements
+        .filter((movement) => movement.directionIn)
+        .map((movement) => asString(movement.metadataJson.symbol))
+        .filter((symbol): symbol is string => Boolean(symbol)),
+    ),
+  );
+  const outgoingSymbols = Array.from(
+    new Set(
+      movements
+        .filter((movement) => !movement.directionIn)
+        .map((movement) => asString(movement.metadataJson.symbol))
+        .filter((symbol): symbol is string => Boolean(symbol)),
+    ),
+  );
+
+  const segments = [
+    outgoingSymbols.length > 0 ? `- ${outgoingSymbols.join(", ")}` : null,
+    incomingSymbols.length > 0 ? `+ ${incomingSymbols.join(", ")}` : null,
+  ].filter((segment): segment is string => Boolean(segment));
+
+  return segments.length > 0 ? segments.join(" · ") : null;
+}
+
+function resolveOverviewActivityDisplayClassification(input: {
+  classification: string | null;
+  metadataJson: Record<string, unknown>;
+  movements: Array<{
+    directionIn: boolean;
+  }>;
+}) {
+  const text = [
+    input.classification,
+    asString(input.metadataJson.category),
+    asString(input.metadataJson.methodLabel),
+    asString(input.metadataJson.summary),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  const hasIncoming = input.movements.some((movement) => movement.directionIn);
+  const hasOutgoing = input.movements.some((movement) => !movement.directionIn);
+
+  if (text.includes("rebalance") || input.classification?.startsWith("rebalance_")) {
+    return "rebalance";
+  }
+
+  if (text.includes("claim") || text.includes("collect") || input.classification === "claim") {
+    return "claim";
+  }
+
+  if (text.includes("unstake")) {
+    return "unstake";
+  }
+
+  if (text.includes("stake")) {
+    return "stake";
+  }
+
+  if (
+    text.includes("withdraw") ||
+    text.includes("decrease") ||
+    text.includes("burn") ||
+    text.includes("remove") ||
+    input.classification === "manual_withdrawal" ||
+    input.classification === "strategy_withdraw"
+  ) {
+    return "withdraw";
+  }
+
+  if (
+    text.includes("deposit") ||
+    text.includes("mint") ||
+    text.includes("increase") ||
+    input.classification === "manual_deposit" ||
+    input.classification === "strategy_deposit"
+  ) {
+    return "deposit";
+  }
+
+  if (text.includes("swap")) {
+    return "swap";
+  }
+
+  if (text.includes("vote") || text.includes("lock") || text.includes("relay") || text.includes("bribe")) {
+    return "governance";
+  }
+
+  if (hasIncoming && !hasOutgoing) {
+    return "cash_in";
+  }
+
+  if (hasOutgoing && !hasIncoming) {
+    return "cash_out";
+  }
+
+  return "other";
+}
+
+function getOverviewActivityLabelKey(classification: string) {
+  switch (classification) {
+    case "cash_in":
+      return "overview:activity.classifications.cashIn";
+    case "cash_out":
+      return "overview:activity.classifications.cashOut";
+    case "swap":
+      return "overview:activity.classifications.swap";
+    case "rebalance":
+      return "overview:activity.classifications.rebalance";
+    case "deposit":
+      return "overview:activity.classifications.deposit";
+    case "withdraw":
+      return "overview:activity.classifications.withdraw";
+    case "stake":
+      return "overview:activity.classifications.stake";
+    case "unstake":
+      return "overview:activity.classifications.unstake";
+    case "claim":
+      return "overview:activity.classifications.claim";
+    case "governance":
+      return "overview:activity.classifications.governance";
+    default:
+      return "overview:activity.classifications.other";
+  }
+}
+
+function buildOverviewAnalyzedActivityDetail(input: {
+  metadataJson: Record<string, unknown>;
+  movements: Array<{
+    directionIn: boolean;
+    metadataJson: Record<string, unknown>;
+  }>;
+}) {
+  const summary = asString(input.metadataJson.summary)?.trim();
+  if (summary) {
+    return summary;
+  }
+
+  const methodLabel = asString(input.metadataJson.methodLabel)?.trim();
+  const category = asString(input.metadataJson.category)?.trim();
+  const movementSummary = summarizeActivityMovementSymbols(input.movements);
+
+  return [methodLabel ?? category ?? null, movementSummary]
+    .filter((segment): segment is string => Boolean(segment))
+    .join(" · ") || null;
+}
+
+function buildOverviewActivityFromAnalyzedRows(input: {
+  response: OverviewResponse;
+  rows: Awaited<ReturnType<typeof readRecentOverviewAnalyzedActivity>>;
+}) {
+  input.response.activity = {
+    ...input.response.activity,
+    source: "analyzed_history",
+    coverageStatus: input.rows.some((row) => !row.classification || row.classification === "other") ? "partial" : "recent",
+    coverageReasonCodes: null,
+    items: input.rows.map((row) => {
+      const classification = resolveOverviewActivityDisplayClassification({
+        classification: row.classification,
+        metadataJson: row.metadataJson,
+        movements: row.movements,
+      });
+
+      return {
+        id: row.id,
+        occurredAt: row.occurredAt.toISOString(),
+        eventType: row.eventType,
+        classification,
+        labelKey: getOverviewActivityLabelKey(classification),
+        detail: buildOverviewAnalyzedActivityDetail({
+          metadataJson: row.metadataJson,
+          movements: row.movements,
+        }),
+        txHash: row.txHash,
+        confidence:
+          row.confidence === "low" || row.confidence === "medium" || row.confidence === "high"
+            ? row.confidence
+            : null,
+        isUnclassified: classification === "other",
+      } satisfies OverviewResponse["activity"]["items"][number];
+    }),
+  };
+}
+
+function buildDistributionCompositionLabel(
+  row: OverviewResponse["protocolPositions"]["rows"][number],
+) {
+  return row.strategyLabel ?? row.poolLabel ?? row.governanceLabel ?? row.label;
+}
+
+function buildDistributionSliceComposition(
+  rows: OverviewResponse["protocolPositions"]["rows"],
+  family: OverviewResponse["protocolPositions"]["rows"][number]["family"],
+): NonNullable<OverviewResponse["distribution"]["slices"][number]["composition"]> | null {
+  const composition = rows
+    .filter((row) => row.family === family)
+    .map((row) => ({
+      positionKey: row.positionKey,
+      label: buildDistributionCompositionLabel(row),
+      valueUsd: row.valueUsd,
+      tokens: [
+        row.primaryTokenSymbol
+          ? {
+              symbol: row.primaryTokenSymbol,
+              amount: row.primaryTokenAmount,
+            }
+          : null,
+        row.secondaryTokenSymbol
+          ? {
+              symbol: row.secondaryTokenSymbol,
+              amount: row.secondaryTokenAmount,
+            }
+          : null,
+      ].filter((token): token is { symbol: string; amount: number | null } => token !== null),
+    }))
+    .filter((entry) => entry.label.length > 0 || entry.tokens.length > 0 || entry.valueUsd !== null)
+    .sort((left, right) => {
+      const leftValue = left.valueUsd ?? -1;
+      const rightValue = right.valueUsd ?? -1;
+
+      if (rightValue !== leftValue) {
+        return rightValue - leftValue;
+      }
+
+      return left.label.localeCompare(right.label);
+    });
+
+  return composition.length > 0 ? composition : null;
+}
 
 export function normalizeOverviewRange(range?: string | null): OverviewRange {
   if (range === "24h" || range === "30d") {
@@ -225,7 +467,9 @@ function buildOverviewActivityBlock(input: {
         asString(item.created_at) ??
         input.now.toISOString(),
       eventType: asString(item.category) ?? "unclassified",
+      classification: null,
       labelKey: "overview.activity.unclassified",
+      detail: asString(item.summary) ?? asString(item.method_label) ?? asString(item.category),
       txHash: asString(item.transaction_hash) ?? asString(item.hash),
       confidence: "low",
       isUnclassified: true,
@@ -290,6 +534,23 @@ export async function getRecentOverviewActivity(input: OverviewRequest): Promise
   const historyFulfilled = historyResult.status === "fulfilled";
   const history = historyFulfilled ? (historyResult.value.result ?? []) : [];
   response.analysis = createOverviewAnalysisState({ latestRun, freshness });
+
+  if (canUseAnalyzedOverviewActivity(response.analysis.status)) {
+    const analyzedActivityRows = await readRecentOverviewAnalyzedActivity({
+      walletAddress: input.walletAddress,
+      chainId: input.chainId,
+      limit: 10,
+    });
+
+    if (analyzedActivityRows.length > 0) {
+      buildOverviewActivityFromAnalyzedRows({
+        response,
+        rows: analyzedActivityRows,
+      });
+
+      return response;
+    }
+  }
 
   if (!historyFulfilled) {
     const coverageReasonCodes = buildProviderPartialReasonCodes(response.coverage.reasonCodes);
@@ -1861,6 +2122,14 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
   const now = new Date();
   response.analysis = createOverviewAnalysisState({ latestRun, freshness });
 
+  const analyzedActivityRows = canUseAnalyzedOverviewActivity(response.analysis.status)
+    ? await readRecentOverviewAnalyzedActivity({
+        walletAddress: input.walletAddress,
+        chainId: input.chainId,
+        limit: 10,
+      })
+    : [];
+
   const tokens = tokensResult.status === "fulfilled" ? (tokensResult.value.result ?? []) : [];
   const history = historyResult.status === "fulfilled" ? (historyResult.value.result ?? []) : [];
   const defiPositions = defiPositionsResult.status === "fulfilled" ? defiPositionsResult.value : [];
@@ -2303,6 +2572,7 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
       label: "Idle assets",
       valueUsd: idleValueUsd,
       coverageStatus,
+      composition: null,
     });
   }
 
@@ -2312,6 +2582,7 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
       label: "Manual deposits",
       valueUsd: manualDepositsValueUsd,
       coverageStatus: toOverviewCoverageStatus(protocolPositions.block.coverageStatus),
+      composition: buildDistributionSliceComposition(protocolPositions.block.rows, "manual_deposit"),
     });
   }
 
@@ -2321,6 +2592,7 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
       label: "Automated strategies",
       valueUsd: automatedStrategiesValueUsd,
       coverageStatus: toOverviewCoverageStatus(protocolPositions.block.coverageStatus),
+      composition: buildDistributionSliceComposition(protocolPositions.block.rows, "strategy_exposure"),
     });
   }
 
@@ -2330,6 +2602,7 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
       label: "Governance locks",
       valueUsd: governanceValueUsd,
       coverageStatus: toOverviewCoverageStatus(protocolPositions.block.coverageStatus),
+      composition: buildDistributionSliceComposition(protocolPositions.block.rows, "governance_lock"),
     });
   }
 
@@ -2339,6 +2612,7 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
       label: "Staked LP",
       valueUsd: residualAttributedValueUsd,
       coverageStatus: toOverviewCoverageStatus(protocolPositions.block.coverageStatus),
+      composition: buildDistributionSliceComposition(protocolPositions.block.rows, "staked_lp"),
     });
   }
 
@@ -2372,13 +2646,20 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
 
   response.protocolPositions = protocolPositions.block;
 
-  buildOverviewActivityBlock({
-    response,
-    history,
-    historyFulfilled: historyResult.status === "fulfilled",
-    now,
-    walletAddress: input.walletAddress,
-  });
+  if (analyzedActivityRows.length > 0) {
+    buildOverviewActivityFromAnalyzedRows({
+      response,
+      rows: analyzedActivityRows,
+    });
+  } else {
+    buildOverviewActivityBlock({
+      response,
+      history,
+      historyFulfilled: historyResult.status === "fulfilled",
+      now,
+      walletAddress: input.walletAddress,
+    });
+  }
 
   await insertOverviewCoverageReport({
     walletAddress: input.walletAddress,

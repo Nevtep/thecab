@@ -30,7 +30,7 @@ export type OverviewCoverageReasonCode =
 
 export type OverviewMode = "recent_view";
 
-export type OverviewDataSource = "recent_provider_data" | "partial_fallback";
+export type OverviewDataSource = "recent_provider_data" | "partial_fallback" | "analyzed_history";
 
 export type OverviewCoverageStatus = "recent" | "partial" | "unknown";
 
@@ -100,12 +100,25 @@ export type OverviewChart = OverviewBlockProvenance & {
   points: OverviewChartPoint[];
 };
 
+export type OverviewDistributionCompositionToken = {
+  symbol: string;
+  amount: number | null;
+};
+
+export type OverviewDistributionCompositionEntry = {
+  positionKey: string;
+  label: string;
+  valueUsd: number | null;
+  tokens: OverviewDistributionCompositionToken[];
+};
+
 export type OverviewDistribution = OverviewBlockProvenance & {
   slices: Array<{
     dimension: "manual_deposit" | "staked_lp" | "strategy" | "idle" | "governance";
     label: string;
     valueUsd: number;
     coverageStatus: OverviewCoverageStatus | null;
+    composition: OverviewDistributionCompositionEntry[] | null;
   }>;
   exclusions: OverviewExclusionSummary | null;
 };
@@ -152,7 +165,9 @@ export type OverviewActivity = OverviewBlockProvenance & {
     id: string;
     occurredAt: string;
     eventType: string;
+    classification: string | null;
     labelKey: string;
+    detail: string | null;
     txHash: string | null;
     confidence: "low" | "medium" | "high" | null;
     isUnclassified: boolean;

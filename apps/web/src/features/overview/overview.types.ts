@@ -80,6 +80,18 @@ export type OverviewScreenState = {
   range: OverviewRange;
 };
 
+export type OverviewDistributionCompositionToken = {
+  symbol: string;
+  amount: number | null;
+};
+
+export type OverviewDistributionCompositionEntry = {
+  positionKey: string;
+  label: string;
+  valueUsd: number | null;
+  tokens: OverviewDistributionCompositionToken[];
+};
+
 export type OverviewViewModel = {
   walletAddress: string;
   chainId: number;
@@ -96,7 +108,7 @@ export type OverviewViewModel = {
     details: string | null;
   };
   summary: {
-    source: "recent_provider_data" | "partial_fallback";
+    source: "recent_provider_data" | "partial_fallback" | "analyzed_history";
     coverageStatus: OverviewCoverageStatus;
     coverageReasonCodes: OverviewCoverageReasonCode[] | null;
     walletAddress: string;
@@ -106,7 +118,7 @@ export type OverviewViewModel = {
     modeLabelKey: string;
   };
   metrics: {
-    source: "recent_provider_data" | "partial_fallback";
+    source: "recent_provider_data" | "partial_fallback" | "analyzed_history";
     coverageStatus: OverviewCoverageStatus;
     coverageReasonCodes: OverviewCoverageReasonCode[] | null;
     netPortfolioValueUsd: number | null;
@@ -121,7 +133,7 @@ export type OverviewViewModel = {
     exclusions: OverviewExclusionSummary | null;
   };
   chart: {
-    source: "recent_provider_data" | "partial_fallback";
+    source: "recent_provider_data" | "partial_fallback" | "analyzed_history";
     coverageStatus: OverviewCoverageStatus;
     coverageReasonCodes: OverviewCoverageReasonCode[] | null;
     range: OverviewRange;
@@ -135,7 +147,7 @@ export type OverviewViewModel = {
     }>;
   };
   distribution: {
-    source: "recent_provider_data" | "partial_fallback";
+    source: "recent_provider_data" | "partial_fallback" | "analyzed_history";
     coverageStatus: OverviewCoverageStatus;
     coverageReasonCodes: OverviewCoverageReasonCode[] | null;
     slices: Array<{
@@ -143,11 +155,12 @@ export type OverviewViewModel = {
       label: string;
       valueUsd: number;
       coverageStatus: OverviewCoverageStatus | null;
+      composition: OverviewDistributionCompositionEntry[] | null;
     }>;
     exclusions: OverviewExclusionSummary | null;
   };
   assets: {
-    source: "recent_provider_data" | "partial_fallback";
+    source: "recent_provider_data" | "partial_fallback" | "analyzed_history";
     coverageStatus: OverviewCoverageStatus;
     coverageReasonCodes: OverviewCoverageReasonCode[] | null;
     rows: Array<{
@@ -171,7 +184,7 @@ export type OverviewViewModel = {
     defaultVisibleCount: number;
   };
   protocolPositions: {
-    source: "recent_provider_data" | "partial_fallback";
+    source: "recent_provider_data" | "partial_fallback" | "analyzed_history";
     coverageStatus: "full" | "partial" | "unknown";
     coverageReasonCodes: ProtocolPositionCoverageReasonCode[] | null;
     rows: Array<{
@@ -225,14 +238,16 @@ export type OverviewViewModel = {
     };
   };
   activity: {
-    source: "recent_provider_data" | "partial_fallback";
+    source: "recent_provider_data" | "partial_fallback" | "analyzed_history";
     coverageStatus: OverviewCoverageStatus;
     coverageReasonCodes: OverviewCoverageReasonCode[] | null;
     items: Array<{
       id: string;
       occurredAt: string;
       eventType: string;
+      classification: string | null;
       labelKey: string;
+      detail: string | null;
       txHash: string | null;
       confidence: "low" | "medium" | "high" | null;
       isUnclassified: boolean;

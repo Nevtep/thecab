@@ -2,7 +2,9 @@ import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
 
 import { getDb } from "@/server/db/client";
 import {
+  assetMovements,
   coverageReports,
+  ledgerEvents,
   portfolioSnapshots,
   pricePoints,
   protocolContracts,
@@ -364,4 +366,70 @@ export async function readKnownProtocolContracts(input: Pick<OverviewRequest, "c
     })
     .from(protocolContracts)
     .where(eq(protocolContracts.chainId, input.chainId));
+}
+
+export async function readRecentOverviewAnalyzedActivity(input: ScopedWalletInput & {
+  limit?: number;
+}) {
+  const db = getDb();
+  const eventRows = await db
+    .select({
+      id: ledgerEvents.id,
+      txHash: ledgerEvents.txHash,
+      eventType: ledgerEvents.eventType,
+      occurredAt: ledgerEvents.occurredAt,
+      classification: ledgerEvents.classification,
+      confidence: ledgerEvents.confidence,
+      metadataJson: ledgerEvents.metadataJson,
+    })
+    .from(ledgerEvents)
+    .where(
+      and(
+        eq(ledgerEvents.walletAddress, input.walletAddress.toLowerCase()),
+        eq(ledgerEvents.chainId, input.chainId),
+      ),
+    )
+    .orderBy(desc(ledgerEvents.occurredAt), desc(ledgerEvents.createdAt))
+    .limit(input.limit ?? 10);
+
+  if (eventRows.length === 0) {
+    return [];
+  }
+
+  const movementRows = await db
+    .select({
+      ledgerEventId: assetMovements.ledgerEventId,
+      directionIn: assetMovements.directionIn,
+      amountUsd: assetMovements.amountUsd,
+      metadataJson: assetMovements.metadataJson,
+    })
+    .from(assetMovements)
+    .where(
+      and(
+        eq(assetMovements.chainId, input.chainId),
+        inArray(assetMovements.ledgerEventId, eventRows.map((row) => row.id)),
+      ),
+    )
+    .orderBy(assetMovements.ledgerEventId, assetMovements.movementIndex);
+
+  const movementsByLedgerEventId = new Map<string, typeof movementRows>();
+  for (const movement of movementRows) {
+    const ledgerEventId = movement.ledgerEventId;
+    if (!ledgerEventId) {
+      continue;
+    }
+
+    const existingMovements = movementsByLedgerEventId.get(ledgerEventId);
+    if (existingMovements) {
+      existingMovements.push(movement);
+      continue;
+    }
+
+    movementsByLedgerEventId.set(ledgerEventId, [movement]);
+  }
+
+  return eventRows.map((row) => ({
+    ...row,
+    movements: movementsByLedgerEventId.get(row.id) ?? [],
+  }));
 }

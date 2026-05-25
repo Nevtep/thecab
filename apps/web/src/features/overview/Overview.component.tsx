@@ -322,6 +322,71 @@ function getDistributionSliceColor(
   }
 }
 
+type DistributionSlice = OverviewViewModel["distribution"]["slices"][number];
+
+function formatDistributionCompositionToken(
+  token: NonNullable<DistributionSlice["composition"]>[number]["tokens"][number],
+  locale: string,
+  translate: (key: string, options?: Record<string, unknown>) => string,
+) {
+  if (token.amount === null) {
+    return translate("distribution.composition.tokenAmountUnavailable", {
+      symbol: token.symbol,
+    });
+  }
+
+  return translate("distribution.composition.tokenAmount", {
+    symbol: token.symbol,
+    amount: formatProtocolTokenAmount(token.amount, locale),
+  });
+}
+
+function renderDistributionSliceComposition(
+  slice: DistributionSlice,
+  input: {
+    locale: string;
+    translate: (key: string, options?: Record<string, unknown>) => string;
+  },
+) {
+  if (slice.composition?.length) {
+    return (
+      <CabStack gap="$2">
+        {slice.composition.map((entry) => (
+          <CabStack key={entry.positionKey} gap="$1">
+            <CabStack row justifyContent="space-between" alignItems="center" gap="$2">
+              <CabText variant="caption" fontSize={12}>
+                {entry.label}
+              </CabText>
+              {entry.valueUsd !== null ? (
+                <CabText variant="caption" fontSize={12}>
+                  {formatUsd(entry.valueUsd, input.locale)}
+                </CabText>
+              ) : null}
+            </CabStack>
+            {entry.tokens.length > 0 ? (
+              <CabText variant="caption" fontSize={12}>
+                {entry.tokens
+                  .map((token) => formatDistributionCompositionToken(token, input.locale, input.translate))
+                  .join(" · ")}
+              </CabText>
+            ) : null}
+          </CabStack>
+        ))}
+      </CabStack>
+    );
+  }
+
+  if (slice.dimension === "idle") {
+    return (
+      <CabText variant="caption" fontSize={12}>
+        {input.translate("distribution.composition.idleDetailedBelow")}
+      </CabText>
+    );
+  }
+
+  return null;
+}
+
 type ProtocolPositionRow = OverviewViewModel["protocolPositions"]["rows"][number];
 
 type ProtocolPositionGroup = {
@@ -1066,27 +1131,30 @@ export function OverviewComponent({
                     <CabStack gap="$2">
                       {resolvedChartViewModel.distribution.slices.map((slice) => (
                         <CabCard key={`${slice.dimension}-${slice.label}`} density="default">
-                          <CabStack row justifyContent="space-between" alignItems="center">
-                            <CabStack row alignItems="center" gap="$2">
-                              <div
-                                style={{
-                                  width: 10,
-                                  height: 10,
-                                  borderRadius: 999,
-                                  backgroundColor: getDistributionSliceColor(slice.dimension),
-                                  flexShrink: 0,
-                                }}
-                              />
-                              <CabText variant="label">{getDistributionSliceLabel(slice, t)}</CabText>
+                          <CabStack gap="$2">
+                            <CabStack row justifyContent="space-between" alignItems="center">
+                              <CabStack row alignItems="center" gap="$2">
+                                <div
+                                  style={{
+                                    width: 10,
+                                    height: 10,
+                                    borderRadius: 999,
+                                    backgroundColor: getDistributionSliceColor(slice.dimension),
+                                    flexShrink: 0,
+                                  }}
+                                />
+                                <CabText variant="label">{getDistributionSliceLabel(slice, t)}</CabText>
+                              </CabStack>
+                              <CabStack alignItems="flex-end" gap="$1">
+                                <CabText variant="label">{formatUsd(slice.valueUsd, locale)}</CabText>
+                                <CabText variant="caption" fontSize={12}>
+                                  {totalDistributionUsd > 0
+                                    ? formatPercent(slice.valueUsd / totalDistributionUsd, locale)
+                                    : t("states.unavailableValue")}
+                                </CabText>
+                              </CabStack>
                             </CabStack>
-                            <CabStack alignItems="flex-end" gap="$1">
-                              <CabText variant="label">{formatUsd(slice.valueUsd, locale)}</CabText>
-                              <CabText variant="caption" fontSize={12}>
-                                {totalDistributionUsd > 0
-                                  ? formatPercent(slice.valueUsd / totalDistributionUsd, locale)
-                                  : t("states.unavailableValue")}
-                              </CabText>
-                            </CabStack>
+                            {renderDistributionSliceComposition(slice, { locale, translate: t })}
                           </CabStack>
                         </CabCard>
                       ))}
@@ -1291,7 +1359,14 @@ export function OverviewComponent({
                         <CabCard key={item.id} density="default">
                           <CabStack row justifyContent="space-between" alignItems="center" gap="$3">
                             <CabStack gap="$1">
-                              <CabText variant="label">{t(item.labelKey, { defaultValue: t("activity.unclassified") })}</CabText>
+                              <CabStack row gap="$2" alignItems="center" flexWrap="wrap">
+                                <CabText variant="label">
+                                  {item.detail ?? t(item.labelKey, { defaultValue: t("activity.unclassified") })}
+                                </CabText>
+                                <CabBadge tone={item.isUnclassified ? "warning" : "neutral"} size="sm">
+                                  {t(item.labelKey, { defaultValue: t("activity.unclassified") })}
+                                </CabBadge>
+                              </CabStack>
                               <CabText variant="caption" fontSize={12}>
                                 {formatDateTime(item.occurredAt, locale)}
                               </CabText>
