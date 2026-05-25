@@ -8,8 +8,11 @@ import {
 } from "@/features/overview/portfolio-evolution/portfolioEvolution.meta";
 import type { OverviewRange } from "@/features/overview/overview.types";
 import { PortfolioEvolutionEventSummary } from "@/features/overview/portfolio-evolution/PortfolioEvolutionEventSummary.component";
-import type { PortfolioEvolutionDatum } from "@/features/overview/portfolio-evolution/portfolioEvolution.utils";
-import { formatDateTime, formatUsd } from "@/i18n/formatters";
+import {
+  formatPortfolioEvolutionBucketTimestamp,
+  type PortfolioEvolutionDatum,
+} from "@/features/overview/portfolio-evolution/portfolioEvolution.utils";
+import { formatUsd } from "@/i18n/formatters";
 import { useTranslation } from "react-i18next";
 
 type PortfolioEvolutionTooltipProps = {
@@ -83,7 +86,7 @@ export function PortfolioEvolutionTooltip({ active, payload, locale, range }: Po
       <CabCard density="default">
         <CabStack gap="$3.5">
           <CabText variant="label" fontSize={13} color={cabColors.text.primary}>
-            {formatDateTime(datum.capturedAt, locale)}
+            {formatPortfolioEvolutionBucketTimestamp(datum.capturedAt, range, locale)}
           </CabText>
           <CabStack gap="$2.5">
             {rows.map((row) => (

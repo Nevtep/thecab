@@ -55,6 +55,26 @@ export function buildSnapshotValueLookup(input: {
     capturedAtMs: number;
   }>();
 
+  function getSnapshotCandidateScore(row: {
+    totalValueUsd: string;
+    deployedValueUsd: string | null;
+    idleValueUsd: string | null;
+    metadataJson: Record<string, unknown>;
+  }) {
+    const metadataJson = row.metadataJson ?? {};
+    const snapshotKind = typeof metadataJson.snapshotKind === "string" ? metadataJson.snapshotKind : null;
+
+    return (
+      (snapshotKind === "analysis_engine_daily" ? 32 : 0) +
+      (metadataJson.source === "analyzed_history" ? 16 : 0) +
+      (snapshotKind === "range_bucket" ? 8 : 0) +
+      (metadataJson.range === input.range ? 4 : 0) +
+      (row.deployedValueUsd !== null ? 3 : 0) +
+      (row.idleValueUsd !== null ? 2 : 0) +
+      (row.totalValueUsd !== null ? 1 : 0)
+    );
+  }
+
   for (const row of input.snapshotRows) {
     const totalValueUsd = asNumber(row.totalValueUsd);
     const deployedValueUsd = asNumber(row.deployedValueUsd);
@@ -66,19 +86,12 @@ export function buildSnapshotValueLookup(input: {
     }
 
     const bucketTimestamp = toBucketTimestamp(row.capturedAt.toISOString(), input.granularity);
-    const metadataJson = row.metadataJson ?? {};
-    const score =
-      (metadataJson.snapshotKind === "range_bucket" ? 8 : 0) +
-      (metadataJson.range === input.range ? 4 : 0) +
-      (row.deployedValueUsd !== null ? 3 : 0) +
-      (row.idleValueUsd !== null ? 2 : 0) +
-      (row.totalValueUsd !== null ? 1 : 0);
     const nextCandidate = {
       totalValueUsd,
       deployedValueUsd,
       idleValueUsd,
       rewardValueUsd,
-      score,
+      score: getSnapshotCandidateScore(row),
       capturedAtMs: row.capturedAt.getTime(),
     };
     const existingCandidate = snapshotCandidatesByBucket.get(bucketTimestamp);

@@ -38,6 +38,8 @@
   },
   "portfolioEvolution": {
     "subtitle": "Historical growth and key portfolio events",
+    "awaitingAnalysisTitle": "Historical evolution pending",
+    "awaitingAnalysisDescription": "Run an analysis to view portfolio evolution, classified claims, and the complete historical event timeline.",
     "legend": {
       "series": "Visible series",
       "events": "Timeline events"

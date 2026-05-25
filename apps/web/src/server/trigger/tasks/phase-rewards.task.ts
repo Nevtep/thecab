@@ -4,8 +4,8 @@ import { getAnalysisRunById } from "@/server/analysis/analysis-run.repository";
 import { getAnalysisSlice } from "@/server/analysis/analysis-slice.repository";
 import { persistResolvedRewardEvents } from "@/server/analysis/enginePersistence";
 import { getDb } from "@/server/db/client";
-import { deposits, rawProviderRecords, strategies, strategyExposures } from "@/server/db/schema";
-import { and, desc, eq } from "drizzle-orm";
+import { deposits, ledgerEvents, rawProviderRecords, strategies, strategyExposures } from "@/server/db/schema";
+import { and, desc, eq, inArray } from "drizzle-orm";
 
 type RewardCandidate = {
   txHash: string;
@@ -54,6 +54,29 @@ function asRewardCandidate(value: unknown): RewardCandidate | null {
 function inferRewardType(candidate: RewardCandidate) {
   const text = [candidate.category, candidate.summary].filter(Boolean).join(" ").toLowerCase();
   return text.includes("reward") || text.includes("collect") ? "reward_claim" : "claim";
+}
+
+export function isGovernanceRewardCandidate(input: {
+  classification: string | null;
+  category: string | null;
+  methodLabel: string | null;
+  summary: string | null;
+}) {
+  const text = [input.classification, input.category, input.methodLabel, input.summary]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  const touchesVotingEscrow =
+    text.includes("voting escrow") ||
+    text.includes("veaero") ||
+    (text.includes("escrow") && text.includes("aerodrome"));
+
+  if (!touchesVotingEscrow) {
+    return input.classification === "governance";
+  }
+
+  return true;
 }
 
 export type PhaseRewardsTaskPayload = {
@@ -121,9 +144,41 @@ export const phaseRewardsTask = task({
         ),
     ]);
 
-    const latestRewardCandidates = Array.isArray(rows[0]?.responseJson.rewardCandidates)
-      ? rows[0]?.responseJson.rewardCandidates.map(asRewardCandidate).filter((candidate): candidate is RewardCandidate => Boolean(candidate))
-      : [];
+    const latestRewardCandidates = Array.isArray(run.metadataJson.latestRewardCandidates)
+      ? run.metadataJson.latestRewardCandidates.map(asRewardCandidate).filter((candidate): candidate is RewardCandidate => Boolean(candidate))
+      : Array.isArray(rows[0]?.responseJson.rewardCandidates)
+        ? rows[0]?.responseJson.rewardCandidates.map(asRewardCandidate).filter((candidate): candidate is RewardCandidate => Boolean(candidate))
+        : [];
+    const normalizedCandidateTxHashes = [...new Set(latestRewardCandidates.map((candidate) => candidate.txHash.toLowerCase()))];
+    const ledgerRows = normalizedCandidateTxHashes.length === 0
+      ? []
+      : await db
+        .select({
+          txHash: ledgerEvents.txHash,
+          classification: ledgerEvents.classification,
+          metadataJson: ledgerEvents.metadataJson,
+        })
+        .from(ledgerEvents)
+        .where(
+          and(
+            eq(ledgerEvents.walletAddress, payload.walletAddress.toLowerCase()),
+            eq(ledgerEvents.chainId, payload.chainId),
+            inArray(ledgerEvents.txHash, normalizedCandidateTxHashes),
+          ),
+        );
+    const governanceCandidateTxHashes = new Set(
+      ledgerRows
+        .filter((row) => isGovernanceRewardCandidate({
+          classification: row.classification,
+          category: typeof row.metadataJson.category === "string" ? row.metadataJson.category : null,
+          methodLabel: typeof row.metadataJson.methodLabel === "string" ? row.metadataJson.methodLabel : null,
+          summary: typeof row.metadataJson.summary === "string" ? row.metadataJson.summary : null,
+        }))
+        .map((row) => row.txHash.toLowerCase()),
+    );
+    const filteredRewardCandidates = latestRewardCandidates.filter((candidate) =>
+      !governanceCandidateTxHashes.has(candidate.txHash.toLowerCase()),
+    );
 
     const depositTargets = depositRows.map((row) => ({
       id: row.id,
@@ -136,7 +191,7 @@ export const phaseRewardsTask = task({
       protocol: row.protocol,
     }));
 
-    const resolvedClaims = latestRewardCandidates.map((candidate, index) => {
+    const resolvedClaims = filteredRewardCandidates.map((candidate, index) => {
       const matchingDeposit = candidate.targetTokenId
         ? depositTargets.find((target) => target.tokenId === candidate.targetTokenId)
         : candidate.protocol === "aerodrome"

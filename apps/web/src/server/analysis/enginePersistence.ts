@@ -220,6 +220,35 @@ function isRewardLikeRecord(record: SliceHistoryRecord) {
   return fields.includes("reward") || fields.includes("claim") || fields.includes("collect");
 }
 
+function isAerodromeVotingEscrowInteraction(input: {
+  category?: string | null;
+  methodLabel?: string | null;
+  summary?: string | null;
+  protocol?: string | null;
+  contractType?: string | null;
+}) {
+  const text = [input.category, input.methodLabel, input.summary, input.protocol, input.contractType]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  const touchesVotingEscrow =
+    text.includes("voting escrow") ||
+    text.includes("veaero") ||
+    (input.protocol === "aerodrome" && (text.includes("escrow") || text.includes("governance")));
+
+  if (!touchesVotingEscrow) {
+    return false;
+  }
+
+  return text.includes("claim")
+    || text.includes("collect")
+    || text.includes("lock")
+    || text.includes("relock")
+    || text.includes("delegate")
+    || text.includes("vote");
+}
+
 async function upsertPool(input: {
   chainId: number;
   poolAddress: string;
@@ -518,6 +547,7 @@ export async function persistSliceHistory(input: {
 
   const db = getDb();
   let assetMovementCount = 0;
+  const inboundMovementByTxHash = new Map<string, boolean>();
   if (dedupedUnseen.length > 0) {
     const insertedLedgerEvents = await db
       .insert(ledgerEvents)
@@ -558,12 +588,18 @@ export async function persistSliceHistory(input: {
         return [];
       }
 
-      return buildAssetMovementRows({
+      const movementRows = buildAssetMovementRows({
         walletAddress: input.walletAddress,
         chainId: input.chainId,
         ledgerEventId,
         historyRecord: record,
       });
+
+      if (txHash && movementRows.some((row) => row.directionIn)) {
+        inboundMovementByTxHash.set(txHash, true);
+      }
+
+      return movementRows;
     });
 
     if (assetMovementRows.length > 0) {
@@ -587,12 +623,17 @@ export async function persistSliceHistory(input: {
     txCountSeen: recordsInWindow.length,
     txCountProcessed: dedupedUnseen.length,
     assetMovementCount,
-    rewardCandidates: dedupedUnseen.filter(isRewardLikeRecord).map((record) => ({
-      txHash: extractHistoryHash(record) as string,
-      occurredAt: parseHistoryTimestamp(record) ?? input.sliceEndUtc,
-      category: asString(record.category),
-      summary: asString(record.summary),
-    })),
+    rewardCandidates: dedupedUnseen
+      .filter((record) => {
+        const txHash = extractHistoryHash(record);
+        return Boolean(txHash && inboundMovementByTxHash.get(txHash) && isRewardLikeRecord(record));
+      })
+      .map((record) => ({
+        txHash: extractHistoryHash(record) as string,
+        occurredAt: parseHistoryTimestamp(record) ?? input.sliceEndUtc,
+        category: asString(record.category),
+        summary: asString(record.summary),
+      })),
   };
 }
 
@@ -811,6 +852,14 @@ export async function classifyRunLedgerEvents(input: {
       classification = "approve";
     } else if (isSwap) {
       classification = "swap";
+    } else if (isAerodromeVotingEscrowInteraction({
+      category,
+      methodLabel,
+      summary,
+      protocol: counterpartyInfo?.protocol ?? null,
+      contractType: counterpartyInfo?.contractType ?? null,
+    })) {
+      classification = "governance";
     } else if (!isAirdropTagged && (
       claimMethods.has(methodLabel)
       || summary.includes("reward")
@@ -1032,11 +1081,9 @@ export async function persistResolvedRewardEvents(input: {
       .onConflictDoUpdate({
         target: [rewardEvents.chainId, rewardEvents.txHash, rewardEvents.logIndex, rewardEvents.rewardType],
         set: {
-          depositOrStrategyId: input.claims[0]?.depositOrStrategyId ?? null,
-          occurredAt: input.claims[0]?.occurredAt ?? new Date(),
-          metadataJson: {
-            valuationMethod: "event",
-          },
+          depositOrStrategyId: sql`excluded.deposit_or_strategy_id`,
+          occurredAt: sql`excluded.occurred_at`,
+          metadataJson: sql`COALESCE(${rewardEvents.metadataJson}, '{}'::jsonb) || COALESCE(excluded.metadata_json, '{}'::jsonb) || jsonb_build_object('valuationMethod', 'event')`,
         },
       });
 
@@ -1107,35 +1154,65 @@ async function enrichRewardEventsFromMovements(input: {
 
   const db = getDb();
   const txHashesArray = sql`ARRAY[${sql.join(input.txHashes.map((txHash) => sql`${txHash}`), sql`, `)}]::text[]`;
-  // For each tx hash, pick the inbound movement to the wallet with the largest USD value (or raw amount fallback).
-  // Update reward_events rows for that tx with token_address / amount_raw / amount_usd.
+  // Aggregate all inbound movements for the tx so split claim transfers are valued the same way as overview reads.
   await db.execute(sql`
-    WITH best_movement AS (
-      SELECT DISTINCT ON (le.tx_hash)
+    WITH movement_rollup AS (
+      SELECT
         le.tx_hash,
-        am.token_address,
-        am.amount_raw,
-        am.amount_usd
+        CASE WHEN count(DISTINCT am.token_address) = 1 THEN min(am.token_address) ELSE null END AS token_address,
+        CASE
+          WHEN count(DISTINCT am.token_address) = 1 AND bool_and(am.amount_raw IS NOT NULL)
+          THEN sum(am.amount_raw::numeric)
+          ELSE null
+        END AS amount_raw,
+        sum(
+          coalesce(
+            am.amount_usd,
+            CASE
+              WHEN priced_movement.price_usd IS NULL OR am.amount_raw IS NULL THEN null
+              WHEN am.token_address = '0x4200000000000000000000000000000000000006'
+              THEN (am.amount_raw::numeric / 1000000000000000000::numeric) * priced_movement.price_usd
+              WHEN am.token_address = '0x940181a94a35a4569e4529a3cdfb74e38fd98631'
+              THEN (am.amount_raw::numeric / 1000000000000000000::numeric) * priced_movement.price_usd
+              WHEN am.token_address = '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913'
+              THEN (am.amount_raw::numeric / 1000000::numeric) * priced_movement.price_usd
+              WHEN am.token_address = '0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf'
+              THEN (am.amount_raw::numeric / 100000000::numeric) * priced_movement.price_usd
+              WHEN am.token_address = '0x60a3e35cc302bfa44cb288bc5a4f316fdb1adb42'
+              THEN (am.amount_raw::numeric / 1000000::numeric) * priced_movement.price_usd
+              ELSE null
+            END
+          )
+        ) AS amount_usd
       FROM ${ledgerEvents} le
       JOIN ${assetMovements} am ON am.ledger_event_id = le.id
+      LEFT JOIN LATERAL (
+        SELECT pp.price_usd
+        FROM ${pricePoints} pp
+        WHERE pp.chain_id = ${input.chainId}
+          AND pp.token_address = am.token_address
+          AND pp.priced_at <= le.occurred_at
+        ORDER BY pp.priced_at DESC
+        LIMIT 1
+      ) priced_movement ON true
       WHERE am.wallet_address = ${input.walletAddress}
         AND am.chain_id = ${input.chainId}
         AND am.direction_in = true
         AND le.tx_hash = ANY(${txHashesArray})
-      ORDER BY le.tx_hash, COALESCE(am.amount_usd, 0) DESC, COALESCE(am.amount_raw::numeric, 0) DESC
+      GROUP BY le.tx_hash
     )
     UPDATE ${rewardEvents} re
     SET
-      token_address = bm.token_address,
-      amount_raw = bm.amount_raw,
-      amount_usd = bm.amount_usd,
+      token_address = mr.token_address,
+      amount_raw = mr.amount_raw,
+      amount_usd = mr.amount_usd,
       metadata_json = COALESCE(re.metadata_json, '{}'::jsonb) || jsonb_build_object('enrichedFromMovement', true)
-    FROM best_movement bm
-    WHERE re.tx_hash = bm.tx_hash
+    FROM movement_rollup mr
+    WHERE re.tx_hash = mr.tx_hash
       AND re.chain_id = ${input.chainId}
       AND re.wallet_address = ${input.walletAddress}
       AND re.is_accrual_snapshot = false
-      AND (re.token_address IS NULL OR re.amount_raw IS NULL)
+      AND (re.token_address IS NULL OR re.amount_raw IS NULL OR re.amount_usd IS NULL)
   `);
 }
 

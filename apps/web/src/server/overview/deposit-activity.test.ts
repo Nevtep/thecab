@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { resolveManualDepositMintTxHash } from "@/server/analysis/enginePersistence";
-import { buildOverviewApprovalDetail, buildOverviewDepositMintDetail } from "@/server/overview/getRecentOverview";
+import {
+  buildOverviewApprovalDetail,
+  buildOverviewDepositMintDetail,
+  buildOverviewRewardFallbackEvents,
+} from "@/server/overview/getRecentOverview";
 
 function ensureTestEnv() {
   process.env.MORALIS_API_KEY ??= "test-moralis-key";
@@ -85,4 +89,29 @@ test("buildOverviewApprovalDetail renders explicit Aerodrome LP NFT gauge approv
   });
 
   assert.equal(detail, "Approved LP NFT #71272831 for WETH / USDC gauge");
+});
+
+test("buildOverviewRewardFallbackEvents emits claim markers for persisted rewards without analyzed activity rows", () => {
+  const events = buildOverviewRewardFallbackEvents({
+    range: "30d",
+    rewardRows: [
+      {
+        txHash: "0xrewardtx",
+        occurredAt: new Date("2026-04-27T15:45:49.000Z"),
+        amountUsd: "4807.318526677795",
+      },
+    ],
+    existingTxHashes: [],
+  });
+
+  assert.equal(events.length, 1);
+  assert.deepEqual(events[0], {
+    id: "reward-0xrewardtx",
+    type: "claim",
+    occurredAt: "2026-04-27T15:45:49.000Z",
+    capturedAt: "2026-04-27T00:00:00.000Z",
+    detail: null,
+    txHash: "0xrewardtx",
+    rewardValueUsd: 4807.318526677795,
+  });
 });

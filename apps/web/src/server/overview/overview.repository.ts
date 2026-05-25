@@ -7,6 +7,7 @@ import {
   coverageReports,
   deposits,
   ledgerEvents,
+  performanceSnapshots,
   portfolioSnapshots,
   pricePoints,
   protocolContracts,
@@ -37,6 +38,18 @@ function normalizeAddress(value: unknown) {
 }
 
 type ScopedWalletInput = Pick<OverviewRequest, "walletAddress" | "chainId">;
+
+function getSnapshotKind(metadataJson: Record<string, unknown> | null | undefined) {
+  return typeof metadataJson?.snapshotKind === "string" ? metadataJson.snapshotKind : null;
+}
+
+export function shouldPreserveAnalyzedPortfolioSnapshot(input: {
+  existingMetadataJson: Record<string, unknown> | null | undefined;
+  nextMetadataJson: Record<string, unknown> | null | undefined;
+}) {
+  return getSnapshotKind(input.existingMetadataJson) === "analysis_engine_daily"
+    && getSnapshotKind(input.nextMetadataJson) !== "analysis_engine_daily";
+}
 
 export async function readOverviewFreshness(input: ScopedWalletInput) {
   const db = getDb();
@@ -309,6 +322,25 @@ export async function insertOverviewPortfolioSnapshot(
   },
 ) {
   const db = getDb();
+  const [existingRow] = await db
+    .select()
+    .from(portfolioSnapshots)
+    .where(
+      and(
+        eq(portfolioSnapshots.walletAddress, input.walletAddress.toLowerCase()),
+        eq(portfolioSnapshots.chainId, input.chainId),
+        eq(portfolioSnapshots.capturedAt, input.capturedAt),
+      ),
+    )
+    .limit(1);
+
+  if (existingRow && shouldPreserveAnalyzedPortfolioSnapshot({
+    existingMetadataJson: existingRow.metadataJson,
+    nextMetadataJson: input.metadataJson ?? null,
+  })) {
+    return existingRow;
+  }
+
   const [row] = await db
     .insert(portfolioSnapshots)
     .values({
@@ -332,6 +364,52 @@ export async function insertOverviewPortfolioSnapshot(
     .returning();
 
   return row;
+}
+
+export async function readOverviewAnalyzedPortfolioSnapshots(input: ScopedWalletInput & {
+  startAt: Date;
+  endAt: Date;
+}) {
+  const db = getDb();
+
+  return db
+    .select({
+      capturedAt: performanceSnapshots.capturedAt,
+      totalValueUsd: performanceSnapshots.valueUsd,
+      metadataJson: performanceSnapshots.metadataJson,
+    })
+    .from(performanceSnapshots)
+    .where(
+      and(
+        eq(performanceSnapshots.walletAddress, input.walletAddress.toLowerCase()),
+        eq(performanceSnapshots.chainId, input.chainId),
+        eq(performanceSnapshots.scope, "portfolio"),
+        eq(performanceSnapshots.resolution, "daily"),
+        gte(performanceSnapshots.capturedAt, input.startAt),
+        lte(performanceSnapshots.capturedAt, input.endAt),
+      ),
+    )
+    .orderBy(desc(performanceSnapshots.capturedAt))
+    .then((rows) => rows.map((row) => {
+      const idleValueUsd = row.metadataJson.idleValueUsd;
+      const depositValueUsd = row.metadataJson.depositValueUsd;
+      const strategyValueUsd = row.metadataJson.strategyValueUsd;
+      const hasDeployedValue =
+        typeof depositValueUsd === "number" || typeof depositValueUsd === "string"
+        || typeof strategyValueUsd === "number" || typeof strategyValueUsd === "string";
+
+      return {
+        capturedAt: row.capturedAt,
+        totalValueUsd: row.totalValueUsd,
+        deployedValueUsd: hasDeployedValue ? String(Number(depositValueUsd ?? 0) + Number(strategyValueUsd ?? 0)) : null,
+        idleValueUsd: typeof idleValueUsd === "number" || typeof idleValueUsd === "string" ? String(idleValueUsd) : null,
+        metadataJson: {
+          ...row.metadataJson,
+          snapshotKind: "analysis_engine_daily",
+          source: "analyzed_history",
+        },
+      };
+    }));
 }
 
 export async function getLatestOverviewPortfolioSnapshot(input: ScopedWalletInput) {

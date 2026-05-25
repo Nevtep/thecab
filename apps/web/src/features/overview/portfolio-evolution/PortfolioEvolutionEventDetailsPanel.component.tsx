@@ -1,5 +1,6 @@
 "use client";
 
+import { getExplorerBaseUrl } from "@/chains/chains";
 import { CabCard, CabStack, CabText, CabTxHash } from "@/design-system";
 import { cabColors } from "@/design-system/tokens";
 import { getOverviewTimeUnit } from "@/features/overview/overviewRange.utils";
@@ -9,14 +10,18 @@ import {
 } from "@/features/overview/portfolio-evolution/portfolioEvolution.meta";
 import { EventGlyph } from "@/features/overview/portfolio-evolution/PortfolioEvolutionEventSummary.component";
 import type { OverviewRange } from "@/features/overview/overview.types";
-import type { PortfolioEvolutionDatum } from "@/features/overview/portfolio-evolution/portfolioEvolution.utils";
-import { formatDateTime, formatRelativeTime, formatUsd } from "@/i18n/formatters";
+import {
+  formatPortfolioEvolutionBucketTimestamp,
+  type PortfolioEvolutionDatum,
+} from "@/features/overview/portfolio-evolution/portfolioEvolution.utils";
+import { formatRelativeTime, formatUsd } from "@/i18n/formatters";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 type PortfolioEvolutionEventDetailsPanelProps = {
   selectedPoint: PortfolioEvolutionDatum | null;
   latestEventOccurredAt: string | null;
+  chainId: number;
   locale: string;
   range: OverviewRange;
 };
@@ -24,6 +29,7 @@ type PortfolioEvolutionEventDetailsPanelProps = {
 export function PortfolioEvolutionEventDetailsPanel({
   selectedPoint,
   latestEventOccurredAt,
+  chainId,
   locale,
   range,
 }: PortfolioEvolutionEventDetailsPanelProps) {
@@ -67,7 +73,7 @@ export function PortfolioEvolutionEventDetailsPanel({
             {t("portfolioEvolution.selectedPoint.title")}
           </CabText>
           <CabText variant="caption" fontSize={12} color={cabColors.text.secondary}>
-            {selectedPoint ? formatDateTime(selectedPoint.capturedAt, locale) : t(`portfolioEvolution.selectedPoint.empty${timeUnitSuffix}`)}
+            {selectedPoint ? formatPortfolioEvolutionBucketTimestamp(selectedPoint.capturedAt, range, locale) : t(`portfolioEvolution.selectedPoint.empty${timeUnitSuffix}`)}
           </CabText>
           {selectedPoint ? (
             <CabText variant="mono" fontSize={11} color={cabColors.text.muted}>
@@ -141,10 +147,16 @@ export function PortfolioEvolutionEventDetailsPanel({
                     {formatRelativeTime(event.occurredAt, locale)}
                   </CabText>
                   <CabStack gap="$1.5">
-                    <CabText variant="caption" fontSize={12} color={cabColors.text.secondary}>
-                      {event.detail ?? t("portfolioEvolution.selectedPoint.noEventDetail")}
-                    </CabText>
-                    {event.txHash ? <CabTxHash hash={event.txHash} /> : null}
+                    {event.detail ? (
+                      <CabText variant="caption" fontSize={12} color={cabColors.text.secondary}>
+                        {event.detail}
+                      </CabText>
+                    ) : !event.txHash ? (
+                      <CabText variant="caption" fontSize={12} color={cabColors.text.secondary}>
+                        {t("portfolioEvolution.selectedPoint.noEventDetail")}
+                      </CabText>
+                    ) : null}
+                    {event.txHash ? <CabTxHash hash={event.txHash} href={`${getExplorerBaseUrl(chainId)}/tx/${event.txHash}`} /> : null}
                   </CabStack>
                 </div>
               ))}

@@ -18,6 +18,7 @@ import {
   getLatestOverviewPortfolioSnapshot,
   readLatestOverviewPricePoints,
   readKnownProtocolContracts,
+  readOverviewAnalyzedPortfolioSnapshots,
   readRecentOverviewAnalyzedActivity,
   readOverviewPricePointsInRange,
   readOverviewPortfolioSnapshots,
@@ -162,6 +163,26 @@ function resolveAeroRewardValueUsd(
   return rewardValueUsd > 0 ? rewardValueUsd : null;
 }
 
+function isGovernanceEscrowDisplayEvent(input: {
+  classification: string | null;
+  metadataJson: Record<string, unknown>;
+}) {
+  const text = [
+    input.classification,
+    asString(input.metadataJson.category),
+    asString(input.metadataJson.methodLabel),
+    asString(input.metadataJson.summary),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return input.classification === "governance"
+    || text.includes("voting escrow")
+    || text.includes("veaero")
+    || (text.includes("escrow") && text.includes("aerodrome"));
+}
+
 function resolveOverviewActivityDisplayClassification(input: {
   classification: string | null;
   metadataJson: Record<string, unknown>;
@@ -198,6 +219,13 @@ function resolveOverviewActivityDisplayClassification(input: {
 
   if (text.includes("approve") || input.classification === "approve") {
     return "approve";
+  }
+
+  if (isGovernanceEscrowDisplayEvent({
+    classification: input.classification,
+    metadataJson: input.metadataJson,
+  })) {
+    return "governance";
   }
 
   if (text.includes("claim") || text.includes("collect") || input.classification === "claim") {
@@ -508,14 +536,72 @@ function isCoreRebalanceSwapCandidate(input: {
   });
 }
 
+export function buildOverviewRewardFallbackEvents(input: {
+  range: OverviewRange;
+  rewardRows: Array<{
+    occurredAt: Date;
+    amountUsd: string | number | null;
+    txHash: string;
+  }>;
+  existingTxHashes?: Iterable<string>;
+}) {
+  const granularity = getRecentOverviewBucketConfig(input.range).granularity;
+  const existingTxHashes = new Set(
+    Array.from(input.existingTxHashes ?? [], (txHash) => txHash.toLowerCase()),
+  );
+  const rewardFallbackEventsByTxHash = new Map<string, OverviewResponse["chart"]["events"][number]>();
+
+  for (const rewardRow of input.rewardRows) {
+    const txHash = rewardRow.txHash.toLowerCase();
+    if (existingTxHashes.has(txHash)) {
+      continue;
+    }
+
+    const rewardValueUsd = asNumber(rewardRow.amountUsd);
+    if ((rewardValueUsd ?? 0) <= 0) {
+      continue;
+    }
+
+    const existingEvent = rewardFallbackEventsByTxHash.get(txHash);
+    if (!existingEvent) {
+      rewardFallbackEventsByTxHash.set(txHash, {
+        id: `reward-${txHash}`,
+        type: "claim",
+        occurredAt: rewardRow.occurredAt.toISOString(),
+        capturedAt: toBucketTimestamp(rewardRow.occurredAt.toISOString(), granularity),
+        detail: null,
+        txHash: rewardRow.txHash,
+        rewardValueUsd,
+      });
+      continue;
+    }
+
+    rewardFallbackEventsByTxHash.set(txHash, {
+      ...existingEvent,
+      occurredAt: rewardRow.occurredAt < new Date(existingEvent.occurredAt)
+        ? rewardRow.occurredAt.toISOString()
+        : existingEvent.occurredAt,
+      rewardValueUsd: (existingEvent.rewardValueUsd ?? 0) + rewardValueUsd,
+    });
+  }
+
+  return Array.from(rewardFallbackEventsByTxHash.values()).sort((left, right) =>
+    left.occurredAt.localeCompare(right.occurredAt),
+  );
+}
+
 function buildOverviewChartEvents(input: {
   rows: Awaited<ReturnType<typeof readRecentOverviewAnalyzedActivity>>;
   range: OverviewRange;
   rewardValueByTxHash?: Map<string, number>;
+  rewardRows?: Array<{
+    occurredAt: Date;
+    amountUsd: string | number | null;
+    txHash: string;
+  }>;
 }) {
   const granularity = getRecentOverviewBucketConfig(input.range).granularity;
-
-  return input.rows.flatMap((row) => {
+  const events = input.rows.flatMap((row) => {
     const baseClassification = resolveOverviewActivityDisplayClassification({
       classification: row.classification,
       metadataJson: row.metadataJson,
@@ -559,6 +645,18 @@ function buildOverviewChartEvents(input: {
       rewardValueUsd,
     }] satisfies OverviewResponse["chart"]["events"];
   });
+
+  const rewardFallbackEvents = buildOverviewRewardFallbackEvents({
+    range: input.range,
+    rewardRows: input.rewardRows ?? [],
+    existingTxHashes: events
+      .map((event) => event.txHash)
+      .filter((txHash): txHash is string => Boolean(txHash)),
+  });
+
+  return [...events, ...rewardFallbackEvents].sort((left, right) =>
+    left.occurredAt.localeCompare(right.occurredAt),
+  );
 }
 
 function buildDistributionCompositionLabel(
@@ -1072,245 +1170,15 @@ export async function getRecentOverviewChart(input: OverviewRequest): Promise<Ov
 }
 
 export async function getRecentOverviewCurrentState(input: OverviewRequest): Promise<OverviewResponse> {
-  const response = createEmptyRecentOverviewResponse(input);
-  const now = new Date();
-  const bucketTimestamps = buildBucketTimestamps(input.range, now);
-  const rangeStartAt = new Date(bucketTimestamps[0] ?? now.toISOString());
-  const [tokensResult, latestRun, freshness, protocolMetadata, realizedRewardRows] = await Promise.all([
-    getWalletTokens(input.walletAddress, input.chainId).then(
-      (value) => ({ status: "fulfilled" as const, value }),
-      (error) => ({ status: "rejected" as const, reason: sanitizeProviderError(error) }),
-    ),
-    getLatestAnalysisRun(input.walletAddress, input.chainId),
-    readOverviewFreshness(input),
-    readKnownProtocolContracts({ chainId: input.chainId }),
-    readOverviewRealizedRewardEvents({
-      walletAddress: input.walletAddress,
-      chainId: input.chainId,
-      startAt: rangeStartAt,
-      endAt: now,
-    }),
-  ]);
+  try {
+    return await getRecentOverview(input);
+  } catch (error) {
+    if (!isProviderRequestFailed(error)) {
+      throw error;
+    }
 
-  if (tokensResult.status === "rejected") {
     return getRecentOverviewCurrentStateFallback(input);
   }
-  const tokens = tokensResult.value.result ?? [];
-  const estimatedRealizedRewardsUsd = sumRewardEventValueUsd(realizedRewardRows);
-  response.analysis = createOverviewAnalysisState({ latestRun, freshness });
-
-  await insertOverviewRawProviderRecord({
-    walletAddress: input.walletAddress,
-    chainId: input.chainId,
-    provider: "moralis",
-    endpoint: "/wallets/:walletAddress/tokens",
-    requestJson: { walletAddress: input.walletAddress, chainId: input.chainId },
-    responseJson: {
-      resultCount: tokens.length,
-      tokens: tokens.map((token) => sanitizeMoralisTokenForPersistence(token as MoralisTokenRecord)),
-    },
-  });
-
-  const tokenPricingContexts = tokens.map((token) => {
-    const tokenAddress = asString(token.token_address)?.toLowerCase() ?? null;
-    const symbol = asString(token.symbol) ?? "UNKNOWN";
-    const name = asString(token.name);
-    const pricingAddress = resolveAlchemyPricingAddress(input.chainId, tokenAddress, symbol, {
-      name,
-      nativeToken: asBoolean(token.native_token),
-      verifiedContract: asBoolean(token.verified_contract),
-    });
-
-    return {
-      token,
-      tokenAddress,
-      symbol,
-      name,
-      pricingAddress,
-      moralisValueUsd: asNumber(token.usd_value),
-      isPriorityPricingAsset: isPriorityPricingAsset(pricingAddress),
-    };
-  });
-
-  const uniqueTokenAddresses = Array.from(
-    new Map(
-      [...tokenPricingContexts]
-        .sort((left, right) => {
-          if (left.isPriorityPricingAsset !== right.isPriorityPricingAsset) {
-            return Number(right.isPriorityPricingAsset) - Number(left.isPriorityPricingAsset);
-          }
-
-          return (right.moralisValueUsd ?? -1) - (left.moralisValueUsd ?? -1);
-        })
-        .filter((context) => Boolean(context.pricingAddress))
-        .map((context) => [context.pricingAddress as string, context]),
-    ).keys(),
-  );
-
-  const priceLookup = new Map<string, { priceUsd: number; pricedAt: string | null; confidence: "high" | "medium" }>();
-  const priceFetchFailed = await hydrateCurrentPriceLookup({
-    walletAddress: input.walletAddress,
-    chainId: input.chainId,
-    addresses: uniqueTokenAddresses,
-    now,
-    priceLookup,
-  });
-
-  const hydratedAssetRows = tokenPricingContexts.map((context) => {
-    const decimals = asNumber(context.token.decimals);
-    const balanceRaw = asString(context.token.balance);
-    const balance = asString(context.token.balance_formatted) ?? formatBalance(balanceRaw, decimals);
-    const pricingAddress = context.pricingAddress;
-    const priceEntry = pricingAddress ? priceLookup.get(pricingAddress) : null;
-    const priceUsd = priceEntry?.priceUsd ?? null;
-    const valueUsd = priceUsd !== null ? Number.parseFloat(balance) * priceUsd : null;
-    const knownProtocolMatch = resolveKnownProtocolAssetMatch(
-      input.chainId,
-      context.tokenAddress,
-      protocolMetadata,
-    );
-    const trustInput: AssetTrustClassifierInput = {
-      walletAddress: input.walletAddress.toLowerCase(),
-      chainId: input.chainId,
-      tokenAddress: context.tokenAddress,
-      symbol: context.symbol,
-      name: context.name,
-      balanceRaw: balanceRaw ?? "0",
-      balanceFormatted: balance,
-      valueUsd,
-      hasReliableAlchemyPrice: priceEntry !== null,
-      moralisPossibleSpam: asBooleanOrNull(context.token.possible_spam),
-      moralisVerifiedContract: asBooleanOrNull(context.token.verified_contract),
-      hasLogo: hasTokenLogo(context.token),
-      hasMetadata: hasTokenMetadata(context.symbol, context.name, decimals),
-      isKnownProtocolAsset: knownProtocolMatch !== null,
-      isNativeAsset: asBoolean(context.token.native_token),
-      isDustValue: valueUsd !== null ? valueUsd < DUST_VALUE_THRESHOLD_USD : Number.parseFloat(balance) === 0,
-      classifierVersion: ASSET_TRUST_CLASSIFIER_VERSION,
-    };
-    const trustClassification = classifyWalletAssetTrust(trustInput, {
-      knownProtocolReasonCode: knownProtocolMatch?.reasonCode ?? null,
-    });
-
-    return {
-      assetRow: {
-        tokenAddress: context.tokenAddress,
-        chainId: input.chainId,
-        symbol: context.symbol,
-        name: context.name,
-        balance,
-        priceUsd,
-        valueUsd,
-        movement24hPct: null,
-        movement7dPct: null,
-        classification: "idle" as const,
-        priceConfidence: priceEntry?.confidence ?? null,
-        trustStatus: trustClassification.trustStatus,
-        trustReasonCodes: trustClassification.trustReasonCodes,
-        isHiddenByDefault: trustClassification.isHiddenByDefault,
-        classifierVersion: trustClassification.classifierVersion,
-      },
-      trustInput,
-      knownProtocolConflict:
-        knownProtocolMatch !== null && asBooleanOrNull(context.token.possible_spam) === true,
-    };
-  });
-
-  const assetRows = hydratedAssetRows.map((row) => row.assetRow);
-  const hiddenAssetRows = hydratedAssetRows.filter((row) => row.assetRow.isHiddenByDefault);
-  const visibleAssetRows = hydratedAssetRows.filter((row) => !row.assetRow.isHiddenByDefault);
-  const pricedVisibleAssetRows = visibleAssetRows.filter((row) => row.assetRow.valueUsd !== null);
-  const idleValueUsd = sumNullableUsd(pricedVisibleAssetRows.map((row) => row.assetRow.valueUsd));
-  const hiddenAssetReasonCodes = buildHiddenAssetReasonCodes(hiddenAssetRows);
-  const exclusionSummary = buildExclusionSummary(hiddenAssetRows, visibleAssetRows);
-  const missingPrices = assetRows.some((row) => row.priceUsd === null);
-  const uniqueCoverageReasonCodes = Array.from(
-    new Set([
-      ...buildCoverageReasonCodes(hydratedAssetRows, {
-        providerPartial: priceFetchFailed,
-        chartPartial: false,
-        hasRecentActivity: true,
-      }),
-    ]),
-  );
-  const coverageStatus =
-    priceFetchFailed ||
-    missingPrices ||
-    hiddenAssetRows.length > 0 ||
-    Boolean(exclusionSummary)
-      ? "partial"
-      : "recent";
-
-  response.coverage = {
-    status: coverageStatus,
-    confidence: coverageStatus === "partial" ? "medium" : "high",
-    reasonCodes: uniqueCoverageReasonCodes,
-    details: null,
-  };
-  response.summary = {
-    ...response.summary,
-    coverageStatus,
-    coverageReasonCodes: uniqueCoverageReasonCodes,
-    lastRefreshedAt: now.toISOString(),
-  };
-  response.metrics = {
-    ...response.metrics,
-    coverageStatus,
-    coverageReasonCodes: uniqueCoverageReasonCodes,
-    netPortfolioValueUsd: null,
-    deployedValueUsd: null,
-    idleValueUsd,
-    estimatedRealizedRewardsUsd,
-    exclusions: exclusionSummary,
-  };
-  response.assets = {
-    ...response.assets,
-    coverageStatus,
-    coverageReasonCodes: uniqueCoverageReasonCodes,
-    rows: assetRows,
-    hiddenSummary:
-      hiddenAssetRows.length > 0
-        ? {
-            hiddenCount: hiddenAssetRows.length,
-            hiddenValueUsd: sumNullableUsd(hiddenAssetRows.map((row) => row.assetRow.valueUsd)),
-            reasonCodes: hiddenAssetReasonCodes,
-            affectsTotals: true,
-            allVisibleAssetsUnpricedOrZero:
-              visibleAssetRows.length === 0 ||
-              visibleAssetRows.every((row) => (row.assetRow.valueUsd ?? 0) <= 0),
-          }
-        : null,
-    defaultVisibleCount: visibleAssetRows.length,
-  };
-  response.distribution = {
-    ...response.distribution,
-    coverageStatus,
-    coverageReasonCodes: uniqueCoverageReasonCodes,
-    exclusions: exclusionSummary,
-    slices: idleValueUsd && idleValueUsd > 0
-      ? [{
-          dimension: "idle",
-          label: "Idle assets",
-          valueUsd: idleValueUsd,
-          coverageStatus,
-          composition: null,
-        }]
-      : [],
-  };
-
-  await upsertOverviewFreshness({
-    walletAddress: input.walletAddress,
-    chainId: input.chainId,
-    lastAnalyzedAt: freshness?.lastAnalyzedAt ?? null,
-    lastSuccessfulRunId: freshness?.lastSuccessfulRunId ?? null,
-    metadataJson: {
-      ...(freshness?.metadataJson ?? {}),
-      lastOverviewRefreshedAt: now.toISOString(),
-      lastOverviewRange: input.range,
-    },
-  });
-
-  return response;
 }
 
 type MoralisHistoryRecord = Record<string, unknown>;
@@ -2194,13 +2062,21 @@ async function getRecentOverviewChartFallback(input: OverviewRequest): Promise<O
   const bucketConfig = getRecentOverviewBucketConfig(input.range);
   const bucketTimestamps = buildBucketTimestamps(input.range, now);
   const rangeStartAt = new Date(bucketTimestamps[0] ?? now.toISOString());
-  const [historicalSnapshotRows, realizedRewardRows] = await Promise.all([
+  const [historicalSnapshotRows, analyzedSnapshotRows, realizedRewardRows] = await Promise.all([
     readOverviewPortfolioSnapshots({
       walletAddress: input.walletAddress,
       chainId: input.chainId,
       startAt: rangeStartAt,
       endAt: now,
     }),
+    canUseAnalyzedOverviewActivity(response.analysis.status) && bucketConfig.granularity === "day"
+      ? readOverviewAnalyzedPortfolioSnapshots({
+          walletAddress: input.walletAddress,
+          chainId: input.chainId,
+          startAt: rangeStartAt,
+          endAt: now,
+        })
+      : Promise.resolve([]),
     readOverviewRealizedRewardEvents({
       walletAddress: input.walletAddress,
       chainId: input.chainId,
@@ -2217,7 +2093,7 @@ async function getRecentOverviewChartFallback(input: OverviewRequest): Promise<O
   const snapshotValuesByBucket = buildSnapshotValueLookup({
     range: input.range,
     granularity: bucketConfig.granularity,
-    snapshotRows: historicalSnapshotRows,
+    snapshotRows: [...historicalSnapshotRows, ...analyzedSnapshotRows],
     currentPoint: {
       capturedAt: now,
       totalValueUsd: response.metrics.netPortfolioValueUsd,
@@ -2563,12 +2439,22 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
     priceLookup,
   });
 
-  const historicalSnapshotRows = await readOverviewPortfolioSnapshots({
-    walletAddress: input.walletAddress,
-    chainId: input.chainId,
-    startAt: rangeStartAt,
-    endAt: now,
-  });
+  const [historicalSnapshotRows, analyzedSnapshotRows] = await Promise.all([
+    readOverviewPortfolioSnapshots({
+      walletAddress: input.walletAddress,
+      chainId: input.chainId,
+      startAt: rangeStartAt,
+      endAt: now,
+    }),
+    canUseAnalyzedOverviewActivity(response.analysis.status) && bucketConfig.granularity === "day"
+      ? readOverviewAnalyzedPortfolioSnapshots({
+          walletAddress: input.walletAddress,
+          chainId: input.chainId,
+          startAt: rangeStartAt,
+          endAt: now,
+        })
+      : Promise.resolve([]),
+  ]);
 
   historicalPriceFetchFailed = await hydrateHistoricalPriceLookup({
     walletAddress: input.walletAddress,
@@ -2774,7 +2660,7 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
   const snapshotValuesByBucket = buildSnapshotValueLookup({
     range: input.range,
     granularity: bucketConfig.granularity,
-    snapshotRows: historicalSnapshotRows,
+    snapshotRows: [...historicalSnapshotRows, ...analyzedSnapshotRows],
     currentPoint: {
       capturedAt: now,
       totalValueUsd,
@@ -2893,6 +2779,7 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
       rows: analyzedActivityRows,
       range: input.range,
       rewardValueByTxHash,
+      rewardRows: realizedRewardRows,
     }),
   };
 

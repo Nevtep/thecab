@@ -211,3 +211,25 @@ test("buildPortfolioEvolutionModel normalizes rewards to zero across every bucke
   );
   assert.equal(model.summary.accumulatedRewardsUsd, 0);
 });
+
+test("buildPortfolioEvolutionModel formats 30d bucket labels in UTC day buckets", () => {
+  const viewModel = createViewModel();
+  viewModel.chart.points = [
+    {
+      capturedAt: "2026-05-25T00:00:00.000Z",
+      totalValueUsd: 308999.65,
+      deployedValueUsd: 300375.04,
+      idleValueUsd: 8624.61,
+      rewardValueUsd: 0,
+    },
+  ];
+
+  const model = buildPortfolioEvolutionModel({
+    viewModel,
+    range: "30d",
+    locale: "en",
+    activity: null,
+  });
+
+  assert.equal(model.data[0]?.axisLabel, "May 25");
+});

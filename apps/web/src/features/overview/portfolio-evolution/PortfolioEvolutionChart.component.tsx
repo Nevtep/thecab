@@ -166,6 +166,7 @@ export function PortfolioEvolutionChart({
   onHoverCapturedAt,
   onOpenDetails,
 }: PortfolioEvolutionChartProps) {
+  const axisLabelByCapturedAt = new Map(data.map((point) => [point.capturedAt, point.axisLabel] as const));
   const portfolioValues = data.flatMap((point) => [point.totalValueUsd, point.deployedValueUsd, point.idleValueUsd])
     .filter((value): value is number => value !== null);
   const rewardBucketValues = data.map((point) => point.rewardValueUsd).filter((value): value is number => value !== null);
@@ -250,7 +251,7 @@ export function PortfolioEvolutionChart({
                 padding={{ left: 0, right: 0 }}
                 stroke={cabColors.text.muted}
                 tick={{ fontSize: 12 }}
-                tickFormatter={(_, index) => data[index]?.axisLabel ?? ""}
+                tickFormatter={(value) => typeof value === "string" ? (axisLabelByCapturedAt.get(value) ?? "") : ""}
                 minTickGap={24}
               />
               <YAxis
@@ -390,7 +391,7 @@ export function PortfolioEvolutionChart({
                   padding={{ left: 0, right: 0 }}
                   stroke={cabColors.text.muted}
                   tick={{ fontSize: 12 }}
-                  tickFormatter={(_, index) => data[index]?.axisLabel ?? ""}
+                  tickFormatter={(value) => typeof value === "string" ? (axisLabelByCapturedAt.get(value) ?? "") : ""}
                   minTickGap={24}
                 />
                 <YAxis

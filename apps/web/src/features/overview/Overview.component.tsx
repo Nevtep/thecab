@@ -684,6 +684,7 @@ export function OverviewComponent({
   const openTransactionLabel = t("activity.openInExplorer");
   const navigationItems = getOverviewNavigationItems(activeAnalysis.status);
   const analysisAction = getOverviewAnalysisAction(activeAnalysis.status);
+  const isHistoricalAnalysisReady = activeAnalysis.status === "ready" || activeAnalysis.status === "stale";
   const exclusionMessage = buildExclusionMessage(overviewViewModel?.metrics.exclusions ?? null, t, locale);
   const visibleRenderableRows = visibleAssetRows.filter((row) => {
     if (!showUnpricedAssets && row.priceUsd === null) {
@@ -963,6 +964,15 @@ export function OverviewComponent({
                 title={t("states.emptyTitle")}
                 description={t("states.emptyDescription")}
               />
+            ) : !isHistoricalAnalysisReady ? (
+              <CabCard density="spacious">
+                <CabEmptyState
+                  title={t("portfolioEvolution.awaitingAnalysisTitle")}
+                  description={t("portfolioEvolution.awaitingAnalysisDescription")}
+                  actionLabel={analysisAction.visible && analysisAction.labelKey ? t(analysisAction.labelKey) : undefined}
+                  onAction={analysisAction.visible && analysisAction.mode ? () => onStartAnalysis(analysisAction.mode) : undefined}
+                />
+              </CabCard>
             ) : (
               <PortfolioEvolutionSection
                 viewModel={resolvedChartViewModel}

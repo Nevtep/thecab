@@ -178,6 +178,7 @@ export function PortfolioEvolutionSection({
           <PortfolioEvolutionEventDetailsPanel
             selectedPoint={selectedPoint}
             latestEventOccurredAt={resolvedModel.footer.latestEvent?.occurredAt ?? null}
+            chainId={viewModel.chainId}
             locale={locale}
             range={range}
           />

@@ -69,14 +69,30 @@ function toBucketTimestamp(timestamp: string, range: OverviewRange) {
   return date.toISOString();
 }
 
-function formatAxisLabel(timestamp: string, range: OverviewRange, locale: string) {
+export function formatPortfolioEvolutionBucketLabel(timestamp: string, range: OverviewRange, locale: string) {
   const date = new Date(timestamp);
 
   if (range === "24h") {
     return new Intl.DateTimeFormat(locale, { hour: "numeric" }).format(date);
   }
 
-  return new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" }).format(date);
+  return new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", timeZone: "UTC" }).format(date);
+}
+
+export function formatPortfolioEvolutionBucketTimestamp(timestamp: string, range: OverviewRange, locale: string) {
+  const date = new Date(timestamp);
+
+  if (range === "24h") {
+    return new Intl.DateTimeFormat(locale, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(date);
+  }
+
+  return new Intl.DateTimeFormat(locale, {
+    dateStyle: "medium",
+    timeZone: "UTC",
+  }).format(date);
 }
 
 function buildMarkerBucketsFromChartEvents(
@@ -245,7 +261,7 @@ export function buildPortfolioEvolutionModel(input: {
 
     return {
       capturedAt: point.capturedAt,
-      axisLabel: formatAxisLabel(point.capturedAt, input.range, input.locale),
+      axisLabel: formatPortfolioEvolutionBucketLabel(point.capturedAt, input.range, input.locale),
       totalValueUsd: point.totalValueUsd,
       deployedValueUsd: point.deployedValueUsd,
       idleValueUsd: point.idleValueUsd,

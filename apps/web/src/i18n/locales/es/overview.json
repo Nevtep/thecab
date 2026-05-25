@@ -38,6 +38,8 @@
   },
   "portfolioEvolution": {
     "subtitle": "Crecimiento histórico y eventos clave del portfolio",
+    "awaitingAnalysisTitle": "Evolución histórica pendiente",
+    "awaitingAnalysisDescription": "Realizá un análisis para ver la evolución del portfolio, los claims clasificados y los eventos históricos completos.",
     "legend": {
       "series": "Series visibles",
       "events": "Eventos del timeline"
