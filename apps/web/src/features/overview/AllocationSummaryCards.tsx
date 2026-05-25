@@ -39,6 +39,12 @@ export function AllocationSummaryCards({ items, selectedKey, onSelect }: Allocat
                 type="button"
                 aria-pressed={isSelected}
                 onClick={() => onSelect(item.key)}
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                }}
+                onPointerUp={(event) => {
+                  event.currentTarget.blur();
+                }}
                 style={{
                   width: "100%",
                   display: "flex",

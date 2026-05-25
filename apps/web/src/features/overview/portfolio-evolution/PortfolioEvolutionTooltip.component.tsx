@@ -1,13 +1,13 @@
 "use client";
 
-import { CabBadge, CabCard, CabStack, CabText, CabTxHash } from "@/design-system";
+import { CabCard, CabStack, CabText } from "@/design-system";
 import { cabColors } from "@/design-system/tokens";
 import {
-  portfolioEvolutionEventMeta,
   portfolioEvolutionSeriesMeta,
 } from "@/features/overview/portfolio-evolution/portfolioEvolution.meta";
+import { PortfolioEvolutionEventSummary } from "@/features/overview/portfolio-evolution/PortfolioEvolutionEventSummary.component";
 import type { PortfolioEvolutionDatum } from "@/features/overview/portfolio-evolution/portfolioEvolution.utils";
-import { formatDateTime, formatRelativeTime, formatUsd } from "@/i18n/formatters";
+import { formatDateTime, formatUsd } from "@/i18n/formatters";
 import { useTranslation } from "react-i18next";
 
 type PortfolioEvolutionTooltipProps = {
@@ -71,77 +71,32 @@ export function PortfolioEvolutionTooltip({ active, payload, locale }: Portfolio
   return (
     <div style={{ minWidth: 316, maxWidth: 360 }}>
       <CabCard density="default">
-      <CabStack gap="$3.5">
-        <CabText variant="label" fontSize={13} color={cabColors.text.primary}>
-          {formatDateTime(datum.capturedAt, locale)}
-        </CabText>
-        <CabStack gap="$2.5">
-          {rows.map((row) => (
-            <CabStack key={row.key} row justifyContent="space-between" alignItems="center" gap="$3">
-              <CabStack row alignItems="center" gap="$2">
-                <ColorDot color={row.color} />
-                <CabText variant="caption" fontSize={12} color={cabColors.text.secondary}>
-                  {row.label}
+        <CabStack gap="$3.5">
+          <CabText variant="label" fontSize={13} color={cabColors.text.primary}>
+            {formatDateTime(datum.capturedAt, locale)}
+          </CabText>
+          <CabStack gap="$2.5">
+            {rows.map((row) => (
+              <CabStack key={row.key} row justifyContent="space-between" alignItems="center" gap="$3">
+                <CabStack row alignItems="center" gap="$2">
+                  <ColorDot color={row.color} />
+                  <CabText variant="caption" fontSize={12} color={cabColors.text.secondary}>
+                    {row.label}
+                  </CabText>
+                </CabStack>
+                <CabText variant="mono" fontSize={12} color={cabColors.text.primary}>
+                  {row.value === null ? t("states.unavailableValue") : formatUsd(row.value, locale)}
                 </CabText>
               </CabStack>
-              <CabText variant="mono" fontSize={12} color={cabColors.text.primary}>
-                {row.value === null ? t("states.unavailableValue") : formatUsd(row.value, locale)}
-              </CabText>
-            </CabStack>
-          ))}
-        </CabStack>
-        {datum.events.length > 0 ? (
-          <CabStack gap="$2.5">
-            <CabText variant="caption" fontSize={11} color={cabColors.text.muted}>
-              {t("portfolioEvolution.legend.events")}
-            </CabText>
-            <div
-              style={{
-                display: "grid",
-                gap: 8,
-                maxHeight: 188,
-                overflowY: "auto",
-                paddingRight: 4,
-              }}
-            >
-              {datum.events.map((event) => (
-                <div
-                  key={event.id}
-                  style={{
-                    display: "grid",
-                    gap: 6,
-                    padding: 10,
-                    borderRadius: 12,
-                    border: `1px solid ${cabColors.surface.border}`,
-                    background: "rgba(15, 24, 38, 0.72)",
-                  }}
-                >
-                  <CabStack row justifyContent="space-between" alignItems="center" gap="$2">
-                    <CabStack row alignItems="center" gap="$2">
-                      <ColorDot color={portfolioEvolutionEventMeta[event.type].color} />
-                      <CabBadge tone={portfolioEvolutionEventMeta[event.type].tone} size="sm">
-                        {t(portfolioEvolutionEventMeta[event.type].labelKey)}
-                      </CabBadge>
-                    </CabStack>
-                    <CabText variant="caption" fontSize={11} color={cabColors.text.muted}>
-                      {formatRelativeTime(event.occurredAt, locale)}
-                    </CabText>
-                  </CabStack>
-                  <CabText variant="caption" fontSize={12} color={cabColors.text.secondary}>
-                    {event.detail ?? t("portfolioEvolution.selectedPoint.noEventDetail")}
-                  </CabText>
-                  {event.txHash ? (
-                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                      <ColorDot color={portfolioEvolutionEventMeta[event.type].color} />
-                      <CabTxHash hash={event.txHash} />
-                    </div>
-                  ) : null}
-                </div>
-              ))}
-            </div>
+            ))}
           </CabStack>
-        ) : null}
-      </CabStack>
+          {datum.events.length > 0 ? (
+            <PortfolioEvolutionEventSummary
+              events={datum.events}
+              locale={locale}
+            />
+          ) : null}
+        </CabStack>
       </CabCard>
     </div>
   );

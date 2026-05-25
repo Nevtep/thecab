@@ -13,6 +13,19 @@
   box-shadow: 0 0 0 5px var(--cab-focus-ring-glow, rgba(0, 224, 225, 0.12));
 }
 
+/* Recharts SVG surfaces used as passive pointer targets should never paint mouse focus rings. */
+:where(
+  .cab-focus-root .cab-passive-chart-surface,
+  .cab-focus-root .cab-passive-chart-surface:focus,
+  .cab-focus-root .cab-passive-chart-surface:focus-visible,
+  .cab-focus-root .cab-passive-chart-surface:active
+) {
+  outline: none !important;
+  box-shadow: none !important;
+  -webkit-focus-ring-color: transparent;
+  -webkit-tap-highlight-color: transparent;
+}
+
 /* Skip link: hidden until keyboard focus (Tab). Jumps past nav to main content. */
 .cab-skip-link {
   position: fixed;

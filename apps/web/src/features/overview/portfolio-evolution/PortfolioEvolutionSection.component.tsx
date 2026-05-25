@@ -5,7 +5,7 @@ import type { OverviewRange, OverviewViewModel } from "@/features/overview/overv
 import {
   PortfolioEvolutionChart,
 } from "@/features/overview/portfolio-evolution/PortfolioEvolutionChart.component";
-import { PortfolioEvolutionEventsPanel } from "@/features/overview/portfolio-evolution/PortfolioEvolutionEventsPanel.component";
+import { PortfolioEvolutionEventDetailsPanel } from "@/features/overview/portfolio-evolution/PortfolioEvolutionEventDetailsPanel.component";
 import {
   PortfolioEvolutionHeader,
 } from "@/features/overview/portfolio-evolution/PortfolioEvolutionHeader.component";
@@ -60,6 +60,7 @@ export function PortfolioEvolutionSection({
   );
   const [visibleSeries, setVisibleSeries] = useState(defaultVisibleSeries);
   const [visibleEventTypes, setVisibleEventTypes] = useState<Partial<Record<PortfolioEvolutionEventType, boolean>>>({});
+  const [hoveredCapturedAt, setHoveredCapturedAt] = useState<string | null>(null);
   const [selectedCapturedAt, setSelectedCapturedAt] = useState<string | null>(null);
 
   useEffect(() => {
@@ -76,8 +77,8 @@ export function PortfolioEvolutionSection({
   }, [model.availableEventTypes]);
 
   useEffect(() => {
-    if (!selectedCapturedAt || !model.data.some((point) => point.capturedAt === selectedCapturedAt)) {
-      setSelectedCapturedAt(model.data.at(-1)?.capturedAt ?? null);
+    if (selectedCapturedAt && !model.data.some((point) => point.capturedAt === selectedCapturedAt)) {
+      setSelectedCapturedAt(null);
     }
   }, [model.data, selectedCapturedAt]);
 
@@ -88,7 +89,7 @@ export function PortfolioEvolutionSection({
     })),
     [model.data, visibleEventTypes],
   );
-  const selectedPoint = filteredData.find((point) => point.capturedAt === selectedCapturedAt) ?? filteredData.at(-1) ?? null;
+  const selectedPoint = filteredData.find((point) => point.capturedAt === selectedCapturedAt) ?? null;
 
   if (filteredData.length === 0) {
     return (
@@ -145,13 +146,14 @@ export function PortfolioEvolutionSection({
                 isRefreshing={isRefreshing}
                 visibleSeries={visibleSeries}
                 visibleEventTypes={visibleEventTypes}
-                selectedCapturedAt={selectedCapturedAt}
-                onSelectCapturedAt={setSelectedCapturedAt}
+                hoveredCapturedAt={hoveredCapturedAt}
+                onHoverCapturedAt={setHoveredCapturedAt}
+                onOpenDetails={setSelectedCapturedAt}
               />
             </CabStack>
           </CabCard>
 
-          <PortfolioEvolutionEventsPanel
+          <PortfolioEvolutionEventDetailsPanel
             selectedPoint={selectedPoint}
             latestEventOccurredAt={model.footer.latestEvent?.occurredAt ?? null}
             locale={locale}

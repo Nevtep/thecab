@@ -65,9 +65,27 @@ export function CabDonutChart({
 
   return (
     <CabChartFrame title={title} subtitle={subtitle} height={height}>
-      <div style={{ width: "100%", height: "100%", position: "relative" }}>
+      <div
+        style={{ width: "100%", height: "100%", position: "relative" }}
+        onMouseDownCapture={(event) => {
+          event.preventDefault();
+        }}
+        onPointerDownCapture={(event) => {
+          event.preventDefault();
+        }}
+        onPointerUpCapture={(event) => {
+          const activeElement = event.currentTarget.ownerDocument.activeElement;
+          if (activeElement && "blur" in activeElement && typeof activeElement.blur === "function") {
+            activeElement.blur();
+          }
+        }}
+      >
         <ResponsiveContainer>
-          <PieChart accessibilityLayer={false}>
+          <PieChart
+            accessibilityLayer={false}
+            tabIndex={-1}
+            className="cab-passive-chart-surface"
+          >
             {normalizedLevels.map((level, levelIndex) => (
               <Pie
                 key={`level-${levelIndex}`}

@@ -60,10 +60,17 @@
     },
     "selectedPoint": {
       "title": "Snapshot del punto seleccionado",
-      "empty": "Pasá por el gráfico para inspeccionar un punto",
+      "empty": "Hacé clic en un punto del gráfico para inspeccionar este bucket",
       "eventsTitle": "Eventos en este bucket",
+      "eventsCount_one": "{{count}} evento en este bucket",
+      "eventsCount_other": "{{count}} eventos en este bucket",
       "noEvents": "No hay eventos del timeline en este bucket",
       "noEventDetail": "No hay detalle adicional disponible para este evento"
+    },
+    "tooltip": {
+      "eventCount_one": "{{count}} evento",
+      "eventCount_other": "{{count}} eventos",
+      "clickHint": "Hacé clic para inspeccionar el detalle completo del bucket"
     },
     "footer": {
       "accumulatedRewards": "Rewards acumuladas",

@@ -1,3 +1,5 @@
+import { ArrowDownToLine, ArrowUpToLine, Coins, Landmark, Lock, RefreshCcw, type LucideIcon } from "lucide-react";
+
 import { cabColors } from "@/design-system/tokens";
 import type { PortfolioEvolutionEventType } from "@/features/overview/portfolio-evolution/portfolioEvolution.utils";
 
@@ -48,4 +50,22 @@ export const portfolioEvolutionEventMeta: Record<
     color: "#6366F1",
     tone: "info",
   },
+};
+
+export const portfolioEvolutionEventOrder: PortfolioEvolutionEventType[] = [
+  "claim",
+  "redeploy",
+  "move_to_idle",
+  "rebalance",
+  "lock",
+  "vote",
+];
+
+export const portfolioEvolutionEventIcons: Record<PortfolioEvolutionEventType, LucideIcon> = {
+  claim: Coins,
+  redeploy: ArrowUpToLine,
+  move_to_idle: ArrowDownToLine,
+  rebalance: RefreshCcw,
+  lock: Lock,
+  vote: Landmark,
 };

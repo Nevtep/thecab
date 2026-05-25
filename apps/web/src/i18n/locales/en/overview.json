@@ -60,10 +60,17 @@
     },
     "selectedPoint": {
       "title": "Selected point snapshot",
-      "empty": "Hover over the chart to inspect a point",
+      "empty": "Click a point in the chart to inspect this bucket",
       "eventsTitle": "Events in this bucket",
+      "eventsCount_one": "{{count}} event in this bucket",
+      "eventsCount_other": "{{count}} events in this bucket",
       "noEvents": "No timeline events in this bucket",
       "noEventDetail": "No additional event detail available"
+    },
+    "tooltip": {
+      "eventCount_one": "{{count}} event",
+      "eventCount_other": "{{count}} events",
+      "clickHint": "Click to inspect the full bucket detail"
     },
     "footer": {
       "accumulatedRewards": "Rewards accumulated",
