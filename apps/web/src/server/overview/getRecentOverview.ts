@@ -11,6 +11,7 @@ import {
   getCurrentTokenPricesByAddress,
   getHistoricalTokenPricesByAddress,
 } from "@/server/providers/alchemy";
+import { buildHistoricalComponentValueLookup } from "@/server/valuation/historicalValueLookup";
 import { getWalletDefiPositions, getWalletHistory, getWalletTokens } from "@/server/providers/moralis";
 import { detectProtocolPositions } from "@/server/protocol-positions/detectProtocolPositions";
 import {
@@ -1905,7 +1906,6 @@ function buildHistoricalProtocolValueLookup(input: {
     }>;
   } | null;
 }) {
-  const estimatedDeployedValueByBucket = new Map<string, number | null>();
   const manualArtifactByTokenId = new Map(
     (input.manualArtifacts?.positions ?? []).map((position) => [position.tokenId, position] as const),
   );
@@ -1969,42 +1969,15 @@ function buildHistoricalProtocolValueLookup(input: {
     }
   }
 
-  for (const bucketTimestamp of input.bucketTimestamps) {
-    let deployedValueUsd = 0;
-    let hasAnyValue = false;
-
-    for (const component of pricedComponents) {
-      if (component.token0Amount !== null) {
-        const price0 = input.seriesByToken.get(component.token0Address)?.get(bucketTimestamp);
-        if (price0 === undefined) {
-          hasPartialHistory = true;
-        } else {
-          deployedValueUsd += component.token0Amount * price0;
-          hasAnyValue = true;
-        }
-      } else {
-        hasPartialHistory = true;
-      }
-
-      if (component.token1Amount !== null) {
-        const price1 = input.seriesByToken.get(component.token1Address)?.get(bucketTimestamp);
-        if (price1 === undefined) {
-          hasPartialHistory = true;
-        } else {
-          deployedValueUsd += component.token1Amount * price1;
-          hasAnyValue = true;
-        }
-      } else {
-        hasPartialHistory = true;
-      }
-    }
-
-    estimatedDeployedValueByBucket.set(bucketTimestamp, hasAnyValue ? deployedValueUsd : null);
-  }
+  const estimatedValues = buildHistoricalComponentValueLookup({
+    bucketKeys: input.bucketTimestamps,
+    seriesByToken: input.seriesByToken,
+    components: pricedComponents,
+  });
 
   return {
-    estimatedDeployedValueByBucket,
-    hasPartialHistory,
+    estimatedDeployedValueByBucket: estimatedValues.valueByBucket,
+    hasPartialHistory: hasPartialHistory || estimatedValues.hasPartialHistory,
   };
 }
 

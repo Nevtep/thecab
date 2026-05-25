@@ -11,9 +11,10 @@ import {
   portfolioSnapshots,
   pricePoints,
   protocolContracts,
-  rewardEvents,
   strategyExposures,
 } from "@/server/db/schema";
+import { readOverviewRealizedRewardEvents } from "@/server/overview/overview.repository";
+import { buildHistoricalComponentValueLookup } from "@/server/valuation/historicalValueLookup";
 
 export type WalletTokenSnapshot = {
   tokenAddress: string;
@@ -255,7 +256,7 @@ export async function computeSnapshots(input: {
   const walletAddress = input.walletAddress.toLowerCase();
   const walletTokens = (input.walletTokens ?? []).filter((token) => !token.possibleSpam);
 
-  const [depositRows, exposureRows, rewardRows, poolRows, protocolAddressRows] = await Promise.all([
+  const [depositRows, exposureRows, poolRows, protocolAddressRows] = await Promise.all([
     db
       .select({ id: deposits.id, metadataJson: deposits.metadataJson, coverageStatus: deposits.coverageStatus })
       .from(deposits)
@@ -271,25 +272,6 @@ export async function computeSnapshots(input: {
       })
       .from(strategyExposures)
       .where(and(eq(strategyExposures.walletAddress, walletAddress), eq(strategyExposures.chainId, input.chainId))),
-    db
-      .select({
-        amountUsd: rewardEvents.amountUsd,
-        amountRaw: rewardEvents.amountRaw,
-        occurredAt: rewardEvents.occurredAt,
-        tokenAddress: rewardEvents.tokenAddress,
-        txHash: rewardEvents.txHash,
-        accrualSnapshotDayUtc: rewardEvents.accrualSnapshotDayUtc,
-        isAccrualSnapshot: rewardEvents.isAccrualSnapshot,
-      })
-      .from(rewardEvents)
-      .where(
-        and(
-          eq(rewardEvents.walletAddress, walletAddress),
-          eq(rewardEvents.chainId, input.chainId),
-          lte(rewardEvents.occurredAt, input.capturedAt),
-          gte(rewardEvents.occurredAt, new Date(`${input.startDayUtc}T00:00:00.000Z`)),
-        ),
-      ),
     input.poolTotals.length === 0
       ? Promise.resolve([])
       : db
@@ -442,17 +424,9 @@ export async function computeSnapshots(input: {
       ].filter((component): component is { tokenAddress: string; amount: number | null } => Boolean(component));
     }),
   ];
-  const rewardTxHashes = new Set(
-    rewardRows
-      .filter((row) => !row.isAccrualSnapshot)
-      .map((row) => row.txHash.toLowerCase()),
-  );
   const relevantTokenAddresses = new Set<string>([
     ...idleTokenAddresses,
     ...deployedComponents.map((component) => component.tokenAddress),
-    ...movementRows
-      .filter((row) => row.directionIn && rewardTxHashes.has(row.txHash.toLowerCase()))
-      .map((row) => row.tokenAddress.toLowerCase()),
   ]);
 
   const priceRows = relevantTokenAddresses.size === 0
@@ -488,101 +462,34 @@ export async function computeSnapshots(input: {
     }
   }
 
-  const rewardMovementValueByTxHash = new Map<string, number>();
-  for (const row of movementRows) {
-    if (!row.directionIn) {
-      continue;
-    }
-
-    const txHash = row.txHash.toLowerCase();
-    if (!rewardTxHashes.has(txHash)) {
-      continue;
-    }
-
-    const tokenAddress = row.tokenAddress.toLowerCase();
-    const movementMetadata = row.metadataJson ?? {};
-    const decimals = tokenMeta.get(tokenAddress)?.decimals ?? resolveKnownTokenDecimals({
-      chainId: input.chainId,
-      tokenAddress,
-      symbol: movementMetadata.symbol,
-      decimals: movementMetadata.decimals,
-    });
-    const dayUtc = dayUtcFromDate(row.occurredAt);
-    const priceUsd = resolveTokenPriceForDay({
-      tokenAddress,
-      dayUtc,
-      priceSeriesByToken,
-      latestPriceByToken,
-    }) ?? 0;
-    const tokenAmount = decimals !== null ? dividePow10(row.amountRaw, decimals) : 0;
-    const valueUsd = asNumber(row.amountUsd) ?? tokenAmount * priceUsd;
-
-    rewardMovementValueByTxHash.set(txHash, (rewardMovementValueByTxHash.get(txHash) ?? 0) + valueUsd);
-  }
-
   const rewardValueByDay = new Map<string, number>();
-  for (const row of rewardRows) {
-    const dayUtc = row.isAccrualSnapshot && row.accrualSnapshotDayUtc
-      ? row.accrualSnapshotDayUtc
-      : row.occurredAt.toISOString().slice(0, 10);
-    const tokenAddress = row.tokenAddress?.toLowerCase() ?? null;
-    const decimals = tokenAddress
-      ? resolveKnownTokenDecimals({
-          chainId: input.chainId,
-          tokenAddress,
-          symbol: null,
-          decimals: null,
-        })
-      : null;
-    const fallbackPriceUsd = tokenAddress
-      ? (resolveTokenPriceForDay({
-          tokenAddress,
-          dayUtc,
-          priceSeriesByToken,
-          latestPriceByToken,
-        }) ?? 0)
-      : 0;
-    const fallbackAmountUsd = tokenAddress && row.amountRaw && decimals !== null
-      ? dividePow10(row.amountRaw, decimals) * fallbackPriceUsd
-      : 0;
-    const realizedMovementValueUsd = !row.isAccrualSnapshot
-      ? (rewardMovementValueByTxHash.get(row.txHash.toLowerCase()) ?? null)
-      : null;
-    const resolvedRewardValueUsd =
-      realizedMovementValueUsd ??
-      asNumber(row.amountUsd) ??
-      fallbackAmountUsd;
-
-    rewardValueByDay.set(dayUtc, (rewardValueByDay.get(dayUtc) ?? 0) + resolvedRewardValueUsd);
+  const realizedRewardRows = await readOverviewRealizedRewardEvents({
+    walletAddress,
+    chainId: input.chainId,
+    startAt: new Date(`${input.startDayUtc}T00:00:00.000Z`),
+    endAt: input.capturedAt,
+  });
+  for (const row of realizedRewardRows) {
+    const dayUtc = row.occurredAt.toISOString().slice(0, 10);
+    rewardValueByDay.set(dayUtc, (rewardValueByDay.get(dayUtc) ?? 0) + (asNumber(row.amountUsd) ?? 0));
   }
-
+  const historicalDeployedValues = buildHistoricalComponentValueLookup({
+    bucketKeys: dayRows,
+    seriesByToken: priceSeriesByToken,
+    components: deployedComponents.map((component) => ({
+      token0Address: component.tokenAddress,
+      token1Address: component.tokenAddress,
+      token0Amount: component.amount,
+      token1Amount: null,
+    })),
+  });
   const deployedValueByDay = new Map<string, number>();
   for (const dayUtc of dayRows) {
-    let dayValueUsd = 0;
-    let hasAnyHistoricalComponent = false;
-
-    for (const component of deployedComponents) {
-      if (component.amount === null) {
-        continue;
-      }
-
-      const priceUsd = resolveTokenPriceForDay({
-        tokenAddress: component.tokenAddress,
-        dayUtc,
-        priceSeriesByToken,
-        latestPriceByToken,
-      });
-      if (priceUsd === null) {
-        continue;
-      }
-
-      hasAnyHistoricalComponent = true;
-      dayValueUsd += component.amount * priceUsd;
-    }
-
     deployedValueByDay.set(
       dayUtc,
-      dayUtc === input.endDayUtc || !hasAnyHistoricalComponent ? deployedValueUsd : dayValueUsd,
+      dayUtc === input.endDayUtc
+        ? deployedValueUsd
+        : (historicalDeployedValues.valueByBucket.get(dayUtc) ?? deployedValueUsd),
     );
   }
 
