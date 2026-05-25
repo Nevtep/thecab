@@ -1,9 +1,21 @@
 "use client";
 
-import type { ComponentType, SVGProps } from "react";
-
-import { CabChartFrame } from "@/design-system/charts/CabChartFrame";
-import { cabColors } from "@/design-system/tokens";
+import {
+  Area,
+  Bar,
+  CabChartFrame,
+  CabIcon,
+  CartesianGrid,
+  ComposedChart,
+  Line,
+  ReferenceDot,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+  cabColors,
+} from "@/design-system";
 import {
   portfolioEvolutionEventIcons,
   portfolioEvolutionEventMeta,
@@ -14,19 +26,6 @@ import type {
   PortfolioEvolutionDatum,
   PortfolioEvolutionEventType,
 } from "@/features/overview/portfolio-evolution/portfolioEvolution.utils";
-import {
-  Area,
-  Bar,
-  CartesianGrid,
-  ComposedChart,
-  Line,
-  ReferenceDot,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 
 import { formatCompactAxisNumber } from "@/i18n/formatters";
 import { PortfolioEvolutionTooltip } from "@/features/overview/portfolio-evolution/PortfolioEvolutionTooltip.component";
@@ -122,7 +121,7 @@ function EventStackMarker({
       />
       {eventTypes.map((eventType, index) => {
         const color = portfolioEvolutionEventMeta[eventType].color;
-        const Icon = portfolioEvolutionEventIcons[eventType] as ComponentType<SVGProps<SVGSVGElement>>;
+        const iconName = portfolioEvolutionEventIcons[eventType];
         const chipY = stackOriginY + index * (MARKER_CHIP_SIZE + MARKER_STACK_GAP);
 
         return (
@@ -134,12 +133,14 @@ function EventStackMarker({
               fill={`${color}18`}
               stroke={`${color}88`}
             />
-            <Icon
+            <CabIcon
+              name={iconName}
               x={(MARKER_CHIP_SIZE - MARKER_ICON_SIZE) / 2}
               y={(MARKER_CHIP_SIZE - MARKER_ICON_SIZE) / 2}
               width={MARKER_ICON_SIZE}
               height={MARKER_ICON_SIZE}
               color={color}
+              size="sm"
               strokeWidth={2}
             />
           </g>

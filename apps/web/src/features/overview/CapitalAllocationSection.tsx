@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { CabCard, CabEmptyState, CabStack } from "@/design-system";
@@ -14,7 +14,6 @@ import {
   buildCapitalAllocationStatusBadges,
   buildDistributionCompositionBreakdown,
   buildIdleAssetBreakdown,
-  getDefaultSelectedDistributionKey,
 } from "@/features/overview/capitalAllocation.utils";
 import type { OverviewViewModel } from "@/features/overview/overview.types";
 
@@ -63,26 +62,6 @@ export function CapitalAllocationSection({ distribution, assetRows }: CapitalAll
     () => buildCapitalAllocationStatusBadges(distribution, t),
     [distribution, t],
   );
-
-  useEffect(() => {
-    const nextDefaultKey = getDefaultSelectedDistributionKey(distribution.slices);
-
-    if (!nextDefaultKey) {
-      if (selectedKey !== null) {
-        setSelectedKey(null);
-      }
-
-      return;
-    }
-
-    const isCurrentSelectionValid = selectedKey
-      ? sliceSummaries.some((item) => item.key === selectedKey)
-      : false;
-
-    if (!isCurrentSelectionValid) {
-      setSelectedKey(nextDefaultKey);
-    }
-  }, [distribution.slices, selectedKey, sliceSummaries]);
 
   if (sliceSummaries.length === 0) {
     return (

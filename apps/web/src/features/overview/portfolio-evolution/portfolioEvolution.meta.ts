@@ -1,6 +1,4 @@
-import { ArrowDownToLine, ArrowUpToLine, Coins, Landmark, Lock, RefreshCcw, type LucideIcon } from "lucide-react";
-
-import { cabColors } from "@/design-system/tokens";
+import { cabColors, type CabIconName } from "@/design-system";
 import type { PortfolioEvolutionEventType } from "@/features/overview/portfolio-evolution/portfolioEvolution.utils";
 
 export type PortfolioEvolutionSeriesKey = "total" | "deployed" | "idle" | "rewards";
@@ -61,11 +59,11 @@ export const portfolioEvolutionEventOrder: PortfolioEvolutionEventType[] = [
   "vote",
 ];
 
-export const portfolioEvolutionEventIcons: Record<PortfolioEvolutionEventType, LucideIcon> = {
-  claim: Coins,
-  redeploy: ArrowUpToLine,
-  move_to_idle: ArrowDownToLine,
-  rebalance: RefreshCcw,
-  lock: Lock,
-  vote: Landmark,
+export const portfolioEvolutionEventIcons: Record<PortfolioEvolutionEventType, CabIconName> = {
+  claim: "coins",
+  redeploy: "arrowUpToLine",
+  move_to_idle: "arrowDownToLine",
+  rebalance: "refreshCcw",
+  lock: "lock",
+  vote: "governance",
 };

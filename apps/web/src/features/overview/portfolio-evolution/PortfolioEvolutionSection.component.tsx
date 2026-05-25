@@ -21,7 +21,7 @@ import {
   type PortfolioEvolutionEventType,
 } from "@/features/overview/portfolio-evolution/portfolioEvolution.utils";
 import { formatRelativeTime, formatUsd } from "@/i18n/formatters";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 type PortfolioEvolutionSectionProps = {
@@ -62,25 +62,6 @@ export function PortfolioEvolutionSection({
   const [visibleEventTypes, setVisibleEventTypes] = useState<Partial<Record<PortfolioEvolutionEventType, boolean>>>({});
   const [hoveredCapturedAt, setHoveredCapturedAt] = useState<string | null>(null);
   const [selectedCapturedAt, setSelectedCapturedAt] = useState<string | null>(null);
-
-  useEffect(() => {
-    setVisibleEventTypes((currentState) => {
-      const nextState = { ...currentState };
-      for (const eventType of model.availableEventTypes) {
-        if (nextState[eventType] === undefined) {
-          nextState[eventType] = true;
-        }
-      }
-
-      return nextState;
-    });
-  }, [model.availableEventTypes]);
-
-  useEffect(() => {
-    if (selectedCapturedAt && !model.data.some((point) => point.capturedAt === selectedCapturedAt)) {
-      setSelectedCapturedAt(null);
-    }
-  }, [model.data, selectedCapturedAt]);
 
   const filteredData = useMemo(
     () => model.data.map((point) => ({

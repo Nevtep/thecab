@@ -1,6 +1,6 @@
 "use client";
 
-import { CabStack, CabText } from "@/design-system";
+import { CabIcon, CabStack, CabText } from "@/design-system";
 import { cabColors } from "@/design-system/tokens";
 import {
   portfolioEvolutionEventIcons,
@@ -15,7 +15,7 @@ import { useTranslation } from "react-i18next";
 const DENSE_EVENT_THRESHOLD = 4;
 
 function EventGlyph({ type }: { type: PortfolioEvolutionMarker["type"] }) {
-  const Icon = portfolioEvolutionEventIcons[type];
+  const iconName = portfolioEvolutionEventIcons[type];
   const color = portfolioEvolutionEventMeta[type].color;
 
   return (
@@ -34,7 +34,7 @@ function EventGlyph({ type }: { type: PortfolioEvolutionMarker["type"] }) {
         flexShrink: 0,
       }}
     >
-      <Icon size={11} strokeWidth={2} />
+      <CabIcon name={iconName} size="sm" width={11} height={11} color={color} strokeWidth={2} />
     </div>
   );
 }

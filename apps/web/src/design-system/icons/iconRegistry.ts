@@ -1,15 +1,20 @@
 import {
   AlertTriangle,
   Activity,
+  ArrowDownToLine,
+  ArrowUpToLine,
   ArrowUpRight,
   BarChart3,
   ChevronDown,
   CircleHelp,
+  Coins,
   Compass,
   Landmark,
   Gauge,
   Layers,
+  Lock,
   Radar,
+  RefreshCcw,
   Settings,
   Sparkles,
   Wallet,
@@ -32,6 +37,11 @@ export const cabIconRegistry = {
   settings: Settings,
   chevronDown: ChevronDown,
   externalLink: ArrowUpRight,
+  arrowDownToLine: ArrowDownToLine,
+  arrowUpToLine: ArrowUpToLine,
+  coins: Coins,
+  lock: Lock,
+  refreshCcw: RefreshCcw,
 } as const satisfies Record<string, LucideIcon>;
 
 export type CabIconName = keyof typeof cabIconRegistry;

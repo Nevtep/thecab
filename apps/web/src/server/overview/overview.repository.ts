@@ -12,7 +12,6 @@ import {
   protocolContracts,
   pools,
   rawProviderRecords,
-  rewardEvents,
   walletContexts,
 } from "@/server/db/schema";
 import { alchemyRpc } from "@/server/providers/alchemy/rpc";

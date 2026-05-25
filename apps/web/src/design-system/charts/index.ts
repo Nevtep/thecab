@@ -1,5 +1,6 @@
 export * from "@/design-system/charts/CabAreaChart";
 export * from "@/design-system/charts/CabBarChart";
+export * from "@/design-system/charts/CabChartPrimitives";
 export * from "@/design-system/charts/CabChartFrame";
 export * from "@/design-system/charts/CabDonutChart";
 export * from "@/design-system/charts/CabLineChart";
