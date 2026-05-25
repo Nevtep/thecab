@@ -1106,6 +1106,7 @@ async function enrichRewardEventsFromMovements(input: {
   }
 
   const db = getDb();
+  const txHashesArray = sql`ARRAY[${sql.join(input.txHashes.map((txHash) => sql`${txHash}`), sql`, `)}]::text[]`;
   // For each tx hash, pick the inbound movement to the wallet with the largest USD value (or raw amount fallback).
   // Update reward_events rows for that tx with token_address / amount_raw / amount_usd.
   await db.execute(sql`
@@ -1120,7 +1121,7 @@ async function enrichRewardEventsFromMovements(input: {
       WHERE am.wallet_address = ${input.walletAddress}
         AND am.chain_id = ${input.chainId}
         AND am.direction_in = true
-        AND le.tx_hash = ANY(${input.txHashes})
+        AND le.tx_hash = ANY(${txHashesArray})
       ORDER BY le.tx_hash, COALESCE(am.amount_usd, 0) DESC, COALESCE(am.amount_raw::numeric, 0) DESC
     )
     UPDATE ${rewardEvents} re
