@@ -1,0 +1,55 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import {
+  mergeAnalyzedPerformanceSnapshotRows,
+  shouldPreserveAnalyzedPortfolioSnapshot,
+} from "@/server/overview/overview.repository";
+
+test("mergeAnalyzedPerformanceSnapshotRows prefers analyzed idle scope values for daily snapshots", () => {
+  const rows = mergeAnalyzedPerformanceSnapshotRows([
+    {
+      capturedAt: new Date("2026-05-20T00:00:00.000Z"),
+      scope: "portfolio",
+      valueUsd: "330624.03",
+      metadataJson: {
+        idleValueUsd: "9000",
+        rewardValueUsd: 11527.44,
+      },
+    },
+    {
+      capturedAt: new Date("2026-05-20T00:00:00.000Z"),
+      scope: "idle",
+      valueUsd: "14781.61",
+      metadataJson: {
+        tokens: [{ tokenAddress: "0x940181a94a35a4569e4529a3cdfb74e38fd98631", symbol: "AERO" }],
+      },
+    },
+  ]);
+
+  assert.equal(rows.length, 1);
+  assert.deepEqual(rows[0], {
+    capturedAt: new Date("2026-05-20T00:00:00.000Z"),
+    totalValueUsd: "330624.03",
+    deployedValueUsd: "315842.42",
+    idleValueUsd: "14781.61",
+    metadataJson: {
+      idleValueUsd: "9000",
+      rewardValueUsd: 11527.44,
+      idleTokens: [{ tokenAddress: "0x940181a94a35a4569e4529a3cdfb74e38fd98631", symbol: "AERO" }],
+      snapshotKind: "analysis_engine_daily",
+      source: "analyzed_history",
+    },
+  });
+});
+
+test("shouldPreserveAnalyzedPortfolioSnapshot keeps analysis snapshots from recent overwrite", () => {
+  assert.equal(shouldPreserveAnalyzedPortfolioSnapshot({
+    existingMetadataJson: { snapshotKind: "analysis_engine_daily" },
+    nextMetadataJson: { snapshotKind: "range_bucket" },
+  }), true);
+  assert.equal(shouldPreserveAnalyzedPortfolioSnapshot({
+    existingMetadataJson: { snapshotKind: "range_bucket" },
+    nextMetadataJson: { snapshotKind: "analysis_engine_daily" },
+  }), false);
+});

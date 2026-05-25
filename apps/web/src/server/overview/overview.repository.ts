@@ -43,12 +43,101 @@ function getSnapshotKind(metadataJson: Record<string, unknown> | null | undefine
   return typeof metadataJson?.snapshotKind === "string" ? metadataJson.snapshotKind : null;
 }
 
+function formatSnapshotUsd(value: number) {
+  return value.toFixed(6).replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
+}
+
 export function shouldPreserveAnalyzedPortfolioSnapshot(input: {
   existingMetadataJson: Record<string, unknown> | null | undefined;
   nextMetadataJson: Record<string, unknown> | null | undefined;
 }) {
   return getSnapshotKind(input.existingMetadataJson) === "analysis_engine_daily"
     && getSnapshotKind(input.nextMetadataJson) !== "analysis_engine_daily";
+}
+
+type AnalyzedPerformanceSnapshotRow = {
+  capturedAt: Date;
+  scope: string;
+  valueUsd: string;
+  metadataJson: Record<string, unknown>;
+};
+
+export function mergeAnalyzedPerformanceSnapshotRows(rows: AnalyzedPerformanceSnapshotRow[]) {
+  const rowsByCapturedAt = new Map<string, {
+    capturedAt: Date;
+    portfolio: AnalyzedPerformanceSnapshotRow | null;
+    idle: AnalyzedPerformanceSnapshotRow | null;
+  }>();
+
+  for (const row of rows) {
+    const key = row.capturedAt.toISOString();
+    const existing = rowsByCapturedAt.get(key) ?? {
+      capturedAt: row.capturedAt,
+      portfolio: null,
+      idle: null,
+    };
+
+    if (row.scope === "portfolio") {
+      existing.portfolio = row;
+    }
+
+    if (row.scope === "idle") {
+      existing.idle = row;
+    }
+
+    rowsByCapturedAt.set(key, existing);
+  }
+
+  return Array.from(rowsByCapturedAt.values())
+    .map((row) => {
+      const portfolioMetadata = row.portfolio?.metadataJson ?? {};
+      const totalValueUsd = row.portfolio?.valueUsd ?? null;
+      const idleValueUsd = row.idle?.valueUsd
+        ?? (typeof portfolioMetadata.idleValueUsd === "number" || typeof portfolioMetadata.idleValueUsd === "string"
+          ? String(portfolioMetadata.idleValueUsd)
+          : null);
+      const totalValue = totalValueUsd === null ? null : Number(totalValueUsd);
+      const idleValue = idleValueUsd === null ? null : Number(idleValueUsd);
+      const deployedValueUsd =
+        totalValue !== null && idleValue !== null && Number.isFinite(totalValue) && Number.isFinite(idleValue)
+          ? formatSnapshotUsd(totalValue - idleValue)
+          : (() => {
+              const depositValueUsd = portfolioMetadata.depositValueUsd;
+              const strategyValueUsd = portfolioMetadata.strategyValueUsd;
+              const hasDeployedValue =
+                typeof depositValueUsd === "number" || typeof depositValueUsd === "string"
+                || typeof strategyValueUsd === "number" || typeof strategyValueUsd === "string";
+
+              return hasDeployedValue
+                ? formatSnapshotUsd(Number(depositValueUsd ?? 0) + Number(strategyValueUsd ?? 0))
+                : null;
+            })();
+
+      if (!row.portfolio || totalValueUsd === null) {
+        return null;
+      }
+
+      return {
+        capturedAt: row.capturedAt,
+        totalValueUsd,
+        deployedValueUsd,
+        idleValueUsd,
+        metadataJson: {
+          ...portfolioMetadata,
+          idleTokens: row.idle?.metadataJson.tokens ?? portfolioMetadata.idleTokens,
+          snapshotKind: "analysis_engine_daily",
+          source: "analyzed_history",
+        },
+      };
+    })
+    .filter((row): row is {
+      capturedAt: Date;
+      totalValueUsd: string;
+      deployedValueUsd: string | null;
+      idleValueUsd: string | null;
+      metadataJson: Record<string, unknown>;
+    } => Boolean(row))
+    .sort((left, right) => left.capturedAt.getTime() - right.capturedAt.getTime());
 }
 
 export async function readOverviewFreshness(input: ScopedWalletInput) {
@@ -372,10 +461,11 @@ export async function readOverviewAnalyzedPortfolioSnapshots(input: ScopedWallet
 }) {
   const db = getDb();
 
-  return db
+  const rows = await db
     .select({
       capturedAt: performanceSnapshots.capturedAt,
-      totalValueUsd: performanceSnapshots.valueUsd,
+      scope: performanceSnapshots.scope,
+      valueUsd: performanceSnapshots.valueUsd,
       metadataJson: performanceSnapshots.metadataJson,
     })
     .from(performanceSnapshots)
@@ -383,33 +473,15 @@ export async function readOverviewAnalyzedPortfolioSnapshots(input: ScopedWallet
       and(
         eq(performanceSnapshots.walletAddress, input.walletAddress.toLowerCase()),
         eq(performanceSnapshots.chainId, input.chainId),
-        eq(performanceSnapshots.scope, "portfolio"),
+        inArray(performanceSnapshots.scope, ["portfolio", "idle"]),
         eq(performanceSnapshots.resolution, "daily"),
         gte(performanceSnapshots.capturedAt, input.startAt),
         lte(performanceSnapshots.capturedAt, input.endAt),
       ),
     )
-    .orderBy(desc(performanceSnapshots.capturedAt))
-    .then((rows) => rows.map((row) => {
-      const idleValueUsd = row.metadataJson.idleValueUsd;
-      const depositValueUsd = row.metadataJson.depositValueUsd;
-      const strategyValueUsd = row.metadataJson.strategyValueUsd;
-      const hasDeployedValue =
-        typeof depositValueUsd === "number" || typeof depositValueUsd === "string"
-        || typeof strategyValueUsd === "number" || typeof strategyValueUsd === "string";
+    .orderBy(desc(performanceSnapshots.capturedAt));
 
-      return {
-        capturedAt: row.capturedAt,
-        totalValueUsd: row.totalValueUsd,
-        deployedValueUsd: hasDeployedValue ? String(Number(depositValueUsd ?? 0) + Number(strategyValueUsd ?? 0)) : null,
-        idleValueUsd: typeof idleValueUsd === "number" || typeof idleValueUsd === "string" ? String(idleValueUsd) : null,
-        metadataJson: {
-          ...row.metadataJson,
-          snapshotKind: "analysis_engine_daily",
-          source: "analyzed_history",
-        },
-      };
-    }));
+  return mergeAnalyzedPerformanceSnapshotRows(rows);
 }
 
 export async function getLatestOverviewPortfolioSnapshot(input: ScopedWalletInput) {
@@ -538,6 +610,22 @@ export async function readOverviewRealizedRewardEvents(input: ScopedWalletInput 
       and re.is_accrual_snapshot = false
       and re.occurred_at >= ${input.startAt}
       and re.occurred_at <= ${input.endAt}
+      and not exists (
+        select 1
+        from ledger_events le_filtered
+        where le_filtered.chain_id = re.chain_id
+          and le_filtered.wallet_address = re.wallet_address
+          and le_filtered.tx_hash = re.tx_hash
+          and (
+            le_filtered.classification = 'governance'
+            or lower(coalesce(le_filtered.metadata_json->>'summary', '')) like '%voting escrow%'
+            or lower(coalesce(le_filtered.metadata_json->>'summary', '')) like '%veaero%'
+            or (
+              lower(coalesce(le_filtered.metadata_json->>'summary', '')) like '%aerodrome%'
+              and lower(coalesce(le_filtered.metadata_json->>'summary', '')) like '%escrow%'
+            )
+          )
+      )
     order by re.occurred_at asc
   `);
 

@@ -1,5 +1,11 @@
 import { and, asc, eq, gte, inArray, lte } from "drizzle-orm";
 
+import {
+  ASSET_TRUST_CLASSIFIER_VERSION,
+  type AssetTrustClassifierInput,
+} from "@/server/asset-trust/assetTrust.types";
+import { classifyWalletAssetTrust } from "@/server/asset-trust/classifyWalletAssetTrust";
+import { resolveKnownProtocolAssetMatch } from "@/server/asset-trust/knownProtocolAssets";
 import { getDb } from "@/server/db/client";
 import {
   assetMovements,
@@ -34,6 +40,7 @@ const BASE_CBBTC_ADDRESS = "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf";
 const BASE_AERO_ADDRESS = "0x940181a94a35a4569e4529a3cdfb74e38fd98631";
 const BASE_USDC_ADDRESS = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
 const BASE_EURC_ADDRESS = "0x60a3e35cc302bfa44cb288bc5a4f316fdb1adb42";
+const DUST_VALUE_THRESHOLD_USD = 1;
 
 const KNOWN_BASE_TOKEN_METADATA: Record<string, { address: string; decimals: number }> = {
   weth: { address: BASE_WETH_ADDRESS, decimals: 18 },
@@ -160,6 +167,71 @@ function fitsAnnualizedReturnPctColumn(value: number) {
   return Number.isFinite(value) && Math.abs(value) < 1_000_000;
 }
 
+function hasHistoricalTokenMetadata(symbol: string | null, name: string | null, decimals: number | null) {
+  return Boolean(symbol && name && decimals !== null);
+}
+
+function buildHistoricalIdleTrustInput(input: {
+  walletAddress: string;
+  chainId: number;
+  protocolContracts: Array<{
+    chainId: number;
+    address: string;
+    protocol: string;
+    contractType: string;
+    metadataJson?: Record<string, unknown> | null;
+  }>;
+  tokenAddress: string;
+  symbol: string | null;
+  name: string | null;
+  decimals: number | null;
+  balanceRaw: string;
+  balanceFormatted: number;
+  valueUsd: number | null;
+  possibleSpam: boolean | null;
+  verifiedContract: boolean | null;
+  isNativeAsset: boolean;
+}) {
+  const knownProtocolMatch = resolveKnownProtocolAssetMatch(
+    input.chainId,
+    input.tokenAddress,
+    input.protocolContracts,
+  );
+
+  return {
+    walletAddress: input.walletAddress,
+    chainId: input.chainId,
+    tokenAddress: input.tokenAddress,
+    symbol: input.symbol,
+    name: input.name,
+    balanceRaw: input.balanceRaw,
+    balanceFormatted: String(input.balanceFormatted),
+    valueUsd: input.valueUsd,
+    hasReliableAlchemyPrice: input.valueUsd !== null,
+    moralisPossibleSpam: input.possibleSpam,
+    moralisVerifiedContract: input.verifiedContract,
+    hasLogo: true,
+    hasMetadata: hasHistoricalTokenMetadata(input.symbol, input.name, input.decimals),
+    isKnownProtocolAsset: knownProtocolMatch !== null,
+    isNativeAsset: input.isNativeAsset,
+    isDustValue: input.valueUsd !== null ? input.valueUsd < DUST_VALUE_THRESHOLD_USD : input.balanceFormatted === 0,
+    classifierVersion: ASSET_TRUST_CLASSIFIER_VERSION,
+  } satisfies AssetTrustClassifierInput;
+}
+
+export function shouldIncludeHistoricalIdleToken(input: {
+  trustInput: AssetTrustClassifierInput;
+  knownProtocolReasonCode?: "knownAerodromeToken" | "knownProtocolContract" | null;
+}) {
+  const trustClassification = classifyWalletAssetTrust(input.trustInput, {
+    knownProtocolReasonCode: input.knownProtocolReasonCode ?? null,
+  });
+
+  return !input.trustInput.isDustValue
+    && input.trustInput.hasReliableAlchemyPrice
+    && !trustClassification.isHiddenByDefault;
+}
+
 type ReconstructedDayMetric = {
   idleValueUsd: number;
   idleTokens: Array<{
@@ -279,7 +351,12 @@ export async function computeSnapshots(input: {
         .from(pools)
         .where(inArray(pools.id, input.poolTotals.map((pool) => pool.poolId))),
     db
-      .select({ address: protocolContracts.address })
+      .select({
+        address: protocolContracts.address,
+        protocol: protocolContracts.protocol,
+        contractType: protocolContracts.contractType,
+        metadataJson: protocolContracts.metadataJson,
+      })
       .from(protocolContracts)
       .where(eq(protocolContracts.chainId, input.chainId)),
   ]);
@@ -317,11 +394,25 @@ export async function computeSnapshots(input: {
 
   // Build map of current balance per idle token (in token-units, not raw).
   const currentBalanceByToken = new Map<string, number>();
-  const tokenMeta = new Map<string, { symbol: string | null; decimals: number }>();
+  const tokenMeta = new Map<string, {
+    symbol: string | null;
+    name: string | null;
+    decimals: number;
+    possibleSpam: boolean | null;
+    verifiedContract: boolean | null;
+    nativeToken: boolean;
+  }>();
   for (const token of idleTokenList) {
     const addr = token.tokenAddress.toLowerCase();
     const decimals = token.decimals ?? 18;
-    tokenMeta.set(addr, { symbol: token.symbol, decimals });
+    tokenMeta.set(addr, {
+      symbol: token.symbol,
+      name: token.name,
+      decimals,
+      possibleSpam: token.possibleSpam,
+      verifiedContract: token.verifiedContract ?? null,
+      nativeToken: token.nativeToken,
+    });
     currentBalanceByToken.set(addr, dividePow10(token.balanceRaw, decimals));
   }
 
@@ -348,6 +439,37 @@ export async function computeSnapshots(input: {
         lte(ledgerEvents.occurredAt, endBoundary),
       ),
     );
+
+  for (const row of movementRows) {
+    const tokenAddress = row.tokenAddress.toLowerCase();
+    if (tokenMeta.has(tokenAddress)) {
+      continue;
+    }
+
+    const metadataJson = (row.metadataJson ?? {}) as Record<string, unknown>;
+    const symbol = asString(metadataJson.symbol);
+    const name = asString(metadataJson.name);
+    const decimals = resolveKnownTokenDecimals({
+      chainId: input.chainId,
+      tokenAddress,
+      symbol,
+      decimals: metadataJson.decimals,
+    });
+
+    if (decimals === null || decimals < 0) {
+      continue;
+    }
+
+    tokenMeta.set(tokenAddress, {
+      symbol,
+      name,
+      decimals,
+      possibleSpam: typeof metadataJson.possibleSpam === "boolean" ? metadataJson.possibleSpam : null,
+      verifiedContract: typeof metadataJson.verifiedContract === "boolean" ? metadataJson.verifiedContract : null,
+      nativeToken: tokenAddress === BASE_WETH_ADDRESS,
+    });
+    currentBalanceByToken.set(tokenAddress, currentBalanceByToken.get(tokenAddress) ?? 0);
+  }
 
   const dayRows = Array.from(iterateUtcDays(input.startDayUtc, input.endDayUtc));
   const deployedComponents = [
@@ -426,6 +548,7 @@ export async function computeSnapshots(input: {
   ];
   const relevantTokenAddresses = new Set<string>([
     ...idleTokenAddresses,
+    ...Array.from(tokenMeta.keys()),
     ...deployedComponents.map((component) => component.tokenAddress),
   ]);
 
@@ -564,6 +687,8 @@ export async function computeSnapshots(input: {
     const idleTokensForDay: ReconstructedDayMetric["idleTokens"] = [];
     for (const [token, balance] of dayBalances.entries()) {
       if (balance <= 0) continue;
+      const meta = tokenMeta.get(token);
+      if (!meta) continue;
       const price = resolveTokenPriceForDay({
         tokenAddress: token,
         dayUtc,
@@ -571,10 +696,34 @@ export async function computeSnapshots(input: {
         latestPriceByToken,
       }) ?? 0;
       const valueUsd = balance * price;
+      const knownProtocolMatch = resolveKnownProtocolAssetMatch(input.chainId, token, protocolAddressRows);
+      const trustInput = buildHistoricalIdleTrustInput({
+        walletAddress,
+        chainId: input.chainId,
+        protocolContracts: protocolAddressRows,
+        tokenAddress: token,
+        symbol: meta.symbol,
+        name: meta.name,
+        decimals: meta.decimals,
+        balanceRaw: String(Math.round(balance * 10 ** meta.decimals)),
+        balanceFormatted: balance,
+        valueUsd: price > 0 ? valueUsd : null,
+        possibleSpam: meta.possibleSpam,
+        verifiedContract: meta.verifiedContract,
+        isNativeAsset: meta.nativeToken,
+      });
+
+      if (!shouldIncludeHistoricalIdleToken({
+        trustInput,
+        knownProtocolReasonCode: knownProtocolMatch?.reasonCode ?? null,
+      })) {
+        continue;
+      }
+
       idleValueUsd += valueUsd;
       idleTokensForDay.push({
         tokenAddress: token,
-        symbol: tokenMeta.get(token)?.symbol ?? null,
+        symbol: meta.symbol,
         balanceFormatted: balance,
         valueUsd,
       });
