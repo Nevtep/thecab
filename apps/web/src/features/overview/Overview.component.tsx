@@ -48,6 +48,7 @@ import {
   mapOverviewAnalysisStatusToBadgeStatus,
 } from "@/features/overview/overview.mappers";
 import type { OverviewRange, OverviewViewModel } from "@/features/overview/overview.types";
+import { SUPPORTED_CHAIN_ID } from "@/wallet/supportedChains";
 
 type OverviewComponentProps = {
   walletAddress: string | null;
@@ -713,7 +714,7 @@ export function OverviewComponent({
     activeAnalysis.status === "stale" ||
     activeAnalysis.status === "failed";
   const analysisActionLabel =
-    activeAnalysis.status === "failed" ? t("analysis.actions.retry") : t("analysis.actions.start");
+    activeAnalysis.status === "not_analyzed" ? t("analysis:cta.start") : t("analysis:cta.startAgain");
   const exclusionMessage = buildExclusionMessage(overviewViewModel?.metrics.exclusions ?? null, t, locale);
   const visibleRenderableRows = visibleAssetRows.filter((row) => {
     if (!showUnpricedAssets && row.priceUsd === null) {
@@ -800,7 +801,12 @@ export function OverviewComponent({
       <CabStack gap="$3">
         <CabSectionHeader
           title={t("analysis:title")}
-          subtitle={t(`analysis:messages.${activeAnalysis.status}`)}
+          subtitle={t(`analysis:banner.${activeAnalysis.status}`, {
+            chain: chainId === SUPPORTED_CHAIN_ID ? "Base" : String(chainId ?? ""),
+            relative: activeAnalysis.lastSuccessfulRunAt
+              ? formatRelativeTime(activeAnalysis.lastSuccessfulRunAt, locale)
+              : t("analysis:lastSuccessful.never"),
+          })}
           actions={
             <CabAnalysisStatusBadge
               status={mapOverviewAnalysisStatusToBadgeStatus(activeAnalysis.status)}
@@ -815,8 +821,8 @@ export function OverviewComponent({
         ) : null}
         {activeAnalysis.lastSuccessfulRunAt ? (
           <CabText variant="caption" fontSize={12}>
-            {t("analysis:lastSuccessfulRunAt", {
-              value: formatDateTime(activeAnalysis.lastSuccessfulRunAt, locale),
+            {t("analysis:lastSuccessful.atUtc", {
+              datetime: formatDateTime(activeAnalysis.lastSuccessfulRunAt, locale),
             })}
           </CabText>
         ) : null}

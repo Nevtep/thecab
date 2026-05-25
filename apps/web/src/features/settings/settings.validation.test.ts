@@ -144,3 +144,57 @@ test("buildSettingsDiagnosticsRows includes run metadata only when the system ca
     ["analysisStatus", "overviewFreshness", "lastSuccessfulRun", "lastUpdated", "runId"],
   );
 });
+
+test("mapSettingsResponseToViewModel keeps full, partial, and unknown analysis outcomes renderable", () => {
+  const cases = [
+    {
+      status: "ready" as const,
+      reasonCodes: [] as SettingsResponse["diagnostics"]["coverage"]["reasonCodes"],
+      expectedAction: "update",
+    },
+    {
+      status: "failed" as const,
+      reasonCodes: ["providerPartial"] as SettingsResponse["diagnostics"]["coverage"]["reasonCodes"],
+      expectedAction: "retry",
+    },
+    {
+      status: "not_analyzed" as const,
+      reasonCodes: [] as SettingsResponse["diagnostics"]["coverage"]["reasonCodes"],
+      expectedAction: "start",
+    },
+  ];
+
+  for (const testCase of cases) {
+    const viewModel = mapSettingsResponseToViewModel(
+      createSettingsResponse({
+        diagnostics: {
+          analysis: {
+            status: testCase.status,
+            runId: null,
+            lastSuccessfulRunAt: null,
+            lastUpdatedAt: null,
+            lastError: null,
+          },
+          overviewFreshness: {
+            label: "analyzed_view",
+            lastAnalyzedAt: null,
+          },
+          coverage: {
+            reasonCodes: testCase.reasonCodes,
+          },
+        },
+      }),
+      {
+        locale: "en",
+        t: translate,
+        isRefreshingOverview: false,
+        isStartingAnalysis: false,
+        pendingPreferenceKey: null,
+      },
+    );
+
+    assert.equal(viewModel.analysisSection.status, testCase.status);
+    assert.equal(viewModel.analysisSection.primaryAction.kind, testCase.expectedAction);
+    assert.deepEqual(viewModel.diagnosticsSection.coverageReasonCodes, testCase.reasonCodes);
+  }
+});

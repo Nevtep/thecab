@@ -1,12 +1,53 @@
 {
   "title": "Estado del análisis",
   "status": {
-    "not_analyzed": "Sin analizar",
+    "not_analyzed": "Sin analizar aún",
     "queued": "En cola",
+    "running": "Analizando...",
+    "ready": "Al día",
+    "stale": "Actualización disponible",
+    "failed": "El análisis falló"
+  },
+  "mode": {
+    "full_history": "Historial completo",
+    "incremental": "Actualización incremental"
+  },
+  "phase": {
+    "deposits": "Depósitos",
+    "rewards": "Recompensas",
+    "activity": "Clasificación de actividad",
+    "pools": "Metadatos de pools",
+    "finalize": "Serie de rendimiento"
+  },
+  "phaseStatus": {
+    "queued": "Pendiente",
     "running": "En curso",
-    "ready": "Listo",
-    "stale": "Desactualizado",
-    "failed": "Fallido"
+    "complete": "Completado",
+    "failed": "Falló"
+  },
+  "slice": {
+    "label": "Tramo {{index}}",
+    "rangeLabel": "{{start}} -> {{end}}",
+    "progress": "{{processed}} de {{seen}} transacciones",
+    "skippedCached": "Ya cubierto (en caché)"
+  },
+  "cta": {
+    "start": "Analizar billetera",
+    "startAgain": "Actualizar análisis",
+    "cancel": "Cancelar análisis",
+    "viewProgress": "Ver progreso"
+  },
+  "banner": {
+    "not_analyzed": "Esta billetera todavía no tiene análisis.",
+    "queued": "Iniciaremos su análisis en breve.",
+    "running": "Analizando su billetera en {{chain}}. Suele tardar unos minutos.",
+    "ready": "Último análisis {{relative}}.",
+    "stale": "Último análisis {{relative}}. Hay una actualización disponible.",
+    "failed": "No pudimos completar su último análisis. Puede intentarlo de nuevo."
+  },
+  "lastSuccessful": {
+    "never": "Nunca",
+    "atUtc": "{{datetime}} UTC"
   },
   "lastSuccessfulRunAt": "Último análisis exitoso: {{value}}",
   "actions": {

@@ -1,10 +1,36 @@
 {
   "noticeTitle": "Cobertura parcial",
+  "level": {
+    "full": "Cobertura completa",
+    "partial": "Cobertura parcial",
+    "unknown": "Cobertura desconocida"
+  },
   "status": {
     "recent": "Cobertura reciente",
     "partial": "Cobertura parcial",
     "unknown": "Cobertura desconocida"
   },
+  "reason": {
+    "missingPrices": "Algunos precios de tokens no estuvieron disponibles.",
+    "partialDecoded": "No se pudieron decodificar algunos eventos on-chain.",
+    "providerError": "Un proveedor de datos devolvió un error.",
+    "providerThrottled": "Un proveedor de datos limitó la velocidad de las solicitudes.",
+    "reorgSuspect": "Algunos bloques recientes todavía se están asentando.",
+    "decodeError": "Falló la decodificación de un evento on-chain.",
+    "pricingPartial": "Algunos precios usaron una alternativa de menor confianza.",
+    "unknownError": "Un problema desconocido afectó esta ejecución."
+  },
+  "reasonShort": {
+    "missingPrices": "Faltan precios",
+    "partialDecoded": "Decodificación parcial",
+    "providerError": "Error del proveedor",
+    "providerThrottled": "Proveedor limitado",
+    "reorgSuspect": "Bloques recientes asentándose",
+    "decodeError": "Error de decodificación",
+    "pricingPartial": "Se usó precio alternativo",
+    "unknownError": "Problema desconocido"
+  },
+  "priceSymbolFallback": "El precio se resolvió por símbolo (menor confianza).",
   "reasons": {
     "analysisPending": "El análisis histórico todavía está pendiente",
     "providerPartial": "Uno o más proveedores devolvieron datos parciales",

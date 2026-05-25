@@ -8,6 +8,10 @@ type Translate = (key: string, options?: Record<string, unknown>) => string;
 
 const ANALYSIS_ACTIONS_ENABLED = false;
 
+function getAnalysisBannerKey(status: SettingsResponse["diagnostics"]["analysis"]["status"]) {
+  return `analysis:banner.${status}`;
+}
+
 export function mapSettingsResponseToViewModel(
   response: SettingsResponse,
   input: {
@@ -40,7 +44,12 @@ export function mapSettingsResponseToViewModel(
     analysisSection: {
       status: analysisStatus,
       statusLabel: t(`analysis:status.${analysisStatus}`),
-      message: t(`analysis:messages.${analysisStatus}`),
+      message: t(getAnalysisBannerKey(analysisStatus), {
+        chain: response.chainId === SUPPORTED_CHAIN_ID ? "Base" : String(response.chainId),
+        relative: response.diagnostics.analysis.lastUpdatedAt
+          ? formatRelativeTime(response.diagnostics.analysis.lastUpdatedAt, locale)
+          : t("analysis:lastSuccessful.never"),
+      }),
       runId: response.diagnostics.analysis.runId,
       lastSuccessfulRunAt: response.diagnostics.analysis.lastSuccessfulRunAt
         ? formatDateTime(response.diagnostics.analysis.lastSuccessfulRunAt, locale)
@@ -53,24 +62,32 @@ export function mapSettingsResponseToViewModel(
           ? {
               kind: "start",
               mode: "full_history",
-              label: isStartingAnalysis ? t("analysis:actions.starting") : t("analysis:actions.start"),
+              label: isStartingAnalysis ? t("analysis:actions.starting") : t("analysis:cta.start"),
               disabled: !ANALYSIS_ACTIONS_ENABLED || isStartingAnalysis,
             }
           : analysisStatus === "failed"
             ? {
                 kind: "retry",
                 mode: "full_history",
-                label: isStartingAnalysis ? t("analysis:actions.starting") : t("analysis:actions.retry"),
+                label: isStartingAnalysis ? t("analysis:actions.starting") : t("analysis:cta.startAgain"),
                 disabled: !ANALYSIS_ACTIONS_ENABLED || isStartingAnalysis,
               }
             : analysisStatus === "ready" || analysisStatus === "stale"
               ? {
                   kind: "update",
                   mode: "incremental",
-                  label: isStartingAnalysis ? t("analysis:actions.updating") : t("analysis:actions.update"),
+                  label: isStartingAnalysis ? t("analysis:actions.updating") : t("analysis:cta.startAgain"),
                   disabled: !ANALYSIS_ACTIONS_ENABLED || isStartingAnalysis,
                 }
-              : { kind: "none", progressLabel: t(`analysis:messages.${analysisStatus}`) },
+              : {
+                  kind: "none",
+                  progressLabel: t(getAnalysisBannerKey(analysisStatus), {
+                    chain: response.chainId === SUPPORTED_CHAIN_ID ? "Base" : String(response.chainId),
+                    relative: response.diagnostics.analysis.lastUpdatedAt
+                      ? formatRelativeTime(response.diagnostics.analysis.lastUpdatedAt, locale)
+                      : t("analysis:lastSuccessful.never"),
+                  }),
+                },
     },
     displaySection: {
       language: {

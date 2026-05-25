@@ -11,9 +11,9 @@
 
 **Purpose**: Reserve the implementation surfaces for the Trigger.dev runtime, analysis modules, and route handlers.
 
-- [ ] T001 Create the Trigger.dev runtime surface in apps/web/trigger.config.ts and apps/web/src/server/trigger/tasks/
-- [ ] T002 [P] Create the analysis-engine module surface in apps/web/src/server/analysis/orchestrator.ts, apps/web/src/server/analysis/analysis-slice.repository.ts, apps/web/src/server/analysis/processing-cursor.repository.ts, and apps/web/src/server/analysis/processed-tx.repository.ts
-- [ ] T003 [P] Add package and environment wiring for the engine runtime in apps/web/package.json and apps/web/src/server/env.ts
+- [X] T001 Create the Trigger.dev runtime surface in apps/web/trigger.config.ts and apps/web/src/server/trigger/tasks/
+- [X] T002 [P] Create the analysis-engine module surface in apps/web/src/server/analysis/orchestrator.ts, apps/web/src/server/analysis/analysis-slice.repository.ts, apps/web/src/server/analysis/processing-cursor.repository.ts, and apps/web/src/server/analysis/processed-tx.repository.ts
+- [X] T003 [P] Add package and environment wiring for the engine runtime in apps/web/package.json and apps/web/src/server/env.ts
 
 ---
 
@@ -23,15 +23,15 @@
 
 **⚠️ CRITICAL**: No user story work should begin until this phase is complete.
 
-- [ ] T004 Extend the Drizzle schema for engine-control tables and run metadata in apps/web/src/server/db/schema.ts
-- [ ] T005 Generate the corresponding Drizzle migration files in apps/web/src/server/db/migrations/
-- [ ] T006 [P] Implement chain-aware analysis run, slice, cursor, and processed-tx repositories in apps/web/src/server/analysis/analysis-run.repository.ts, apps/web/src/server/analysis/analysis-slice.repository.ts, apps/web/src/server/analysis/processing-cursor.repository.ts, and apps/web/src/server/analysis/processed-tx.repository.ts
-- [ ] T007 [P] Implement raw-provider-record persistence and request-hash support in apps/web/src/server/providers/raw-provider-records.repository.ts and apps/web/src/server/providers/provider-cache.repository.ts
-- [ ] T008 [P] Implement provider retry and queue-aware client boundaries in apps/web/src/server/providers/alchemy/prices.ts, apps/web/src/server/providers/alchemy/rpc.ts, apps/web/src/server/providers/moralis/getWalletHistory.ts, and apps/web/src/server/providers/moralis/getWalletTokens.ts
-- [ ] T009 Implement shared coverage-reason and canonical status projection helpers in apps/web/src/server/analysis/coverage.ts and apps/web/src/server/analysis/status-projection.ts
-- [ ] T010 Implement Trigger.dev v3 client and queue definitions in apps/web/src/server/trigger/client.ts and apps/web/src/server/trigger/queues.ts
-- [ ] T011 [P] Align canonical analysis status usage for engine routes and UI consumers in apps/web/src/analysis/analysisStatus.ts, apps/web/src/features/overview/overview.mappers.ts, and apps/web/src/design-system/data-display/CabAnalysisStatusBadge.tsx
-- [ ] T012 [P] Add machine-code namespace skeletons for the engine in apps/web/src/i18n/locales/en/analysis.json, apps/web/src/i18n/locales/en/coverage.json, apps/web/src/i18n/locales/en/errors.json, apps/web/src/i18n/locales/es/analysis.json, apps/web/src/i18n/locales/es/coverage.json, and apps/web/src/i18n/locales/es/errors.json
+- [X] T004 Extend the Drizzle schema for engine-control tables and run metadata in apps/web/src/server/db/schema.ts
+- [X] T005 Generate the corresponding Drizzle migration files in apps/web/src/server/db/migrations/
+- [X] T006 [P] Implement chain-aware analysis run, slice, cursor, and processed-tx repositories in apps/web/src/server/analysis/analysis-run.repository.ts, apps/web/src/server/analysis/analysis-slice.repository.ts, apps/web/src/server/analysis/processing-cursor.repository.ts, and apps/web/src/server/analysis/processed-tx.repository.ts
+- [X] T007 [P] Implement raw-provider-record persistence and request-hash support in apps/web/src/server/providers/raw-provider-records.repository.ts and apps/web/src/server/providers/provider-cache.repository.ts
+- [X] T008 [P] Implement provider retry and queue-aware client boundaries in apps/web/src/server/providers/alchemy/prices.ts, apps/web/src/server/providers/alchemy/rpc.ts, apps/web/src/server/providers/moralis/getWalletHistory.ts, and apps/web/src/server/providers/moralis/getWalletTokens.ts
+- [X] T009 Implement shared coverage-reason and canonical status projection helpers in apps/web/src/server/analysis/coverage.ts and apps/web/src/server/analysis/status-projection.ts
+- [X] T010 Implement Trigger.dev v3 client and queue definitions in apps/web/src/server/trigger/client.ts and apps/web/src/server/trigger/queues.ts
+- [X] T011 [P] Align canonical analysis status usage for engine routes and UI consumers in apps/web/src/analysis/analysisStatus.ts, apps/web/src/features/overview/overview.mappers.ts, and apps/web/src/design-system/data-display/CabAnalysisStatusBadge.tsx
+- [X] T012 [P] Add machine-code namespace skeletons for the engine in apps/web/src/i18n/locales/en/analysis.json, apps/web/src/i18n/locales/en/coverage.json, apps/web/src/i18n/locales/en/errors.json, apps/web/src/i18n/locales/es/analysis.json, apps/web/src/i18n/locales/es/coverage.json, and apps/web/src/i18n/locales/es/errors.json
 
 **Checkpoint**: Schema, repositories, provider boundaries, queue wiring, and canonical status helpers are ready for story work.
 
@@ -43,14 +43,14 @@
 
 **Independent Test**: Trigger `POST /api/analysis/start` for a wallet with no prior complete run and verify that the run fans out backward 90-day slices, executes per-slice deposit and reward phases, and reaches a completed run state with normalized domain writes.
 
-- [ ] T013 [US1] Implement backward slice planning and run-window calculation in apps/web/src/server/analysis/orchestrator.ts
-- [ ] T014 [P] [US1] Implement the parent Trigger.dev orchestrator in apps/web/src/server/trigger/tasks/analysis-run.task.ts
-- [ ] T015 [P] [US1] Implement slice task fan-out and per-slice lifecycle management in apps/web/src/server/trigger/tasks/analysis-slice.task.ts
-- [ ] T016 [P] [US1] Implement Aerodrome deposit lifecycle decoding for `mint`, `increaseLiquidity`, `decreaseLiquidity`, and `collect` in apps/web/src/server/protocols/aerodrome/decodeDepositLifecycle.ts
-- [ ] T017 [P] [US1] Implement Mellow share-level exposure discovery in apps/web/src/server/protocols/mellow/computeShareLevelAccounting.ts
-- [ ] T018 [US1] Implement Phase A normalized writes for deposits, strategies, ledger events, and asset movements in apps/web/src/server/trigger/tasks/phase-deposits.task.ts
-- [ ] T019 [US1] Implement Phase B reward claim and accrual writes in apps/web/src/server/trigger/tasks/phase-rewards.task.ts
-- [ ] T020 [US1] Replace the in-process analysis skeleton with Trigger.dev execution from apps/web/src/app/api/analysis/start/route.ts, apps/web/src/server/analysis/analyzeWalletTask.ts, and apps/web/src/server/trigger/client.ts
+- [X] T013 [US1] Implement backward slice planning and run-window calculation in apps/web/src/server/analysis/orchestrator.ts
+- [X] T014 [P] [US1] Implement the parent Trigger.dev orchestrator in apps/web/src/server/trigger/tasks/analysis-run.task.ts
+- [X] T015 [P] [US1] Implement slice task fan-out and per-slice lifecycle management in apps/web/src/server/trigger/tasks/analysis-slice.task.ts
+- [X] T016 [P] [US1] Implement Aerodrome deposit lifecycle decoding for `mint`, `increaseLiquidity`, `decreaseLiquidity`, and `collect` in apps/web/src/server/protocols/aerodrome/decodeDepositLifecycle.ts
+- [X] T017 [P] [US1] Implement Mellow share-level exposure discovery in apps/web/src/server/protocols/mellow/computeShareLevelAccounting.ts
+- [X] T018 [US1] Implement Phase A normalized writes for deposits, strategies, ledger events, and asset movements in apps/web/src/server/trigger/tasks/phase-deposits.task.ts
+- [X] T019 [US1] Implement Phase B reward claim and accrual writes in apps/web/src/server/trigger/tasks/phase-rewards.task.ts
+- [X] T020 [US1] Replace the in-process analysis skeleton with Trigger.dev execution from apps/web/src/app/api/analysis/start/route.ts, apps/web/src/server/analysis/analyzeWalletTask.ts, and apps/web/src/server/trigger/client.ts
 
 **Checkpoint**: A first-time wallet can complete the A→B slice pipeline over the full-history window.
 
@@ -62,11 +62,11 @@
 
 **Independent Test**: Complete one run, trigger a later incremental run, and verify that slices fully behind `lastProcessedDayUtc` become `skipped_cached`, overlapping windows only fetch uncached days, and recent blocks inside the soft reorg window are re-checked.
 
-- [ ] T021 [US2] Implement `ProcessingCursor` reads and latest-complete-day calculations in apps/web/src/server/analysis/processing-cursor.repository.ts and apps/web/src/server/analysis/orchestrator.ts
-- [ ] T022 [P] [US2] Implement `ProcessedTx` dedupe and 32-block reorg filtering in apps/web/src/server/analysis/processed-tx.repository.ts and apps/web/src/server/trigger/tasks/phase-deposits.task.ts
-- [ ] T023 [P] [US2] Implement cache-first provider reuse with distributed in-flight coordination for repeated slice requests in apps/web/src/server/providers/provider-cache.repository.ts, apps/web/src/server/providers/alchemy/prices.ts, and apps/web/src/server/providers/alchemy/rpc.ts
-- [ ] T024 [US2] Persist `skipped_cached`, provider-attempt, and transaction-count slice outcomes in apps/web/src/server/analysis/analysis-slice.repository.ts and apps/web/src/server/trigger/tasks/analysis-slice.task.ts
-- [ ] T025 [US2] Default existing-wallet starts to incremental mode and bound overlapping request windows in apps/web/src/app/api/analysis/start/route.ts and apps/web/src/server/analysis/orchestrator.ts
+- [X] T021 [US2] Implement `ProcessingCursor` reads and latest-complete-day calculations in apps/web/src/server/analysis/processing-cursor.repository.ts and apps/web/src/server/analysis/orchestrator.ts
+- [X] T022 [P] [US2] Implement `ProcessedTx` dedupe and 32-block reorg filtering in apps/web/src/server/analysis/processed-tx.repository.ts and apps/web/src/server/trigger/tasks/phase-deposits.task.ts
+- [X] T023 [P] [US2] Implement cache-first provider reuse with distributed in-flight coordination for repeated slice requests in apps/web/src/server/providers/provider-cache.repository.ts, apps/web/src/server/providers/alchemy/prices.ts, and apps/web/src/server/providers/alchemy/rpc.ts
+- [X] T024 [US2] Persist `skipped_cached`, provider-attempt, and transaction-count slice outcomes in apps/web/src/server/analysis/analysis-slice.repository.ts and apps/web/src/server/trigger/tasks/analysis-slice.task.ts
+- [X] T025 [US2] Default existing-wallet starts to incremental mode and bound overlapping request windows in apps/web/src/app/api/analysis/start/route.ts and apps/web/src/server/analysis/orchestrator.ts
 
 **Checkpoint**: Incremental runs short-circuit old slices and only reprocess the uncached edge of history.
 
@@ -78,10 +78,10 @@
 
 **Independent Test**: Call `POST /api/analysis/start` multiple times on the same UTC day for the same wallet and verify that every repeat call returns the existing or in-flight run summary without creating a second completed run.
 
-- [ ] T026 [US3] Implement UTC-day-bucket run creation and same-day lookup helpers in apps/web/src/server/analysis/analysis-run.repository.ts
-- [ ] T027 [US3] Enforce same-day idempotent enqueue behavior in apps/web/src/app/api/analysis/start/route.ts and apps/web/src/server/trigger/client.ts
-- [ ] T028 [P] [US3] Persist the partial unique-complete-run constraint and active-run lookup indexes in apps/web/src/server/db/schema.ts and apps/web/src/server/db/migrations/
-- [ ] T029 [US3] Return existing same-day and in-flight run summaries from apps/web/src/app/api/analysis/start/route.ts and apps/web/src/server/analysis/status-projection.ts
+- [X] T026 [US3] Implement UTC-day-bucket run creation and same-day lookup helpers in apps/web/src/server/analysis/analysis-run.repository.ts
+- [X] T027 [US3] Enforce same-day idempotent enqueue behavior in apps/web/src/app/api/analysis/start/route.ts and apps/web/src/server/trigger/client.ts
+- [X] T028 [P] [US3] Persist the partial unique-complete-run constraint and active-run lookup indexes in apps/web/src/server/db/schema.ts and apps/web/src/server/db/migrations/
+- [X] T029 [US3] Return existing same-day and in-flight run summaries from apps/web/src/app/api/analysis/start/route.ts and apps/web/src/server/analysis/status-projection.ts
 
 **Checkpoint**: The engine allows only one completed run per wallet and chain per UTC day and deduplicates racing start requests.
 
@@ -93,12 +93,12 @@
 
 **Independent Test**: After a complete run, verify that daily `performance_snapshots`, `pool_metrics_snapshots`, reward accrual rows, and linked protocol entities exist for every covered day without re-deriving data from raw events.
 
-- [ ] T030 [P] [US6] Implement global activity classification and residual attribution writes in apps/web/src/server/trigger/tasks/phase-activity.task.ts and apps/web/src/server/protocols/aerodrome/classifyResidualAttribution.ts
-- [ ] T031 [P] [US6] Implement dynamic factory, gauge, and pool discovery in apps/web/src/server/trigger/tasks/phase-pools.task.ts and apps/web/src/server/protocols/aerodrome/syncAerodromeMetadata.ts
-- [ ] T032 [P] [US6] Implement official Mellow strategy metadata sync and pool linkage in apps/web/src/server/protocols/mellow/syncMellowStrategies.ts
-- [ ] T033 [US6] Implement daily snapshot aggregation for portfolio, pool, deposit, strategy, and rewards scopes in apps/web/src/server/analysis/computeSnapshots.ts and apps/web/src/server/trigger/tasks/phase-finalize.task.ts
-- [ ] T034 [US6] Persist `PerformanceSnapshot`, `PoolMetricsSnapshot`, `StrategyExposure`, and final run/cursor state in apps/web/src/server/db/schema.ts and apps/web/src/server/trigger/tasks/phase-finalize.task.ts
-- [ ] T035 [US6] Update overview freshness and downstream snapshot linkage after finalization in apps/web/src/server/overview/overview.repository.ts and apps/web/src/server/analysis/analysis-run.repository.ts
+- [X] T030 [P] [US6] Implement global activity classification and residual attribution writes in apps/web/src/server/trigger/tasks/phase-activity.task.ts and apps/web/src/server/protocols/aerodrome/classifyResidualAttribution.ts
+- [X] T031 [P] [US6] Implement dynamic factory, gauge, and pool discovery in apps/web/src/server/trigger/tasks/phase-pools.task.ts and apps/web/src/server/protocols/aerodrome/syncAerodromeMetadata.ts
+- [X] T032 [P] [US6] Implement official Mellow strategy metadata sync and pool linkage in apps/web/src/server/protocols/mellow/syncMellowStrategies.ts
+- [X] T033 [US6] Implement daily snapshot aggregation for portfolio, pool, deposit, strategy, and rewards scopes in apps/web/src/server/analysis/computeSnapshots.ts and apps/web/src/server/trigger/tasks/phase-finalize.task.ts
+- [X] T034 [US6] Persist `PerformanceSnapshot`, `PoolMetricsSnapshot`, `StrategyExposure`, and final run/cursor state in apps/web/src/server/db/schema.ts and apps/web/src/server/trigger/tasks/phase-finalize.task.ts
+- [X] T035 [US6] Update overview freshness and downstream snapshot linkage after finalization in apps/web/src/server/overview/overview.repository.ts and apps/web/src/server/analysis/analysis-run.repository.ts
 
 **Checkpoint**: Downstream surfaces can read daily materialized series directly from normalized storage.
 
@@ -110,10 +110,10 @@
 
 **Independent Test**: Force one slice to exhaust provider retries and verify that sibling slices still finish, the run lands as complete with partial coverage, and `coverageReasons[]` reflects the failure accurately.
 
-- [ ] T036 [P] [US4] Normalize provider failure envelopes into the controlled coverage vocabulary in apps/web/src/server/providers/alchemy/index.ts and apps/web/src/server/providers/moralis/index.ts
-- [ ] T037 [P] [US4] Implement slice-level retry exhaustion, failure isolation, and coverage rollup in apps/web/src/server/trigger/tasks/analysis-slice.task.ts and apps/web/src/server/trigger/tasks/analysis-run.task.ts
-- [ ] T038 [US4] Persist slice and run coverage reason aggregation in apps/web/src/server/analysis/analysis-slice.repository.ts and apps/web/src/server/analysis/analysis-run.repository.ts
-- [ ] T039 [US4] Project partial-coverage results through the status surface in apps/web/src/app/api/analysis/status/route.ts and apps/web/src/server/analysis/status-projection.ts
+- [X] T036 [P] [US4] Normalize provider failure envelopes into the controlled coverage vocabulary in apps/web/src/server/providers/alchemy/index.ts and apps/web/src/server/providers/moralis/index.ts
+- [X] T037 [P] [US4] Implement slice-level retry exhaustion, failure isolation, and coverage rollup in apps/web/src/server/trigger/tasks/analysis-slice.task.ts and apps/web/src/server/trigger/tasks/analysis-run.task.ts
+- [X] T038 [US4] Persist slice and run coverage reason aggregation in apps/web/src/server/analysis/analysis-slice.repository.ts and apps/web/src/server/analysis/analysis-run.repository.ts
+- [X] T039 [US4] Project partial-coverage results through the status surface in apps/web/src/app/api/analysis/status/route.ts and apps/web/src/server/analysis/status-projection.ts
 
 **Checkpoint**: Slice-local failures degrade coverage truthfully without blocking the entire run.
 
@@ -125,10 +125,10 @@
 
 **Independent Test**: Cancel a queued or running analysis and verify that the run reaches a cancelled internal state, no new slices are enqueued, and the status API projects the correct post-cancel result.
 
-- [ ] T040 [P] [US5] Implement the cancel route contract in apps/web/src/app/api/analysis/cancel/route.ts
-- [ ] T041 [P] [US5] Implement Trigger.dev cancellation and persisted run cancellation fields in apps/web/src/server/trigger/client.ts and apps/web/src/server/analysis/analysis-run.repository.ts
-- [ ] T042 [US5] Make the run, slice, and finalize tasks honor cancellation without advancing the cursor in apps/web/src/server/trigger/tasks/analysis-run.task.ts, apps/web/src/server/trigger/tasks/analysis-slice.task.ts, and apps/web/src/server/trigger/tasks/phase-finalize.task.ts
-- [ ] T043 [US5] Return canonical post-cancel status projections in apps/web/src/app/api/analysis/status/route.ts and apps/web/src/server/analysis/status-projection.ts
+- [X] T040 [P] [US5] Implement the cancel route contract in apps/web/src/app/api/analysis/cancel/route.ts
+- [X] T041 [P] [US5] Implement Trigger.dev cancellation and persisted run cancellation fields in apps/web/src/server/trigger/client.ts and apps/web/src/server/analysis/analysis-run.repository.ts
+- [X] T042 [US5] Make the run, slice, and finalize tasks honor cancellation without advancing the cursor in apps/web/src/server/trigger/tasks/analysis-run.task.ts, apps/web/src/server/trigger/tasks/analysis-slice.task.ts, and apps/web/src/server/trigger/tasks/phase-finalize.task.ts
+- [X] T043 [US5] Return canonical post-cancel status projections in apps/web/src/app/api/analysis/status/route.ts and apps/web/src/server/analysis/status-projection.ts
 
 **Checkpoint**: Cancellation stops forward progress cleanly and preserves cursor correctness.
 
@@ -140,11 +140,11 @@
 
 **Independent Test**: Poll `GET /api/analysis/status` across `not_analyzed`, `queued`, `running`, `ready`, `stale`, and `failed` lifecycles and verify that the payload contains only canonical statuses, machine codes, phase progress, slice progress, and raw timestamps.
 
-- [ ] T044 [P] [US7] Implement phase and slice progress projection models in apps/web/src/server/analysis/status-projection.ts and apps/web/src/server/analysis/analysis-slice.repository.ts
-- [ ] T045 [US7] Extend the status route to return canonical status, phase progress, slice progress, coverage reasons, and last-success timestamps in apps/web/src/app/api/analysis/status/route.ts
-- [ ] T046 [P] [US7] Add finalized English machine-code copy for engine statuses, phases, coverage reasons, and errors in apps/web/src/i18n/locales/en/analysis.json, apps/web/src/i18n/locales/en/coverage.json, and apps/web/src/i18n/locales/en/errors.json
-- [ ] T047 [P] [US7] Add Spanish parity for the same machine-code catalog in apps/web/src/i18n/locales/es/analysis.json, apps/web/src/i18n/locales/es/coverage.json, and apps/web/src/i18n/locales/es/errors.json
-- [ ] T048 [US7] Align Settings, Overview, and the analysis badge with the canonical status payload in apps/web/src/features/settings/settings.mappers.ts, apps/web/src/features/overview/overview.mappers.ts, and apps/web/src/design-system/data-display/CabAnalysisStatusBadge.tsx
+- [X] T044 [P] [US7] Implement phase and slice progress projection models in apps/web/src/server/analysis/status-projection.ts and apps/web/src/server/analysis/analysis-slice.repository.ts
+- [X] T045 [US7] Extend the status route to return canonical status, phase progress, slice progress, coverage reasons, and last-success timestamps in apps/web/src/app/api/analysis/status/route.ts
+- [X] T046 [P] [US7] Add finalized English machine-code copy for engine statuses, phases, coverage reasons, and errors in apps/web/src/i18n/locales/en/analysis.json, apps/web/src/i18n/locales/en/coverage.json, and apps/web/src/i18n/locales/en/errors.json
+- [X] T047 [P] [US7] Add Spanish parity for the same machine-code catalog in apps/web/src/i18n/locales/es/analysis.json, apps/web/src/i18n/locales/es/coverage.json, and apps/web/src/i18n/locales/es/errors.json
+- [X] T048 [US7] Align Settings, Overview, and the analysis badge with the canonical status payload in apps/web/src/features/settings/settings.mappers.ts, apps/web/src/features/overview/overview.mappers.ts, and apps/web/src/design-system/data-display/CabAnalysisStatusBadge.tsx
 
 **Checkpoint**: UI consumers can render truthful, localized analysis state directly from the status API contract.
 
@@ -154,18 +154,18 @@
 
 **Purpose**: Validate the engine end to end and enforce the contract, provider-boundary, and localization quality gates.
 
-- [ ] T049 Run Trigger.dev task registration smoke validation for apps/web/trigger.config.ts with `cd apps/web && pnpm trigger:dev`
-- [ ] T050 Run schema generation and migration validation for apps/web/src/server/db/schema.ts with `cd apps/web && pnpm db:generate && pnpm db:migrate`
-- [ ] T051 Run static validation for apps/web/src/app/api/analysis/, apps/web/src/server/analysis/, and apps/web/src/server/trigger/tasks/ with `cd apps/web && pnpm lint && pnpm typecheck && pnpm build`
-- [ ] T052 Run EN/ES parity validation for apps/web/src/i18n/locales/en/analysis.json, apps/web/src/i18n/locales/en/coverage.json, apps/web/src/i18n/locales/en/errors.json, apps/web/src/i18n/locales/es/analysis.json, apps/web/src/i18n/locales/es/coverage.json, and apps/web/src/i18n/locales/es/errors.json with `cd apps/web && pnpm i18n:check`
-- [ ] T053 Validate provider-boundary compliance for apps/web/src/server/providers/ and apps/web/src/features/ with `cd apps/web && rg "@/server/providers|moralis|alchemy|trigger" src/features src/app`
-- [ ] T054 Validate the quickstart flow against specs/008-analysis-jobs/quickstart.md and apps/web/src/app/api/analysis/start/route.ts, apps/web/src/app/api/analysis/status/route.ts, and apps/web/src/app/api/analysis/cancel/route.ts
-- [ ] T055 Validate same-day starts, incremental cache hits, partial coverage, cancellation, and status projection against specs/008-analysis-jobs/contracts/analysis-api.md and specs/008-analysis-jobs/contracts/trigger-tasks.md
-- [ ] T056 Validate daily snapshot outputs and cursor advancement against specs/008-analysis-jobs/data-model.md and apps/web/src/server/trigger/tasks/phase-finalize.task.ts
-- [ ] T057 Validate unsupported-chain handling regressions for the analysis routes against specs/008-analysis-jobs/contracts/analysis-api.md and apps/web/src/app/api/analysis/start/route.ts, apps/web/src/app/api/analysis/status/route.ts, and apps/web/src/app/api/analysis/cancel/route.ts
-- [ ] T058 Validate coverage-state rendering regressions for full, partial, and unknown analysis outcomes against specs/008-analysis-jobs/contracts/i18n-namespaces.md, apps/web/src/features/settings/settings.mappers.ts, and apps/web/src/features/overview/overview.mappers.ts
-- [ ] T059 Measure status-route latency against the `GET /api/analysis/status` p95 target in specs/008-analysis-jobs/plan.md and apps/web/src/app/api/analysis/status/route.ts
-- [ ] T060 Measure per-provider queue throughput and retry behavior against SC-010 in specs/008-analysis-jobs/spec.md, specs/008-analysis-jobs/contracts/trigger-tasks.md, and apps/web/src/server/trigger/queues.ts
+- [X] T049 Run Trigger.dev task registration smoke validation for apps/web/trigger.config.ts with `cd apps/web && pnpm trigger:dev`
+- [X] T050 Run schema generation and migration validation for apps/web/src/server/db/schema.ts with `cd apps/web && pnpm db:generate && pnpm db:migrate`
+- [X] T051 Run static validation for apps/web/src/app/api/analysis/, apps/web/src/server/analysis/, and apps/web/src/server/trigger/tasks/ with `cd apps/web && pnpm lint && pnpm typecheck && pnpm build`
+- [X] T052 Run EN/ES parity validation for apps/web/src/i18n/locales/en/analysis.json, apps/web/src/i18n/locales/en/coverage.json, apps/web/src/i18n/locales/en/errors.json, apps/web/src/i18n/locales/es/analysis.json, apps/web/src/i18n/locales/es/coverage.json, and apps/web/src/i18n/locales/es/errors.json with `cd apps/web && pnpm i18n:check`
+- [X] T053 Validate provider-boundary compliance for apps/web/src/server/providers/ and apps/web/src/features/ with `cd apps/web && rg "@/server/providers|moralis|alchemy|trigger" src/features src/app`
+- [X] T054 Validate the quickstart flow against specs/008-analysis-jobs/quickstart.md and apps/web/src/app/api/analysis/start/route.ts, apps/web/src/app/api/analysis/status/route.ts, and apps/web/src/app/api/analysis/cancel/route.ts
+- [X] T055 Validate same-day starts, incremental cache hits, partial coverage, cancellation, and status projection against specs/008-analysis-jobs/contracts/analysis-api.md and specs/008-analysis-jobs/contracts/trigger-tasks.md
+- [X] T056 Validate daily snapshot outputs and cursor advancement against specs/008-analysis-jobs/data-model.md and apps/web/src/server/trigger/tasks/phase-finalize.task.ts
+- [X] T057 Validate unsupported-chain handling regressions for the analysis routes against specs/008-analysis-jobs/contracts/analysis-api.md and apps/web/src/app/api/analysis/start/route.ts, apps/web/src/app/api/analysis/status/route.ts, and apps/web/src/app/api/analysis/cancel/route.ts
+- [X] T058 Validate coverage-state rendering regressions for full, partial, and unknown analysis outcomes against specs/008-analysis-jobs/contracts/i18n-namespaces.md, apps/web/src/features/settings/settings.mappers.ts, and apps/web/src/features/overview/overview.mappers.ts
+- [X] T059 Measure status-route latency against the `GET /api/analysis/status` p95 target in specs/008-analysis-jobs/plan.md and apps/web/src/app/api/analysis/status/route.ts
+- [X] T060 Measure per-provider queue throughput and retry behavior against SC-010 in specs/008-analysis-jobs/spec.md, specs/008-analysis-jobs/contracts/trigger-tasks.md, and apps/web/src/server/trigger/queues.ts
 
 ---
 

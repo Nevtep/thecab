@@ -15,8 +15,15 @@ export async function apiClient<T>(path: string, options: RequestOptions = {}): 
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
     const code =
-      typeof errorBody === "object" && errorBody && "code" in errorBody
-        ? String(errorBody.code)
+      typeof errorBody === "object" && errorBody
+        ? "error" in errorBody &&
+            typeof errorBody.error === "object" &&
+            errorBody.error !== null &&
+            "code" in errorBody.error
+          ? String(errorBody.error.code)
+          : "code" in errorBody
+            ? String(errorBody.code)
+            : "API_REQUEST_FAILED"
         : "API_REQUEST_FAILED";
     throw new Error(code);
   }

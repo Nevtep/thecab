@@ -1,3 +1,14 @@
 {
-  "title": "PENDIENTE"
+  "title": "Errores",
+  "analysis": {
+    "invalid_payload": "La solicitud no es válida.",
+    "unsupported_chain": "Esta red todavía no es compatible.",
+    "unsupported_mode": "Ese modo de análisis no es compatible.",
+    "unauthorized": "Conecte su billetera para continuar.",
+    "wallet_mismatch": "Esta billetera no coincide con su sesión conectada.",
+    "run_already_in_progress": "Ya hay un análisis en curso para esta billetera.",
+    "run_not_found": "No pudimos encontrar esa ejecución de análisis.",
+    "not_cancellable": "Esa ejecución no se puede cancelar.",
+    "internal_error": "Ocurrió un problema. Inténtelo de nuevo."
+  }
 }

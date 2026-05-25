@@ -1,3 +1,4 @@
+import type { AnalysisSummary } from "@/analysis/analysisStatus";
 import type { CabAnalysisStatus, CabBadgeProps, CabIconName } from "@/design-system";
 import type {
   OverviewAnalysisStatus,
@@ -187,7 +188,7 @@ export function getOverviewCoverageReasonLabelKeys(reasonCodes: OverviewCoverage
 }
 
 export function mapOverviewAnalysisStatusToBadgeStatus(
-  status: OverviewAnalysisStatus,
+  status: AnalysisSummary["status"],
 ): CabAnalysisStatus {
   return status;
 }

@@ -7,6 +7,7 @@ import {
   insertProviderCachedResponse,
   readProviderCachedResponse,
 } from "@/server/providers/provider-cache.repository";
+import { withProviderRetry } from "@/server/providers/providerErrors";
 
 const BASE_URL = "https://deep-index.moralis.io/api/v2.2";
 const MORALIS_DEFAULT_CACHE_TTL_MS = 60 * 60 * 1000;
@@ -165,21 +166,28 @@ export async function moralisGet<T>(
   }
 
   const requestPromise = (async () => {
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        accept: "application/json",
-        "X-API-Key": env.MORALIS_API_KEY,
+    const parsed = await withProviderRetry({
+      provider: "moralis",
+      endpoint: path,
+      run: async () => {
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            accept: "application/json",
+            "X-API-Key": env.MORALIS_API_KEY,
+          },
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          const body = await response.text();
+          throw new Error(`MORALIS_REQUEST_FAILED:${response.status}:${body}`);
+        }
+
+        return (await response.json()) as T;
       },
-      cache: "no-store",
     });
 
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(`MORALIS_REQUEST_FAILED:${response.status}:${body}`);
-    }
-
-    const parsed = (await response.json()) as T;
     if (cachePolicy.ttlMs > 0) {
       setMemoryCachedResponse(cacheKey, parsed, cachePolicy.ttlMs);
 

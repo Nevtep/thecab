@@ -7,6 +7,7 @@ import {
   insertProviderCachedResponse,
   readProviderCachedResponse,
 } from "@/server/providers/provider-cache.repository";
+import { withProviderRetry } from "@/server/providers/providerErrors";
 
 type JsonRpcPayload = {
   jsonrpc: "2.0";
@@ -187,26 +188,33 @@ export async function alchemyRpc<T>(
       params,
     };
 
-    const response = await fetch(env.ALCHEMY_BASE_RPC_URL, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
+    const result = await withProviderRetry({
+      provider: "alchemy",
+      endpoint: `/rpc/${method}`,
+      run: async () => {
+        const response = await fetch(env.ALCHEMY_BASE_RPC_URL, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify(payload),
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          const body = await response.text();
+          throw new Error(`ALCHEMY_RPC_HTTP_FAILED:${response.status}:${body}`);
+        }
+
+        const json = (await response.json()) as JsonRpcResponse<T>;
+        if (json.error) {
+          throw new Error(`ALCHEMY_RPC_FAILED:${json.error.code}:${json.error.message}`);
+        }
+
+        return json.result as T;
       },
-      body: JSON.stringify(payload),
-      cache: "no-store",
     });
 
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(`ALCHEMY_RPC_HTTP_FAILED:${response.status}:${body}`);
-    }
-
-    const json = (await response.json()) as JsonRpcResponse<T>;
-    if (json.error) {
-      throw new Error(`ALCHEMY_RPC_FAILED:${json.error.code}:${json.error.message}`);
-    }
-
-    const result = json.result as T;
     setMemoryCachedResponse(cacheKey, result, cacheTtlMs);
     await insertProviderCachedResponse({
       provider: "alchemy",

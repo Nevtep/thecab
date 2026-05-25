@@ -1,10 +1,14 @@
 import { createHash } from "node:crypto";
 
-import { and, desc, eq, gte, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNull } from "drizzle-orm";
 
 import { getRedisClient } from "@/server/cache/redis";
 import { getDb } from "@/server/db/client";
 import { rawProviderRecords } from "@/server/db/schema";
+import {
+  buildRawProviderRequestHash,
+  insertRawProviderRecord,
+} from "@/server/providers/raw-provider-records.repository";
 
 const PROVIDER_CACHE_PREFIX = "provider-cache:v1";
 
@@ -36,6 +40,15 @@ export async function readProviderCachedResponse<T>(input: {
   maxAgeMs: number;
 }) {
   const storageKey = buildProviderCacheStorageKey(input);
+  const requestHash = buildRawProviderRequestHash({
+    provider: input.provider,
+    endpoint: input.endpoint,
+    chainId: input.chainId,
+    walletAddress: input.walletAddress,
+    requestJson: {
+      cacheKey: input.cacheKey,
+    },
+  });
   const redisClient = getRedisClient();
   if (redisClient) {
     const redisPayload = await redisClient.get<T>(storageKey);
@@ -61,7 +74,7 @@ export async function readProviderCachedResponse<T>(input: {
         eq(rawProviderRecords.chainId, input.chainId),
         walletPredicate,
         gte(rawProviderRecords.createdAt, minimumCreatedAt),
-        sql`(${rawProviderRecords.requestJson} ->> 'cacheKey') = ${input.cacheKey}`,
+        eq(rawProviderRecords.requestHash, requestHash),
       ),
     )
     .orderBy(desc(rawProviderRecords.createdAt))
@@ -100,23 +113,17 @@ export async function insertProviderCachedResponse(input: {
     });
   }
 
-  const db = getDb();
-  const [row] = await db
-    .insert(rawProviderRecords)
-    .values({
-      provider: input.provider,
-      endpoint: input.endpoint,
-      chainId: input.chainId,
-      walletAddress: input.walletAddress?.toLowerCase() ?? null,
-      requestJson: {
-        cacheKey: input.cacheKey,
-      },
-      responseJson: {
-        payload: input.payload,
-      },
-      confidence: "high",
-    })
-    .returning();
-
-  return row;
+  return insertRawProviderRecord({
+    provider: input.provider,
+    endpoint: input.endpoint,
+    chainId: input.chainId,
+    walletAddress: input.walletAddress,
+    requestJson: {
+      cacheKey: input.cacheKey,
+    },
+    responseJson: {
+      payload: input.payload,
+    },
+    confidence: "high",
+  });
 }

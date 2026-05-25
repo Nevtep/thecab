@@ -1,3 +1,14 @@
 {
-  "title": "TODO"
+  "title": "Errors",
+  "analysis": {
+    "invalid_payload": "The request was invalid.",
+    "unsupported_chain": "This chain isn't supported yet.",
+    "unsupported_mode": "That analysis mode isn't supported.",
+    "unauthorized": "Please connect your wallet to continue.",
+    "wallet_mismatch": "This wallet doesn't match your connected session.",
+    "run_already_in_progress": "An analysis is already running for this wallet.",
+    "run_not_found": "We couldn't find that analysis run.",
+    "not_cancellable": "That run can't be cancelled.",
+    "internal_error": "Something went wrong. Please try again."
+  }
 }

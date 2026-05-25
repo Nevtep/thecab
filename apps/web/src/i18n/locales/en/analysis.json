@@ -1,12 +1,53 @@
 {
   "title": "Analysis status",
   "status": {
-    "not_analyzed": "Not analyzed",
+    "not_analyzed": "Not analyzed yet",
     "queued": "Queued",
+    "running": "Analyzing...",
+    "ready": "Up to date",
+    "stale": "Refresh available",
+    "failed": "Analysis failed"
+  },
+  "mode": {
+    "full_history": "Full history",
+    "incremental": "Incremental update"
+  },
+  "phase": {
+    "deposits": "Deposits",
+    "rewards": "Rewards",
+    "activity": "Activity classification",
+    "pools": "Pool metadata",
+    "finalize": "Performance series"
+  },
+  "phaseStatus": {
+    "queued": "Pending",
     "running": "Running",
-    "ready": "Ready",
-    "stale": "Stale",
+    "complete": "Complete",
     "failed": "Failed"
+  },
+  "slice": {
+    "label": "Slice {{index}}",
+    "rangeLabel": "{{start}} -> {{end}}",
+    "progress": "{{processed}} of {{seen}} transactions",
+    "skippedCached": "Already covered (cached)"
+  },
+  "cta": {
+    "start": "Analyze wallet",
+    "startAgain": "Refresh analysis",
+    "cancel": "Cancel analysis",
+    "viewProgress": "View progress"
+  },
+  "banner": {
+    "not_analyzed": "This wallet has not been analyzed yet.",
+    "queued": "We will start your analysis shortly.",
+    "running": "Analyzing your wallet on {{chain}}. This usually takes a few minutes.",
+    "ready": "Last analyzed {{relative}}.",
+    "stale": "Last analyzed {{relative}}. A refresh is available.",
+    "failed": "We couldn't finish your last analysis. You can try again."
+  },
+  "lastSuccessful": {
+    "never": "Never",
+    "atUtc": "{{datetime}} UTC"
   },
   "lastSuccessfulRunAt": "Last successful analysis: {{value}}",
   "actions": {

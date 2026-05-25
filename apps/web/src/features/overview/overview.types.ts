@@ -1,4 +1,4 @@
-import type { AnalysisStatus } from "@/analysis/analysisStatus";
+import type { AnalysisStatus, AnalysisSummary } from "@/analysis/analysisStatus";
 
 export type OverviewRange = "24h" | "7d" | "30d";
 
@@ -85,14 +85,9 @@ export type OverviewViewModel = {
   chainId: number;
   mode: OverviewMode;
   selectedRange: OverviewRange;
-  analysis: {
+  analysis: AnalysisSummary & {
     status: OverviewAnalysisStatus;
-    runId: string | null;
-    stage: string;
-    progressPct: number;
-    lastSuccessfulRunAt: string | null;
-    lastUpdatedAt: string | null;
-    lastError: string | null;
+    stage: string | null;
   };
   coverage: {
     status: OverviewCoverageStatus;

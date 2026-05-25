@@ -1,9 +1,9 @@
 "use client";
 
-import type { AnalysisStatus } from "@/analysis/analysisStatus";
+import type { AnalysisSummary } from "@/analysis/analysisStatus";
 import { CabBadge } from "@/design-system/primitives/CabBadge";
 
-export type CabAnalysisStatus = AnalysisStatus;
+export type CabAnalysisStatus = AnalysisSummary["status"];
 
 const toneByStatus: Record<CabAnalysisStatus, "neutral" | "info" | "success" | "danger" | "warning"> = {
   not_analyzed: "neutral",

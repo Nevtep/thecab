@@ -1,21 +1,48 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { getLatestAnalysisRun } from "@/server/analysis/analysis-run.repository";
+import {
+  readAnalysisStatusContext,
+} from "@/server/analysis/analysis-run.repository";
+import { assertAuthenticatedWallet } from "@/server/analysis/assertAuthenticatedWallet";
+import { projectAnalysisProgress, projectAnalysisStatus } from "@/server/analysis/status-projection";
 import { assertSupportedChain, SUPPORTED_CHAIN_ID } from "@/server/chains";
-import { readOverviewFreshness } from "@/server/overview/overview.repository";
+
+const RESPONSE_HEADERS = {
+  "Cache-Control": "no-store",
+};
 
 const statusQuerySchema = z.object({
-  walletAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
+  walletAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/).transform((value) => value.toLowerCase()),
   chainId: z.coerce.number().int().positive().default(SUPPORTED_CHAIN_ID),
+  runId: z.string().uuid().optional(),
 });
 
-function isStale(lastSuccessfulRunAt: Date | null) {
-  if (!lastSuccessfulRunAt) {
-    return false;
-  }
+function errorResponse(code: string, status: number, details?: unknown) {
+  return NextResponse.json(
+    {
+      error: {
+        code,
+        ...(details === undefined ? {} : { details }),
+      },
+    },
+    {
+      status,
+      headers: RESPONSE_HEADERS,
+    },
+  );
+}
 
-  return Date.now() - lastSuccessfulRunAt.getTime() > 7 * 24 * 60 * 60 * 1000;
+function summarizeSliceProgress(
+  slices: Array<{
+    status: string;
+  }>,
+) {
+  return {
+    totalSlices: slices.length,
+    completedSlices: slices.filter((slice) => slice.status === "complete" || slice.status === "skipped_cached").length,
+    failedSlices: slices.filter((slice) => slice.status === "failed").length,
+  };
 }
 
 export async function GET(request: Request) {
@@ -27,57 +54,69 @@ export async function GET(request: Request) {
     });
 
     assertSupportedChain(payload.chainId);
+    await assertAuthenticatedWallet(payload.walletAddress);
 
-    const [run, freshness] = await Promise.all([
-      getLatestAnalysisRun(payload.walletAddress, payload.chainId),
-      readOverviewFreshness({
-        walletAddress: payload.walletAddress,
-        chainId: payload.chainId,
-      }),
-    ]);
+    const { run, freshness, slices } = await readAnalysisStatusContext({
+      walletAddress: payload.walletAddress,
+      chainId: payload.chainId,
+      runId: payload.runId,
+    });
+
+    if (payload.runId && !run) {
+      return errorResponse("run_not_found", 404);
+    }
+
+    const progress = summarizeSliceProgress(slices);
 
     const lastSuccessfulRunAt = freshness?.lastAnalyzedAt ?? run?.completedAt ?? null;
-    const status = run?.status === "queued" || run?.status === "running"
-      ? run.status
-      : run?.status === "failed"
-        ? "failed"
-        : isStale(lastSuccessfulRunAt)
-          ? "stale"
-          : lastSuccessfulRunAt
-            ? "ready"
-            : "not_analyzed";
+    const projected = projectAnalysisStatus({
+      latestRunStatus: run?.status ?? null,
+      lastSuccessfulRunAt,
+      coverageReasons: run?.coverageReasonsJson ?? [],
+      failedSliceCount: progress.failedSlices,
+    });
+    const progressProjection = projectAnalysisProgress({
+      latestRunStatus: run?.status ?? null,
+      currentStage: run?.stage ?? null,
+      totalSlices: progress.totalSlices,
+      completedSlices: progress.completedSlices,
+      failedSlices: progress.failedSlices,
+      slices,
+    });
 
     return NextResponse.json({
-      walletAddress: payload.walletAddress.toLowerCase(),
+      walletAddress: payload.walletAddress,
       chainId: payload.chainId,
-      status,
+      status: projected.status,
       runId: run?.id ?? freshness?.lastSuccessfulRunId ?? null,
-      stage:
-        run?.stage ?? (status === "ready" || status === "stale" ? "completed" : "idle"),
-      progressPct: run?.progressPct ?? (status === "ready" || status === "stale" ? 100 : 0),
+      mode: run?.mode ?? null,
+      stage: run?.stage ?? null,
+      progressPct: run?.progressPct ?? 0,
+      triggeredAtUtc: run?.triggeredAtUtc?.toISOString() ?? null,
+      completedAtUtc: run?.completedAt?.toISOString() ?? null,
+      coverage: projected.coverage,
+      coverageReasons: projected.coverageReasons,
       lastSuccessfulRunAt: lastSuccessfulRunAt ? lastSuccessfulRunAt.toISOString() : null,
       lastUpdatedAt: run?.updatedAt ? run.updatedAt.toISOString() : null,
       lastError: run?.lastError ?? null,
-    });
+      phases: progressProjection.phases,
+      slices: progressProjection.slices,
+    }, { headers: RESPONSE_HEADERS });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        {
-          code: "VALIDATION_FAILED",
-          details: error.issues,
-        },
-        { status: 400 },
-      );
+      return errorResponse("invalid_payload", 400, error.issues);
     }
 
     const message = error instanceof Error ? error.message : "Unknown error";
-    const code = message.startsWith("UNSUPPORTED_CHAIN") ? "UNSUPPORTED_CHAIN" : "ANALYSIS_STATUS_FAILED";
+    const code = message.startsWith("UNSUPPORTED_CHAIN")
+      ? "unsupported_chain"
+      : message.startsWith("ANALYSIS_REQUEST_FAILED:UNAUTHORIZED")
+        ? "unauthorized"
+        : "internal_error";
 
-    return NextResponse.json(
-      {
-        code,
-      },
-      { status: code === "UNSUPPORTED_CHAIN" ? 400 : 500 },
+    return errorResponse(
+      code,
+      code === "unsupported_chain" ? 400 : code === "unauthorized" ? 401 : 500,
     );
   }
 }

@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 
-import type { AnalysisMode, AnalysisStatus } from "@/analysis/analysisStatus";
+import type { AnalysisMode, AnalysisStatus, AnalysisStatusResponse } from "@/analysis/analysisStatus";
 import type { SettingsResponse, SettingsUpdateRequest } from "@/features/settings/settings.types";
 import {
   getOverviewActivityQueryOptions,
@@ -19,18 +19,6 @@ import { queryKeys } from "@/queries/keys";
 type WalletScopedInput = {
   chainId: number;
   walletAddress: string;
-};
-
-type AnalysisStatusResponse = {
-  walletAddress: string;
-  chainId: number;
-  status: AnalysisStatus;
-  runId: string | null;
-  stage: string;
-  progressPct: number;
-  lastSuccessfulRunAt: string | null;
-  lastUpdatedAt: string | null;
-  lastError: string | null;
 };
 
 type StartAnalysisResponse = {

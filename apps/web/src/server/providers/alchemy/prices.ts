@@ -7,6 +7,7 @@ import {
   insertProviderCachedResponse,
   readProviderCachedResponse,
 } from "@/server/providers/provider-cache.repository";
+import { withProviderRetry } from "@/server/providers/providerErrors";
 
 const PRICES_API_BASE = "https://api.g.alchemy.com/prices/v1";
 const CURRENT_PRICE_MEMORY_TTL_MS = 60 * 1000;
@@ -361,21 +362,27 @@ export async function getCurrentTokenPricesByAddress(
       address,
     }));
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
+    const parsed = await withProviderRetry({
+      provider: "alchemy",
+      endpoint: "/prices/tokens/by-address",
+      run: async () => {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ addresses: tokens }),
+          cache: "no-store",
+        });
+
+        if (!response.ok) {
+          const body = await response.text();
+          throw new Error(`ALCHEMY_PRICES_FAILED:${response.status}:${body}`);
+        }
+
+        return (await response.json()) as AlchemyPriceByAddressResult;
       },
-      body: JSON.stringify({ addresses: tokens }),
-      cache: "no-store",
     });
-
-    if (!response.ok) {
-      const body = await response.text();
-      throw new Error(`ALCHEMY_PRICES_FAILED:${response.status}:${body}`);
-    }
-
-    const parsed = (await response.json()) as AlchemyPriceByAddressResult;
     const parsedItems = parsed.data ?? [];
 
     await Promise.all(
@@ -499,48 +506,54 @@ export async function getHistoricalTokenPricesByAddress(
 
     const env = getEnv();
     const url = `${PRICES_API_BASE}/${env.ALCHEMY_API_KEY}/tokens/historical`;
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        network: getAlchemyNetwork(chainId),
-        address: normalizedAddress,
-        startTime: input.startTime,
-        endTime: input.endTime,
-        interval: input.interval,
-      }),
-      cache: "no-store",
-    });
-
-    if (!response.ok) {
-      const body = await response.text();
-      if (isHistoricalTokenNotFoundError(response.status, body)) {
-        await cacheHistoricalTokenNotFound(chainId, normalizedAddress);
-        writeCachedValue(
-          historicalPriceResponseCache,
-          requestKey,
-          emptyHistoricalPriceResult,
-          HISTORICAL_PRICE_MEMORY_TTL_MS,
-        );
-        await insertProviderCachedResponse({
-          provider: "alchemy",
-          endpoint: "/prices/tokens/historical",
-          chainId,
-          walletAddress: null,
-          cacheKey: requestKey,
-          payload: emptyHistoricalPriceResult,
-          ttlMs: HISTORICAL_PRICE_MEMORY_TTL_MS,
+    const parsed = await withProviderRetry({
+      provider: "alchemy",
+      endpoint: "/prices/tokens/historical",
+      run: async () => {
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            network: getAlchemyNetwork(chainId),
+            address: normalizedAddress,
+            startTime: input.startTime,
+            endTime: input.endTime,
+            interval: input.interval,
+          }),
+          cache: "no-store",
         });
 
-        return emptyHistoricalPriceResult;
-      }
+        if (!response.ok) {
+          const body = await response.text();
+          if (isHistoricalTokenNotFoundError(response.status, body)) {
+            await cacheHistoricalTokenNotFound(chainId, normalizedAddress);
+            writeCachedValue(
+              historicalPriceResponseCache,
+              requestKey,
+              emptyHistoricalPriceResult,
+              HISTORICAL_PRICE_MEMORY_TTL_MS,
+            );
+            await insertProviderCachedResponse({
+              provider: "alchemy",
+              endpoint: "/prices/tokens/historical",
+              chainId,
+              walletAddress: null,
+              cacheKey: requestKey,
+              payload: emptyHistoricalPriceResult,
+              ttlMs: HISTORICAL_PRICE_MEMORY_TTL_MS,
+            });
 
-      throw new Error(`ALCHEMY_HISTORICAL_PRICES_FAILED:${response.status}:${body}`);
-    }
+            return emptyHistoricalPriceResult;
+          }
 
-    const parsed = (await response.json()) as AlchemyHistoricalPriceResult;
+          throw new Error(`ALCHEMY_HISTORICAL_PRICES_FAILED:${response.status}:${body}`);
+        }
+
+        return (await response.json()) as AlchemyHistoricalPriceResult;
+      },
+    });
     writeCachedValue(historicalPriceResponseCache, requestKey, parsed, HISTORICAL_PRICE_MEMORY_TTL_MS);
     await insertProviderCachedResponse({
       provider: "alchemy",

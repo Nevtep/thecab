@@ -1,10 +1,36 @@
 {
   "noticeTitle": "Partial coverage",
+  "level": {
+    "full": "Full coverage",
+    "partial": "Partial coverage",
+    "unknown": "Coverage unknown"
+  },
   "status": {
     "recent": "Recent coverage",
     "partial": "Partial coverage",
     "unknown": "Unknown coverage"
   },
+  "reason": {
+    "missingPrices": "Some token prices were unavailable.",
+    "partialDecoded": "Some on-chain events couldn't be decoded.",
+    "providerError": "A data provider returned an error.",
+    "providerThrottled": "A data provider was rate-limited.",
+    "reorgSuspect": "Some recent blocks are still settling.",
+    "decodeError": "An on-chain event failed to decode.",
+    "pricingPartial": "Some prices used a lower-confidence fallback.",
+    "unknownError": "An unknown issue affected this run."
+  },
+  "reasonShort": {
+    "missingPrices": "Missing prices",
+    "partialDecoded": "Partial decode",
+    "providerError": "Provider error",
+    "providerThrottled": "Provider throttled",
+    "reorgSuspect": "Recent blocks settling",
+    "decodeError": "Decode error",
+    "pricingPartial": "Price fallback used",
+    "unknownError": "Unknown issue"
+  },
+  "priceSymbolFallback": "Price resolved by symbol (lower confidence).",
   "reasons": {
     "analysisPending": "Historical analysis is still pending",
     "providerPartial": "One or more providers returned partial data",
