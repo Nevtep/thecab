@@ -1,0 +1,26 @@
+.primaryGrid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.primaryPanel {
+  min-width: 0;
+  display: flex;
+}
+
+.primaryPanel > * {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+@media (max-width: 1920px) {
+  .primaryGrid {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .distributionPanel {
+    order: -1;
+  }
+}
