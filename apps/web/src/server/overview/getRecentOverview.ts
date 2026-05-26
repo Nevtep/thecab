@@ -597,6 +597,8 @@ export function buildOverviewRewardFallbackEvents(input: {
       continue;
     }
 
+    const resolvedRewardValueUsd = rewardValueUsd ?? 0;
+
     const existingEvent = rewardFallbackEventsByTxHash.get(txHash);
     if (!existingEvent) {
       rewardFallbackEventsByTxHash.set(txHash, {
@@ -606,7 +608,7 @@ export function buildOverviewRewardFallbackEvents(input: {
         capturedAt: toBucketTimestamp(rewardRow.occurredAt.toISOString(), granularity),
         detail: null,
         txHash: rewardRow.txHash,
-        rewardValueUsd,
+        rewardValueUsd: resolvedRewardValueUsd,
       });
       continue;
     }
@@ -616,7 +618,7 @@ export function buildOverviewRewardFallbackEvents(input: {
       occurredAt: rewardRow.occurredAt < new Date(existingEvent.occurredAt)
         ? rewardRow.occurredAt.toISOString()
         : existingEvent.occurredAt,
-      rewardValueUsd: (existingEvent.rewardValueUsd ?? 0) + rewardValueUsd,
+      rewardValueUsd: (existingEvent.rewardValueUsd ?? 0) + resolvedRewardValueUsd,
     });
   }
 

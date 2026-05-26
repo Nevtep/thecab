@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   mergeAnalyzedPerformanceSnapshotRows,
+  shouldExcludeLedgerEventFromOverviewUi,
   shouldPreserveAnalyzedPortfolioSnapshot,
 } from "@/server/overview/overview.repository";
 
@@ -52,4 +53,10 @@ test("shouldPreserveAnalyzedPortfolioSnapshot keeps analysis snapshots from rece
     existingMetadataJson: { snapshotKind: "range_bucket" },
     nextMetadataJson: { snapshotKind: "analysis_engine_daily" },
   }), false);
+});
+
+test("shouldExcludeLedgerEventFromOverviewUi hides suspicious phishing transfer rows by default", () => {
+  assert.equal(shouldExcludeLedgerEventFromOverviewUi({ excludeFromUiDefault: true }), true);
+  assert.equal(shouldExcludeLedgerEventFromOverviewUi({ excludeFromUiDefault: false }), false);
+  assert.equal(shouldExcludeLedgerEventFromOverviewUi({}), false);
 });

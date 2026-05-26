@@ -352,6 +352,7 @@ export async function computeSnapshots(input: {
         .where(inArray(pools.id, input.poolTotals.map((pool) => pool.poolId))),
     db
       .select({
+        chainId: protocolContracts.chainId,
         address: protocolContracts.address,
         protocol: protocolContracts.protocol,
         contractType: protocolContracts.contractType,

@@ -47,6 +47,10 @@ function formatSnapshotUsd(value: number) {
   return value.toFixed(6).replace(/\.0+$/, "").replace(/(\.\d*?)0+$/, "$1");
 }
 
+export function shouldExcludeLedgerEventFromOverviewUi(metadataJson: Record<string, unknown> | null | undefined) {
+  return metadataJson?.excludeFromUiDefault === true;
+}
+
 export function shouldPreserveAnalyzedPortfolioSnapshot(input: {
   existingMetadataJson: Record<string, unknown> | null | undefined;
   nextMetadataJson: Record<string, unknown> | null | undefined;
@@ -62,7 +66,17 @@ type AnalyzedPerformanceSnapshotRow = {
   metadataJson: Record<string, unknown>;
 };
 
-export function mergeAnalyzedPerformanceSnapshotRows(rows: AnalyzedPerformanceSnapshotRow[]) {
+type MergedAnalyzedPerformanceSnapshotRow = {
+  capturedAt: Date;
+  totalValueUsd: string;
+  deployedValueUsd: string | null;
+  idleValueUsd: string | null;
+  metadataJson: Record<string, unknown>;
+};
+
+export function mergeAnalyzedPerformanceSnapshotRows(
+  rows: AnalyzedPerformanceSnapshotRow[],
+): MergedAnalyzedPerformanceSnapshotRow[] {
   const rowsByCapturedAt = new Map<string, {
     capturedAt: Date;
     portfolio: AnalyzedPerformanceSnapshotRow | null;
@@ -88,7 +102,7 @@ export function mergeAnalyzedPerformanceSnapshotRows(rows: AnalyzedPerformanceSn
     rowsByCapturedAt.set(key, existing);
   }
 
-  return Array.from(rowsByCapturedAt.values())
+  const mergedRows: Array<MergedAnalyzedPerformanceSnapshotRow | null> = Array.from(rowsByCapturedAt.values())
     .map((row) => {
       const portfolioMetadata = row.portfolio?.metadataJson ?? {};
       const totalValueUsd = row.portfolio?.valueUsd ?? null;
@@ -129,14 +143,10 @@ export function mergeAnalyzedPerformanceSnapshotRows(rows: AnalyzedPerformanceSn
           source: "analyzed_history",
         },
       };
-    })
-    .filter((row): row is {
-      capturedAt: Date;
-      totalValueUsd: string;
-      deployedValueUsd: string | null;
-      idleValueUsd: string | null;
-      metadataJson: Record<string, unknown>;
-    } => Boolean(row))
+    });
+
+  return mergedRows
+    .filter((row): row is MergedAnalyzedPerformanceSnapshotRow => row !== null)
     .sort((left, right) => left.capturedAt.getTime() - right.capturedAt.getTime());
 }
 
@@ -682,9 +692,16 @@ export async function readRecentOverviewAnalyzedActivity(input: ScopedWalletInpu
     .where(and(...filters))
     .orderBy(desc(ledgerEvents.occurredAt), desc(ledgerEvents.createdAt));
 
-  const eventRows = typeof input.limit === "number" && Number.isFinite(input.limit) && input.limit > 0
-    ? await baseEventRowsQuery.limit(input.limit)
+  const queryLimit = typeof input.limit === "number" && Number.isFinite(input.limit) && input.limit > 0
+    ? input.limit * 4
+    : null;
+  const rawEventRows = queryLimit !== null
+    ? await baseEventRowsQuery.limit(queryLimit)
     : await baseEventRowsQuery;
+
+  const eventRows = rawEventRows
+    .filter((row) => !shouldExcludeLedgerEventFromOverviewUi(row.metadataJson))
+    .slice(0, input.limit ?? rawEventRows.length);
 
   if (eventRows.length === 0) {
     return [];

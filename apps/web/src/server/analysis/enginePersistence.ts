@@ -107,6 +107,48 @@ function asNumber(value: unknown) {
   return null;
 }
 
+function hasPositiveAmountRaw(value: unknown) {
+  if (typeof value !== "string" || !/^\d+$/.test(value)) {
+    return false;
+  }
+
+  return BigInt(value) > BigInt(0);
+}
+
+export function isSuspiciousSpoofedTransferActivity(input: {
+  walletAddress: string;
+  category: string;
+  methodLabel: string;
+  fromAddress: string | null;
+  toAddress: string | null;
+  meaningfulOutflowCount: number;
+  suspiciousOutflowCount: number;
+  trustedOutflowCount: number;
+}) {
+  const isTransferLike =
+    input.category === "token send" ||
+    input.category === "send" ||
+    input.methodLabel === "transfer";
+
+  if (!isTransferLike) {
+    return false;
+  }
+
+  if (input.fromAddress === input.walletAddress || input.toAddress === input.walletAddress) {
+    return false;
+  }
+
+  if (input.meaningfulOutflowCount === 0) {
+    return false;
+  }
+
+  if (input.trustedOutflowCount > 0) {
+    return false;
+  }
+
+  return input.suspiciousOutflowCount === input.meaningfulOutflowCount;
+}
+
 function toNumericString(value: number | string | null | undefined) {
   if (typeof value === "string") {
     return value;
@@ -663,6 +705,7 @@ export async function classifyRunLedgerEvents(input: {
       .select({
         id: ledgerEvents.id,
         txHash: ledgerEvents.txHash,
+        confidence: ledgerEvents.confidence,
         metadataJson: ledgerEvents.metadataJson,
       })
       .from(ledgerEvents)
@@ -686,6 +729,7 @@ export async function classifyRunLedgerEvents(input: {
         ledgerEventId: assetMovements.ledgerEventId,
         tokenAddress: assetMovements.tokenAddress,
         directionIn: assetMovements.directionIn,
+        amountRaw: assetMovements.amountRaw,
         amountUsd: assetMovements.amountUsd,
         metadataJson: assetMovements.metadataJson,
       })
@@ -770,31 +814,34 @@ export async function classifyRunLedgerEvents(input: {
     let hasSpamInflow = false;
     let hasUntrustedInflow = false;
     let hasValuelessInflow = false;
+    let meaningfulOutflowCount = 0;
+    let suspiciousOutflowCount = 0;
+    let trustedOutflowCount = 0;
     let hasInflow = false;
     let hasOutflow = false;
     for (const movement of movements) {
       const usd = movement.amountUsd ? Number(movement.amountUsd) : 0;
+      const tokenAddr = movement.tokenAddress.toLowerCase();
+      const movementMeta = (movement.metadataJson ?? {}) as Record<string, unknown>;
+      const tokenSignal = walletTokenSignalMap.get(tokenAddr) ?? null;
+      const movementPossibleSpam = movementMeta.possibleSpam === true;
+      const tokenPossibleSpam = tokenSignal?.possibleSpam === true;
+      const movementVerified = typeof movementMeta.verifiedContract === "boolean"
+        ? movementMeta.verifiedContract
+        : null;
+      const tokenVerified = typeof tokenSignal?.verifiedContract === "boolean"
+        ? tokenSignal.verifiedContract
+        : null;
+      const verifiedContract = movementVerified !== null ? movementVerified : tokenVerified;
+      const hasPriceSignal =
+        movement.amountUsd !== null ||
+        pricedTokenSet.has(tokenAddr) ||
+        (typeof tokenSignal?.usdPrice === "number" && Number.isFinite(tokenSignal.usdPrice) && tokenSignal.usdPrice > 0) ||
+        (typeof tokenSignal?.usdValue === "number" && Number.isFinite(tokenSignal.usdValue) && tokenSignal.usdValue > 0);
+
       if (movement.directionIn) {
         hasInflow = true;
         netUsdIn += Number.isFinite(usd) ? usd : 0;
-        const tokenAddr = movement.tokenAddress.toLowerCase();
-        const movementMeta = (movement.metadataJson ?? {}) as Record<string, unknown>;
-        const tokenSignal = walletTokenSignalMap.get(tokenAddr) ?? null;
-        const movementPossibleSpam = movementMeta.possibleSpam === true;
-        const tokenPossibleSpam = tokenSignal?.possibleSpam === true;
-        const movementVerified = typeof movementMeta.verifiedContract === "boolean"
-          ? movementMeta.verifiedContract
-          : null;
-        const tokenVerified = typeof tokenSignal?.verifiedContract === "boolean"
-          ? tokenSignal.verifiedContract
-          : null;
-        const verifiedContract = movementVerified !== null ? movementVerified : tokenVerified;
-        const hasPriceSignal =
-          movement.amountUsd !== null ||
-          pricedTokenSet.has(tokenAddr) ||
-          (typeof tokenSignal?.usdPrice === "number" && Number.isFinite(tokenSignal.usdPrice) && tokenSignal.usdPrice > 0) ||
-          (typeof tokenSignal?.usdValue === "number" && Number.isFinite(tokenSignal.usdValue) && tokenSignal.usdValue > 0);
-
         if (spamSet.has(tokenAddr) || movementPossibleSpam || tokenPossibleSpam) {
           hasSpamInflow = true;
         }
@@ -807,6 +854,26 @@ export async function classifyRunLedgerEvents(input: {
       } else {
         hasOutflow = true;
         netUsdOut += Number.isFinite(usd) ? usd : 0;
+
+        const hasMeaningfulOutflow =
+          hasPositiveAmountRaw(movement.amountRaw) ||
+          (movement.amountUsd !== null && Number.isFinite(usd) && usd > 0);
+        if (!hasMeaningfulOutflow) {
+          continue;
+        }
+
+        meaningfulOutflowCount += 1;
+
+        const isSpamLikeOutflow = spamSet.has(tokenAddr) || movementPossibleSpam || tokenPossibleSpam;
+        const isUntrustedOutflow = verifiedContract === false;
+        const isValuelessOutflow = !hasPriceSignal;
+        if (isSpamLikeOutflow || isUntrustedOutflow || isValuelessOutflow) {
+          suspiciousOutflowCount += 1;
+        }
+
+        if (!isSpamLikeOutflow && !isUntrustedOutflow && hasPriceSignal) {
+          trustedOutflowCount += 1;
+        }
       }
     }
     const netUsdFlow = netUsdIn - netUsdOut;
@@ -825,6 +892,16 @@ export async function classifyRunLedgerEvents(input: {
     const isAirdropTagged = category === "airdrop" || methodLabel === "airdrop";
     const isApprove = methodLabel === "approve" || category === "approve";
     const isSwap = category.includes("swap") || methodLabel.includes("swap");
+    const isSpoofedTransferActivity = isSuspiciousSpoofedTransferActivity({
+      walletAddress,
+      category,
+      methodLabel,
+      fromAddress,
+      toAddress,
+      meaningfulOutflowCount,
+      suspiciousOutflowCount,
+      trustedOutflowCount,
+    });
     const claimMethods = new Set(["getrewards", "getreward", "claim", "claimfees", "claimrewards", "collect"]);
     const depositMethods = new Set([
       "deposit",
@@ -945,6 +1022,8 @@ export async function classifyRunLedgerEvents(input: {
       classification = "manual_deposit";
     } else if (isAirdropTagged || hasSpamInflow || (!counterpartyInfo && isReceiveLike && (isAirdropLikeMethod || hasUntrustedInflow || hasValuelessInflow))) {
       classification = "airdrop";
+    } else if (isSpoofedTransferActivity) {
+      classification = "other";
     } else if (category === "token receive" || category === "receive") {
       classification = "cash_in";
     } else if (category === "token send" || category === "send") {
@@ -957,11 +1036,27 @@ export async function classifyRunLedgerEvents(input: {
       classification = "other";
     }
 
+    const nextMetadataJson = {
+      ...row.metadataJson,
+    } satisfies Record<string, unknown>;
+
+    if (isSpoofedTransferActivity) {
+      nextMetadataJson.excludeFromUiDefault = true;
+      nextMetadataJson.suspiciousActivity = true;
+      nextMetadataJson.suspiciousReasonCodes = ["spoofedTransfer", "spamTokenOutflow"];
+    } else {
+      delete nextMetadataJson.excludeFromUiDefault;
+      delete nextMetadataJson.suspiciousActivity;
+      delete nextMetadataJson.suspiciousReasonCodes;
+    }
+
     await db
       .update(ledgerEvents)
       .set({
         classification,
         classificationRunId: input.runId,
+        confidence: isSpoofedTransferActivity ? "low" : row.confidence,
+        metadataJson: nextMetadataJson,
       })
       .where(eq(ledgerEvents.id, row.id));
     updated += 1;
