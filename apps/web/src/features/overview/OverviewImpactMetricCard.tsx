@@ -156,13 +156,13 @@ export function OverviewImpactMetricCard({
 
           <CabText
             variant="kpi"
-            fontSize={size === "default" ? 32 : 22}
             fontWeight="700"
             color={cabColors.text.primary}
             style={{
+              fontSize: size === "default" ? "min(32px, max(28px, 1.55vw))" : 22,
               fontVariantNumeric: "tabular-nums",
               lineHeight: 1.05,
-              maxWidth: size === "default" ? "72%" : "78%",
+              maxWidth: size === "default" ? "calc(100% - 64px)" : "78%",
             }}
           >
             {value}

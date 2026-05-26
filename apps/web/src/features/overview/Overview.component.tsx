@@ -26,12 +26,7 @@ import {
   CabTooltip,
   ConnectedShell,
 } from "@/design-system";
-import {
-  formatDateTime,
-  formatPercent,
-  formatRelativeTime,
-  formatUsd,
-} from "@/i18n/formatters";
+import { formatDateTime, formatPercent, formatRelativeTime, formatUsd } from "@/i18n/formatters";
 import { getExplorerBaseUrl } from "@/chains/chains";
 
 import {
@@ -51,6 +46,8 @@ import { buildPortfolioEvolutionModel } from "@/features/overview/portfolio-evol
 import { PortfolioEvolutionSection } from "@/features/overview/portfolio-evolution/PortfolioEvolutionSection.component";
 import type { OverviewRange, OverviewViewModel } from "@/features/overview/overview.types";
 import { SUPPORTED_CHAIN_ID } from "@/wallet/supportedChains";
+
+import styles from "./Overview.module.css";
 
 type OverviewComponentProps = {
   walletAddress: string | null;
@@ -943,70 +940,67 @@ export function OverviewComponent({
             </CabText>
           ) : null}
 
-          <div
-            style={{
-              display: "grid",
-              gap: 16,
-              gridTemplateColumns: "repeat(auto-fit, minmax(0, 1fr))",
-            }}
-          >
-            {isInitialChartLoading ? (
-              <CabLoadingPanel label={t("states.loadingChart")} />
-            ) : !resolvedChartViewModel && chartErrorCode ? (
-              <CabErrorPanel
-                title={t("states.providerFailureTitle")}
-                description={t(`states.errors.${chartErrorCode}`, { defaultValue: t("states.providerFailureDescription") })}
-                retryLabel={t("actions.refresh")}
-                onRetry={onRefresh}
-              />
-            ) : !resolvedChartViewModel ? (
-              <CabEmptyState
-                title={t("states.emptyTitle")}
-                description={t("states.emptyDescription")}
-              />
-            ) : !isHistoricalAnalysisReady ? (
-              <CabCard density="spacious">
-                <CabEmptyState
-                  title={t("portfolioEvolution.awaitingAnalysisTitle")}
-                  description={t("portfolioEvolution.awaitingAnalysisDescription")}
-                  actionLabel={analysisAction.visible && analysisAction.labelKey ? t(analysisAction.labelKey) : undefined}
-                  onAction={analysisAction.visible && analysisAction.mode ? () => onStartAnalysis(analysisAction.mode) : undefined}
+          <div className={styles.primaryGrid}>
+            <div className={styles.primaryPanel}>
+              {isInitialChartLoading ? (
+                <CabLoadingPanel label={t("states.loadingChart")} />
+              ) : !resolvedChartViewModel && chartErrorCode ? (
+                <CabErrorPanel
+                  title={t("states.providerFailureTitle")}
+                  description={t(`states.errors.${chartErrorCode}`, { defaultValue: t("states.providerFailureDescription") })}
+                  retryLabel={t("actions.refresh")}
+                  onRetry={onRefresh}
                 />
-              </CabCard>
-            ) : (
-              <PortfolioEvolutionSection
-                viewModel={resolvedChartViewModel}
-                model={portfolioEvolutionModel}
-                activity={activityViewModel}
-                range={range}
-                locale={locale}
-                isRefreshing={isChartRefreshing}
-                onRangeChange={onRangeChange}
-              />
-            )}
+              ) : !resolvedChartViewModel ? (
+                <CabEmptyState
+                  title={t("states.emptyTitle")}
+                  description={t("states.emptyDescription")}
+                />
+              ) : !isHistoricalAnalysisReady ? (
+                <CabCard density="spacious">
+                  <CabEmptyState
+                    title={t("portfolioEvolution.awaitingAnalysisTitle")}
+                    description={t("portfolioEvolution.awaitingAnalysisDescription")}
+                    actionLabel={analysisAction.visible && analysisAction.labelKey ? t(analysisAction.labelKey) : undefined}
+                    onAction={analysisAction.visible && analysisAction.mode ? () => onStartAnalysis(analysisAction.mode) : undefined}
+                  />
+                </CabCard>
+              ) : (
+                <PortfolioEvolutionSection
+                  viewModel={resolvedChartViewModel}
+                  model={portfolioEvolutionModel}
+                  activity={activityViewModel}
+                  range={range}
+                  locale={locale}
+                  isRefreshing={isChartRefreshing}
+                  onRangeChange={onRangeChange}
+                />
+              )}
+            </div>
 
-            {isInitialChartLoading ? (
-              <CabLoadingPanel label={t("states.loadingDistribution")} />
-            ) : !resolvedChartViewModel && chartErrorCode ? (
-            <CabErrorPanel
-              title={t("states.providerFailureTitle")}
-              description={t(`states.errors.${chartErrorCode}`, { defaultValue: t("states.providerFailureDescription") })}
-              retryLabel={t("actions.refresh")}
-              onRetry={onRefresh}
-            />
-            ) : !resolvedChartViewModel ? (
-            <CabEmptyState
-              title={t("states.emptyTitle")}
-              description={t("states.emptyDescription")}
-            />
-            ) : (
-            <CapitalAllocationSection
-              distribution={resolvedChartViewModel.distribution}
-              range={range}
-              assetRows={(overviewViewModel?.assets.rows ?? [...visibleAssetRows, ...hiddenAssetRows])
-                .filter((row) => !row.isHiddenByDefault && row.priceUsd !== null && !isDustValueRow(row))}
-            />
-            )}
+            <div className={`${styles.primaryPanel} ${styles.distributionPanel}`}>
+              {isInitialChartLoading ? (
+                <CabLoadingPanel label={t("states.loadingDistribution")} />
+              ) : !resolvedChartViewModel && chartErrorCode ? (
+                <CabErrorPanel
+                  title={t("states.providerFailureTitle")}
+                  description={t(`states.errors.${chartErrorCode}`, { defaultValue: t("states.providerFailureDescription") })}
+                  retryLabel={t("actions.refresh")}
+                  onRetry={onRefresh}
+                />
+              ) : !resolvedChartViewModel ? (
+                <CabEmptyState
+                  title={t("states.emptyTitle")}
+                  description={t("states.emptyDescription")}
+                />
+              ) : (
+                <CapitalAllocationSection
+                  distribution={resolvedChartViewModel.distribution}
+                  assetRows={(overviewViewModel?.assets.rows ?? [...visibleAssetRows, ...hiddenAssetRows])
+                    .filter((row) => !row.isHiddenByDefault && row.priceUsd !== null && !isDustValueRow(row))}
+                />
+              )}
+            </div>
           </div>
 
           {isInitialProtocolPositionsLoading ? (
