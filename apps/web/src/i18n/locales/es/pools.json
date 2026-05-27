@@ -40,7 +40,9 @@
   "actions": {
     "retry": "Reintentar",
     "open": "Abrir",
-    "closeDetail": "Cerrar detalle"
+    "closeDetail": "Cerrar detalle",
+    "expandRow": "Expandir fila",
+    "collapseRow": "Contraer fila"
   },
   "table": {
     "value": "Valor",

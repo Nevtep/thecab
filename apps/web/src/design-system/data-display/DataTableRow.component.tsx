@@ -11,11 +11,13 @@ export function DataTableRow<TData extends RowData>({
   row,
   selectable,
   selected,
+  expanded = false,
   onSelect,
 }: {
   row: Row<TData>;
   selectable: boolean;
   selected: boolean;
+  expanded?: boolean;
   onSelect?: (rowId: string) => void;
 }) {
   function handleSelect() {
@@ -41,6 +43,7 @@ export function DataTableRow<TData extends RowData>({
     styles.bodyRow,
     selectable ? styles.bodyRowSelectable : "",
     selected ? styles.bodyRowSelected : "",
+    expanded ? styles.bodyRowExpanded : "",
   ]
     .filter(Boolean)
     .join(" ");

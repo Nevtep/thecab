@@ -1,0 +1,88 @@
+.expandToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: rgba(184, 199, 230, 0.7);
+  cursor: pointer;
+  padding: 0;
+  border-radius: 6px;
+  transition: color 120ms ease, background 120ms ease, transform 160ms ease;
+}
+
+.expandToggle:hover {
+  background: rgba(0, 224, 225, 0.08);
+  color: rgba(0, 224, 225, 0.9);
+}
+
+.expandToggle:focus-visible {
+  outline: 2px solid rgba(0, 224, 225, 0.6);
+  outline-offset: 2px;
+}
+
+.expandToggleIcon {
+  transition: transform 160ms ease;
+}
+
+.expandToggleIconOpen {
+  transform: rotate(180deg);
+}
+
+.breakdown {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.breakdownItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border-left: 2px solid rgba(184, 199, 230, 0.18);
+}
+
+.breakdownItemManual {
+  border-left-color: rgba(0, 224, 225, 0.55);
+}
+
+.breakdownItemStrategy {
+  border-left-color: rgba(80, 142, 255, 0.55);
+}
+
+.breakdownItemResidual {
+  border-left-color: rgba(255, 159, 67, 0.55);
+}
+
+.breakdownLabel {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(184, 199, 230, 0.7);
+}
+
+.breakdownValue {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+  font-variant-numeric: tabular-nums;
+}
+
+.breakdownMeta {
+  font-size: 11px;
+  color: rgba(184, 199, 230, 0.65);
+}
+
+.breakdownState {
+  font-size: 12px;
+  color: rgba(184, 199, 230, 0.7);
+}
+
+@media (max-width: 720px) {
+  .breakdown {
+    grid-template-columns: 1fr;
+  }
+}

@@ -9,7 +9,7 @@ import {
   type SortingState,
   useReactTable,
 } from "@tanstack/react-table";
-import { useState, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 
 import { DataTableEmptyState } from "@/design-system/data-display/DataTableEmptyState.component";
 import { DataTableHeader } from "@/design-system/data-display/DataTableHeader.component";
@@ -45,6 +45,9 @@ export type DataTableProps<TData extends RowData> = {
   toolbar?: ReactNode;
   stickyHeader?: boolean;
   getRowCanSelect?: (row: TData) => boolean;
+  expandedRowIds?: string[];
+  getRowCanExpand?: (row: TData) => boolean;
+  renderExpandedRow?: (row: TData) => ReactNode;
 };
 
 export function DataTable<TData extends RowData>({
@@ -61,10 +64,14 @@ export function DataTable<TData extends RowData>({
   toolbar,
   stickyHeader = true,
   getRowCanSelect,
+  expandedRowIds,
+  getRowCanExpand,
+  renderExpandedRow,
 }: DataTableProps<TData>) {
   const [internalSorting, setInternalSorting] = useState<SortingState>([]);
   const resolvedSorting = sorting ?? internalSorting;
   const handleSortingChange = onSortingChange ?? setInternalSorting;
+  const expandedRowIdSet = new Set(expandedRowIds ?? []);
 
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
@@ -80,6 +87,7 @@ export function DataTable<TData extends RowData>({
   });
 
   const rows = table.getRowModel().rows;
+  const visibleColumnCount = table.getVisibleLeafColumns().length;
   const isEmpty = rows.length === 0;
   const resolvedLoadingState = loadingState ?? <DataTableLoadingState />;
   const resolvedEmptyState = emptyState ?? <DataTableEmptyState />;
@@ -98,13 +106,28 @@ export function DataTable<TData extends RowData>({
               <DataTableHeader table={table} stickyHeader={stickyHeader} />
               <tbody>
                 {rows.map((row) => (
-                  <DataTableRow
-                    key={row.id}
-                    row={row}
-                    selected={selectedRowId === row.id}
-                    selectable={getRowCanSelect ? getRowCanSelect(row.original) : Boolean(onRowSelect)}
-                    onSelect={onRowSelect}
-                  />
+                  <Fragment key={row.id}>
+                    <DataTableRow
+                      row={row}
+                      selected={selectedRowId === row.id}
+                      selectable={getRowCanSelect ? getRowCanSelect(row.original) : Boolean(onRowSelect)}
+                      expanded={Boolean(
+                        renderExpandedRow &&
+                        expandedRowIdSet.has(row.id) &&
+                        (getRowCanExpand ? getRowCanExpand(row.original) : true),
+                      )}
+                      onSelect={onRowSelect}
+                    />
+                    {renderExpandedRow &&
+                    expandedRowIdSet.has(row.id) &&
+                    (getRowCanExpand ? getRowCanExpand(row.original) : true) ? (
+                      <tr className={styles.expandedRow}>
+                        <td className={[styles.cell, styles.expandedRowCell].join(" ")} colSpan={visibleColumnCount}>
+                          <div className={styles.expandedRowContent}>{renderExpandedRow(row.original)}</div>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
                 ))}
               </tbody>
             </table>

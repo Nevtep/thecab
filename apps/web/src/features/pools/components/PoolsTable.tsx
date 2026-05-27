@@ -1,19 +1,22 @@
 "use client";
 
 import { createColumnHelper, type ColumnDef, type SortingState } from "@tanstack/react-table";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type MouseEvent } from "react";
 
 import {
   CabCoverageBadge,
+  CabIcon,
   DataTable,
   DataTablePercentCell,
-  DataTableRowActionCell,
   DataTableStackedCell,
   DataTableStatusCell,
   DataTableValueCell,
 } from "@/design-system";
 
+import type { PoolsExpandedBreakdown } from "@/features/pools/Pools.component";
 import type { PoolsListViewModel } from "@/features/pools/pools.types";
+
+import styles from "@/features/pools/components/PoolsTable.module.css";
 
 type PoolRow = PoolsListViewModel["items"][number];
 
@@ -51,8 +54,14 @@ function toneForReturn(value: number | null) {
 export function PoolsTable(input: {
   items: PoolsListViewModel["items"];
   selectedPoolId?: string | null;
+  expandedPoolId: string | null;
+  onToggleExpand: (poolId: string) => void;
+  expandedBreakdown: PoolsExpandedBreakdown | null;
+  expandedBreakdownIsLoading: boolean;
+  expandedBreakdownErrorCode: string | null;
   labels: {
-    open: string;
+    expandRow: string;
+    collapseRow: string;
     pool: string;
     value: string;
     portfolioShare: string;
@@ -61,10 +70,15 @@ export function PoolsTable(input: {
     status: string;
     coverage: string;
     latestActivity: string;
-    action: string;
     inRange: string;
     outOfRange: string;
     unknown: string;
+    manualExposure: string;
+    strategyExposure: string;
+    residualExposure: string;
+    breakdownLoading: string;
+    breakdownUnavailable: string;
+    strategyMetaLabel: string;
   };
   getCoverageLabel: (coverageStatus: string) => string;
   onSelect: (poolId: string) => void;
@@ -72,6 +86,41 @@ export function PoolsTable(input: {
   const [sorting, setSorting] = useState<SortingState>([{ id: "value", desc: true }]);
   const columns = useMemo(
     () => [
+      columnHelper.display({
+        id: "expand",
+        header: () => "",
+        enableSorting: false,
+        meta: { align: "center" },
+        cell: ({ row }) => {
+          const isExpanded = input.expandedPoolId === row.original.poolId;
+          const handleClick = (event: MouseEvent<HTMLButtonElement>) => {
+            event.stopPropagation();
+
+            if (!isExpanded) {
+              input.onSelect(row.original.poolId);
+            }
+
+            input.onToggleExpand(row.original.poolId);
+          };
+          return (
+            <button
+              type="button"
+              className={styles.expandToggle}
+              aria-expanded={isExpanded}
+              aria-label={isExpanded ? input.labels.collapseRow : input.labels.expandRow}
+              onClick={handleClick}
+            >
+              <CabIcon
+                name="chevronDown"
+                size="sm"
+                className={[styles.expandToggleIcon, isExpanded ? styles.expandToggleIconOpen : ""]
+                  .filter(Boolean)
+                  .join(" ")}
+              />
+            </button>
+          );
+        },
+      }),
       columnHelper.accessor("label", {
         id: "pool",
         header: () => input.labels.pool,
@@ -172,19 +221,6 @@ export function PoolsTable(input: {
           />
         ),
       }),
-      columnHelper.display({
-        id: "actions",
-        header: () => input.labels.action,
-        meta: { align: "right" },
-        enableSorting: false,
-        cell: ({ row }) => (
-          <DataTableRowActionCell
-            label={input.labels.open}
-            tone={input.selectedPoolId === row.original.poolId ? "technical" : "ghost"}
-            onPress={() => input.onSelect(row.original.poolId)}
-          />
-        ),
-      }),
     ],
     [input],
   );
@@ -199,6 +235,52 @@ export function PoolsTable(input: {
       sorting={sorting}
       onSortingChange={setSorting}
       stickyHeader
+      expandedRowIds={input.expandedPoolId ? [input.expandedPoolId] : []}
+      getRowCanExpand={() => true}
+      renderExpandedRow={(row) => {
+        if (row.poolId !== input.expandedPoolId) {
+          return null;
+        }
+
+        if (input.expandedBreakdownIsLoading && !input.expandedBreakdown) {
+          return <div className={styles.breakdownState}>{input.labels.breakdownLoading}</div>;
+        }
+
+        if (input.expandedBreakdownErrorCode || !input.expandedBreakdown) {
+          return <div className={styles.breakdownState}>{input.labels.breakdownUnavailable}</div>;
+        }
+
+        const breakdown = input.expandedBreakdown;
+        const strategyMeta = breakdown.strategyLabels.length > 0
+          ? `${input.labels.strategyMetaLabel}: ${breakdown.strategyLabels.join(", ")}`
+          : null;
+
+        return (
+          <div className={styles.breakdown}>
+            <div className={[styles.breakdownItem, styles.breakdownItemManual].join(" ")}>
+              <span className={styles.breakdownLabel}>{input.labels.manualExposure}</span>
+              <span className={styles.breakdownValue}>{breakdown.manual.formattedCurrentValueUsd}</span>
+              <span className={styles.breakdownMeta}>
+                {input.getCoverageLabel(breakdown.manual.coverageStatus)}
+              </span>
+            </div>
+            <div className={[styles.breakdownItem, styles.breakdownItemStrategy].join(" ")}>
+              <span className={styles.breakdownLabel}>{input.labels.strategyExposure}</span>
+              <span className={styles.breakdownValue}>{breakdown.strategy.formattedCurrentValueUsd}</span>
+              <span className={styles.breakdownMeta}>
+                {strategyMeta ?? input.getCoverageLabel(breakdown.strategy.coverageStatus)}
+              </span>
+            </div>
+            <div className={[styles.breakdownItem, styles.breakdownItemResidual].join(" ")}>
+              <span className={styles.breakdownLabel}>{input.labels.residualExposure}</span>
+              <span className={styles.breakdownValue}>{breakdown.residual.formattedCurrentValueUsd}</span>
+              <span className={styles.breakdownMeta}>
+                {input.getCoverageLabel(breakdown.residual.coverageStatus)}
+              </span>
+            </div>
+          </div>
+        );
+      }}
     />
   );
 }

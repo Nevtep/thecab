@@ -140,8 +140,23 @@
   box-shadow: inset 1px 0 0 rgba(46, 197, 201, 0.92);
 }
 
+.bodyRowExpanded .bodyCell {
+  border-bottom-color: rgba(0, 224, 225, 0.12);
+}
+
 .bodyRow:last-child .bodyCell {
   border-bottom: 0;
+}
+
+.expandedRowCell {
+  padding: 0;
+  background: rgba(14, 22, 34, 0.94);
+  border-bottom: 1px solid rgba(184, 199, 230, 0.12);
+}
+
+.expandedRowContent {
+  padding: 14px 16px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.03);
 }
 
 .toolbar {

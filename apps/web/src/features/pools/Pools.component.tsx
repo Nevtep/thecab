@@ -19,6 +19,14 @@ import type { PoolDetailRange, PoolDetailViewModel, PoolsListFilters, PoolsListV
 
 import styles from "@/features/pools/PoolsWorkspace.module.css";
 
+export type PoolsExpandedBreakdown = {
+  poolId: string;
+  manual: PoolDetailViewModel["segments"]["manual"];
+  strategy: PoolDetailViewModel["segments"]["strategy"];
+  residual: PoolDetailViewModel["segments"]["residual"];
+  strategyLabels: string[];
+};
+
 type PoolsComponentProps = {
   screenState: PoolsScreenState;
   viewModel: PoolsListViewModel | null;
@@ -39,6 +47,11 @@ type PoolsComponentProps = {
   onSearchChange: (value: string) => void;
   onStatusChange: (value: PoolsListFilters["status"]) => void;
   onSelectPool: (poolId: string) => void;
+  expandedPoolId: string | null;
+  onToggleExpand: (poolId: string) => void;
+  expandedBreakdown: PoolsExpandedBreakdown | null;
+  expandedBreakdownIsLoading: boolean;
+  expandedBreakdownErrorCode: string | null;
 };
 
 export function PoolsComponent(input: PoolsComponentProps) {
@@ -119,8 +132,14 @@ export function PoolsComponent(input: PoolsComponentProps) {
           <PoolsTable
             items={input.viewModel.items}
             selectedPoolId={input.selectedPoolId}
+            expandedPoolId={input.expandedPoolId}
+            onToggleExpand={input.onToggleExpand}
+            expandedBreakdown={input.expandedBreakdown}
+            expandedBreakdownIsLoading={input.expandedBreakdownIsLoading}
+            expandedBreakdownErrorCode={input.expandedBreakdownErrorCode}
             labels={{
-              open: t("pools:actions.open"),
+              expandRow: t("pools:actions.expandRow"),
+              collapseRow: t("pools:actions.collapseRow"),
               pool: t("pools:title"),
               value: t("pools:table.value"),
               portfolioShare: t("pools:table.portfolioShare"),
@@ -129,10 +148,15 @@ export function PoolsComponent(input: PoolsComponentProps) {
               status: t("pools:table.status"),
               coverage: t("pools:table.coverage"),
               latestActivity: t("pools:table.latestActivity"),
-              action: t("pools:table.action"),
               inRange: t("pools:table.inRange"),
               outOfRange: t("pools:table.outOfRange"),
               unknown: t("pools:values.unavailable"),
+              manualExposure: t("pools:values.manualExposure"),
+              strategyExposure: t("pools:values.strategyExposure"),
+              residualExposure: t("pools:values.residualExposure"),
+              breakdownLoading: t("pools:states.loadingDetail"),
+              breakdownUnavailable: t("pools:values.unavailable"),
+              strategyMetaLabel: t("pools:values.strategy"),
             }}
             getCoverageLabel={(coverageStatus) => t(getPoolsCoverageLabelKey(coverageStatus))}
             onSelect={input.onSelectPool}

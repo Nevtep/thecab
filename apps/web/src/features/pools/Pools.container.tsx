@@ -32,6 +32,7 @@ export function PoolsContainer({ selectedPoolId = null }: { selectedPoolId?: str
   const { address, chainId, isConnected, isAuthenticated, isSupportedChain, isAuthReady } = useCabWallet();
   const [filters, setFilters] = useState(() => createDefaultPoolsListFilters());
   const [detailRange, setDetailRange] = useState<PoolDetailRange>("90d");
+  const [expandedPoolId, setExpandedPoolId] = useState<string | null>(selectedPoolId);
 
   const walletAddress = address?.toLowerCase() ?? "";
   const resolvedChainId = chainId ?? SUPPORTED_CHAIN_ID;
@@ -66,6 +67,17 @@ export function PoolsContainer({ selectedPoolId = null }: { selectedPoolId?: str
       enabled: isWalletReady && Boolean(selectedPoolId),
     },
   );
+  const expandedDetailQuery = usePoolDetailQuery(
+    {
+      walletAddress,
+      chainId: resolvedChainId,
+      poolId: expandedPoolId ?? "",
+      range: detailRange,
+    },
+    {
+      enabled: isWalletReady && Boolean(expandedPoolId),
+    },
+  );
 
   useEffect(() => {
     const nextStatus = analysisStatusQuery.data?.status ?? null;
@@ -92,6 +104,14 @@ export function PoolsContainer({ selectedPoolId = null }: { selectedPoolId?: str
     }
   }, [analysisStatusQuery.data?.status, detailRange, filters, queryClient, resolvedChainId, selectedPoolId, walletAddress]);
 
+  useEffect(() => {
+    if (!selectedPoolId) {
+      return;
+    }
+
+    setExpandedPoolId(selectedPoolId);
+  }, [selectedPoolId]);
+
   const navigationItems = useMemo(
     () => getOverviewNavigationItems((analysisStatusQuery.data?.status ?? "not_analyzed") as never),
     [analysisStatusQuery.data?.status],
@@ -104,6 +124,20 @@ export function PoolsContainer({ selectedPoolId = null }: { selectedPoolId?: str
     () => (detailQuery.data ? mapPoolDetailResponseToViewModel(detailQuery.data, i18n.language) : null),
     [detailQuery.data, i18n.language],
   );
+  const expandedBreakdown = useMemo(() => {
+    if (!expandedPoolId || !expandedDetailQuery.data) {
+      return null;
+    }
+
+    const vm = mapPoolDetailResponseToViewModel(expandedDetailQuery.data, i18n.language);
+    return {
+      poolId: expandedPoolId,
+      manual: vm.segments.manual,
+      strategy: vm.segments.strategy,
+      residual: vm.segments.residual,
+      strategyLabels: vm.header.strategyLabels,
+    };
+  }, [expandedDetailQuery.data, expandedPoolId, i18n.language]);
   const screenState = useMemo(() => {
     if (!isWalletReady || analysisStatusQuery.isLoading || poolsQuery.isLoading) {
       return "loading" as const;
@@ -202,6 +236,15 @@ export function PoolsContainer({ selectedPoolId = null }: { selectedPoolId?: str
           });
         }}
         onSelectPool={(poolId) => router.push(`/pools/${poolId}`)}
+        expandedPoolId={expandedPoolId}
+        onToggleExpand={(poolId) =>
+          setExpandedPoolId((current) => (current === poolId ? null : poolId))
+        }
+        expandedBreakdown={expandedBreakdown}
+        expandedBreakdownIsLoading={Boolean(expandedPoolId) && expandedDetailQuery.isLoading}
+        expandedBreakdownErrorCode={
+          expandedDetailQuery.error instanceof Error ? expandedDetailQuery.error.message : null
+        }
       />
     </ConnectedShell>
   );
