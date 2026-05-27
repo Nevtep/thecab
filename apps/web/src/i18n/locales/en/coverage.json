@@ -2,6 +2,7 @@
   "noticeTitle": "Partial coverage",
   "level": {
     "full": "Full coverage",
+    "share_level": "Share-level coverage",
     "partial": "Partial coverage",
     "unknown": "Coverage unknown"
   },

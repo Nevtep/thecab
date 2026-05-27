@@ -5,7 +5,7 @@
 
 ## Summary
 
-The Pools feature becomes the first fully unlocked post-analysis destination in the connected shell. It adds routed screens at `/pools` and `/pools/[poolId]`, replaces the current post-analysis `comingSoon` placeholder for Pools with a real destination, and serves visually rich list and detail experiences from database-backed internal APIs only. The feature deliberately does not call Moralis, Alchemy, or Trigger.dev in request/response flow. Instead, the existing analysis engine is extended to materialize wallet-scoped pool read models from normalized protocol tables so the Pools UI can render up to one year of pool history, current and historical exposure segments, rewards, residual attribution, lifecycle and rebalance timelines, and coverage-aware metrics without recomputing heavy joins on every page load.
+The Pools feature becomes the first fully unlocked post-analysis destination in the connected shell. It adds routed screens at `/pools` and `/pools/[poolId]`, replaces the current post-analysis `comingSoon` placeholder for Pools with a real destination, and serves visually rich list and detail experiences from database-backed internal APIs only. The feature deliberately does not call Moralis, Alchemy, or Trigger.dev in request/response flow. Instead, the existing analysis engine is extended to materialize wallet-scoped pool read models from normalized protocol tables so the Pools UI can render up to one year of pool history, current and historical exposure segments, rewards, residual attribution, lifecycle and rebalance timelines, and coverage-aware metrics without recomputing heavy joins on every page load. Pools stays locked until analysis is `ready`; once unlocked, stale refreshes may continue serving the last successful analyzed data during background refreshes.
 
 The key planning decision is to extend analysis output beyond the current `latestPoolTotals` pathway. Today `computeSnapshots()` writes `performance_snapshots(scope = 'pool')` and `pool_metrics_snapshots` using the same latest pool total for every day in the range, which is not sufficient for truthful historical pool charts. This plan therefore introduces dedicated wallet-scoped pool summary, history, and timeline read models written during analysis finalization and consumed by thin authenticated API routes.
 
@@ -14,11 +14,11 @@ The key planning decision is to extend analysis output beyond the current `lates
 **Language/Version**: TypeScript 5.x strict mode  
 **Primary Dependencies**: Next.js 15 App Router, React 19, TanStack Query, Tamagui-based internal design system, Drizzle ORM, PostgreSQL, Trigger.dev v3, i18next + react-i18next  
 **Storage**: PostgreSQL via Drizzle; existing normalized analysis tables plus new wallet-scoped pool read models  
-**Testing**: Vitest for mappers/repositories/routes, Playwright for gated routing and key Pools user flows, existing lint/typecheck/i18n parity gates  
+**Testing**: Vitest for analysis materialization, pools repositories, routes, and mappers; Playwright for ready gating, stale retention after unlock, navigation unlock, and key Pools list/detail user flows; existing lint/typecheck/i18n parity gates  
 **Target Platform**: Browser clients on the existing Next.js web app; serverless route handlers backed by Postgres; Base mainnet product-v1 chain only  
 **Project Type**: Web application monorepo with primary implementation in `apps/web/`  
 **Performance Goals**: `GET /api/pools` p95 <= 200ms from DB only; `GET /api/pools/:poolId` p95 <= 300ms for default range from DB only; no provider calls in Pools request flow; initial Pools shell renders with meaningful metrics and charts without synchronous background work  
-**Constraints**: Pools remains analysis-gated; all browser data access goes through typed internal APIs; routes must validate authenticated wallet + supported chain; query params must be bounded and whitelisted to avoid abusive scans; range selection capped at 365 days; no raw provider payloads exposed; visual density must remain legible on desktop and mobile  
+**Constraints**: Pools remains analysis-gated until status is `ready`; after unlock it may stay available during `stale` refreshes using last-success data; all browser data access goes through typed internal APIs; routes must validate authenticated wallet + supported chain; query params must be bounded and whitelisted to avoid abusive scans; range selection capped at 365 days; no raw provider payloads exposed; visual density must remain legible on desktop and mobile  
 **Scale/Scope**: One connected wallet at a time; up to one year of analyzed pool history; two routed screens (`/pools`, `/pools/[poolId]`); two internal read APIs; one new feature module; one analysis extension to materialize pool-specific read models
 
 ## Constitution Check
@@ -82,7 +82,7 @@ apps/web/
 │   │   └── keys.ts                           # UPDATE — list/detail filter keys if needed
 │   ├── server/
 │   │   ├── analysis/
-│   │   │   ├── computeSnapshots.ts           # UPDATE — stop treating latest pool total as full history for Pools UI
+│   │   │   ├── computeSnapshots.ts           # UPDATE — preserve generic pool snapshots without advertising `latestPoolTotals` as truthful Pools history
 │   │   │   ├── pool-read-models.ts           # NEW — materialize wallet-scoped pool summaries/history/timeline
 │   │   │   └── enginePersistence.ts          # UPDATE — persist pool read models per completed run
 │   │   ├── db/
@@ -94,13 +94,28 @@ apps/web/
 │   │       ├── pools.route.ts
 │   │       └── pools.types.ts
 │   └── i18n/
+│       ├── formatters.ts                     # UPDATE — centralized locale-aware formatting for Pools output
 │       └── locales/
 │           ├── en/pools.json                 # UPDATE
 │           ├── en/charts.json                # UPDATE
 │           ├── en/navigation.json            # UPDATE
+│           ├── en/coverage.json              # UPDATE
+│           ├── en/common.json                # UPDATE
 │           ├── es/pools.json                 # UPDATE
 │           ├── es/charts.json                # UPDATE
-│           └── es/navigation.json            # UPDATE
+│           ├── es/navigation.json            # UPDATE
+│           ├── es/coverage.json              # UPDATE
+│           └── es/common.json                # UPDATE
+├── src/server/analysis/
+│   ├── computeSnapshots.test.ts              # UPDATE — guard pool snapshot semantics
+│   └── enginePersistence.test.ts             # UPDATE — cover pool read-model writes
+├── src/server/pools/
+│   ├── pools.repository.test.ts              # NEW — list/detail query coverage
+│   ├── pools.route.test.ts                   # NEW — route guard and contract coverage
+│   └── pools.service.test.ts                 # NEW — response composition coverage
+├── src/features/pools/
+│   ├── pools.mappers.test.ts                 # NEW — view-model and formatting coverage
+│   └── pools.validation.test.ts              # NEW — filter/range state coverage
 └── e2e/
     └── pools-gated-and-history.spec.ts       # NEW — gating + routed screen coverage
 ```
@@ -123,7 +138,7 @@ Phase 0 resolved the main planning questions:
 
 1. Whether Pools should read directly from provider-backed logic at request time: **No**. The route layer remains DB-only.
 2. Whether current analysis output already supports truthful one-year Pools history: **No**. The engine must be extended to materialize wallet-scoped pool history and timeline read models.
-3. How routing and gating should behave: Pools becomes the first unlocked deep route after analysis is `ready` or `stale`, while direct pre-analysis visits render a gated state rather than leaking partially implemented data.
+3. How routing and gating should behave: Pools becomes the first unlocked deep route when analysis is `ready`, and direct pre-ready visits render a gated state rather than leaking partially implemented data. Once unlocked, stale refresh behavior can continue serving the last successful analyzed data.
 4. How UI richness should be expressed safely: through explicit UI contracts and bounded data series, not through unbounded chart queries or provider-side fanout.
 
 ## Phase 1 — Design & Contracts

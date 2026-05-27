@@ -112,12 +112,32 @@ async function main() {
         query: `delete from portfolio_snapshots where wallet_address = $1 and chain_id = $2`,
       },
       {
+        label: "pool_timeline_events",
+        query: `delete from pool_timeline_events where wallet_address = $1 and chain_id = $2`,
+      },
+      {
+        label: "pool_history_snapshots",
+        query: `delete from pool_history_snapshots where wallet_address = $1 and chain_id = $2`,
+      },
+      {
+        label: "pool_wallet_summaries",
+        query: `delete from pool_wallet_summaries where wallet_address = $1 and chain_id = $2`,
+      },
+      {
         label: "governance_events",
         query: `delete from governance_events where wallet_address = $1 and chain_id = $2`,
       },
       {
         label: "discarded_events",
         query: `delete from discarded_events where wallet_address = $1 and chain_id = $2`,
+      },
+      {
+        label: "inferred_actions",
+        query: `delete from inferred_actions where wallet_address = $1 and chain_id = $2`,
+      },
+      {
+        label: "approval_links",
+        query: `delete from approval_links where wallet_address = $1 and chain_id = $2`,
       },
       {
         label: "attribution_source_lots",

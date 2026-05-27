@@ -1,6 +1,7 @@
 export const ANALYSIS_COVERAGE_LEVELS = ["full", "partial", "unknown"] as const;
 export const ANALYSIS_COVERAGE_REASON_CODES = [
   "missingPrices",
+  "historyPaginationExceeded",
   "partialDecoded",
   "providerError",
   "providerThrottled",

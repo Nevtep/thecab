@@ -178,6 +178,7 @@ function createCurrentPositionRow(input: {
       protocolSurface: buildProtocolSurface(protocol, family),
       wrapperAddress,
       positionContractAddress,
+      poolAddress: null,
       lockEndAt: family === "governance_lock" ? extractLockEndAt(input.position) : null,
       feeTierLabel: null,
       rangeLowerTick: null,

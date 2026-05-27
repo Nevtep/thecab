@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, inArray, lte } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 
 import {
   ASSET_TRUST_CLASSIFIER_VERSION,
@@ -13,10 +13,10 @@ import {
   ledgerEvents,
   performanceSnapshots,
   poolMetricsSnapshots,
-  pools,
   portfolioSnapshots,
   pricePoints,
   protocolContracts,
+  strategies,
   strategyExposures,
 } from "@/server/db/schema";
 import { readOverviewRealizedRewardEvents } from "@/server/overview/overview.repository";
@@ -41,6 +41,7 @@ const BASE_AERO_ADDRESS = "0x940181a94a35a4569e4529a3cdfb74e38fd98631";
 const BASE_USDC_ADDRESS = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
 const BASE_EURC_ADDRESS = "0x60a3e35cc302bfa44cb288bc5a4f316fdb1adb42";
 const DUST_VALUE_THRESHOLD_USD = 1;
+const SNAPSHOT_INSERT_CHUNK_SIZE = 250;
 
 const KNOWN_BASE_TOKEN_METADATA: Record<string, { address: string; decimals: number }> = {
   weth: { address: BASE_WETH_ADDRESS, decimals: 18 },
@@ -124,6 +125,16 @@ function resolveKnownTokenDecimals(input: {
 
   const normalizedSymbol = normalizeTokenSymbol(input.symbol);
   return normalizedSymbol ? (KNOWN_BASE_TOKEN_METADATA[normalizedSymbol]?.decimals ?? null) : null;
+}
+
+function chunkRows<T>(rows: T[], chunkSize: number) {
+  const chunks: T[][] = [];
+
+  for (let index = 0; index < rows.length; index += chunkSize) {
+    chunks.push(rows.slice(index, index + chunkSize));
+  }
+
+  return chunks;
 }
 
 function* iterateUtcDays(startDayUtc: string, endDayUtc: string) {
@@ -328,28 +339,24 @@ export async function computeSnapshots(input: {
   const walletAddress = input.walletAddress.toLowerCase();
   const walletTokens = (input.walletTokens ?? []).filter((token) => !token.possibleSpam);
 
-  const [depositRows, exposureRows, poolRows, protocolAddressRows] = await Promise.all([
+  const [depositRows, exposureRows, protocolAddressRows] = await Promise.all([
     db
-      .select({ id: deposits.id, metadataJson: deposits.metadataJson, coverageStatus: deposits.coverageStatus })
+      .select({ id: deposits.id, poolId: deposits.poolId, metadataJson: deposits.metadataJson, coverageStatus: deposits.coverageStatus })
       .from(deposits)
       .where(and(eq(deposits.walletAddress, walletAddress), eq(deposits.chainId, input.chainId))),
     db
       .select({
         id: strategyExposures.id,
         strategyId: strategyExposures.strategyId,
+        primaryPoolId: strategies.primaryPoolId,
         underlying0AmountRaw: strategyExposures.underlying0AmountRaw,
         underlying1AmountRaw: strategyExposures.underlying1AmountRaw,
         metadataJson: strategyExposures.metadataJson,
         coverageStatus: strategyExposures.coverageStatus,
       })
       .from(strategyExposures)
+      .innerJoin(strategies, eq(strategyExposures.strategyId, strategies.id))
       .where(and(eq(strategyExposures.walletAddress, walletAddress), eq(strategyExposures.chainId, input.chainId))),
-    input.poolTotals.length === 0
-      ? Promise.resolve([])
-      : db
-        .select({ id: pools.id })
-        .from(pools)
-        .where(inArray(pools.id, input.poolTotals.map((pool) => pool.poolId))),
     db
       .select({
         chainId: protocolContracts.chainId,
@@ -361,6 +368,14 @@ export async function computeSnapshots(input: {
       .from(protocolContracts)
       .where(eq(protocolContracts.chainId, input.chainId)),
   ]);
+
+  const poolIds = Array.from(
+    new Set([
+      ...depositRows.map((row) => row.poolId).filter((value): value is string => Boolean(value)),
+      ...exposureRows.map((row) => row.primaryPoolId).filter((value): value is string => Boolean(value)),
+      ...input.poolTotals.map((poolTotal) => poolTotal.poolId),
+    ]),
+  );
 
   const depositValueUsd = depositRows.reduce((sum, row) => sum + (asNumber(row.metadataJson.valueUsd) ?? 0), 0);
   const strategyValueUsd = exposureRows.reduce((sum, row) => sum + (asNumber(row.metadataJson.valueUsd) ?? 0), 0);
@@ -889,20 +904,6 @@ export async function computeSnapshots(input: {
           snapshotKind: "analysis_engine_daily",
         },
       })),
-      ...input.poolTotals.map((poolTotal) => ({
-        chainId: input.chainId,
-        walletAddress,
-        scope: "pool",
-        scopeRefId: poolTotal.poolId,
-        capturedAt: new Date(`${dayUtc}T00:00:00.000Z`),
-        dayUtc,
-        resolution: "daily",
-        coverageStatus: "full",
-        valueUsd: String(poolTotal.valueUsd),
-        metadataJson: {
-          snapshotKind: "analysis_engine_daily",
-        },
-      })),
     ];
   });
 
@@ -919,7 +920,9 @@ export async function computeSnapshots(input: {
     );
 
   if (performanceRows.length > 0) {
-    await db.insert(performanceSnapshots).values(performanceRows);
+    for (const chunk of chunkRows(performanceRows, SNAPSHOT_INSERT_CHUNK_SIZE)) {
+      await db.insert(performanceSnapshots).values(chunk);
+    }
   }
 
   for (const dayUtc of dayRows) {
@@ -970,29 +973,18 @@ export async function computeSnapshots(input: {
       });
   }
 
-  for (const dayUtc of dayRows) {
-    for (const poolTotal of input.poolTotals) {
-      await db
-        .insert(poolMetricsSnapshots)
-        .values({
-          chainId: input.chainId,
-          poolId: poolTotal.poolId,
-          dayUtc,
-          tvlUsd: String(poolTotal.valueUsd),
-          metadataJson: {
-            source: "analysis_engine_daily",
-          },
-        })
-        .onConflictDoUpdate({
-          target: [poolMetricsSnapshots.chainId, poolMetricsSnapshots.poolId, poolMetricsSnapshots.dayUtc],
-          set: {
-            tvlUsd: String(poolTotal.valueUsd),
-            metadataJson: {
-              source: "analysis_engine_daily",
-            },
-          },
-        });
-    }
+  if (poolIds.length > 0) {
+    await db
+      .delete(poolMetricsSnapshots)
+      .where(
+        and(
+          eq(poolMetricsSnapshots.chainId, input.chainId),
+          inArray(poolMetricsSnapshots.poolId, poolIds),
+          gte(poolMetricsSnapshots.dayUtc, input.startDayUtc),
+          lte(poolMetricsSnapshots.dayUtc, input.endDayUtc),
+          sql`${poolMetricsSnapshots.metadataJson}->>'source' = 'analysis_engine_daily'`,
+        ),
+      );
   }
 
   const finalMetric = metricsByDay.get(input.endDayUtc);
@@ -1007,6 +999,6 @@ export async function computeSnapshots(input: {
     cumulativeCashOutUsd: finalMetric?.cumulativeCashOutUsd ?? 0,
     netCapitalInUsd: finalMetric?.netCapitalInUsd ?? 0,
     rewardDayCount: rewardValueByDay.size,
-    poolCount: poolRows.length,
+    poolCount: poolIds.length,
   };
 }

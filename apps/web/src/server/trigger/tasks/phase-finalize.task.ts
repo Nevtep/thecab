@@ -7,8 +7,9 @@ import {
   mergeAnalysisRunMetadata,
   readRunSliceCoverage,
 } from "@/server/analysis/analysis-run.repository";
-import { listRunSlices } from "@/server/analysis/analysis-slice.repository";
+import { listRunSlices, resolveRunSliceDayWindow } from "@/server/analysis/analysis-slice.repository";
 import { computeSnapshots, type WalletTokenSnapshot } from "@/server/analysis/computeSnapshots";
+import { materializePoolReadModels } from "@/server/analysis/pool-read-models";
 import { getDb } from "@/server/db/client";
 import { rawProviderRecords } from "@/server/db/schema";
 import { upsertProcessingCursor } from "@/server/analysis/processing-cursor.repository";
@@ -118,6 +119,7 @@ export const phaseFinalizeTask = task({
 
     const capturedAt = new Date();
     const slices = await listRunSlices(payload.runId);
+    const sliceDayWindow = resolveRunSliceDayWindow(slices, run.utcDayBucket);
     let walletTokens = parseWalletTokenSnapshots(run.metadataJson.latestWalletTokens);
 
     if (walletTokens.length === 0) {
@@ -140,8 +142,8 @@ export const phaseFinalizeTask = task({
     const snapshot = await computeSnapshots({
       walletAddress: payload.walletAddress,
       chainId: payload.chainId,
-      startDayUtc: slices[0]?.sliceStartUtc.toISOString().slice(0, 10) ?? run.utcDayBucket,
-      endDayUtc: run.utcDayBucket,
+      startDayUtc: sliceDayWindow.startDayUtc,
+      endDayUtc: sliceDayWindow.endDayUtc,
       capturedAt,
       poolTotals: Array.isArray(run.metadataJson.latestPoolTotals)
         ? run.metadataJson.latestPoolTotals
@@ -152,6 +154,14 @@ export const phaseFinalizeTask = task({
           }))
         : [],
       walletTokens,
+    });
+    const poolReadModels = await materializePoolReadModels({
+      runId: payload.runId,
+      walletAddress: payload.walletAddress,
+      chainId: payload.chainId,
+      startDayUtc: sliceDayWindow.startDayUtc,
+      endDayUtc: sliceDayWindow.endDayUtc,
+      capturedAt,
     });
     const sliceCoverage = await readRunSliceCoverage(payload.runId);
 
@@ -190,6 +200,7 @@ export const phaseFinalizeTask = task({
       coverage: finalizedRun.coverage,
       coverageReasons: finalizedRun.coverageReasonsJson,
       totalValueUsd: snapshot.totalValueUsd,
+      poolReadModels,
     };
   },
 });

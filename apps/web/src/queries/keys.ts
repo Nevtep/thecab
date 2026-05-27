@@ -7,6 +7,10 @@ type OverviewParams = BaseParams & {
   range: string;
 };
 
+type PoolsParams = BaseParams & {
+  filters?: Record<string, unknown>;
+};
+
 export const queryKeys = {
   overview: ({ chainId, walletAddress, range }: OverviewParams) =>
     ["overview", chainId, walletAddress ?? "", range] as const,
@@ -20,9 +24,10 @@ export const queryKeys = {
     ["overview-protocol-positions", chainId, walletAddress ?? "", range] as const,
   analysisStatus: ({ chainId, walletAddress }: BaseParams) =>
     ["analysis-status", chainId, walletAddress ?? ""] as const,
-  pools: ({ chainId, walletAddress }: BaseParams) =>
-    ["pools", chainId, walletAddress ?? ""] as const,
-  poolDetail: (chainId: number, poolId: string) => ["pool", chainId, poolId] as const,
+  pools: ({ chainId, walletAddress, filters }: PoolsParams) =>
+    ["pools", chainId, walletAddress ?? "", JSON.stringify(filters ?? {})] as const,
+  poolDetail: (chainId: number, poolId: string, range = "90d") =>
+    ["pool", chainId, poolId, range] as const,
   deposits: ({ chainId, walletAddress }: BaseParams) =>
     ["deposits", chainId, walletAddress ?? ""] as const,
   depositDetail: (chainId: number, depositId: string) =>

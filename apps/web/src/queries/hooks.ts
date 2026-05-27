@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 
 import type { AnalysisMode, AnalysisStatus, AnalysisStatusResponse } from "@/analysis/analysisStatus";
+import type { PoolDetailRange, PoolDetailResponse, PoolsListFilters, PoolsListResponse } from "@/features/pools/pools.types";
 import type { SettingsResponse, SettingsUpdateRequest } from "@/features/settings/settings.types";
 import {
   getOverviewActivityQueryOptions,
@@ -9,6 +10,7 @@ import {
   getOverviewQueryOptions,
   getOverviewShellQueryOptions,
 } from "@/features/overview/overview.queries";
+import { buildPoolDetailQueryString, buildPoolsListQueryString } from "@/features/pools/pools.queries";
 import type {
   OverviewQueryInput,
   OverviewRange,
@@ -116,19 +118,29 @@ export function useWarmOverviewMutation() {
   });
 }
 
-export function usePoolsQuery(input: WalletScopedInput) {
-  return useQuery({
+export function usePoolsQuery(
+  input: WalletScopedInput & { filters: PoolsListFilters },
+  options?: { enabled?: boolean },
+) {
+  return useQuery<PoolsListResponse>({
     queryKey: queryKeys.pools(input),
-    queryFn: () => apiClient(`/api/pools?chainId=${input.chainId}`),
-    enabled: false,
+    queryFn: () =>
+      apiClient(`/api/pools?${buildPoolsListQueryString({ chainId: input.chainId, filters: input.filters })}`),
+    enabled: (options?.enabled ?? true) && Boolean(input.walletAddress),
   });
 }
 
-export function usePoolDetailQuery(chainId: number, poolId: string) {
-  return useQuery({
-    queryKey: queryKeys.poolDetail(chainId, poolId),
-    queryFn: () => apiClient(`/api/pools/${poolId}?chainId=${chainId}`),
-    enabled: false,
+export function usePoolDetailQuery(
+  input: WalletScopedInput & { poolId: string; range: PoolDetailRange },
+  options?: { enabled?: boolean },
+) {
+  return useQuery<PoolDetailResponse>({
+    queryKey: queryKeys.poolDetail(input.chainId, input.poolId, input.range),
+    queryFn: () =>
+      apiClient(
+        `/api/pools/${input.poolId}?${buildPoolDetailQueryString({ chainId: input.chainId, range: input.range })}`,
+      ),
+    enabled: (options?.enabled ?? true) && Boolean(input.walletAddress) && Boolean(input.poolId),
   });
 }
 

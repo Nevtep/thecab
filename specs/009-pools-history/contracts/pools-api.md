@@ -9,7 +9,7 @@
 - **Base path**: `/api/pools`
 - **Auth**: Wallet-auth gated. Routes infer the wallet from the authenticated session; callers do not supply arbitrary wallet addresses.
 - **Chain**: `chainId` is required and validated through the shared chain configuration layer. Product v1 accepts only `8453`.
-- **Analysis gate**: If canonical analysis status is not `ready` or `stale`, routes return `423 analysis_required` instead of partial recent-view pool data.
+- **Analysis gate**: If canonical analysis status is not `ready`, routes return `423 analysis_required` until the feature has been unlocked by a successful analysis. After unlock, stale refreshes may continue serving the last successful analyzed data instead of falling back to partial recent-view pool data.
 - **Data source**: Postgres read models only.
 - **Error shape**:
   ```json
@@ -180,7 +180,7 @@ Return a detailed wallet-scoped pool view.
 | 401 | `unauthorized` | Missing or invalid session. |
 | 403 | `wallet_mismatch` | Session wallet cannot access requested scope. |
 | 404 | `pool_not_found` | Pool is not present in the authenticated wallet's read models. |
-| 423 | `analysis_required` | Canonical analysis status is not `ready` or `stale`. |
+| 423 | `analysis_required` | Canonical analysis status is not `ready`, and no previously unlocked analyzed Pools data can be served. |
 | 500 | `internal_error` | Unexpected server failure. |
 
 ## 4. Non-goals

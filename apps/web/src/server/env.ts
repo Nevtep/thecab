@@ -21,6 +21,7 @@ const envSchema = z.object({
   ANALYSIS_DEFAULT_MODE: z.enum(["full_history", "incremental"]).default("full_history"),
   ANALYSIS_HISTORY_DAYS: z.coerce.number().int().positive().default(365),
   ANALYSIS_SLICE_DAYS: z.coerce.number().int().positive().default(90),
+  ANALYSIS_MIN_HISTORY_WINDOW_HOURS: z.coerce.number().int().positive().default(1),
   ANALYSIS_SLICE_CONCURRENCY: z.coerce.number().int().positive().default(2),
   ANALYSIS_REBALANCE_WINDOW_HOURS: z.coerce.number().int().positive().default(24),
   ANALYSIS_REORG_SOFT_BLOCKS: z.coerce.number().int().positive().default(32),

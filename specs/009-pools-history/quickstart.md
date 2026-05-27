@@ -33,7 +33,8 @@ pnpm db:purge
 
 1. Connect the validation wallet.
 2. Start historical analysis through the existing Settings or Overview analysis control.
-3. Wait until canonical analysis status becomes `ready` or `stale`.
+3. Wait until canonical analysis status becomes `ready`.
+4. If the wallet later enters `stale` during refresh, verify Pools continues serving the last successful analyzed data instead of relocking.
 
 ## Validate pool read models
 

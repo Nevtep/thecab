@@ -1,11 +1,12 @@
 import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
-import { decodeFunctionData } from "viem";
 
 import { getDb } from "@/server/db/client";
 import {
+  approvalLinks,
   assetMovements,
   coverageReports,
   deposits,
+  inferredActions,
   ledgerEvents,
   performanceSnapshots,
   portfolioSnapshots,
@@ -15,21 +16,7 @@ import {
   rawProviderRecords,
   walletContexts,
 } from "@/server/db/schema";
-import { alchemyRpc } from "@/server/providers/alchemy/rpc";
 import type { OverviewRequest } from "@/server/overview/overview.types";
-
-const erc721ApproveAbi = [
-  {
-    type: "function",
-    name: "approve",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "to", type: "address" },
-      { name: "tokenId", type: "uint256" },
-    ],
-    outputs: [],
-  },
-] as const;
 
 function normalizeAddress(value: unknown) {
   return typeof value === "string" && /^0x[a-fA-F0-9]{40}$/.test(value)
@@ -707,31 +694,6 @@ export async function readRecentOverviewAnalyzedActivity(input: ScopedWalletInpu
     return [];
   }
 
-  const eventTargetAddresses = Array.from(new Set(
-    eventRows
-      .map((row) => normalizeAddress(row.metadataJson.toAddress))
-      .filter((address): address is string => Boolean(address)),
-  ));
-  const targetContractRows = eventTargetAddresses.length === 0
-    ? []
-    : await db
-      .select({
-        address: protocolContracts.address,
-        protocol: protocolContracts.protocol,
-        contractType: protocolContracts.contractType,
-        metadataJson: protocolContracts.metadataJson,
-      })
-      .from(protocolContracts)
-      .where(
-        and(
-          eq(protocolContracts.chainId, input.chainId),
-          inArray(protocolContracts.address, eventTargetAddresses),
-        ),
-      );
-  const targetContractsByAddress = new Map(
-    targetContractRows.map((row) => [row.address.toLowerCase(), row] as const),
-  );
-
   const movementRows = await db
     .select({
       ledgerEventId: assetMovements.ledgerEventId,
@@ -766,78 +728,32 @@ export async function readRecentOverviewAnalyzedActivity(input: ScopedWalletInpu
       ),
     );
 
-  const genericApprovalRows = eventRows.filter((row) => {
-    if (row.classification !== "approve") {
-      return false;
-    }
-
-    const summary = typeof row.metadataJson.summary === "string"
-      ? row.metadataJson.summary.trim().toLowerCase()
-      : "";
-    if (summary !== "signed a transaction") {
-      return false;
-    }
-
-    const toAddress = normalizeAddress(row.metadataJson.toAddress);
-    const targetContract = toAddress ? targetContractsByAddress.get(toAddress) ?? null : null;
-    return Boolean(targetContract?.protocol === "aerodrome" && targetContract.contractType.toLowerCase().includes("position"));
-  });
-
-  const decodedApprovalRows = await Promise.all(genericApprovalRows.map(async (row) => {
-    try {
-      const tx = await alchemyRpc<{ input?: `0x${string}` | string | null }>(
-        "eth_getTransactionByHash",
-        [row.txHash],
-        { chainId: input.chainId },
-      );
-      if (!tx?.input || tx.input === "0x") {
-        return null;
-      }
-
-      const decoded = decodeFunctionData({
-        abi: erc721ApproveAbi,
-        data: tx.input as `0x${string}`,
-      });
-      const spenderAddress = normalizeAddress(decoded.args?.[0]);
-      const tokenId = typeof decoded.args?.[1] === "bigint" ? decoded.args[1].toString() : null;
-      if (!spenderAddress || !tokenId) {
-        return null;
-      }
-
-      return {
-        txHash: row.txHash.toLowerCase(),
-        spenderAddress,
-        tokenId,
-      };
-    } catch {
-      return null;
-    }
-  }));
-
-  const spenderAddresses = Array.from(new Set(
-    decodedApprovalRows
-      .filter((row): row is NonNullable<typeof row> => row !== null)
-      .map((row) => row.spenderAddress),
-  ));
-  const spenderContractRows = spenderAddresses.length === 0
+  // Approval context is now persisted by the engine into `approval_links`
+  // during canonical inference. Overview just reads it back; no RPC decoding
+  // happens here.
+  const approvalLinkRows = eventRows.length === 0
     ? []
     : await db
       .select({
-        address: protocolContracts.address,
-        protocol: protocolContracts.protocol,
-        contractType: protocolContracts.contractType,
-        metadataJson: protocolContracts.metadataJson,
+        txHash: approvalLinks.txHash,
+        tokenId: approvalLinks.tokenId,
+        spenderAddress: approvalLinks.spenderAddress,
+        spenderContractType: approvalLinks.spenderContractType,
+        relatedPoolId: approvalLinks.relatedPoolId,
+        poolLabel: pools.label,
       })
-      .from(protocolContracts)
+      .from(approvalLinks)
+      .leftJoin(pools, eq(approvalLinks.relatedPoolId, pools.id))
       .where(
         and(
-          eq(protocolContracts.chainId, input.chainId),
-          inArray(protocolContracts.address, spenderAddresses),
+          eq(approvalLinks.walletAddress, input.walletAddress.toLowerCase()),
+          eq(approvalLinks.chainId, input.chainId),
+          inArray(
+            approvalLinks.txHash,
+            eventRows.map((row) => row.txHash.toLowerCase()),
+          ),
         ),
       );
-  const spenderContractsByAddress = new Map(
-    spenderContractRows.map((row) => [row.address.toLowerCase(), row] as const),
-  );
 
   const movementsByLedgerEventId = new Map<string, typeof movementRows>();
   for (const movement of movementRows) {
@@ -861,27 +777,59 @@ export async function readRecentOverviewAnalyzedActivity(input: ScopedWalletInpu
       .map((row) => [row.mintTxHash.toLowerCase(), row] as const),
   );
   const approvalContextByTxHash = new Map(
-    decodedApprovalRows
-      .filter((row): row is NonNullable<typeof row> => row !== null)
-      .flatMap((row) => {
-        const spenderContract = spenderContractsByAddress.get(row.spenderAddress) ?? null;
-        if (!spenderContract || spenderContract.protocol !== "aerodrome" || !spenderContract.contractType.toLowerCase().includes("gauge")) {
-          return [];
-        }
-
-        const poolLabel = typeof spenderContract.metadataJson.poolLabel === "string"
-          ? spenderContract.metadataJson.poolLabel
-          : null;
-
-        return [[row.txHash, {
+    approvalLinkRows.flatMap((row) => {
+      if (!row.spenderContractType || !row.spenderContractType.toLowerCase().includes("gauge")) {
+        return [];
+      }
+      return [[
+        row.txHash.toLowerCase(),
+        {
           tokenId: row.tokenId,
           spenderAddress: row.spenderAddress,
-          spenderContractType: spenderContract.contractType,
-          protocol: spenderContract.protocol,
-          poolLabel,
-        }] as const];
-      }),
+          spenderContractType: row.spenderContractType,
+          protocol: "aerodrome",
+          poolLabel: row.poolLabel,
+        },
+      ] as const];
+    }),
   );
+
+  // Inferred actions persisted by the engine drive rebalance labeling on the
+  // Overview timeline. Each `rebalance_same_pool` action references the
+  // deposit ledger event (`source_ledger_event_id`) and the upstream events
+  // consumed by that deposit (`consuming_ledger_event_ids_json` — typically
+  // the paired swap and the originating withdraw). Any ledger event in
+  // either set is part of the rebalance flow and should display as such.
+  const inferredActionRows = await db
+    .select({
+      actionType: inferredActions.actionType,
+      primaryPoolId: inferredActions.primaryPoolId,
+      sourceLedgerEventId: inferredActions.sourceLedgerEventId,
+      consumingLedgerEventIdsJson: inferredActions.consumingLedgerEventIdsJson,
+    })
+    .from(inferredActions)
+    .where(
+      and(
+        eq(inferredActions.walletAddress, input.walletAddress.toLowerCase()),
+        eq(inferredActions.chainId, input.chainId),
+        inArray(
+          inferredActions.sourceLedgerEventId,
+          eventRows.map((row) => row.id),
+        ),
+      ),
+    );
+
+  const rebalanceMembershipByLedgerEventId = new Map<string, { actionType: string; primaryPoolId: string | null }>();
+  for (const action of inferredActionRows) {
+    if (action.actionType !== "rebalance_same_pool") continue;
+    const membership = { actionType: action.actionType, primaryPoolId: action.primaryPoolId };
+    if (action.sourceLedgerEventId) {
+      rebalanceMembershipByLedgerEventId.set(action.sourceLedgerEventId, membership);
+    }
+    for (const consumingId of action.consumingLedgerEventIdsJson ?? []) {
+      rebalanceMembershipByLedgerEventId.set(consumingId, membership);
+    }
+  }
 
   return eventRows.map((row) => ({
     ...row,
@@ -903,5 +851,6 @@ export async function readRecentOverviewAnalyzedActivity(input: ScopedWalletInpu
       };
     })(),
     approvalContext: approvalContextByTxHash.get(row.txHash.toLowerCase()) ?? null,
+    rebalanceMembership: rebalanceMembershipByLedgerEventId.get(row.id) ?? null,
   }));
 }

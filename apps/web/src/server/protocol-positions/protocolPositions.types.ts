@@ -58,6 +58,7 @@ export type OverviewProtocolPosition = {
     protocolSurface: string | null;
     wrapperAddress: string | null;
     positionContractAddress: string | null;
+    poolAddress: string | null;
     lockEndAt: string | null;
     feeTierLabel: string | null;
     rangeLowerTick: number | null;

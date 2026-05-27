@@ -29,6 +29,34 @@
       "when": 1779682120538,
       "tag": "0003_daily_jubilee",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1779761616484,
+      "tag": "0004_amazing_mimic",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1779830138172,
+      "tag": "0005_certain_morph",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1779830450763,
+      "tag": "0006_smooth_spectrum",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1779830500000,
+      "tag": "0007_inferred_actions_plain_unique",
+      "breakpoints": true
     }
   ]
 }

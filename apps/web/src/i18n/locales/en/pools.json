@@ -1,3 +1,86 @@
 {
-  "title": "TODO"
+  "title": "Pools",
+  "subtitle": "Historical pool participation, rewards, and continuity.",
+  "sections": {
+    "detail": "Pool detail",
+    "history": "Pool value evolution",
+    "composition": "Composition",
+    "related": "Related links",
+    "timeline": "Timeline"
+  },
+  "metrics": {
+    "poolsWithPosition": "Pools with position",
+    "currentValue": "Current value",
+    "impermanentLoss": "Impermanent loss",
+    "capitalInvested": "Capital invested",
+    "capitalEntered": "Capital entered",
+    "capitalWithdrawn": "Capital withdrawn",
+    "timeInvested": "Time invested",
+    "totalRewards": "Total rewards",
+    "totalReturn": "Total return",
+    "apr": "APR",
+    "estimatedReturn": "Average APY estimate",
+    "activeInRange": "Pools in active range"
+  },
+  "filters": {
+    "searchPlaceholder": "Search pools",
+    "statusAll": "All",
+    "statusActive": "Active",
+    "statusClosed": "Closed"
+  },
+  "totals": {
+    "pools": "Pools",
+    "totalValue": "Total value",
+    "coveredRange": "Covered range"
+  },
+  "actions": {
+    "retry": "Retry",
+    "open": "Open",
+    "closeDetail": "Close detail"
+  },
+  "table": {
+    "value": "Value",
+    "portfolioShare": "% of portfolio",
+    "performance": "APR performance",
+    "exposure": "Exposure",
+    "latestActivity": "Latest activity",
+    "inRange": "In range",
+    "outOfRange": "Out of range"
+  },
+  "states": {
+    "loading": "Loading Pools",
+    "loadingDetail": "Loading pool detail",
+    "lockedTitle": "Pools unlocks after analysis",
+    "lockedDescription": "Run historical analysis to review stable pool history, rewards, and residual attribution.",
+    "emptyTitle": "No analyzed pools yet",
+    "emptyDescription": "This wallet does not have reconstructed pool participation in the covered window.",
+    "errorTitle": "Pools couldn't load",
+    "errorDescription": "Try again in a moment.",
+    "errors": {
+      "analysis_required": "Historical analysis is required before Pools is available.",
+      "pool_not_found": "That pool is not available for this wallet.",
+      "unauthorized": "Connect the matching wallet to continue.",
+      "unsupported_chain": "This chain is not supported.",
+      "internal_error": "Pools failed to load."
+    }
+  },
+  "ranges": {
+    "covered": "Covered"
+  },
+  "messages": {
+    "estimatedMetrics": "Some Pools metrics are estimated from the current component composition and the analyzed event timeline.",
+    "confidence": "Confidence",
+    "activeInRangeMeta": "{{active}} of {{total}} active pools in range"
+  },
+  "values": {
+    "unavailable": "Unavailable",
+    "manualExposure": "Manual exposure",
+    "strategyExposure": "Automated strategy",
+    "residualExposure": "Residual attribution",
+    "status": "Status",
+    "rewards": "Rewards",
+    "capitalIn": "Capital in",
+    "deposit": "Deposit",
+    "strategy": "Strategy"
+  }
 }

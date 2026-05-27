@@ -8,8 +8,9 @@
 
 - `/pools` is the main analyzed Pools route.
 - `/pools/[poolId]` is the pool detail route.
-- Navigation unlocks Pools only when canonical analysis status is `ready` or `stale`.
+- Navigation unlocks Pools when canonical analysis status is `ready`.
 - Before analysis is ready, direct visits render a gated state explaining that Pools requires analyzed history.
+- After Pools has been unlocked, stale refreshes may continue showing the last successful analyzed data while background refresh runs.
 - Pools becomes a real destination; other deep sections may remain placeholder-backed until their own features land.
 
 ## 2. Shared Shell Contract

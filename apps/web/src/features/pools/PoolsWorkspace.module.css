@@ -1,0 +1,36 @@
+.workspace {
+  display: grid;
+  gap: 24px;
+  align-items: start;
+}
+
+.withDetail {
+  grid-template-columns: minmax(0, 1fr) clamp(480px, 34vw, 620px);
+}
+
+.listColumn {
+  min-width: 0;
+}
+
+.detailColumn {
+  min-width: 0;
+  display: grid;
+  gap: 16px;
+  align-self: start;
+  position: sticky;
+  top: 16px;
+}
+
+.detailBody {
+  min-width: 0;
+}
+
+@media (max-width: 1280px) {
+  .withDetail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .detailColumn {
+    position: static;
+  }
+}

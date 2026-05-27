@@ -654,6 +654,7 @@ export async function readAerodromeManualPositions(input: {
           protocolSurface: buildProtocolSurface("aerodrome", "manual_deposit"),
           wrapperAddress: null,
           positionContractAddress: positionManagerAddress,
+          poolAddress: null,
           lockEndAt: null,
           feeTierLabel: formatFeeTierLabel(state.tickSpacing),
           rangeLowerTick: state.tickLower,

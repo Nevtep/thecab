@@ -35,3 +35,47 @@ test("isGovernanceRewardCandidate keeps standard reward claims in reward process
     summary: "Received AERO from Aerodrome Finance: CLGauge",
   }), false);
 });
+
+test("resolveRewardClaimTarget leaves Aerodrome claims unresolved when token identity is absent", async () => {
+  const { resolveRewardClaimTarget } = await import("@/server/trigger/tasks/phase-rewards.task");
+
+  const result = resolveRewardClaimTarget({
+    candidate: {
+      txHash: "0xreward",
+      occurredAt: new Date("2026-05-24T12:00:00.000Z"),
+      category: "reward",
+      summary: "Claimed gauge rewards",
+      protocol: "aerodrome",
+      targetType: "deposit",
+      targetTokenId: null,
+      targetWrapperAddress: null,
+    },
+    depositTargets: [{ id: "deposit-1", tokenId: "123", protocol: "aerodrome" }],
+    strategyTargets: [],
+  });
+
+  assert.equal(result.depositOrStrategyId, null);
+  assert.equal(result.targetType, "deposit");
+});
+
+test("resolveRewardClaimTarget resolves Mellow claims only from explicit wrapper identity", async () => {
+  const { resolveRewardClaimTarget } = await import("@/server/trigger/tasks/phase-rewards.task");
+
+  const result = resolveRewardClaimTarget({
+    candidate: {
+      txHash: "0xreward",
+      occurredAt: new Date("2026-05-24T12:00:00.000Z"),
+      category: "reward",
+      summary: "Claimed strategy rewards",
+      protocol: "mellow",
+      targetType: "strategy",
+      targetTokenId: null,
+      targetWrapperAddress: "0xwrapper",
+    },
+    depositTargets: [],
+    strategyTargets: [{ id: "strategy-1", wrapperAddress: "0xwrapper", protocol: "mellow" }],
+  });
+
+  assert.equal(result.depositOrStrategyId, "strategy-1");
+  assert.equal(result.targetType, "strategy");
+});

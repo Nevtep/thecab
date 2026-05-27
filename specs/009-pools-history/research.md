@@ -44,9 +44,9 @@
 **Alternatives considered**:
 - Store everything in `metadata_json` on generic snapshots. Rejected because it would make validation, indexing, and route-level query bounding much harder.
 
-## Decision 4: Pools routing unlocks only after analysis is `ready` or `stale`
+## Decision 4: Pools routing stays locked until analysis is `ready`
 
-**Decision**: `/pools` and `/pools/[poolId]` become real connected routes, but only for wallets whose canonical analysis status is `ready` or `stale`. Before that, nav remains gated and direct visits render a guided locked state.
+**Decision**: `/pools` and `/pools/[poolId]` become real connected routes only once canonical analysis status is `ready`. Before that, nav remains gated and direct visits render a guided locked state. After unlock, stale refreshes may continue serving the last successful analyzed data.
 
 **Rationale**:
 - Pools is defined in the product spec as analysis-gated.

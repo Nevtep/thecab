@@ -1,3 +1,86 @@
 {
-  "title": "PENDIENTE"
+  "title": "Pools",
+  "subtitle": "Participación histórica en pools, recompensas y continuidad.",
+  "sections": {
+    "detail": "Detalle del pool",
+    "history": "Evolución del valor del pool",
+    "composition": "Composición",
+    "related": "Enlaces relacionados",
+    "timeline": "Línea de tiempo"
+  },
+  "metrics": {
+    "poolsWithPosition": "Pools con posición",
+    "currentValue": "Valor actual",
+    "impermanentLoss": "Pérdida impermanente",
+    "capitalInvested": "Capital invertido",
+    "capitalEntered": "Capital ingresado",
+    "capitalWithdrawn": "Capital retirado",
+    "timeInvested": "Tiempo invertido",
+    "totalRewards": "Recompensas totales",
+    "totalReturn": "Retorno total",
+    "apr": "APR",
+    "estimatedReturn": "Estimación APY promedio",
+    "activeInRange": "Pools en rango activo"
+  },
+  "filters": {
+    "searchPlaceholder": "Buscar pools",
+    "statusAll": "Todas",
+    "statusActive": "Activas",
+    "statusClosed": "Cerradas"
+  },
+  "totals": {
+    "pools": "Pools",
+    "totalValue": "Valor total",
+    "coveredRange": "Rango cubierto"
+  },
+  "actions": {
+    "retry": "Reintentar",
+    "open": "Abrir",
+    "closeDetail": "Cerrar detalle"
+  },
+  "table": {
+    "value": "Valor",
+    "portfolioShare": "% de portafolio",
+    "performance": "Rendimiento APR",
+    "exposure": "Exposición",
+    "latestActivity": "Última actividad",
+    "inRange": "En rango",
+    "outOfRange": "Fuera de rango"
+  },
+  "states": {
+    "loading": "Cargando Pools",
+    "loadingDetail": "Cargando detalle del pool",
+    "lockedTitle": "Pools se desbloquea después del análisis",
+    "lockedDescription": "Ejecute el análisis histórico para revisar el historial estable del pool, las recompensas y la atribución residual.",
+    "emptyTitle": "Todavía no hay pools analizados",
+    "emptyDescription": "Esta billetera no tiene participación reconstruida en pools dentro de la ventana cubierta.",
+    "errorTitle": "No se pudo cargar Pools",
+    "errorDescription": "Inténtelo de nuevo en un momento.",
+    "errors": {
+      "analysis_required": "El análisis histórico es necesario antes de que Pools esté disponible.",
+      "pool_not_found": "Ese pool no está disponible para esta billetera.",
+      "unauthorized": "Conecte la billetera correspondiente para continuar.",
+      "unsupported_chain": "Esta red no es compatible.",
+      "internal_error": "Pools no se pudo cargar."
+    }
+  },
+  "ranges": {
+    "covered": "Cubierto"
+  },
+  "messages": {
+    "estimatedMetrics": "Algunas métricas de Pools se estiman a partir de la composición actual y de la línea de tiempo analizada de eventos.",
+    "confidence": "Confianza",
+    "activeInRangeMeta": "{{active}} de {{total}} pools activas en rango"
+  },
+  "values": {
+    "unavailable": "No disponible",
+    "manualExposure": "Exposición manual",
+    "strategyExposure": "Estrategia automatizada",
+    "residualExposure": "Atribución residual",
+    "status": "Estado",
+    "rewards": "Recompensas",
+    "capitalIn": "Capital entrante",
+    "deposit": "Depósito",
+    "strategy": "Estrategia"
+  }
 }

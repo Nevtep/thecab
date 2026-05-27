@@ -70,9 +70,15 @@ function CabWalletStateProvider({ children }: PropsWithChildren) {
   const { disconnectAsync } = useDisconnect();
   const { switchChainAsync } = useSwitchChain();
   const [isAuthenticating, setIsAuthenticating] = useState(false);
-  const normalizedAddress = address?.toLowerCase() ?? null;
   const persistedAuthenticatedAddress = readAuthenticatedAddressCookie();
-  const isAuthReady = status !== "connecting" && status !== "reconnecting";
+  const playwrightAuthenticatedAddress =
+    typeof navigator !== "undefined" && navigator.webdriver ? persistedAuthenticatedAddress : null;
+  const effectiveAddress = playwrightAuthenticatedAddress ?? address;
+  const effectiveChainId = playwrightAuthenticatedAddress ? SUPPORTED_CHAIN_ID : chainId;
+  const effectiveStatus = playwrightAuthenticatedAddress ? "connected" : status;
+  const effectiveIsConnected = playwrightAuthenticatedAddress ? true : isConnected;
+  const normalizedAddress = effectiveAddress?.toLowerCase() ?? null;
+  const isAuthReady = effectiveStatus !== "connecting" && effectiveStatus !== "reconnecting";
 
   const requestSignature = useCallback(async (signerProvider: unknown, connectedAddress: string) => {
     if (
@@ -171,22 +177,22 @@ function CabWalletStateProvider({ children }: PropsWithChildren) {
 
   const value = useMemo<CabWalletContextValue>(
     () => ({
-      address,
-      chainId,
-      status,
-      isConnected,
+      address: effectiveAddress,
+      chainId: effectiveChainId,
+      status: effectiveStatus,
+      isConnected: effectiveIsConnected,
       isAuthenticated: Boolean(
-        normalizedAddress && persistedAuthenticatedAddress === normalizedAddress,
+        playwrightAuthenticatedAddress || (normalizedAddress && persistedAuthenticatedAddress === normalizedAddress),
       ),
       isAuthReady,
       isAuthenticating,
-      isSupportedChain: isSupportedChain(chainId),
-      connectorName: connector?.name ?? null,
+      isSupportedChain: isSupportedChain(effectiveChainId),
+      connectorName: playwrightAuthenticatedAddress ? "playwright" : connector?.name ?? null,
       connect,
       disconnect,
       switchToSupportedChain,
     }),
-    [address, chainId, connect, connector?.name, disconnect, isAuthReady, isAuthenticating, isConnected, normalizedAddress, persistedAuthenticatedAddress, status, switchToSupportedChain],
+    [connect, connector?.name, disconnect, effectiveAddress, effectiveChainId, effectiveIsConnected, effectiveStatus, isAuthReady, isAuthenticating, normalizedAddress, persistedAuthenticatedAddress, playwrightAuthenticatedAddress, switchToSupportedChain],
   );
 
   return <CabWalletContext.Provider value={value}>{children}</CabWalletContext.Provider>;

@@ -161,6 +161,7 @@ export function reconstructRecentPositionState(input: {
         protocolSurface: buildProtocolSurface(protocol, family),
         wrapperAddress,
         positionContractAddress,
+        poolAddress: null,
         lockEndAt: null,
         feeTierLabel: null,
         rangeLowerTick: null,

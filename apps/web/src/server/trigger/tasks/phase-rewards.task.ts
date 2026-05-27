@@ -18,6 +18,18 @@ type RewardCandidate = {
   targetWrapperAddress: string | null;
 };
 
+type RewardDepositTarget = {
+  id: string;
+  tokenId: string | null;
+  protocol: string;
+};
+
+type RewardStrategyTarget = {
+  id: string;
+  wrapperAddress: string;
+  protocol: string | null;
+};
+
 function asRewardCandidate(value: unknown): RewardCandidate | null {
   if (!value || typeof value !== "object") {
     return null;
@@ -77,6 +89,24 @@ export function isGovernanceRewardCandidate(input: {
   }
 
   return true;
+}
+
+export function resolveRewardClaimTarget(input: {
+  candidate: RewardCandidate;
+  depositTargets: RewardDepositTarget[];
+  strategyTargets: RewardStrategyTarget[];
+}) {
+  const matchingDeposit = input.candidate.targetTokenId
+    ? input.depositTargets.find((target) => target.tokenId === input.candidate.targetTokenId)
+    : null;
+  const matchingStrategy = input.candidate.targetWrapperAddress
+    ? input.strategyTargets.find((target) => target.wrapperAddress === input.candidate.targetWrapperAddress)
+    : null;
+
+  return {
+    depositOrStrategyId: matchingDeposit?.id ?? matchingStrategy?.id ?? null,
+    targetType: matchingDeposit ? "deposit" : matchingStrategy ? "strategy" : input.candidate.targetType,
+  };
 }
 
 export type PhaseRewardsTaskPayload = {
@@ -192,27 +222,22 @@ export const phaseRewardsTask = task({
     }));
 
     const resolvedClaims = filteredRewardCandidates.map((candidate, index) => {
-      const matchingDeposit = candidate.targetTokenId
-        ? depositTargets.find((target) => target.tokenId === candidate.targetTokenId)
-        : candidate.protocol === "aerodrome"
-          ? depositTargets[0]
-          : null;
-      const matchingStrategy = candidate.targetWrapperAddress
-        ? strategyTargets.find((target) => target.wrapperAddress === candidate.targetWrapperAddress)
-        : candidate.protocol === "mellow"
-          ? strategyTargets[0]
-          : null;
+      const resolution = resolveRewardClaimTarget({
+        candidate,
+        depositTargets,
+        strategyTargets,
+      });
 
       return {
         txHash: candidate.txHash,
         logIndex: index,
         rewardType: inferRewardType(candidate),
-        depositOrStrategyId: matchingDeposit?.id ?? matchingStrategy?.id ?? null,
+        depositOrStrategyId: resolution.depositOrStrategyId,
         occurredAt: candidate.occurredAt,
         category: candidate.category,
         summary: candidate.summary,
         protocol: candidate.protocol,
-        targetType: matchingDeposit ? "deposit" : matchingStrategy ? "strategy" : candidate.targetType,
+        targetType: resolution.targetType,
         targetTokenId: candidate.targetTokenId,
         targetWrapperAddress: candidate.targetWrapperAddress,
       };

@@ -69,6 +69,14 @@ export function OverviewImpactMetricCard({
   const sparkline = buildSparkline(series, 240, sparklineHeight, 8);
   const gradientId = `overview-impact-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${size}`;
   const contentPadding = size === "default" ? 18 : 14;
+  const sparklineWidth = size === "default" ? 220 : 136;
+  const sparklineDisplayHeight = size === "default" ? 82 : 46;
+  const iconSize = size === "default" ? 32 : 28;
+  const iconRadius = size === "default" ? 12 : 10;
+  const iconGlyphSize = size === "default" ? 16 : 14;
+  const labelFontSize = size === "default" ? 12 : 11;
+  const valueFontSize = size === "default" ? "clamp(28px, 1.45vw, 32px)" : "clamp(21px, 1.18vw, 24px)";
+  const valueMaxWidth = size === "default" ? "calc(100% - 72px)" : "100%";
 
   return (
     <CabCard padding={0} gap={0} density={size === "default" ? "spacious" : "default"}>
@@ -107,9 +115,9 @@ export function OverviewImpactMetricCard({
             style={{
               position: "absolute",
               right: -8,
-              bottom: -4,
-              width: size === "default" ? 220 : 170,
-              height: size === "default" ? 82 : 58,
+              bottom: size === "default" ? -4 : -10,
+              width: sparklineWidth,
+              height: sparklineDisplayHeight,
               pointerEvents: "none",
               opacity: 0.95,
             }}
@@ -130,17 +138,17 @@ export function OverviewImpactMetricCard({
           </div>
         ) : null}
 
-        <CabStack gap="$3" style={{ position: "relative", zIndex: 1 }}>
+        <CabStack gap={size === "default" ? "$3" : "$2.5"} style={{ position: "relative", zIndex: 1 }}>
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
-            <CabText variant="caption" fontSize={12} color={cabColors.text.secondary}>
+            <CabText variant="caption" fontSize={labelFontSize} color={cabColors.text.secondary}>
               {label}
             </CabText>
             <div
               aria-hidden="true"
               style={{
-                width: 32,
-                height: 32,
-                borderRadius: 12,
+                width: iconSize,
+                height: iconSize,
+                borderRadius: iconRadius,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -150,7 +158,7 @@ export function OverviewImpactMetricCard({
                 flexShrink: 0,
               }}
             >
-              <CabIcon name={iconName} width={16} height={16} color={accentColor} />
+              <CabIcon name={iconName} width={iconGlyphSize} height={iconGlyphSize} color={accentColor} />
             </div>
           </div>
 
@@ -159,17 +167,17 @@ export function OverviewImpactMetricCard({
             fontWeight="700"
             color={cabColors.text.primary}
             style={{
-              fontSize: size === "default" ? "min(32px, max(28px, 1.55vw))" : 22,
+              fontSize: valueFontSize,
               fontVariantNumeric: "tabular-nums",
               lineHeight: 1.05,
-              maxWidth: size === "default" ? "calc(100% - 64px)" : "78%",
+              maxWidth: valueMaxWidth,
             }}
           >
             {value}
           </CabText>
 
           {meta ? (
-            <CabText variant="caption" fontSize={12} color={accentColor}>
+            <CabText variant="caption" fontSize={labelFontSize} color={accentColor}>
               {meta}
             </CabText>
           ) : null}

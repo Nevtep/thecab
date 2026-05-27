@@ -1,0 +1,1 @@
+ALTER TABLE "reward_events" ADD COLUMN "resolution_status" varchar(24) DEFAULT 'unresolved' NOT NULL;

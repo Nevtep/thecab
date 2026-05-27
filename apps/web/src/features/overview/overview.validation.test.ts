@@ -201,12 +201,18 @@ test("mapOverviewResponseToViewModel preserves full, partial, and unknown covera
   }
 });
 
-test("overview navigation requires analysis until the analysis becomes ready", () => {
+test("overview navigation unlocks Pools once the analysis becomes ready", () => {
   const pendingItems = getOverviewNavigationItems("not_analyzed");
   const readyItems = getOverviewNavigationItems("ready");
 
+  assert.equal(pendingItems[1]?.key, "pools");
   assert.equal(pendingItems[1]?.stateKey, "requiresAnalysis");
-  assert.equal(readyItems[1]?.stateKey, "comingSoon");
+  assert.equal(pendingItems[1]?.disabled, true);
+
+  assert.equal(readyItems[1]?.key, "pools");
+  assert.equal(readyItems[1]?.stateKey, "active");
+  assert.equal(readyItems[1]?.href, "/pools");
+  assert.equal(readyItems[1]?.disabled, false);
 });
 
 test("overview analysis action is available for first run and reruns", () => {

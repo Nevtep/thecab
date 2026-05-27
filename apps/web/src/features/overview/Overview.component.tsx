@@ -998,6 +998,7 @@ export function OverviewComponent({
                   distribution={resolvedChartViewModel.distribution}
                   assetRows={(overviewViewModel?.assets.rows ?? [...visibleAssetRows, ...hiddenAssetRows])
                     .filter((row) => !row.isHiddenByDefault && row.priceUsd !== null && !isDustValueRow(row))}
+                  range={range}
                 />
               )}
             </div>

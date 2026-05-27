@@ -1,10 +1,40 @@
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+
 import { and, desc, eq } from "drizzle-orm";
 
 import { getAnalysisRunById, mergeAnalysisRunMetadata } from "@/server/analysis/analysis-run.repository";
-import { listRunSlices } from "@/server/analysis/analysis-slice.repository";
+import { listRunSlices, resolveRunSliceDayWindow } from "@/server/analysis/analysis-slice.repository";
 import { computeSnapshots, type WalletTokenSnapshot } from "@/server/analysis/computeSnapshots";
 import { getDb } from "@/server/db/client";
 import { rawProviderRecords } from "@/server/db/schema";
+
+function loadLocalEnvFile() {
+  const envFilePath = resolve(process.cwd(), ".env.local");
+  if (!existsSync(envFilePath)) {
+    return;
+  }
+
+  for (const line of readFileSync(envFilePath, "utf8").split(/\r?\n/)) {
+    const trimmedLine = line.trim();
+    if (!trimmedLine || trimmedLine.startsWith("#")) {
+      continue;
+    }
+
+    const separatorIndex = trimmedLine.indexOf("=");
+    if (separatorIndex <= 0) {
+      continue;
+    }
+
+    const key = trimmedLine.slice(0, separatorIndex).trim();
+    const value = trimmedLine.slice(separatorIndex + 1).trim().replace(/^['"]|['"]$/g, "");
+    if (!process.env[key]) {
+      process.env[key] = value;
+    }
+  }
+}
+
+loadLocalEnvFile();
 
 function parseWalletTokenSnapshots(value: unknown): WalletTokenSnapshot[] {
   if (!Array.isArray(value)) {
@@ -125,11 +155,12 @@ async function main() {
     });
   }
 
+  const sliceDayWindow = resolveRunSliceDayWindow(slices, run.utcDayBucket);
   const snapshot = await computeSnapshots({
     walletAddress: run.walletAddress,
     chainId: run.chainId,
-    startDayUtc: slices[0]?.sliceStartUtc.toISOString().slice(0, 10) ?? run.utcDayBucket,
-    endDayUtc: run.utcDayBucket,
+    startDayUtc: sliceDayWindow.startDayUtc,
+    endDayUtc: sliceDayWindow.endDayUtc,
     capturedAt: new Date(),
     poolTotals: Array.isArray(run.metadataJson.latestPoolTotals)
       ? run.metadataJson.latestPoolTotals

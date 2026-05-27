@@ -29,7 +29,7 @@ test("resolveAnalysisMode defaults to incremental when a prior completed run exi
   );
 });
 
-test("planAnalysisSlices marks older windows as cached when the cursor already covers them", () => {
+test("planAnalysisSlices does not cache-skip windows during full_history reruns", () => {
   const slices = planAnalysisSlices({
     triggeredAtUtc: new Date("2026-05-24T12:00:00.000Z"),
     mode: "full_history",
@@ -38,7 +38,22 @@ test("planAnalysisSlices marks older windows as cached when the cursor already c
 
   assert.equal(slices.length > 1, true);
   assert.equal(slices[0]?.isFullyCached, false);
+  assert.equal(slices.some((slice) => slice.isFullyCached), false);
+});
+
+test("planAnalysisSlices keeps the full-year horizon for incremental runs while skipping cached windows", () => {
+  const triggeredAtUtc = new Date("2026-05-24T12:00:00.000Z");
+  const slices = planAnalysisSlices({
+    triggeredAtUtc,
+    mode: "incremental",
+    lastProcessedDayUtc: "2026-03-01",
+  });
+
+  assert.equal(slices.length >= 4, true);
+  assert.equal(slices[0]?.sliceEndUtc.toISOString(), "2026-05-25T00:00:00.000Z");
+  assert.equal((slices.at(-1)?.sliceStartUtc.getTime() ?? 0) <= triggeredAtUtc.getTime() - (300 * 24 * 60 * 60 * 1000), true);
   assert.equal(slices.some((slice) => slice.isFullyCached), true);
+  assert.equal(slices.some((slice) => !slice.isFullyCached), true);
 });
 
 test("projectAnalysisStatus reports partial coverage after retry exhaustion while preserving canonical status", () => {

@@ -118,6 +118,7 @@ export function readCoverageReasonsFromError(error: unknown): AnalysisCoverageRe
     .map((reason) => reason.trim())
     .filter(Boolean)
     .filter((reason): reason is AnalysisCoverageReasonCode =>
+      reason === "historyPaginationExceeded" ||
       reason === "providerError" ||
       reason === "providerThrottled" ||
       reason === "missingPrices" ||

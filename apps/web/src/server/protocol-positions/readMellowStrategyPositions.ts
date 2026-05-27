@@ -40,6 +40,7 @@ type MellowWrapperPositionInfo = {
 
 type MellowWrapperState = {
   wrapperAddress: string;
+  poolAddress: string | null;
   strategyLabel: string;
   tokenId: string | null;
   feeTierLabel: string | null;
@@ -59,6 +60,7 @@ export type ReadMellowStrategyPositionsResult = {
   artifacts: {
     wrappers: Array<{
       wrapperAddress: string;
+      poolAddress: string | null;
       strategyLabel: string;
       tokenId: string | null;
       feeTierLabel: string | null;
@@ -376,6 +378,7 @@ export async function readMellowStrategyPositions(input: {
 
           return {
             wrapperAddress,
+            poolAddress,
             strategyLabel,
             tokenId,
             feeTierLabel: formatFeeTierLabel(tickSpacing),
@@ -523,6 +526,7 @@ export async function readMellowStrategyPositions(input: {
         metadata: {
           protocolSurface: buildProtocolSurface("mellow", "strategy_exposure"),
           wrapperAddress: state.wrapperAddress,
+          poolAddress: state.poolAddress,
           positionContractAddress: state.wrapperAddress,
           lockEndAt: null,
           feeTierLabel: state.feeTierLabel,
@@ -544,6 +548,7 @@ export async function readMellowStrategyPositions(input: {
       artifacts: {
         wrappers: wrapperStates.map((state, index) => ({
           wrapperAddress: state.wrapperAddress,
+          poolAddress: state.poolAddress,
           strategyLabel: state.strategyLabel,
           tokenId: state.tokenId,
           feeTierLabel: state.feeTierLabel,

@@ -48,6 +48,7 @@ type MellowWrapperArtifacts = {
     token0AmountRaw: string;
     token1AmountRaw: string;
     valueUsd: number | null;
+    poolAddress?: string | null;
   }>;
 } | null;
 
@@ -58,10 +59,31 @@ type RawProviderSnapshot = {
   responseJson: Record<string, unknown>;
 };
 
+const BASE_WETH_ADDRESS = "0x4200000000000000000000000000000000000006";
+const BASE_CBBTC_ADDRESS = "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf";
+const BASE_AERO_ADDRESS = "0x940181a94a35a4569e4529a3cdfb74e38fd98631";
+const BASE_USDC_ADDRESS = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
+const BASE_EURC_ADDRESS = "0x60a3e35cc302bfa44cb288bc5a4f316fdb1adb42";
+
+const KNOWN_BASE_TOKEN_ADDRESSES: Record<string, string> = {
+  weth: BASE_WETH_ADDRESS,
+  eth: BASE_WETH_ADDRESS,
+  usdc: BASE_USDC_ADDRESS,
+  cbbtc: BASE_CBBTC_ADDRESS,
+  aero: BASE_AERO_ADDRESS,
+  eurc: BASE_EURC_ADDRESS,
+};
+
 export type ManualDepositLifecycleRecord = {
   txHash: string;
   tokenId: string | null;
   action: "mint" | "increaseLiquidity" | "decreaseLiquidity" | "collect";
+  occurredAt?: Date;
+  positionManagerAddress?: string | null;
+  poolAddress?: string | null;
+  category?: string | null;
+  methodLabel?: string | null;
+  summary?: string | null;
 };
 
 export type SliceHistoryRecord = Record<string, unknown>;
@@ -159,6 +181,72 @@ function toNumericString(value: number | string | null | undefined) {
   }
 
   return null;
+}
+
+function parseOptionalDate(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function normalizeTokenAddress(value: string | null | undefined) {
+  return typeof value === "string" && /^0x[a-fA-F0-9]{40}$/.test(value) ? value.toLowerCase() : null;
+}
+
+function normalizeTokenSymbol(value: string | null | undefined) {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim().toLowerCase() : null;
+}
+
+function resolveKnownPoolTokenAddress(input: {
+  chainId: number;
+  tokenAddress?: string | null;
+  symbol?: string | null;
+}) {
+  const normalizedAddress = normalizeTokenAddress(input.tokenAddress ?? null);
+  if (normalizedAddress) {
+    return normalizedAddress;
+  }
+
+  if (input.chainId !== 8453) {
+    return null;
+  }
+
+  const normalizedSymbol = normalizeTokenSymbol(input.symbol ?? null);
+  return normalizedSymbol ? (KNOWN_BASE_TOKEN_ADDRESSES[normalizedSymbol] ?? null) : null;
+}
+
+function isGenericPoolLabel(label: string | null | undefined) {
+  return typeof label === "string" && /^Aerodrome CL position #\d+$/i.test(label.trim());
+}
+
+function preferPoolLabel(existingLabel: string | null | undefined, incomingLabel: string | null | undefined) {
+  if (incomingLabel && !isGenericPoolLabel(incomingLabel)) {
+    return incomingLabel;
+  }
+
+  if (existingLabel && !isGenericPoolLabel(existingLabel)) {
+    return existingLabel;
+  }
+
+  return existingLabel ?? incomingLabel ?? null;
+}
+
+function mergePoolMetadata(
+  existingMetadata: Record<string, unknown> | null | undefined,
+  incomingMetadata: Record<string, unknown> | null | undefined,
+) {
+  const merged: Record<string, unknown> = { ...(existingMetadata ?? {}) };
+
+  for (const [key, value] of Object.entries(incomingMetadata ?? {})) {
+    if (value !== null && value !== undefined) {
+      merged[key] = value;
+    }
+  }
+
+  return merged;
 }
 
 function parseHistoryTimestamp(record: SliceHistoryRecord) {
@@ -300,23 +388,31 @@ async function upsertPool(input: {
   metadataJson?: Record<string, unknown>;
 }) {
   const db = getDb();
+  const normalizedPoolAddress = input.poolAddress.toLowerCase();
+  const existing = await db.query.pools.findFirst({
+    where: and(eq(pools.chainId, input.chainId), eq(pools.poolAddress, normalizedPoolAddress)),
+  });
+  const mergedLabel = preferPoolLabel(existing?.label, input.label) ?? input.label;
+  const mergedToken0Address = normalizeTokenAddress(input.token0Address ?? null) ?? existing?.token0Address ?? null;
+  const mergedToken1Address = normalizeTokenAddress(input.token1Address ?? null) ?? existing?.token1Address ?? null;
+  const mergedMetadataJson = mergePoolMetadata(existing?.metadataJson, input.metadataJson ?? {});
   const [row] = await db
     .insert(pools)
     .values({
       chainId: input.chainId,
-      poolAddress: input.poolAddress.toLowerCase(),
-      label: input.label,
-      token0Address: input.token0Address?.toLowerCase() ?? null,
-      token1Address: input.token1Address?.toLowerCase() ?? null,
-      metadataJson: input.metadataJson ?? {},
+      poolAddress: normalizedPoolAddress,
+      label: mergedLabel,
+      token0Address: mergedToken0Address,
+      token1Address: mergedToken1Address,
+      metadataJson: mergedMetadataJson,
     })
     .onConflictDoUpdate({
       target: [pools.chainId, pools.poolAddress],
       set: {
-        label: input.label,
-        token0Address: input.token0Address?.toLowerCase() ?? null,
-        token1Address: input.token1Address?.toLowerCase() ?? null,
-        metadataJson: input.metadataJson ?? {},
+        label: mergedLabel,
+        token0Address: mergedToken0Address,
+        token1Address: mergedToken1Address,
+        metadataJson: mergedMetadataJson,
         updatedAt: new Date(),
       },
     })
@@ -364,96 +460,204 @@ export async function persistProtocolPositions(input: {
   const mellowByWrapper = new Map(
     (input.mellowArtifacts?.wrappers ?? []).map((item) => [item.wrapperAddress.toLowerCase(), item] as const),
   );
+  const manualLifecycleByTokenId = new Map<string, ManualDepositLifecycleRecord[]>();
+  for (const record of input.manualLifecycle ?? []) {
+    if (!record.tokenId) {
+      continue;
+    }
+
+    const bucket = manualLifecycleByTokenId.get(record.tokenId) ?? [];
+    bucket.push(record);
+    manualLifecycleByTokenId.set(record.tokenId, bucket);
+  }
+  for (const bucket of manualLifecycleByTokenId.values()) {
+    bucket.sort((left, right) => {
+      const leftTime = left.occurredAt?.getTime() ?? 0;
+      const rightTime = right.occurredAt?.getTime() ?? 0;
+      return leftTime - rightTime;
+    });
+  }
+
+  const manualPositionByTokenId = new Map<string, {
+    primaryPosition: OverviewProtocolPosition;
+    hasManualPosition: boolean;
+    hasStakedPosition: boolean;
+  }>();
+  for (const position of input.positions) {
+    if ((position.family !== "manual_deposit" && position.family !== "staked_lp") || !position.tokenId) {
+      continue;
+    }
+
+    const existing = manualPositionByTokenId.get(position.tokenId) ?? null;
+    const currentPrimary = existing?.primaryPosition ?? null;
+    const shouldReplacePrimary = !currentPrimary
+      || (currentPrimary.valueUsd === null && position.valueUsd !== null)
+      || (currentPrimary.family === "staked_lp" && position.family === "manual_deposit");
+
+    manualPositionByTokenId.set(position.tokenId, {
+      primaryPosition: shouldReplacePrimary ? position : (currentPrimary ?? position),
+      hasManualPosition: (existing?.hasManualPosition ?? false) || position.family === "manual_deposit",
+      hasStakedPosition: (existing?.hasStakedPosition ?? false) || position.family === "staked_lp",
+    });
+  }
   const poolTotals = new Map<string, { poolId: string; valueUsd: number }>();
   const depositIds: string[] = [];
   const strategyIds: string[] = [];
 
-  for (const position of input.positions) {
-    if (position.family === "manual_deposit" && position.tokenId && position.metadata.positionContractAddress) {
-      const manual = manualByTokenId.get(position.tokenId);
-      const mintTxHash = resolveManualDepositMintTxHash({
-        tokenId: position.tokenId,
-        lifecycle: input.manualLifecycle,
+  const manualTokenIds = Array.from(new Set([
+    ...manualPositionByTokenId.keys(),
+    ...manualByTokenId.keys(),
+    ...manualLifecycleByTokenId.keys(),
+  ]));
+
+  for (const tokenId of manualTokenIds) {
+    const positionState = manualPositionByTokenId.get(tokenId) ?? null;
+    const position = positionState?.primaryPosition ?? null;
+    const manual = manualByTokenId.get(tokenId) ?? null;
+    const lifecycle = manualLifecycleByTokenId.get(tokenId) ?? [];
+    const mintTxHash = resolveManualDepositMintTxHash({ tokenId, lifecycle });
+    const firstLifecycleRecord = lifecycle.find((record) => record.occurredAt instanceof Date) ?? lifecycle[0] ?? null;
+    const lastLifecycleRecord = lifecycle.at(-1) ?? null;
+    const positionManagerAddress = (
+      lifecycle.find((record) => typeof record.positionManagerAddress === "string" && record.positionManagerAddress.length > 0)?.positionManagerAddress
+      ?? (position?.family === "manual_deposit" ? position.metadata.positionContractAddress : null)
+      ?? null
+    )?.toLowerCase() ?? null;
+    const poolAddress = (
+      manual?.poolAddress
+      ?? lifecycle.find((record) => typeof record.poolAddress === "string" && record.poolAddress.length > 0)?.poolAddress
+      ?? null
+    )?.toLowerCase() ?? null;
+    let poolId: string | null = null;
+
+    if (poolAddress) {
+      const token0Address = resolveKnownPoolTokenAddress({
+        chainId: input.chainId,
+        tokenAddress: manual?.token0Address ?? null,
+        symbol: position?.primaryTokenSymbol ?? null,
       });
-      let poolId: string | null = null;
+      const token1Address = resolveKnownPoolTokenAddress({
+        chainId: input.chainId,
+        tokenAddress: manual?.token1Address ?? null,
+        symbol: position?.secondaryTokenSymbol ?? null,
+      });
+      const pool = await upsertPool({
+        chainId: input.chainId,
+        poolAddress,
+        label: position?.poolLabel ?? position?.label ?? `Aerodrome CL position #${tokenId}`,
+        token0Address,
+        token1Address,
+        metadataJson: {
+          protocol: "aerodrome",
+          feeTierLabel: position?.metadata.feeTierLabel ?? null,
+          source: manual ? "manual_current_state" : "manual_lifecycle",
+        },
+      });
+      poolId = pool.id;
 
-      if (manual?.poolAddress) {
-        const pool = await upsertPool({
-          chainId: input.chainId,
-          poolAddress: manual.poolAddress,
-          label: position.poolLabel ?? position.label,
-          token0Address: manual.token0Address,
-          token1Address: manual.token1Address,
-          metadataJson: {
-            protocol: position.protocol,
-            feeTierLabel: position.metadata.feeTierLabel,
-          },
-        });
-        poolId = pool.id;
-
-        const currentTotal = poolTotals.get(poolId)?.valueUsd ?? 0;
-        poolTotals.set(poolId, {
-          poolId,
-          valueUsd: currentTotal + (position.valueUsd ?? 0),
+      if (position?.valueUsd !== null && position?.valueUsd !== undefined) {
+        const currentTotal = poolTotals.get(pool.id)?.valueUsd ?? 0;
+        poolTotals.set(pool.id, {
+          poolId: pool.id,
+          valueUsd: currentTotal + position.valueUsd,
         });
       }
+    }
 
-      const [deposit] = await db
-        .insert(deposits)
-        .values({
-          chainId: input.chainId,
-          walletAddress: input.walletAddress.toLowerCase(),
+    if (!positionManagerAddress && !poolId) {
+      continue;
+    }
+
+    const status = positionState?.hasStakedPosition
+      ? "staked"
+      : positionState?.hasManualPosition
+        ? "open"
+        : "closed";
+    const metadataJson = {
+      label: position?.label ?? `Aerodrome CL position #${tokenId}`,
+      protocol: "aerodrome",
+      poolLabel: position?.poolLabel,
+      valueUsd: position?.valueUsd ?? manual?.valueUsd ?? null,
+      valueUpdatedAt: position?.valueUpdatedAt ?? null,
+      primaryTokenSymbol: position?.primaryTokenSymbol,
+      secondaryTokenSymbol: position?.secondaryTokenSymbol,
+      primaryTokenAmount: position?.primaryTokenAmount,
+      secondaryTokenAmount: position?.secondaryTokenAmount,
+      metadata: {
+        ...(position?.metadata ?? {}),
+        positionContractAddress: positionManagerAddress,
+      },
+      historicalPersistenceSource: lifecycle.length > 0 ? "manual_lifecycle" : "current_position",
+    } satisfies Record<string, unknown>;
+
+    const [deposit] = await db
+      .insert(deposits)
+      .values({
+        chainId: input.chainId,
+        walletAddress: input.walletAddress.toLowerCase(),
+        poolId,
+        positionManagerAddress,
+        tokenId,
+        mintTxHash,
+        status,
+        coverageStatus: position?.coverageStatus ?? (poolId ? "partial" : "unknown"),
+        metadataJson,
+        createdAt: firstLifecycleRecord?.occurredAt ?? new Date(),
+        updatedAt: lastLifecycleRecord?.occurredAt ?? parseOptionalDate(position?.valueUpdatedAt) ?? new Date(),
+      })
+      .onConflictDoUpdate({
+        target: [deposits.chainId, deposits.positionManagerAddress, deposits.tokenId],
+        targetWhere: sql`${deposits.tokenId} is not null and ${deposits.positionManagerAddress} is not null`,
+        set: {
           poolId,
-          positionManagerAddress: position.metadata.positionContractAddress.toLowerCase(),
-          tokenId: position.tokenId,
-          mintTxHash,
-          status: "open",
-          coverageStatus: position.coverageStatus,
-          metadataJson: {
-            label: position.label,
-            protocol: position.protocol,
-            poolLabel: position.poolLabel,
-            valueUsd: position.valueUsd,
-            valueUpdatedAt: position.valueUpdatedAt,
-            primaryTokenSymbol: position.primaryTokenSymbol,
-            secondaryTokenSymbol: position.secondaryTokenSymbol,
-            primaryTokenAmount: position.primaryTokenAmount,
-            secondaryTokenAmount: position.secondaryTokenAmount,
-            metadata: position.metadata,
-          },
-        })
-        .onConflictDoUpdate({
-          target: [deposits.chainId, deposits.positionManagerAddress, deposits.tokenId],
-          targetWhere: sql`${deposits.tokenId} is not null and ${deposits.positionManagerAddress} is not null`,
-          set: {
-            poolId,
-            mintTxHash: sql`coalesce(${mintTxHash}, ${deposits.mintTxHash})`,
-            status: "open",
-            coverageStatus: position.coverageStatus,
-            metadataJson: {
-              label: position.label,
-              protocol: position.protocol,
-              poolLabel: position.poolLabel,
-              valueUsd: position.valueUsd,
-              valueUpdatedAt: position.valueUpdatedAt,
-              primaryTokenSymbol: position.primaryTokenSymbol,
-              secondaryTokenSymbol: position.secondaryTokenSymbol,
-              primaryTokenAmount: position.primaryTokenAmount,
-              secondaryTokenAmount: position.secondaryTokenAmount,
-              metadata: position.metadata,
-            },
-            updatedAt: new Date(),
-          },
-        })
-        .returning();
+          mintTxHash: sql`coalesce(${mintTxHash}, ${deposits.mintTxHash})`,
+          status,
+          coverageStatus: position?.coverageStatus ?? (poolId ? "partial" : "unknown"),
+          metadataJson,
+          updatedAt: lastLifecycleRecord?.occurredAt ?? parseOptionalDate(position?.valueUpdatedAt) ?? new Date(),
+        },
+      })
+      .returning();
 
-      depositIds.push(deposit.id);
+    depositIds.push(deposit.id);
+  }
+
+  for (const position of input.positions) {
+    if (position.family === "manual_deposit" || position.family === "staked_lp") {
       continue;
     }
 
     if (position.family === "strategy_exposure" && position.metadata.wrapperAddress) {
       const wrapperAddress = position.metadata.wrapperAddress.toLowerCase();
       const wrapper = mellowByWrapper.get(wrapperAddress);
+      const strategyPoolAddress =
+        typeof position.metadata.poolAddress === "string" && position.metadata.poolAddress.length > 0
+          ? position.metadata.poolAddress.toLowerCase()
+          : wrapper?.poolAddress?.toLowerCase() ?? null;
+      let primaryPoolId: string | null = null;
+
+      if (strategyPoolAddress) {
+        const pool = await upsertPool({
+          chainId: input.chainId,
+          poolAddress: strategyPoolAddress,
+          label: position.poolLabel ?? position.strategyLabel ?? position.label,
+          token0Address: wrapper?.token0Address,
+          token1Address: wrapper?.token1Address,
+          metadataJson: {
+            protocol: position.protocol,
+            feeTierLabel: position.metadata.feeTierLabel,
+            source: "mellow_wrapper_pool",
+          },
+        });
+        primaryPoolId = pool.id;
+
+        const currentTotal = poolTotals.get(pool.id)?.valueUsd ?? 0;
+        poolTotals.set(pool.id, {
+          poolId: pool.id,
+          valueUsd: currentTotal + (position.valueUsd ?? 0),
+        });
+      }
+
       const [strategy] = await db
         .insert(strategies)
         .values({
@@ -461,6 +665,7 @@ export async function persistProtocolPositions(input: {
           label: position.strategyLabel ?? position.label,
           protocol: position.protocol,
           wrapperAddress,
+          primaryPoolId,
           coverageStatus: position.coverageStatus,
           metadataJson: {
             label: position.label,
@@ -475,6 +680,7 @@ export async function persistProtocolPositions(input: {
           targetWhere: sql`${strategies.wrapperAddress} is not null`,
           set: {
             label: position.strategyLabel ?? position.label,
+            primaryPoolId,
             coverageStatus: position.coverageStatus,
             metadataJson: {
               label: position.label,
@@ -1162,6 +1368,7 @@ export async function persistResolvedRewardEvents(input: {
           rewardType: claim.rewardType,
           depositOrStrategyId: claim.depositOrStrategyId,
           occurredAt: claim.occurredAt,
+          resolutionStatus: claim.depositOrStrategyId ? "resolved" : "unresolved",
           metadataJson: {
             category: claim.category,
             summary: claim.summary,
@@ -1178,6 +1385,7 @@ export async function persistResolvedRewardEvents(input: {
         set: {
           depositOrStrategyId: sql`excluded.deposit_or_strategy_id`,
           occurredAt: sql`excluded.occurred_at`,
+          resolutionStatus: sql`excluded.resolution_status`,
           metadataJson: sql`COALESCE(${rewardEvents.metadataJson}, '{}'::jsonb) || COALESCE(excluded.metadata_json, '{}'::jsonb) || jsonb_build_object('valuationMethod', 'event')`,
         },
       });
@@ -1209,6 +1417,7 @@ export async function persistResolvedRewardEvents(input: {
           occurredAt: input.sliceEndUtc,
           accrualSnapshotDayUtc,
           isAccrualSnapshot: true,
+          resolutionStatus: "resolved",
           metadataJson: {
             protocol: snapshot.protocol,
             targetType: snapshot.targetType,

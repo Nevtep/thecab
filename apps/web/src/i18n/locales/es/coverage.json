@@ -2,6 +2,7 @@
   "noticeTitle": "Cobertura parcial",
   "level": {
     "full": "Cobertura completa",
+    "share_level": "Cobertura a nivel de participación",
     "partial": "Cobertura parcial",
     "unknown": "Cobertura desconocida"
   },

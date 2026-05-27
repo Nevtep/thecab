@@ -61,10 +61,6 @@ export function planAnalysisSlices(input: {
       isFullyCached,
     });
 
-    if (input.mode === "incremental" && cursorBoundary && boundedStart <= cursorBoundary) {
-      break;
-    }
-
     currentEnd = boundedStart;
     sliceIndex += 1;
 

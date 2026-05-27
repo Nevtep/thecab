@@ -3,6 +3,7 @@ export * from "@/design-system/charts/CabBarChart";
 export * from "@/design-system/charts/CabChartPrimitives";
 export * from "@/design-system/charts/CabChartFrame";
 export * from "@/design-system/charts/CabDonutChart";
+export * from "@/design-system/charts/CabGaugeChart";
 export * from "@/design-system/charts/CabLineChart";
 export * from "@/design-system/charts/CabPoolValueChart";
 export * from "@/design-system/charts/CabPortfolioEvolutionChart";

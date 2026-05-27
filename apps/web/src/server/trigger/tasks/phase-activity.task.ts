@@ -3,8 +3,8 @@ import { task } from "@trigger.dev/sdk/v3";
 
 import { getAnalysisRunById } from "@/server/analysis/analysis-run.repository";
 import { listRunSlices } from "@/server/analysis/analysis-slice.repository";
+import { runCanonicalInference } from "@/server/analysis/canonicalInference";
 import { classifyRunLedgerEvents } from "@/server/analysis/enginePersistence";
-import { classifyResidualAttribution } from "@/server/protocols/aerodrome/classifyResidualAttribution";
 import { getDb } from "@/server/db/client";
 import { processedTxs, rawProviderRecords } from "@/server/db/schema";
 
@@ -131,16 +131,18 @@ export const phaseActivityTask = task({
       walletTokenSignals,
     });
 
-    const attribution = await classifyResidualAttribution({
+    const inference = await runCanonicalInference({
       walletAddress: payload.walletAddress,
       chainId: payload.chainId,
       txHashes: txRows.map((row) => row.txHash),
+      runId: payload.runId,
     });
 
     return {
       classifiedCount,
-      sourceLotCount: attribution.sourceLotCount,
-      residualStateCount: attribution.residualStateCount,
+      sourceLotCount: inference.sourceLotCount,
+      residualStateCount: inference.residualStateCount,
+      inferredActionCount: inference.inferredActionCount,
     };
   },
 });

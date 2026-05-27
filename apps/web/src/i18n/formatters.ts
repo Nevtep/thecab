@@ -37,6 +37,23 @@ export function formatDateTime(value: Date | string, locale: string): string {
   }).format(new Date(value));
 }
 
+export function formatDate(value: Date | string, locale: string): string {
+  return new Intl.DateTimeFormat(locale, {
+    dateStyle: "medium",
+  }).format(new Date(value));
+}
+
+export function formatDayRange(startDayUtc: string | null, endDayUtc: string | null, locale: string): string | null {
+  if (!startDayUtc || !endDayUtc) {
+    return null;
+  }
+
+  const start = formatDate(`${startDayUtc}T00:00:00.000Z`, locale);
+  const end = formatDate(`${endDayUtc}T00:00:00.000Z`, locale);
+
+  return `${start} - ${end}`;
+}
+
 export function formatRelativeTime(value: Date | string, locale: string): string {
   const now = Date.now();
   const then = new Date(value).getTime();

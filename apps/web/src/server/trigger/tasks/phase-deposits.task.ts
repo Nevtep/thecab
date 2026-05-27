@@ -27,6 +27,40 @@ export type PhaseDepositsTaskPayload = {
   chainId: number;
 };
 
+type WalletHistoryPageResponse = {
+  result?: unknown;
+  cursor?: string | null;
+};
+
+export type SliceHistoryLoadResult = {
+  records: Array<Record<string, unknown>>;
+  paginationTruncated: boolean;
+};
+
+function resolveHistoryWindowDurationMs(sliceStartUtc: Date, sliceEndUtc: Date) {
+  return Math.max(0, sliceEndUtc.getTime() - sliceStartUtc.getTime());
+}
+
+function splitHistoryWindow(sliceStartUtc: Date, sliceEndUtc: Date) {
+  const midpointMs = sliceStartUtc.getTime() + Math.floor((sliceEndUtc.getTime() - sliceStartUtc.getTime()) / 2);
+  const midpoint = new Date(midpointMs);
+
+  if (midpoint.getTime() <= sliceStartUtc.getTime() || midpoint.getTime() >= sliceEndUtc.getTime()) {
+    return null;
+  }
+
+  return {
+    left: {
+      sliceStartUtc,
+      sliceEndUtc: midpoint,
+    },
+    right: {
+      sliceStartUtc: midpoint,
+      sliceEndUtc,
+    },
+  };
+}
+
 const MORALIS_HISTORY_PAGE_LIMIT = 100;
 const MORALIS_HISTORY_MAX_PAGES_PER_SLICE = 20;
 
@@ -77,21 +111,32 @@ function toLatestWalletTokenSnapshot(token: Record<string, unknown>) {
   };
 }
 
-async function loadSliceHistory(
-  walletAddress: string,
-  chainId: number,
-  sliceStartUtc: Date,
-  sliceEndUtc: Date,
-) {
+export async function collectSliceHistoryPages(input: {
+  walletAddress: string;
+  chainId: number;
+  sliceStartUtc: Date;
+  sliceEndUtc: Date;
+  fetchPage: (args: {
+    walletAddress: string;
+    chainId: number;
+    cursor?: string;
+    fromDate: string;
+    toDate: string;
+    limit: number;
+  }) => Promise<WalletHistoryPageResponse>;
+}): Promise<SliceHistoryLoadResult> {
   const records: Array<Record<string, unknown>> = [];
   let cursor: string | undefined;
+  let paginationTruncated = false;
 
   for (let pageIndex = 0; pageIndex < MORALIS_HISTORY_MAX_PAGES_PER_SLICE; pageIndex += 1) {
-    const response = await getWalletHistory(walletAddress, chainId, {
+    const response = await input.fetchPage({
+      walletAddress: input.walletAddress,
+      chainId: input.chainId,
       limit: MORALIS_HISTORY_PAGE_LIMIT,
       cursor,
-      fromDate: sliceStartUtc.toISOString(),
-      toDate: sliceEndUtc.toISOString(),
+      fromDate: input.sliceStartUtc.toISOString(),
+      toDate: input.sliceEndUtc.toISOString(),
     });
 
     const pageRecords = Array.isArray(response.result) ? response.result : [];
@@ -101,10 +146,86 @@ async function loadSliceHistory(
       break;
     }
 
+    if (pageIndex === MORALIS_HISTORY_MAX_PAGES_PER_SLICE - 1) {
+      paginationTruncated = true;
+      break;
+    }
+
     cursor = response.cursor;
   }
 
-  return records;
+  return {
+    records,
+    paginationTruncated,
+  };
+}
+
+export async function loadSliceHistoryWithAdaptiveSplitting(input: {
+  walletAddress: string;
+  chainId: number;
+  sliceStartUtc: Date;
+  sliceEndUtc: Date;
+  fetchPage: (args: {
+    walletAddress: string;
+    chainId: number;
+    cursor?: string;
+    fromDate: string;
+    toDate: string;
+    limit: number;
+  }) => Promise<WalletHistoryPageResponse>;
+  minimumWindowMs?: number;
+}): Promise<SliceHistoryLoadResult> {
+  const minimumWindowMs = input.minimumWindowMs ?? getEnv().ANALYSIS_MIN_HISTORY_WINDOW_HOURS * 60 * 60 * 1000;
+  const initialLoad = await collectSliceHistoryPages(input);
+
+  if (!initialLoad.paginationTruncated) {
+    return initialLoad;
+  }
+
+  if (resolveHistoryWindowDurationMs(input.sliceStartUtc, input.sliceEndUtc) <= minimumWindowMs) {
+    return initialLoad;
+  }
+
+  const splitWindow = splitHistoryWindow(input.sliceStartUtc, input.sliceEndUtc);
+  if (!splitWindow) {
+    return initialLoad;
+  }
+
+  const [leftLoad, rightLoad] = await Promise.all([
+    loadSliceHistoryWithAdaptiveSplitting({
+      ...input,
+      sliceStartUtc: splitWindow.left.sliceStartUtc,
+      sliceEndUtc: splitWindow.left.sliceEndUtc,
+      minimumWindowMs,
+    }),
+    loadSliceHistoryWithAdaptiveSplitting({
+      ...input,
+      sliceStartUtc: splitWindow.right.sliceStartUtc,
+      sliceEndUtc: splitWindow.right.sliceEndUtc,
+      minimumWindowMs,
+    }),
+  ]);
+
+  return {
+    records: [...leftLoad.records, ...rightLoad.records],
+    paginationTruncated: leftLoad.paginationTruncated || rightLoad.paginationTruncated,
+  };
+}
+
+async function loadSliceHistory(
+  walletAddress: string,
+  chainId: number,
+  sliceStartUtc: Date,
+  sliceEndUtc: Date,
+) {
+  return loadSliceHistoryWithAdaptiveSplitting({
+    walletAddress,
+    chainId,
+    sliceStartUtc,
+    sliceEndUtc,
+    fetchPage: ({ walletAddress: nextWalletAddress, chainId: nextChainId, ...params }) =>
+      getWalletHistory(nextWalletAddress, nextChainId, params),
+  });
 }
 
 export const phaseDepositsTask = task({
@@ -154,7 +275,7 @@ export const phaseDepositsTask = task({
     }
 
     const tokens = tokensResult.ok ? (tokensResult.value.result ?? []) : [];
-  const history = historyResult.ok ? historyResult.value : [];
+    const history = historyResult.ok ? historyResult.value.records : [];
     const defiPositions = defiPositionsResult.ok ? defiPositionsResult.value : [];
     const coverageReasons = new Set<string>();
 
@@ -163,9 +284,15 @@ export const phaseDepositsTask = task({
     }
     if (!historyResult.ok) {
       coverageReasons.add(historyResult.coverageReason);
+    } else if (historyResult.value.paginationTruncated) {
+      coverageReasons.add("historyPaginationExceeded");
     }
     if (!defiPositionsResult.ok) {
       coverageReasons.add(defiPositionsResult.coverageReason);
+    }
+
+    if (historyResult.ok && historyResult.value.paginationTruncated) {
+      throw buildAnalysisProviderFailureError(["historyPaginationExceeded"]);
     }
 
     const now = new Date();

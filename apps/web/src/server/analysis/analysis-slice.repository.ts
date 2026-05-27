@@ -18,6 +18,51 @@ export type AnalysisSliceProgressRow = {
   completedAt: Date | null;
 };
 
+type AnalysisSliceWindowInput = {
+  sliceStartUtc: Date;
+  sliceEndUtc: Date;
+};
+
+function formatDayUtc(value: Date) {
+  return value.toISOString().slice(0, 10);
+}
+
+function toInclusiveEndDayUtc(value: Date) {
+  const inclusiveEnd = new Date(value);
+  inclusiveEnd.setUTCDate(inclusiveEnd.getUTCDate() - 1);
+  return formatDayUtc(inclusiveEnd);
+}
+
+export function resolveRunSliceDayWindow(slices: AnalysisSliceWindowInput[], fallbackDayUtc: string) {
+  if (slices.length === 0) {
+    return {
+      startDayUtc: fallbackDayUtc,
+      endDayUtc: fallbackDayUtc,
+    };
+  }
+
+  let earliestSliceStart = slices[0].sliceStartUtc;
+  let latestSliceEnd = slices[0].sliceEndUtc;
+
+  for (const slice of slices.slice(1)) {
+    if (slice.sliceStartUtc.getTime() < earliestSliceStart.getTime()) {
+      earliestSliceStart = slice.sliceStartUtc;
+    }
+
+    if (slice.sliceEndUtc.getTime() > latestSliceEnd.getTime()) {
+      latestSliceEnd = slice.sliceEndUtc;
+    }
+  }
+
+  const startDayUtc = formatDayUtc(earliestSliceStart);
+  const endDayUtc = toInclusiveEndDayUtc(latestSliceEnd);
+
+  return {
+    startDayUtc,
+    endDayUtc: endDayUtc >= startDayUtc ? endDayUtc : fallbackDayUtc,
+  };
+}
+
 export async function createAnalysisSlices(
   slices: Array<{
     runId: string;

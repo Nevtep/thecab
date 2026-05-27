@@ -537,38 +537,14 @@ function isCoreRebalanceSwapCandidate(input: {
   rows: Awaited<ReturnType<typeof readRecentOverviewAnalyzedActivity>>;
   classification: string;
 }) {
-  if (input.classification !== "swap") {
-    return false;
-  }
-
-  const movementSymbols = Array.from(new Set(
-    input.row.movements
-      .map((movement) => asString(movement.metadataJson.symbol)?.trim().toLowerCase() ?? null)
-      .filter((symbol): symbol is string => Boolean(symbol)),
-  ));
-  const coreSymbols = new Set(["usdc", "weth", "eth", "cbbtc", "aero"]);
-
-  if (movementSymbols.length < 2 || movementSymbols.some((symbol) => !coreSymbols.has(symbol))) {
-    return false;
-  }
-
-  return input.rows.some((candidate) => {
-    if (candidate.id === input.row.id) {
-      return false;
-    }
-
-    const candidateClassification = resolveOverviewActivityDisplayClassification({
-      classification: candidate.classification,
-      metadataJson: candidate.metadataJson,
-      movements: candidate.movements,
-    });
-    if (!["deposit", "withdraw", "stake", "unstake", "rebalance"].includes(candidateClassification)) {
-      return false;
-    }
-
-    const deltaMs = Math.abs(candidate.occurredAt.getTime() - input.row.occurredAt.getTime());
-    return deltaMs <= 20 * 60 * 1000;
-  });
+  // Canonical rebalance labeling now comes from the engine via
+  // `inferred_actions` (slice 3b/3c). A swap, withdraw, or deposit whose
+  // ledger event id participates in a `rebalance_same_pool` action is
+  // displayed as a rebalance regardless of its primitive classification.
+  // The legacy 20-minute swap-proximity heuristic has been removed.
+  void input.rows;
+  void input.classification;
+  return input.row.rebalanceMembership?.actionType === "rebalance_same_pool";
 }
 
 export function buildOverviewRewardFallbackEvents(input: {

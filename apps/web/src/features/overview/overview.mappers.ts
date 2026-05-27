@@ -229,6 +229,15 @@ export function getOverviewNavigationItems(
 ): OverviewNavigationItem[] {
   const analysisReady = status === "ready" || status === "stale";
 
+  const poolsState: OverviewNavigationItem = {
+    key: "pools",
+    iconName: "pools",
+    labelKey: "navigation:items.pools",
+    href: analysisReady ? "/pools" : undefined,
+    stateKey: analysisReady ? "active" : "requiresAnalysis",
+    disabled: !analysisReady,
+  };
+
   return [
     {
       key: "overview",
@@ -238,13 +247,7 @@ export function getOverviewNavigationItems(
       stateKey: "active",
       disabled: false,
     },
-    {
-      key: "pools",
-      iconName: "pools",
-      labelKey: "navigation:items.pools",
-      stateKey: analysisReady ? "comingSoon" : "requiresAnalysis",
-      disabled: true,
-    },
+    poolsState,
     {
       key: "deposits",
       iconName: "deposits",

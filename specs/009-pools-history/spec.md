@@ -13,14 +13,14 @@ As an analyzed user, I need a Pools view that summarizes every pool I participat
 
 **Why this priority**: The list view is the entry point to the feature. Without it, users cannot understand the scope of their pool participation or choose which market to inspect more deeply.
 
-**Independent Test**: Can be fully tested by opening Pools after historical analysis is ready and verifying that every participated pool in the covered window appears with core metrics, filters, and visible coverage status.
+**Independent Test**: Can be fully tested by opening Pools after historical analysis is `ready` and verifying that every participated pool in the covered window appears with core metrics, filters, and visible coverage status; if the wallet later becomes `stale`, the last successful analyzed data remains available during refresh.
 
 **Acceptance Scenarios**:
 
 1. **Given** a wallet with completed historical analysis and at least one participated pool, **When** the user opens Pools, **Then** the list shows every participating pool within the covered window with pool identity, current attributed value, capital entered, capital withdrawn, rewards claimed, estimated return, active status, and coverage.
 2. **Given** the pool list is visible, **When** the user filters by active or closed state, manual or automated exposure, positive or negative return, or partial coverage, **Then** the results update to match the selected criteria without hiding relevant coverage warnings.
 3. **Given** a wallet has no analyzed pool participation, **When** the user opens Pools, **Then** the feature shows a clear empty state explaining that no pool participation was reconstructed for the wallet.
-4. **Given** historical analysis has not completed, **When** the user attempts to reach Pools, **Then** the feature remains locked and clearly explains that deeper pool analytics require analyzed history.
+4. **Given** historical analysis has never completed successfully for the wallet, **When** the user attempts to reach Pools, **Then** the feature remains locked and clearly explains that deeper pool analytics require analyzed history.
 
 ---
 
@@ -75,7 +75,8 @@ As an analyzed user, I need Pools to stay honest when reconstruction is partial 
 #### 1) Feature Scope And Availability
 
 - **FR-001**: The system MUST provide a dedicated analyzed Pools feature that summarizes and explains historical participation by pool.
-- **FR-002**: Pools MUST remain unavailable until historical analysis is ready, and the locked state MUST explain why the feature is gated.
+- **FR-002**: Pools MUST remain unavailable until historical analysis is `ready`, and the locked state MUST explain why the feature is gated.
+- **FR-002a**: After Pools has been unlocked by a successful ready analysis, the feature SHOULD remain available while analysis status is `stale`, using the last successful analyzed data while refresh activity runs in the background.
 - **FR-003**: Pools MUST support the full analyzed history window up to 365 days and MUST show the actual covered range when less than one year is available.
 - **FR-004**: Pools MUST treat each pool as a stable analytical unit that can aggregate manual deposits, automated strategy exposure, residual attributed assets, rewards, and lifecycle events.
 - **FR-005**: Pools MUST remain a read-only analytics and monitoring surface and MUST NOT become a trading or execution workflow.
@@ -152,8 +153,8 @@ As an analyzed user, I need Pools to stay honest when reconstruction is partial 
 ### Constitution Alignment Requirements *(mandatory)*
 
 - **CA-001 Brand**: Feature MUST preserve The Cab control-tower tone and visual direction, using the provided reference image only as a layout and hierarchy guide, not as a reason to introduce hype-oriented or off-brand UI patterns.
-- **CA-002 Localization**: Feature MUST define i18n impact across the `pools`, `coverage`, `charts`, and `common` namespaces and MUST prohibit hardcoded user-facing copy in the UI.
-- **CA-003 Localization Formatting**: Feature MUST use locale-aware formatting for currency, token amounts, percentages, dates, times, and covered-range messaging.
+- **CA-002 Localization**: Feature MUST define i18n impact across the `pools`, `coverage`, `charts`, `common`, and `navigation` namespaces and MUST prohibit hardcoded user-facing copy in the UI.
+- **CA-003 Localization Formatting**: Feature MUST use centralized locale-aware formatters for currency, token amounts, percentages, dates, times, relative times, and covered-range messaging.
 - **CA-004 Chain Awareness**: Feature MUST treat pool identity, rewards, strategies, deposits, residual attribution, query scope, and API scope as chain-aware, while keeping Base mainnet as the only product-v1 enabled chain.
 - **CA-005 Provider Boundaries**: Feature MUST preserve the data-source ownership defined by the architecture: Moralis for discovery signals, Alchemy Prices for price history, RPC and contract reads for protocol reconstruction, and normalized analyzed domain data as the browser-facing source of truth.
 - **CA-006 Explainability**: Feature MUST make coverage state, covered date range, partial attribution, and estimated-versus-measured status visible anywhere the accounting is incomplete or inferred.
@@ -181,6 +182,7 @@ As an analyzed user, I need Pools to stay honest when reconstruction is partial 
 ## Assumptions
 
 - Historical analysis is the prerequisite for Pools, and the analyzed history window is capped at up to 365 days in product v1.
+- After Pools has been unlocked by a ready analysis, stale refresh behavior may continue showing the last successful analyzed data until refresh completes, consistent with the broader connected-app analysis policy.
 - Product v1 remains Base mainnet only, but pool identities, rewards, strategies, deposits, and attribution records remain chain-aware.
 - The provided reference image is a design-direction input for analytical density, hierarchy, and panel structure; final copy and states still follow The Cab brand and localization rules.
 - The existing analysis engine already stores the core primitives needed for this feature, including pools, deposits, strategy exposure, rewards, ledger events, asset movements, attribution records, and daily snapshots, but richer pool-level UI metrics will require derived rollups or series built from those normalized records.
