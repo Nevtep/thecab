@@ -138,6 +138,62 @@ function createDetailResponse(): PoolDetailResponse {
       nextCursor: null,
       hasMore: false,
     },
+    positions: {
+      manualDeposits: [
+        {
+          depositId: "dep-1f3dcd44-b5d1-48f0-90f4-acde0001",
+          tokenId: "18462",
+          status: "open",
+          coverageStatus: "full",
+          tickLower: -120000,
+          tickUpper: -119400,
+          rangeLowerPrice: 95_000.125,
+          rangeUpperPrice: 98_500.875,
+          rangeQuoteTokenSymbol: "cbBTC",
+          rangeDisplayFractionDigits: 3,
+          isInRange: true,
+          valueUsd: 3_000,
+          tokens: [
+            { symbol: "WETH", amount: 1.25 },
+            { symbol: "cbBTC", amount: 0.0456 },
+          ],
+          annualizedReturnPct: null,
+        },
+        {
+          depositId: "dep-closed-1",
+          tokenId: "18463",
+          status: "closed",
+          coverageStatus: "full",
+          tickLower: -125000,
+          tickUpper: -124000,
+          rangeLowerPrice: 90_000,
+          rangeUpperPrice: 91_000,
+          rangeQuoteTokenSymbol: "cbBTC",
+          rangeDisplayFractionDigits: 2,
+          isInRange: false,
+          valueUsd: 0,
+          tokens: [
+            { symbol: "WETH", amount: 0 },
+            { symbol: "cbBTC", amount: 0 },
+          ],
+          annualizedReturnPct: null,
+        },
+      ],
+      automatedStrategies: [
+        {
+          exposureId: "exp-1",
+          strategyId: "strat-1f3dcd44-b5d1-48f0-90f4-acde0002",
+          strategyLabel: "Mellow steakhouse",
+          coverageStatus: "share_level",
+          valueUsd: 2_000,
+          tokens: [
+            { symbol: "WETH", amount: null },
+            { symbol: "cbBTC", amount: null },
+          ],
+          annualizedReturnPct: null,
+        },
+      ],
+    },
     related: { deposits: [], strategies: [] },
   };
 }
@@ -192,6 +248,7 @@ test("mapPoolDetailResponseToViewModel formats header, segments, chart, and time
   assert.match(vm.header.formattedCurrentAttributedValueUsd, /\$5,000/);
   assert.equal(vm.header.formattedProtocolFamily, "Aerodrome");
   assert.equal(vm.header.formattedPoolType, "CL");
+  assert.equal(vm.header.formattedTokenPair, "WETH / cbBTC");
   assert.match(vm.segments.manual.formattedCurrentValueUsd, /\$3,000/);
   assert.match(vm.segments.strategy.formattedCurrentValueUsd, /\$2,000/);
   assert.equal(vm.chart.length, 1);
@@ -199,4 +256,51 @@ test("mapPoolDetailResponseToViewModel formats header, segments, chart, and time
   assert.equal(vm.timeline.length, 1);
   assert.ok(vm.timeline[0]?.formattedOccurredAt);
   assert.match(vm.timeline[0]?.formattedAttributedValueUsd ?? "", /\$1,000/);
+});
+
+test("mapPoolDetailResponseToViewModel de-dupes token symbols case-insensitively", () => {
+  const response = createDetailResponse();
+  response.header.tokenSymbols = ["WETH", "cbBTC", "CBBTC"];
+
+  const vm = mapPoolDetailResponseToViewModel(response, "en-US");
+
+  assert.deepEqual(vm.header.tokenSymbols, ["WETH", "cbBTC"]);
+  assert.equal(vm.header.formattedTokenPair, "WETH / cbBTC");
+});
+
+test("mapPoolDetailResponseToViewModel maps manual deposits and automated strategies into composition rows", () => {
+  const vm = mapPoolDetailResponseToViewModel(createDetailResponse(), "en-US");
+
+  assert.equal(vm.composition.manualDeposits.length, 1);
+  assert.equal(vm.composition.automatedStrategies.length, 1);
+  assert.equal(vm.composition.manualDeposits[0]?.idLabel, "#18462");
+  assert.equal(vm.composition.manualDeposits[0]?.rangeState, "active");
+  assert.equal(vm.composition.manualDeposits[0]?.rangeDetail, "95,000.125 -> 98,500.875 cbBTC");
+  assert.match(vm.composition.manualDeposits[0]?.underlyingLabel ?? "", /WETH/);
+  assert.equal(vm.composition.manualDeposits[0]?.stakingState, "unstaked");
+  assert.equal(vm.composition.manualDeposits[0]?.aprLabel, null);
+  assert.equal(vm.composition.automatedStrategies[0]?.idLabel, "Mellow steakhouse");
+  assert.equal(vm.composition.automatedStrategies[0]?.rangeState, "managed");
+  assert.equal(vm.composition.automatedStrategies[0]?.stakingState, "staked");
+});
+
+test("mapPoolDetailResponseToViewModel hides closed deposits from composition rows", () => {
+  const vm = mapPoolDetailResponseToViewModel(createDetailResponse(), "en-US");
+
+  assert.equal(vm.composition.manualDeposits.some((row) => row.idLabel === "#18463"), false);
+});
+
+test("mapPoolDetailResponseToViewModel falls back to ticks when price range metadata is unavailable", () => {
+  const response = createDetailResponse();
+  response.positions.manualDeposits[0] = {
+    ...response.positions.manualDeposits[0],
+    rangeLowerPrice: null,
+    rangeUpperPrice: null,
+    rangeQuoteTokenSymbol: null,
+    rangeDisplayFractionDigits: null,
+  };
+
+  const vm = mapPoolDetailResponseToViewModel(response, "en-US");
+
+  assert.match(vm.composition.manualDeposits[0]?.rangeDetail ?? "", /-120,000 -> -119,400/);
 });

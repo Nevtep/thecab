@@ -116,6 +116,43 @@ export type PoolTimelineItem = {
   metadata: Record<string, unknown>;
 };
 
+export type PoolPositionToken = {
+  symbol: string;
+  amount: number | null;
+};
+
+export type PoolManualDepositPosition = {
+  depositId: string;
+  tokenId: string | null;
+  status: "staked" | "open" | "closed" | "unknown";
+  coverageStatus: "full" | "share_level" | "partial" | "unknown";
+  tickLower: number | null;
+  tickUpper: number | null;
+  rangeLowerPrice: number | null;
+  rangeUpperPrice: number | null;
+  rangeQuoteTokenSymbol: string | null;
+  rangeDisplayFractionDigits: number | null;
+  isInRange: boolean | null;
+  valueUsd: number | null;
+  tokens: PoolPositionToken[];
+  annualizedReturnPct: number | null;
+};
+
+export type PoolAutomatedStrategyPosition = {
+  exposureId: string;
+  strategyId: string;
+  strategyLabel: string;
+  coverageStatus: "full" | "share_level" | "partial" | "unknown";
+  valueUsd: number | null;
+  tokens: PoolPositionToken[];
+  annualizedReturnPct: number | null;
+};
+
+export type PoolPositions = {
+  manualDeposits: PoolManualDepositPosition[];
+  automatedStrategies: PoolAutomatedStrategyPosition[];
+};
+
 export type PoolDetailResponse = {
   walletAddress: string;
   chainId: number;
@@ -166,6 +203,7 @@ export type PoolDetailResponse = {
     nextCursor: string | null;
     hasMore: boolean;
   };
+  positions: PoolPositions;
   related: {
     deposits: Array<{ id: string; label: string }>;
     strategies: Array<{ id: string; label: string }>;

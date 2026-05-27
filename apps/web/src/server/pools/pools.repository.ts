@@ -1,8 +1,8 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 
 import { getDb } from "@/server/db/client";
-import { poolHistorySnapshots, poolTimelineEvents, poolWalletSummaries } from "@/server/db/schema";
-import type { PoolDetailRange, PoolsListItem } from "@/server/pools/pools.types";
+import { deposits, poolHistorySnapshots, poolTimelineEvents, poolWalletSummaries, strategies, strategyExposures } from "@/server/db/schema";
+import type { PoolDetailRange, PoolPositionToken, PoolPositions, PoolsListItem } from "@/server/pools/pools.types";
 
 function asNumber(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -21,6 +21,22 @@ function asStringArray(value: unknown) {
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === "string" && item.length > 0)
     : [];
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+function asTick(value: unknown) {
+  const parsed = asNumber(value);
+  return parsed === null ? null : Math.trunc(parsed);
+}
+
+function asNullableInteger(value: unknown) {
+  const parsed = asNumber(value);
+  return parsed === null ? null : Math.trunc(parsed);
 }
 
 function looksLikeAddressLabel(value: string) {
@@ -110,6 +126,67 @@ function normalizeCoverageStatus(value: string): PoolsListItem["coverageStatus"]
     default:
       return "unknown";
   }
+}
+
+function normalizeDepositStatus(value: string): "staked" | "open" | "closed" | "unknown" {
+  switch (value) {
+    case "staked":
+    case "open":
+    case "closed":
+      return value;
+    default:
+      return "unknown";
+  }
+}
+
+function buildPositionTokens(input: {
+  primaryTokenSymbol: unknown;
+  secondaryTokenSymbol: unknown;
+  primaryTokenAmount: unknown;
+  secondaryTokenAmount: unknown;
+  fallbackSymbols?: string[];
+}) {
+  const tokens: PoolPositionToken[] = [];
+  const seen = new Set<string>();
+
+  const appendToken = (symbol: unknown, amount: unknown) => {
+    if (typeof symbol !== "string") {
+      return;
+    }
+
+    const trimmed = symbol.trim();
+    if (trimmed.length === 0) {
+      return;
+    }
+
+    const dedupeKey = trimmed.toLowerCase();
+    if (seen.has(dedupeKey)) {
+      return;
+    }
+
+    seen.add(dedupeKey);
+    tokens.push({
+      symbol: trimmed,
+      amount: asNumber(amount),
+    });
+  };
+
+  appendToken(input.primaryTokenSymbol, input.primaryTokenAmount);
+  appendToken(input.secondaryTokenSymbol, input.secondaryTokenAmount);
+
+  if (tokens.length > 0) {
+    return tokens;
+  }
+
+  for (const symbol of input.fallbackSymbols ?? []) {
+    appendToken(symbol, null);
+
+    if (tokens.length === 2) {
+      break;
+    }
+  }
+
+  return tokens;
 }
 
 
@@ -378,4 +455,98 @@ export async function readPoolTimeline(input: {
       coverageStatus: normalizeCoverageStatus(row.coverageStatus),
     }))
     .sort((left, right) => right.occurredAt.getTime() - left.occurredAt.getTime());
+}
+
+export async function readPoolPositions(input: {
+  walletAddress: string;
+  chainId: number;
+  poolId: string;
+  fallbackTokenSymbols: string[];
+}): Promise<PoolPositions> {
+  const db = getDb();
+  const walletAddress = input.walletAddress.toLowerCase();
+  const [depositRows, strategyRows] = await Promise.all([
+    db
+      .select()
+      .from(deposits)
+      .where(
+        and(
+          eq(deposits.walletAddress, walletAddress),
+          eq(deposits.chainId, input.chainId),
+          eq(deposits.poolId, input.poolId),
+        ),
+      ),
+    db
+      .select({
+        exposureId: strategyExposures.id,
+        strategyId: strategyExposures.strategyId,
+        coverageStatus: strategyExposures.coverageStatus,
+        metadataJson: strategyExposures.metadataJson,
+        strategyLabel: strategies.label,
+      })
+      .from(strategyExposures)
+      .innerJoin(strategies, eq(strategyExposures.strategyId, strategies.id))
+      .where(
+        and(
+          eq(strategyExposures.walletAddress, walletAddress),
+          eq(strategyExposures.chainId, input.chainId),
+          eq(strategies.primaryPoolId, input.poolId),
+        ),
+      ),
+  ]);
+
+  return {
+    manualDeposits: depositRows
+      .filter((row) => normalizeDepositStatus(row.status) !== "closed")
+      .map((row) => {
+      const metadata = asRecord(row.metadataJson);
+      const nestedMetadata = asRecord(metadata.metadata);
+
+      return {
+        depositId: row.id,
+        tokenId: row.tokenId,
+        status: normalizeDepositStatus(row.status),
+        coverageStatus: normalizeCoverageStatus(row.coverageStatus),
+        tickLower: asTick(nestedMetadata.rangeLowerTick),
+        tickUpper: asTick(nestedMetadata.rangeUpperTick),
+        rangeLowerPrice: asNumber(nestedMetadata.rangeLowerPrice),
+        rangeUpperPrice: asNumber(nestedMetadata.rangeUpperPrice),
+        rangeQuoteTokenSymbol:
+          typeof nestedMetadata.rangeQuoteTokenSymbol === "string" && nestedMetadata.rangeQuoteTokenSymbol.trim().length > 0
+            ? nestedMetadata.rangeQuoteTokenSymbol.trim()
+            : null,
+        rangeDisplayFractionDigits: asNullableInteger(nestedMetadata.rangeDisplayFractionDigits),
+        isInRange: typeof nestedMetadata.isInRange === "boolean" ? nestedMetadata.isInRange : null,
+        valueUsd: asNumber(metadata.valueUsd),
+        tokens: buildPositionTokens({
+          primaryTokenSymbol: metadata.primaryTokenSymbol,
+          secondaryTokenSymbol: metadata.secondaryTokenSymbol,
+          primaryTokenAmount: metadata.primaryTokenAmount,
+          secondaryTokenAmount: metadata.secondaryTokenAmount,
+          fallbackSymbols: input.fallbackTokenSymbols,
+        }),
+        annualizedReturnPct: null,
+      };
+    }),
+    automatedStrategies: strategyRows.map((row) => {
+      const metadata = asRecord(row.metadataJson);
+      const nestedMetadata = asRecord(metadata.metadata);
+
+      return {
+        exposureId: row.exposureId,
+        strategyId: row.strategyId,
+        strategyLabel: row.strategyLabel,
+        coverageStatus: normalizeCoverageStatus(row.coverageStatus),
+        valueUsd: asNumber(metadata.valueUsd),
+        tokens: buildPositionTokens({
+          primaryTokenSymbol: metadata.primaryTokenSymbol ?? nestedMetadata.primaryTokenSymbol,
+          secondaryTokenSymbol: metadata.secondaryTokenSymbol ?? nestedMetadata.secondaryTokenSymbol,
+          primaryTokenAmount: metadata.primaryTokenAmount ?? nestedMetadata.primaryTokenAmount,
+          secondaryTokenAmount: metadata.secondaryTokenAmount ?? nestedMetadata.secondaryTokenAmount,
+          fallbackSymbols: input.fallbackTokenSymbols,
+        }),
+        annualizedReturnPct: null,
+      };
+    }),
+  };
 }

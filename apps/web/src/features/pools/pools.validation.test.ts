@@ -127,6 +127,10 @@ test("detail view model preserves coverage metadata across header, segments, and
       residual: { currentValueUsd: 0, coverageStatus: "partial" },
     },
     currentComposition: [],
+    positions: {
+      manualDeposits: [],
+      automatedStrategies: [],
+    },
     history: { points: [], coverageStatus: "share_level", coverageReasonCodes: ["share_level_strategy"] },
     timeline: { items: [], nextCursor: null, hasMore: false },
     related: { deposits: [], strategies: [] },

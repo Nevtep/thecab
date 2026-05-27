@@ -92,6 +92,29 @@
     "poolAddress": "Pool address",
     "viewExplorer": "View in explorer"
   },
+  "composition": {
+    "manualDeposits": "Manual deposits",
+    "automatedStrategies": "Automated strategies",
+    "loading": "Loading composition",
+    "unavailable": "Unavailable",
+    "columns": {
+      "id": "ID",
+      "type": "Type",
+      "range": "Range",
+      "staking": "Staking",
+      "underlying": "Underlying assets",
+      "apr": "APR / emissions"
+    },
+    "typeManual": "Manual",
+    "typeAutomated": "Automated",
+    "staked": "Staked",
+    "unstaked": "Unstaked",
+    "closed": "Closed",
+    "managedAutomatically": "Managed automatically",
+    "inRange": "Active",
+    "outOfRange": "Inactive",
+    "rangeUnknown": "Range unknown"
+  },
   "values": {
     "unavailable": "Unavailable",
     "manualExposure": "Manual exposure",

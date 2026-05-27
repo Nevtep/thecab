@@ -1,6 +1,6 @@
 import { readAnalysisStatusContext } from "@/server/analysis/analysis-run.repository";
 import { projectAnalysisStatus } from "@/server/analysis/status-projection";
-import { listPoolSummaries, readPoolHistory, readPoolSummarySeries, readPoolTimeline } from "@/server/pools/pools.repository";
+import { listPoolSummaries, readPoolHistory, readPoolPositions, readPoolSummarySeries, readPoolTimeline } from "@/server/pools/pools.repository";
 import type { PoolDetailRequest, PoolDetailResponse, PoolsListRequest, PoolsListResponse } from "@/server/pools/pools.types";
 
 function dedupe(values: string[]) {
@@ -174,7 +174,7 @@ export async function getPoolDetail(input: PoolDetailRequest): Promise<PoolDetai
     throw new Error("POOLS_REQUEST_FAILED:POOL_NOT_FOUND");
   }
 
-  const [historyRows, timelineRows] = await Promise.all([
+  const [historyRows, timelineRows, positions] = await Promise.all([
     readPoolHistory({
       walletAddress: input.walletAddress,
       chainId: input.chainId,
@@ -185,6 +185,12 @@ export async function getPoolDetail(input: PoolDetailRequest): Promise<PoolDetai
       walletAddress: input.walletAddress,
       chainId: input.chainId,
       poolId: input.poolId,
+    }),
+    readPoolPositions({
+      walletAddress: input.walletAddress,
+      chainId: input.chainId,
+      poolId: input.poolId,
+      fallbackTokenSymbols: summary.tokenSymbols,
     }),
   ]);
   const timelineOffset = input.timelineCursor ? Number.parseInt(input.timelineCursor, 10) : 0;
@@ -270,6 +276,7 @@ export async function getPoolDetail(input: PoolDetailRequest): Promise<PoolDetai
       nextCursor: nextOffset < timelineRows.length ? String(nextOffset) : null,
       hasMore: nextOffset < timelineRows.length,
     },
+    positions,
     related: {
       deposits: timelineItems
         .filter((row) => row.relatedDepositId)

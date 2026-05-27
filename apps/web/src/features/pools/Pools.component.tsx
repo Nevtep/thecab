@@ -21,10 +21,8 @@ import styles from "@/features/pools/PoolsWorkspace.module.css";
 
 export type PoolsExpandedBreakdown = {
   poolId: string;
-  manual: PoolDetailViewModel["segments"]["manual"];
-  strategy: PoolDetailViewModel["segments"]["strategy"];
-  residual: PoolDetailViewModel["segments"]["residual"];
-  strategyLabels: string[];
+  manualDeposits: PoolDetailViewModel["composition"]["manualDeposits"];
+  automatedStrategies: PoolDetailViewModel["composition"]["automatedStrategies"];
 };
 
 type PoolsComponentProps = {
@@ -49,9 +47,9 @@ type PoolsComponentProps = {
   onSelectPool: (poolId: string) => void;
   expandedPoolId: string | null;
   onToggleExpand: (poolId: string) => void;
-  expandedBreakdown: PoolsExpandedBreakdown | null;
-  expandedBreakdownIsLoading: boolean;
-  expandedBreakdownErrorCode: string | null;
+  expandedComposition: PoolsExpandedBreakdown | null;
+  expandedCompositionIsLoading: boolean;
+  expandedCompositionErrorCode: string | null;
 };
 
 export function PoolsComponent(input: PoolsComponentProps) {
@@ -134,9 +132,9 @@ export function PoolsComponent(input: PoolsComponentProps) {
             selectedPoolId={input.selectedPoolId}
             expandedPoolId={input.expandedPoolId}
             onToggleExpand={input.onToggleExpand}
-            expandedBreakdown={input.expandedBreakdown}
-            expandedBreakdownIsLoading={input.expandedBreakdownIsLoading}
-            expandedBreakdownErrorCode={input.expandedBreakdownErrorCode}
+            expandedBreakdown={input.expandedComposition}
+            expandedBreakdownIsLoading={input.expandedCompositionIsLoading}
+            expandedBreakdownErrorCode={input.expandedCompositionErrorCode}
             labels={{
               expandRow: t("pools:actions.expandRow"),
               collapseRow: t("pools:actions.collapseRow"),
@@ -151,12 +149,29 @@ export function PoolsComponent(input: PoolsComponentProps) {
               inRange: t("pools:table.inRange"),
               outOfRange: t("pools:table.outOfRange"),
               unknown: t("pools:values.unavailable"),
-              manualExposure: t("pools:values.manualExposure"),
-              strategyExposure: t("pools:values.strategyExposure"),
-              residualExposure: t("pools:values.residualExposure"),
-              breakdownLoading: t("pools:states.loadingDetail"),
-              breakdownUnavailable: t("pools:values.unavailable"),
-              strategyMetaLabel: t("pools:values.strategy"),
+              composition: {
+                manualDeposits: t("pools:composition.manualDeposits"),
+                automatedStrategies: t("pools:composition.automatedStrategies"),
+                loading: t("pools:composition.loading"),
+                unavailable: t("pools:composition.unavailable"),
+                columns: {
+                  id: t("pools:composition.columns.id"),
+                  type: t("pools:composition.columns.type"),
+                  range: t("pools:composition.columns.range"),
+                  staking: t("pools:composition.columns.staking"),
+                  underlying: t("pools:composition.columns.underlying"),
+                  apr: t("pools:composition.columns.apr"),
+                },
+                typeManual: t("pools:composition.typeManual"),
+                typeAutomated: t("pools:composition.typeAutomated"),
+                staked: t("pools:composition.staked"),
+                unstaked: t("pools:composition.unstaked"),
+                closed: t("pools:composition.closed"),
+                managedAutomatically: t("pools:composition.managedAutomatically"),
+                inRange: t("pools:composition.inRange"),
+                outOfRange: t("pools:composition.outOfRange"),
+                rangeUnknown: t("pools:composition.rangeUnknown"),
+              },
             }}
             getCoverageLabel={(coverageStatus) => t(getPoolsCoverageLabelKey(coverageStatus))}
             onSelect={input.onSelectPool}

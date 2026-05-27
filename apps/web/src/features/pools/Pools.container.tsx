@@ -33,6 +33,7 @@ export function PoolsContainer({ selectedPoolId = null }: { selectedPoolId?: str
   const [filters, setFilters] = useState(() => createDefaultPoolsListFilters());
   const [detailRange, setDetailRange] = useState<PoolDetailRange>("90d");
   const [expandedPoolId, setExpandedPoolId] = useState<string | null>(selectedPoolId);
+  const [collapsedSelectedPoolId, setCollapsedSelectedPoolId] = useState<string | null>(null);
 
   const walletAddress = address?.toLowerCase() ?? "";
   const resolvedChainId = chainId ?? SUPPORTED_CHAIN_ID;
@@ -71,11 +72,19 @@ export function PoolsContainer({ selectedPoolId = null }: { selectedPoolId?: str
     {
       walletAddress,
       chainId: resolvedChainId,
-      poolId: expandedPoolId ?? "",
+      poolId: (selectedPoolId
+        ? collapsedSelectedPoolId === selectedPoolId
+          ? null
+          : selectedPoolId
+        : expandedPoolId) ?? "",
       range: detailRange,
     },
     {
-      enabled: isWalletReady && Boolean(expandedPoolId),
+      enabled: isWalletReady && Boolean(selectedPoolId
+        ? collapsedSelectedPoolId === selectedPoolId
+          ? null
+          : selectedPoolId
+        : expandedPoolId),
     },
   );
 
@@ -104,13 +113,11 @@ export function PoolsContainer({ selectedPoolId = null }: { selectedPoolId?: str
     }
   }, [analysisStatusQuery.data?.status, detailRange, filters, queryClient, resolvedChainId, selectedPoolId, walletAddress]);
 
-  useEffect(() => {
-    if (!selectedPoolId) {
-      return;
-    }
-
-    setExpandedPoolId(selectedPoolId);
-  }, [selectedPoolId]);
+  const resolvedExpandedPoolId = selectedPoolId
+    ? collapsedSelectedPoolId === selectedPoolId
+      ? null
+      : selectedPoolId
+    : expandedPoolId;
 
   const navigationItems = useMemo(
     () => getOverviewNavigationItems((analysisStatusQuery.data?.status ?? "not_analyzed") as never),
@@ -124,20 +131,17 @@ export function PoolsContainer({ selectedPoolId = null }: { selectedPoolId?: str
     () => (detailQuery.data ? mapPoolDetailResponseToViewModel(detailQuery.data, i18n.language) : null),
     [detailQuery.data, i18n.language],
   );
-  const expandedBreakdown = useMemo(() => {
-    if (!expandedPoolId || !expandedDetailQuery.data) {
+  const expandedComposition = useMemo(() => {
+    if (!resolvedExpandedPoolId || !expandedDetailQuery.data) {
       return null;
     }
 
     const vm = mapPoolDetailResponseToViewModel(expandedDetailQuery.data, i18n.language);
     return {
-      poolId: expandedPoolId,
-      manual: vm.segments.manual,
-      strategy: vm.segments.strategy,
-      residual: vm.segments.residual,
-      strategyLabels: vm.header.strategyLabels,
+      poolId: resolvedExpandedPoolId,
+      ...vm.composition,
     };
-  }, [expandedDetailQuery.data, expandedPoolId, i18n.language]);
+  }, [expandedDetailQuery.data, i18n.language, resolvedExpandedPoolId]);
   const screenState = useMemo(() => {
     if (!isWalletReady || analysisStatusQuery.isLoading || poolsQuery.isLoading) {
       return "loading" as const;
@@ -236,13 +240,19 @@ export function PoolsContainer({ selectedPoolId = null }: { selectedPoolId?: str
           });
         }}
         onSelectPool={(poolId) => router.push(`/pools/${poolId}`)}
-        expandedPoolId={expandedPoolId}
-        onToggleExpand={(poolId) =>
-          setExpandedPoolId((current) => (current === poolId ? null : poolId))
-        }
-        expandedBreakdown={expandedBreakdown}
-        expandedBreakdownIsLoading={Boolean(expandedPoolId) && expandedDetailQuery.isLoading}
-        expandedBreakdownErrorCode={
+        expandedPoolId={resolvedExpandedPoolId}
+        onToggleExpand={(poolId) => {
+          if (selectedPoolId === poolId) {
+            setCollapsedSelectedPoolId((current) => (current === poolId ? null : poolId));
+            return;
+          }
+
+          setExpandedPoolId((current) => (current === poolId ? null : poolId));
+          setCollapsedSelectedPoolId(null);
+        }}
+        expandedComposition={expandedComposition}
+        expandedCompositionIsLoading={Boolean(resolvedExpandedPoolId) && expandedDetailQuery.isLoading}
+        expandedCompositionErrorCode={
           expandedDetailQuery.error instanceof Error ? expandedDetailQuery.error.message : null
         }
       />

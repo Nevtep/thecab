@@ -324,6 +324,38 @@ function pushUnique(target: string[], value: string | null) {
   target.push(value);
 }
 
+function pushUniqueCaseInsensitive(target: string[], value: string | null) {
+  if (!value) {
+    return;
+  }
+
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return;
+  }
+
+  const normalized = trimmed.toLowerCase();
+  if (target.some((candidate) => candidate.trim().toLowerCase() === normalized)) {
+    return;
+  }
+
+  target.push(trimmed);
+}
+
+function normalizePoolTokenSymbols(tokenSymbols: string[]) {
+  const normalized: string[] = [];
+
+  for (const tokenSymbol of tokenSymbols) {
+    pushUniqueCaseInsensitive(normalized, tokenSymbol);
+
+    if (normalized.length === 2) {
+      break;
+    }
+  }
+
+  return normalized;
+}
+
 function mergeBooleanState(current: boolean | null, candidate: unknown) {
   if (candidate === true) {
     return true;
@@ -347,7 +379,11 @@ function getOrCreatePoolAccumulator(input: {
   const existing = input.map.get(input.poolId);
   if (existing) {
     for (const tokenSymbol of input.tokenSymbols) {
-      pushUnique(existing.tokenSymbols, tokenSymbol);
+      pushUniqueCaseInsensitive(existing.tokenSymbols, tokenSymbol);
+
+      if (existing.tokenSymbols.length === 2) {
+        break;
+      }
     }
 
     if (!existing.feeTierLabel && input.feeTierLabel) {
@@ -361,7 +397,7 @@ function getOrCreatePoolAccumulator(input: {
     poolId: input.poolId,
     poolAddress: input.poolAddress,
     label: input.label,
-    tokenSymbols: [...input.tokenSymbols],
+    tokenSymbols: normalizePoolTokenSymbols(input.tokenSymbols),
     feeTierLabel: input.feeTierLabel,
     manualValueUsd: 0,
     strategyValueUsd: 0,

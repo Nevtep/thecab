@@ -92,6 +92,29 @@
     "poolAddress": "Dirección del pool",
     "viewExplorer": "Ver en el explorador"
   },
+  "composition": {
+    "manualDeposits": "Depósitos manuales",
+    "automatedStrategies": "Estrategias automatizadas",
+    "loading": "Cargando composición",
+    "unavailable": "No disponible",
+    "columns": {
+      "id": "ID",
+      "type": "Tipo",
+      "range": "Rango",
+      "staking": "Staking",
+      "underlying": "Activos subyacentes",
+      "apr": "APR / emisiones"
+    },
+    "typeManual": "Manual",
+    "typeAutomated": "Automatizada",
+    "staked": "Staked",
+    "unstaked": "Sin staking",
+    "closed": "Cerrado",
+    "managedAutomatically": "Gestionado automáticamente",
+    "inRange": "Activo",
+    "outOfRange": "Inactivo",
+    "rangeUnknown": "Rango desconocido"
+  },
   "values": {
     "unavailable": "No disponible",
     "manualExposure": "Exposición manual",

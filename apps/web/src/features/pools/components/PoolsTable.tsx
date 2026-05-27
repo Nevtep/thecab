@@ -4,6 +4,7 @@ import { createColumnHelper, type ColumnDef, type SortingState } from "@tanstack
 import { useMemo, useState, type MouseEvent } from "react";
 
 import {
+  CabBadge,
   CabCoverageBadge,
   CabIcon,
   DataTable,
@@ -19,6 +20,8 @@ import type { PoolsListViewModel } from "@/features/pools/pools.types";
 import styles from "@/features/pools/components/PoolsTable.module.css";
 
 type PoolRow = PoolsListViewModel["items"][number];
+type ExpandedComposition = NonNullable<PoolsExpandedBreakdown>;
+type CompositionRow = ExpandedComposition["manualDeposits"][number] | ExpandedComposition["automatedStrategies"][number];
 
 const columnHelper = createColumnHelper<PoolRow>();
 
@@ -51,7 +54,63 @@ function toneForReturn(value: number | null) {
   return "neutral" as const;
 }
 
-export function PoolsTable(input: {
+function toneForRangeState(state: CompositionRow["rangeState"]) {
+  switch (state) {
+    case "active":
+      return "success" as const;
+    case "inactive":
+      return "warning" as const;
+    case "managed":
+      return "info" as const;
+    default:
+      return "neutral" as const;
+  }
+}
+
+function toneForStakingState(state: CompositionRow["stakingState"]) {
+  switch (state) {
+    case "staked":
+      return "success" as const;
+    case "unstaked":
+      return "warning" as const;
+    case "closed":
+      return "neutral" as const;
+    default:
+      return "neutral" as const;
+  }
+}
+
+function getTypeLabel(type: CompositionRow["type"], labels: PoolsTableProps["labels"]["composition"]) {
+  return type === "manual" ? labels.typeManual : labels.typeAutomated;
+}
+
+function getRangeLabel(state: CompositionRow["rangeState"], labels: PoolsTableProps["labels"]["composition"]) {
+  switch (state) {
+    case "active":
+      return labels.inRange;
+    case "inactive":
+      return labels.outOfRange;
+    case "managed":
+      return labels.managedAutomatically;
+    default:
+      return labels.rangeUnknown;
+  }
+}
+
+function getStakingLabel(state: CompositionRow["stakingState"], labels: PoolsTableProps["labels"]["composition"]) {
+  switch (state) {
+    case "staked":
+      return labels.staked;
+    case "unstaked":
+      return labels.unstaked;
+    case "closed":
+      return labels.closed;
+    default:
+      return labels.unavailable;
+  }
+}
+
+type PoolsTableProps = {
   items: PoolsListViewModel["items"];
   selectedPoolId?: string | null;
   expandedPoolId: string | null;
@@ -73,16 +132,105 @@ export function PoolsTable(input: {
     inRange: string;
     outOfRange: string;
     unknown: string;
-    manualExposure: string;
-    strategyExposure: string;
-    residualExposure: string;
-    breakdownLoading: string;
-    breakdownUnavailable: string;
-    strategyMetaLabel: string;
+    composition: {
+      manualDeposits: string;
+      automatedStrategies: string;
+      loading: string;
+      unavailable: string;
+      columns: {
+        id: string;
+        type: string;
+        range: string;
+        staking: string;
+        underlying: string;
+        apr: string;
+      };
+      typeManual: string;
+      typeAutomated: string;
+      staked: string;
+      unstaked: string;
+      closed: string;
+      managedAutomatically: string;
+      inRange: string;
+      outOfRange: string;
+      rangeUnknown: string;
+    };
   };
   getCoverageLabel: (coverageStatus: string) => string;
   onSelect: (poolId: string) => void;
+};
+
+function CompositionSection(input: {
+  title: string;
+  rows: CompositionRow[];
+  labels: PoolsTableProps["labels"]["composition"];
 }) {
+  if (input.rows.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className={styles.compositionSection}>
+      <div className={styles.compositionSectionTitle}>{input.title}</div>
+      <div className={styles.compositionTableWrap}>
+        <table className={styles.compositionTable}>
+          <thead>
+            <tr>
+              <th className={styles.compositionHeaderCell}>{input.labels.columns.id}</th>
+              <th className={styles.compositionHeaderCell}>{input.labels.columns.type}</th>
+              <th className={styles.compositionHeaderCell}>{input.labels.columns.range}</th>
+              <th className={styles.compositionHeaderCell}>{input.labels.columns.staking}</th>
+              <th className={styles.compositionHeaderCell}>{input.labels.columns.underlying}</th>
+              <th className={[styles.compositionHeaderCell, styles.compositionHeaderCellNumeric].join(" ")}>{input.labels.columns.apr}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {input.rows.map((row) => (
+              <tr key={row.rowId} className={styles.compositionRow}>
+                <td className={[styles.compositionCell, styles.compositionCellId].join(" ")}>
+                  <div className={styles.compositionIdentifier}>
+                    <span className={styles.compositionIdentifierLabel}>{row.idLabel}</span>
+                    {row.idMeta ? <span className={styles.compositionIdentifierMeta}>{row.idMeta}</span> : null}
+                  </div>
+                </td>
+                <td className={styles.compositionCell}>
+                  <CabBadge tone={row.type === "manual" ? "neutral" : "info"} size="sm">
+                    {getTypeLabel(row.type, input.labels)}
+                  </CabBadge>
+                </td>
+                <td className={styles.compositionCell}>
+                  <div className={styles.compositionStack}>
+                    <CabBadge tone={toneForRangeState(row.rangeState)} size="sm">
+                      {getRangeLabel(row.rangeState, input.labels)}
+                    </CabBadge>
+                    {row.rangeDetail ? <span className={styles.compositionMeta}>{row.rangeDetail}</span> : null}
+                  </div>
+                </td>
+                <td className={styles.compositionCell}>
+                  <CabBadge tone={toneForStakingState(row.stakingState)} size="sm">
+                    {getStakingLabel(row.stakingState, input.labels)}
+                  </CabBadge>
+                </td>
+                <td className={styles.compositionCell}>
+                  <span className={row.underlyingLabel ? styles.compositionUnderlying : styles.compositionMuted}>
+                    {row.underlyingLabel ?? input.labels.unavailable}
+                  </span>
+                </td>
+                <td className={[styles.compositionCell, styles.compositionCellNumeric].join(" ")}>
+                  <span className={row.aprLabel ? styles.compositionApr : styles.compositionMuted}>
+                    {row.aprLabel ?? input.labels.unavailable}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+export function PoolsTable(input: PoolsTableProps) {
   const [sorting, setSorting] = useState<SortingState>([{ id: "value", desc: true }]);
   const columns = useMemo(
     () => [
@@ -243,41 +391,32 @@ export function PoolsTable(input: {
         }
 
         if (input.expandedBreakdownIsLoading && !input.expandedBreakdown) {
-          return <div className={styles.breakdownState}>{input.labels.breakdownLoading}</div>;
+          return <div className={styles.compositionState}>{input.labels.composition.loading}</div>;
         }
 
         if (input.expandedBreakdownErrorCode || !input.expandedBreakdown) {
-          return <div className={styles.breakdownState}>{input.labels.breakdownUnavailable}</div>;
+          return <div className={styles.compositionState}>{input.labels.composition.unavailable}</div>;
         }
 
         const breakdown = input.expandedBreakdown;
-        const strategyMeta = breakdown.strategyLabels.length > 0
-          ? `${input.labels.strategyMetaLabel}: ${breakdown.strategyLabels.join(", ")}`
-          : null;
+        const hasRows = breakdown.manualDeposits.length > 0 || breakdown.automatedStrategies.length > 0;
+
+        if (!hasRows) {
+          return <div className={styles.compositionState}>{input.labels.composition.unavailable}</div>;
+        }
 
         return (
-          <div className={styles.breakdown}>
-            <div className={[styles.breakdownItem, styles.breakdownItemManual].join(" ")}>
-              <span className={styles.breakdownLabel}>{input.labels.manualExposure}</span>
-              <span className={styles.breakdownValue}>{breakdown.manual.formattedCurrentValueUsd}</span>
-              <span className={styles.breakdownMeta}>
-                {input.getCoverageLabel(breakdown.manual.coverageStatus)}
-              </span>
-            </div>
-            <div className={[styles.breakdownItem, styles.breakdownItemStrategy].join(" ")}>
-              <span className={styles.breakdownLabel}>{input.labels.strategyExposure}</span>
-              <span className={styles.breakdownValue}>{breakdown.strategy.formattedCurrentValueUsd}</span>
-              <span className={styles.breakdownMeta}>
-                {strategyMeta ?? input.getCoverageLabel(breakdown.strategy.coverageStatus)}
-              </span>
-            </div>
-            <div className={[styles.breakdownItem, styles.breakdownItemResidual].join(" ")}>
-              <span className={styles.breakdownLabel}>{input.labels.residualExposure}</span>
-              <span className={styles.breakdownValue}>{breakdown.residual.formattedCurrentValueUsd}</span>
-              <span className={styles.breakdownMeta}>
-                {input.getCoverageLabel(breakdown.residual.coverageStatus)}
-              </span>
-            </div>
+          <div className={styles.composition}>
+            <CompositionSection
+              title={input.labels.composition.manualDeposits}
+              rows={breakdown.manualDeposits}
+              labels={input.labels.composition}
+            />
+            <CompositionSection
+              title={input.labels.composition.automatedStrategies}
+              rows={breakdown.automatedStrategies}
+              labels={input.labels.composition}
+            />
           </div>
         );
       }}
