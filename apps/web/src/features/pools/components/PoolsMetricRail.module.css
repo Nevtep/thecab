@@ -2,62 +2,7 @@
   display: grid;
   gap: 12px;
   width: 100%;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
-}
-
-.gaugeCard {
-  position: relative;
-  overflow: hidden;
-  min-height: 128px;
-  border-radius: inherit;
-  padding: 18px;
-}
-
-.gaugeGlow {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.gaugeTopLine {
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 2px;
-  opacity: 0.85;
-}
-
-.gaugeContent {
-  position: relative;
-  z-index: 1;
-}
-
-.gaugeLabel {
-  font-size: 12px;
-}
-
-.gaugeChart {
-  margin-top: -6px;
-}
-
-.gaugeValue {
-  font-size: clamp(26px, 1.45vw, 30px);
-  font-variant-numeric: tabular-nums;
-  line-height: 1.05;
-}
-
-.gaugeMeta {
-  font-size: 12px;
-}
-
-@media (max-width: 1600px) {
-  .grid {
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
-  }
-
-  .gaugeCard {
-    min-height: 120px;
-    padding: 16px;
-  }
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
 }
 
 @media (max-width: 1280px) {

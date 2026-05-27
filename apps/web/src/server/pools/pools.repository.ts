@@ -23,6 +23,61 @@ function asStringArray(value: unknown) {
     : [];
 }
 
+function looksLikeAddressLabel(value: string) {
+  return /^0x[0-9a-f]{40}(\b|$)/i.test(value.trim());
+}
+
+function isPairOnlyLabelWithoutDensity(value: string) {
+  return /^[A-Za-z0-9]+\s*\/\s*[A-Za-z0-9]+$/.test(value.trim());
+}
+
+// Mirrors Aerodrome's pool taxonomy (CL tick spacing | v1 Volatile | v1 Stable).
+// Labels MUST carry a density/type suffix — pair-only labels are forbidden
+// because two pools with the same pair at different densities collide.
+function resolveAerodromeSuffix(input: { feeTierLabel: string | null; poolType: string | null }) {
+  if (input.feeTierLabel && input.feeTierLabel.trim().length > 0) {
+    return input.feeTierLabel.trim();
+  }
+  const type = input.poolType?.trim().toLowerCase() ?? "";
+  if (type === "stable") return "Stable";
+  if (type === "volatile") return "Volatile";
+  return null;
+}
+
+function resolveDisplayPoolLabel(input: {
+  rawLabel: unknown;
+  tokenSymbols: string[];
+  feeTierLabel: string | null;
+  poolType?: string | null;
+}) {
+  const pair = input.tokenSymbols.length >= 2
+    ? `${input.tokenSymbols[0]} / ${input.tokenSymbols[1]}`
+    : null;
+  const suffix = resolveAerodromeSuffix({
+    feeTierLabel: input.feeTierLabel,
+    poolType: input.poolType ?? null,
+  });
+  const synthetic = pair && suffix ? `${pair} ${suffix}` : null;
+
+  if (typeof input.rawLabel === "string" && input.rawLabel.trim().length > 0) {
+    const trimmed = input.rawLabel.trim();
+    if (!looksLikeAddressLabel(trimmed)) {
+      // Reject pair-only stored labels: upgrade to a suffixed label if we
+      // can, otherwise fall through so we never display "TOKEN0 / TOKEN1"
+      // without a density/type suffix.
+      if (isPairOnlyLabelWithoutDensity(trimmed)) {
+        if (suffix) {
+          return `${trimmed} ${suffix}`;
+        }
+      } else {
+        return trimmed;
+      }
+    }
+  }
+
+  return synthetic ?? "Unknown pool";
+}
+
 function normalizeStatus(value: string): PoolsListItem["status"] {
   switch (value) {
     case "active":
@@ -154,7 +209,12 @@ export async function listPoolSummaries(input: {
 
     return {
       poolId: row.poolId,
-      label: typeof metadata.label === "string" ? metadata.label : "Unknown pool",
+      label: resolveDisplayPoolLabel({
+        rawLabel: metadata.label,
+        tokenSymbols: asStringArray(metadata.tokenSymbols),
+        feeTierLabel: typeof metadata.feeTierLabel === "string" ? metadata.feeTierLabel : null,
+        poolType: typeof metadata.poolType === "string" ? metadata.poolType : null,
+      }),
       poolAddress: typeof metadata.poolAddress === "string" ? metadata.poolAddress : "",
       tokenSymbols: asStringArray(metadata.tokenSymbols),
       feeTierLabel: typeof metadata.feeTierLabel === "string" ? metadata.feeTierLabel : null,

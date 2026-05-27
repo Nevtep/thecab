@@ -1,11 +1,7 @@
 .workspace {
   display: grid;
-  gap: 24px;
+  gap: 16px;
   align-items: start;
-}
-
-.withDetail {
-  grid-template-columns: minmax(0, 1fr) clamp(480px, 34vw, 620px);
 }
 
 .listColumn {
@@ -15,22 +11,26 @@
 .detailColumn {
   min-width: 0;
   display: grid;
-  gap: 16px;
+  gap: 12px;
   align-self: start;
-  position: sticky;
-  top: 16px;
 }
 
 .detailBody {
   min-width: 0;
 }
 
-@media (max-width: 1280px) {
+/*
+ * Master-detail side-by-side is opt-in above 1920px. Below that, the detail
+ * rail stacks under the table so each surface keeps a usable width on
+ * regular and laptop displays.
+ */
+@media (min-width: 1920px) {
   .withDetail {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) clamp(520px, 32vw, 720px);
   }
 
-  .detailColumn {
-    position: static;
+  .withDetail .detailColumn {
+    position: sticky;
+    top: 12px;
   }
 }

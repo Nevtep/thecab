@@ -89,7 +89,7 @@ export function PoolsComponent(input: PoolsComponentProps) {
   return (
     <div className={[styles.workspace, input.detailPanel ? styles.withDetail : ""].filter(Boolean).join(" ")}>
       <div className={styles.listColumn}>
-        <CabStack gap="$4">
+        <CabStack gap="$3">
           <CabSectionHeader title={t("pools:title")} subtitle={t("pools:subtitle")} />
           <PoolsFiltersBar
             filters={input.filters}
@@ -98,14 +98,6 @@ export function PoolsComponent(input: PoolsComponentProps) {
               all: t("pools:filters.statusAll"),
               active: t("pools:filters.statusActive"),
               closed: t("pools:filters.statusClosed"),
-              pools: t("pools:totals.pools"),
-              totalValue: t("pools:totals.totalValue"),
-              coveredRange: t("pools:totals.coveredRange"),
-            }}
-            summary={{
-              poolCount: input.viewModel.formattedSummary.poolCount,
-              currentAttributedValueUsd: input.viewModel.formattedSummary.currentAttributedValueUsd,
-              coveredRange: input.viewModel.formattedCoveredRange,
             }}
             onSearchChange={input.onSearchChange}
             onStatusChange={input.onStatusChange}
@@ -139,11 +131,12 @@ export function PoolsComponent(input: PoolsComponentProps) {
               pool: t("pools:title"),
               value: t("pools:table.value"),
               portfolioShare: t("pools:table.portfolioShare"),
-              performance: t("pools:table.performance"),
-              exposure: t("pools:table.exposure"),
+              rewards: t("pools:table.rewards"),
+              apr: t("pools:table.apr"),
+              status: t("pools:table.status"),
+              coverage: t("pools:table.coverage"),
               latestActivity: t("pools:table.latestActivity"),
-              status: t("pools:values.status"),
-              rewards: t("pools:values.rewards"),
+              action: t("pools:table.action"),
               inRange: t("pools:table.inRange"),
               outOfRange: t("pools:table.outOfRange"),
               unknown: t("pools:values.unavailable"),
@@ -155,8 +148,8 @@ export function PoolsComponent(input: PoolsComponentProps) {
       </div>
       {input.detailPanel ? (
         <aside className={styles.detailColumn}>
-          <CabCard density="spacious">
-            <CabStack gap="$3">
+          <CabCard density="compact">
+            <CabStack gap="$2">
               <CabSectionHeader
                 title={t("pools:sections.detail")}
                 subtitle={input.detailPanel.viewModel?.formattedCoveredRange ? `${t("pools:totals.coveredRange")}: ${input.detailPanel.viewModel.formattedCoveredRange}` : undefined}

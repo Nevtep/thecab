@@ -143,6 +143,7 @@ export async function syncMellowStrategies(input: {
         label: strategies.label,
         wrapperAddress: strategies.wrapperAddress,
         stakingRewardsAddress: strategies.stakingRewardsAddress,
+        primaryPoolId: strategies.primaryPoolId,
         coverageStatus: strategies.coverageStatus,
         metadataJson: strategies.metadataJson,
       })
@@ -163,6 +164,12 @@ export async function syncMellowStrategies(input: {
       .map((row) => [normalizeAddress(row.poolAddress), row.id] as const)
       .filter((entry): entry is [string, string] => Boolean(entry[0])),
   );
+  // Label-based lookup is intentionally only used as a last-ditch fallback
+  // when no pool address is available. When multiple pools share the same
+  // human label (e.g. "USDC / cbBTC" at different densities), this map
+  // would silently collapse them and mis-attribute strategies — so callers
+  // must prefer poolIdByAddress whenever the strategy carries an underlying
+  // pool address in its metadata.
   const poolIdByLabel = new Map(
     poolRows.map((row) => [normalizePoolLabel(row.label), row.id] as const)
       .filter((entry): entry is [string, string] => Boolean(entry[0])),
@@ -181,12 +188,39 @@ export async function syncMellowStrategies(input: {
       (wrapperAddress ? (officialByWrapper.get(wrapperAddress) ?? null) : null) ??
       (stakingRewardsAddress ? (officialByStakingRewards.get(stakingRewardsAddress) ?? null) : null);
     const storedPoolLabel = typeof row.metadataJson.poolLabel === "string" ? row.metadataJson.poolLabel : null;
+    const nestedMetadata =
+      typeof row.metadataJson.metadata === "object" && row.metadataJson.metadata !== null
+        ? (row.metadataJson.metadata as Record<string, unknown>)
+        : null;
+    const storedPoolAddress =
+      typeof row.metadataJson.underlyingPoolAddress === "string"
+        ? normalizeAddress(row.metadataJson.underlyingPoolAddress)
+        : nestedMetadata && typeof nestedMetadata.poolAddress === "string"
+          ? normalizeAddress(nestedMetadata.poolAddress)
+          : null;
     const derivedPoolLabel = official ? derivePoolLabelFromStrategyName(official.name) : storedPoolLabel;
     const normalizedStoredPoolLabel = normalizePoolLabel(storedPoolLabel);
     const normalizedDerivedPoolLabel = normalizePoolLabel(derivedPoolLabel);
-    const primaryPoolId = official
+
+    // Resolve primaryPoolId with strict priority:
+    //   1. Official Mellow strategy: use its hard-coded underlyingPoolAddress.
+    //   2. Stored underlying pool address from strategy metadata.
+    //   3. Existing primaryPoolId (set at upsert time from on-chain metadata).
+    //   4. Label-only lookup (last resort, may collide across densities).
+    const officialPoolId = official
       ? (poolIdByAddress.get(official.underlyingPoolAddress) ?? null)
-      : (normalizedStoredPoolLabel ? (poolIdByLabel.get(normalizedStoredPoolLabel) ?? null) : null);
+      : null;
+    const storedAddressPoolId = storedPoolAddress
+      ? (poolIdByAddress.get(storedPoolAddress) ?? null)
+      : null;
+    const labelPoolId =
+      (normalizedStoredPoolLabel ? (poolIdByLabel.get(normalizedStoredPoolLabel) ?? null) : null) ??
+      (normalizedDerivedPoolLabel ? (poolIdByLabel.get(normalizedDerivedPoolLabel) ?? null) : null);
+    const primaryPoolId =
+      officialPoolId ??
+      storedAddressPoolId ??
+      row.primaryPoolId ??
+      labelPoolId;
 
     return {
       row,
@@ -194,9 +228,7 @@ export async function syncMellowStrategies(input: {
       official,
       stakingRewardsAddress: official?.stakingRewardsAddress ?? stakingRewardsAddress,
       poolLabel: derivedPoolLabel,
-      primaryPoolId:
-        primaryPoolId ??
-        (normalizedDerivedPoolLabel ? (poolIdByLabel.get(normalizedDerivedPoolLabel) ?? null) : null),
+      primaryPoolId,
     };
   });
 

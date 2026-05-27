@@ -5,7 +5,6 @@ import { useMemo, useState } from "react";
 
 import {
   CabCoverageBadge,
-  CabStack,
   DataTable,
   DataTablePercentCell,
   DataTableRowActionCell,
@@ -57,11 +56,12 @@ export function PoolsTable(input: {
     pool: string;
     value: string;
     portfolioShare: string;
-    performance: string;
-    exposure: string;
-    latestActivity: string;
-    status: string;
     rewards: string;
+    apr: string;
+    status: string;
+    coverage: string;
+    latestActivity: string;
+    action: string;
     inRange: string;
     outOfRange: string;
     unknown: string;
@@ -75,18 +75,19 @@ export function PoolsTable(input: {
       columnHelper.accessor("label", {
         id: "pool",
         header: () => input.labels.pool,
-        cell: ({ getValue, row }) => (
-          <DataTableStackedCell
-            title={getValue()}
-            subtitle={[
-              row.original.tokenSymbols.join(" / ") || row.original.poolAddress,
-              row.original.feeTierLabel,
-            ]
-              .filter(Boolean)
-              .join(" • ")}
-            align="left"
-          />
-        ),
+        cell: ({ getValue, row }) => {
+          const pair = row.original.tokenSymbols.length >= 2
+            ? `${row.original.tokenSymbols[0]} / ${row.original.tokenSymbols[1]}`
+            : null;
+          const subtitle = [pair, row.original.feeTierLabel].filter(Boolean).join(" • ");
+          return (
+            <DataTableStackedCell
+              title={getValue()}
+              subtitle={subtitle.length > 0 ? subtitle : undefined}
+              align="left"
+            />
+          );
+        },
       }),
       columnHelper.accessor("currentAttributedValueUsd", {
         id: "value",
@@ -105,9 +106,15 @@ export function PoolsTable(input: {
         meta: { numeric: true },
         cell: ({ row }) => <DataTablePercentCell value={row.original.formattedPortfolioSharePct} />,
       }),
+      columnHelper.accessor("totalRewardsUsd", {
+        id: "rewards",
+        header: () => input.labels.rewards,
+        meta: { numeric: true },
+        cell: ({ row }) => <DataTableValueCell primary={row.original.formattedTotalRewardsUsd} />,
+      }),
       columnHelper.accessor("annualizedReturnPct", {
-        id: "performance",
-        header: () => input.labels.performance,
+        id: "apr",
+        header: () => input.labels.apr,
         meta: { numeric: true },
         sortingFn: (left, right) => {
           const leftValue = left.original.annualizedReturnPct ?? Number.NEGATIVE_INFINITY;
@@ -122,20 +129,29 @@ export function PoolsTable(input: {
           />
         ),
       }),
-      columnHelper.accessor("totalRewardsUsd", {
-        id: "rewards",
-        header: () => input.labels.rewards,
-        meta: { numeric: true },
-        cell: ({ row }) => <DataTableValueCell primary={row.original.formattedTotalRewardsUsd} />,
-      }),
-      columnHelper.accessor("exposureMix", {
-        id: "exposure",
-        header: () => input.labels.exposure,
+      columnHelper.display({
+        id: "status",
+        header: () => input.labels.status,
         cell: ({ row }) => (
-          <DataTableStackedCell
-            title={row.original.exposureMix.replaceAll("_", " ")}
-            subtitle={row.original.strategyLabels[0] ?? undefined}
-            align="left"
+          <DataTableStatusCell
+            tone={toneForStatus(row.original.status)}
+            label={
+              row.original.isInRange === true
+                ? input.labels.inRange
+                : row.original.isInRange === false
+                  ? input.labels.outOfRange
+                  : row.original.status
+            }
+          />
+        ),
+      }),
+      columnHelper.display({
+        id: "coverage",
+        header: () => input.labels.coverage,
+        cell: ({ row }) => (
+          <CabCoverageBadge
+            state={row.original.coverageStatus}
+            label={input.getCoverageLabel(row.original.coverageStatus)}
           />
         ),
       }),
@@ -157,30 +173,8 @@ export function PoolsTable(input: {
         ),
       }),
       columnHelper.display({
-        id: "status",
-        header: () => input.labels.status,
-        cell: ({ row }) => (
-          <CabStack gap="$2">
-            <CabCoverageBadge
-              state={row.original.coverageStatus}
-              label={input.getCoverageLabel(row.original.coverageStatus)}
-            />
-            <DataTableStatusCell
-              tone={toneForStatus(row.original.status)}
-              label={
-                row.original.isInRange === true
-                  ? input.labels.inRange
-                  : row.original.isInRange === false
-                    ? input.labels.outOfRange
-                    : row.original.status
-              }
-            />
-          </CabStack>
-        ),
-      }),
-      columnHelper.display({
         id: "actions",
-        header: () => "",
+        header: () => input.labels.action,
         meta: { align: "right" },
         enableSorting: false,
         cell: ({ row }) => (

@@ -200,6 +200,35 @@ function resolveKnownTokenAddress(input: {
   return normalizedSymbol ? (KNOWN_BASE_TOKEN_METADATA[normalizedSymbol]?.address ?? null) : null;
 }
 
+function resolveTokenSymbolByAddress(input: { chainId: number; tokenAddress: unknown }) {
+  if (input.chainId !== 8453) {
+    return null;
+  }
+  const normalizedAddress = normalizeTokenAddress(input.tokenAddress);
+  if (!normalizedAddress) {
+    return null;
+  }
+  for (const [symbol, metadata] of Object.entries(KNOWN_BASE_TOKEN_METADATA)) {
+    if (metadata.address === normalizedAddress) {
+      return symbol.toUpperCase();
+    }
+  }
+  return null;
+}
+
+function deriveTokenSymbolsFromPool(input: {
+  chainId: number;
+  token0Address: unknown;
+  token1Address: unknown;
+}) {
+  const result: string[] = [];
+  const primary = resolveTokenSymbolByAddress({ chainId: input.chainId, tokenAddress: input.token0Address });
+  const secondary = resolveTokenSymbolByAddress({ chainId: input.chainId, tokenAddress: input.token1Address });
+  if (primary) result.push(primary);
+  if (secondary) result.push(secondary);
+  return result;
+}
+
 function resolveKnownTokenDecimals(input: {
   chainId: number;
   tokenAddress: unknown;
@@ -1291,7 +1320,11 @@ export async function materializePoolReadModels(input: MaterializePoolReadModels
       poolId: strategy.primaryPoolId,
       poolAddress: pool.poolAddress,
       label: pool.label,
-      tokenSymbols: [],
+      tokenSymbols: deriveTokenSymbolsFromPool({
+        chainId: input.chainId,
+        token0Address: pool.token0Address,
+        token1Address: pool.token1Address,
+      }),
       feeTierLabel: asString((pool.metadataJson ?? {}).feeTierLabel),
     });
 
@@ -1381,7 +1414,11 @@ export async function materializePoolReadModels(input: MaterializePoolReadModels
       poolId: matchingPoolId,
       poolAddress: pool.poolAddress,
       label: pool.label,
-      tokenSymbols: [],
+      tokenSymbols: deriveTokenSymbolsFromPool({
+        chainId: input.chainId,
+        token0Address: pool.token0Address,
+        token1Address: pool.token1Address,
+      }),
       feeTierLabel: asString((pool.metadataJson ?? {}).feeTierLabel),
     });
     accumulator.hasManual = true;
@@ -1464,7 +1501,11 @@ export async function materializePoolReadModels(input: MaterializePoolReadModels
       poolId: matchingPoolId,
       poolAddress: pool.poolAddress,
       label: pool.label,
-      tokenSymbols: [],
+      tokenSymbols: deriveTokenSymbolsFromPool({
+        chainId: input.chainId,
+        token0Address: pool.token0Address,
+        token1Address: pool.token1Address,
+      }),
       feeTierLabel: asString((pool.metadataJson ?? {}).feeTierLabel),
     });
     accumulator.hasStrategy = true;

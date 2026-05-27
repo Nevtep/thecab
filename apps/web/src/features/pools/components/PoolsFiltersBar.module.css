@@ -1,8 +1,7 @@
 .layout {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   width: 100%;
   flex-wrap: wrap;
 }
@@ -13,56 +12,12 @@
   gap: 8px;
   align-items: center;
   min-width: 0;
-}
-
-.summaryGrid {
-  display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(auto-fit, minmax(148px, max-content));
-  justify-content: end;
-  margin-left: auto;
-}
-
-.summaryCard {
-  min-width: 148px;
-  border-radius: 14px;
-  padding: 11px 13px;
-}
-
-.summaryLabel {
-  font-size: 12px;
-}
-
-.summaryValue {
-  margin-top: 4px;
-  font-size: clamp(13px, 0.92vw, 15px);
-  line-height: 1.3;
-}
-
-@media (max-width: 1280px) {
-  .layout {
-    align-items: stretch;
-  }
-
-  .controls {
-    width: 100%;
-  }
-
-  .summaryGrid {
-    width: 100%;
-    margin-left: 0;
-    justify-content: stretch;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  }
+  flex: 1 1 auto;
 }
 
 @media (max-width: 760px) {
   .controls {
     flex-direction: column;
     align-items: stretch;
-  }
-
-  .summaryGrid {
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   }
 }

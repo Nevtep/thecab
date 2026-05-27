@@ -218,8 +218,96 @@ function resolveKnownPoolTokenAddress(input: {
   return normalizedSymbol ? (KNOWN_BASE_TOKEN_ADDRESSES[normalizedSymbol] ?? null) : null;
 }
 
+function isAddressLikeLabel(label: string) {
+  // Matches a raw 0x… address, optionally followed by extra text (e.g. fee/density suffix).
+  return /^0x[0-9a-f]{40}(\b|$)/i.test(label.trim());
+}
+
+function isPairOnlyLabelWithoutDensity(label: string) {
+  // Matches "TOKEN0 / TOKEN1" without a trailing density/fee tier suffix.
+  // Density is required so identical pairs at different fee tiers don't
+  // collapse to the same label (e.g. USDC / cbBTC at densities 100 and 2000).
+  return /^[A-Za-z0-9]+\s*\/\s*[A-Za-z0-9]+$/.test(label.trim());
+}
+
 function isGenericPoolLabel(label: string | null | undefined) {
-  return typeof label === "string" && /^Aerodrome CL position #\d+$/i.test(label.trim());
+  if (typeof label !== "string") {
+    return false;
+  }
+  const trimmed = label.trim();
+  if (trimmed.length === 0) {
+    return true;
+  }
+  if (/^Aerodrome CL position #\d+$/i.test(trimmed)) {
+    return true;
+  }
+  if (isAddressLikeLabel(trimmed)) {
+    return true;
+  }
+  if (/^Manual protocol position$/i.test(trimmed)) {
+    return true;
+  }
+  if (/^[A-Za-z]+ staked LP$/i.test(trimmed)) {
+    return true;
+  }
+  if (/^[A-Za-z]+ strategy exposure$/i.test(trimmed)) {
+    return true;
+  }
+  if (/^[A-Za-z]+ governance lock$/i.test(trimmed)) {
+    return true;
+  }
+  if (isPairOnlyLabelWithoutDensity(trimmed)) {
+    return true;
+  }
+  return false;
+}
+
+// Aerodrome pool taxonomy (https://aerodrome.finance/docs):
+//   - Slipstream / Concentrated Liquidity (CL): pools created by CLFactory.
+//     Labelled by tick spacing (the "density"): 1, 50, 100, 200, 2000…
+//   - v1 Volatile (vAMM): x*y=k constant-product pool. PoolFactory.stable=false.
+//   - v1 Stable  (sAMM): x³y + y³x = k stable curve. PoolFactory.stable=true.
+//
+// We mirror that taxonomy: every canonical label MUST carry a density-or-type
+// suffix so identical token pairs across pool types/densities never collide.
+function resolveAerodromePoolSuffix(input: {
+  feeTierLabel?: string | null;
+  poolType?: string | null;
+}) {
+  const fee = typeof input.feeTierLabel === "string" ? input.feeTierLabel.trim() : "";
+  if (fee) {
+    return fee;
+  }
+  const type = typeof input.poolType === "string" ? input.poolType.trim().toLowerCase() : "";
+  if (type === "stable") {
+    return "Stable";
+  }
+  if (type === "volatile") {
+    return "Volatile";
+  }
+  return null;
+}
+
+function buildCanonicalPoolLabel(input: {
+  primarySymbol?: string | null;
+  secondarySymbol?: string | null;
+  feeTierLabel?: string | null;
+  poolType?: string | null;
+  fallback?: string | null;
+}) {
+  const primary = typeof input.primarySymbol === "string" ? input.primarySymbol.trim() : "";
+  const secondary = typeof input.secondarySymbol === "string" ? input.secondarySymbol.trim() : "";
+  const suffix = resolveAerodromePoolSuffix(input);
+  if (primary && secondary && suffix) {
+    return `${primary} / ${secondary} ${suffix}`;
+  }
+  // Pair-only labels are forbidden: two pools at different densities (or one
+  // CL + one v1) would collapse into the same display label. Drop to the
+  // caller's fallback so we never emit "TOKEN0 / TOKEN1" without a suffix.
+  if (input.fallback && !isAddressLikeLabel(input.fallback) && !isPairOnlyLabelWithoutDensity(input.fallback)) {
+    return input.fallback;
+  }
+  return null;
 }
 
 function preferPoolLabel(existingLabel: string | null | undefined, incomingLabel: string | null | undefined) {
@@ -544,12 +632,20 @@ export async function persistProtocolPositions(input: {
       const pool = await upsertPool({
         chainId: input.chainId,
         poolAddress,
-        label: position?.poolLabel ?? position?.label ?? `Aerodrome CL position #${tokenId}`,
+        label:
+          buildCanonicalPoolLabel({
+            primarySymbol: position?.primaryTokenSymbol ?? null,
+            secondarySymbol: position?.secondaryTokenSymbol ?? null,
+            feeTierLabel: position?.metadata.feeTierLabel ?? null,
+            poolType: "cl",
+            fallback: position?.poolLabel ?? position?.label ?? null,
+          }) ?? `Aerodrome CL position #${tokenId}`,
         token0Address,
         token1Address,
         metadataJson: {
           protocol: "aerodrome",
           feeTierLabel: position?.metadata.feeTierLabel ?? null,
+          poolType: "cl",
           source: manual ? "manual_current_state" : "manual_lifecycle",
         },
       });
@@ -640,12 +736,20 @@ export async function persistProtocolPositions(input: {
         const pool = await upsertPool({
           chainId: input.chainId,
           poolAddress: strategyPoolAddress,
-          label: position.poolLabel ?? position.strategyLabel ?? position.label,
+          label:
+            buildCanonicalPoolLabel({
+              primarySymbol: position.primaryTokenSymbol,
+              secondarySymbol: position.secondaryTokenSymbol,
+              feeTierLabel: position.metadata.feeTierLabel ?? null,
+              poolType: "cl",
+              fallback: position.poolLabel ?? position.strategyLabel ?? position.label,
+            }) ?? position.strategyLabel ?? position.label,
           token0Address: wrapper?.token0Address,
           token1Address: wrapper?.token1Address,
           metadataJson: {
             protocol: position.protocol,
             feeTierLabel: position.metadata.feeTierLabel,
+            poolType: "cl",
             source: "mellow_wrapper_pool",
           },
         });
