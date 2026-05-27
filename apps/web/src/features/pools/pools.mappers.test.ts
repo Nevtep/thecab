@@ -37,6 +37,7 @@ function createListResponse(overrides: Partial<PoolsListResponse> = {}): PoolsLi
         poolAddress: "0xabc",
         tokenSymbols: ["WETH", "cbBTC"],
         feeTierLabel: "0.05%",
+        poolType: "cl",
         protocolFamily: "aerodrome",
         status: "active",
         exposureMix: "manual",
@@ -76,6 +77,8 @@ function createDetailResponse(): PoolDetailResponse {
       poolAddress: "0xabc",
       tokenSymbols: ["WETH", "cbBTC"],
       feeTierLabel: "0.05%",
+      poolType: "cl",
+      protocolFamily: "aerodrome",
       status: "active",
       currentAttributedValueUsd: 5_000,
       capitalInvestedUsd: 4_500,
@@ -87,6 +90,7 @@ function createDetailResponse(): PoolDetailResponse {
       realizedPnlUsd: null,
       unrealizedPnlUsd: 500,
       annualizedReturnPct: 18.5,
+      isInRange: true,
       coverageStatus: "share_level",
       coverageReasonCodes: ["share_level_strategy"],
       strategyLabels: ["Mellow steakhouse"],
@@ -186,6 +190,8 @@ test("mapPoolsListResponseToViewModel handles zero-value summary safely", () => 
 test("mapPoolDetailResponseToViewModel formats header, segments, chart, and timeline", () => {
   const vm = mapPoolDetailResponseToViewModel(createDetailResponse(), "en-US");
   assert.match(vm.header.formattedCurrentAttributedValueUsd, /\$5,000/);
+  assert.equal(vm.header.formattedProtocolFamily, "Aerodrome");
+  assert.equal(vm.header.formattedPoolType, "CL");
   assert.match(vm.segments.manual.formattedCurrentValueUsd, /\$3,000/);
   assert.match(vm.segments.strategy.formattedCurrentValueUsd, /\$2,000/);
   assert.equal(vm.chart.length, 1);

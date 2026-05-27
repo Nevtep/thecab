@@ -101,6 +101,7 @@ export function PoolDetailContainer({ poolId }: { poolId: string }) {
         viewModel={viewModel}
         errorCode={detailQuery.error instanceof Error ? detailQuery.error.message : null}
         range={range}
+        onClose={() => router.push("/pools")}
         onRangeChange={setRange}
         onRetry={() => void detailQuery.refetch()}
       />

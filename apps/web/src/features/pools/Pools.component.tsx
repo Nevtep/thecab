@@ -3,17 +3,13 @@
 import { useTranslation } from "react-i18next";
 
 import {
-  CabButton,
   CabCard,
-  CabCoverageBadge,
   CabEmptyState,
   CabErrorPanel,
   CabLoadingPanel,
   CabSectionHeader,
   CabStack,
-  CabText,
 } from "@/design-system";
-import { cabColors } from "@/design-system/tokens";
 import { PoolDetailComponent } from "@/features/pools/PoolDetail.component";
 import { PoolsFiltersBar } from "@/features/pools/components/PoolsFiltersBar";
 import { PoolsMetricRail } from "@/features/pools/components/PoolsMetricRail";
@@ -47,9 +43,6 @@ type PoolsComponentProps = {
 
 export function PoolsComponent(input: PoolsComponentProps) {
   const { t } = useTranslation(["pools", "coverage"]);
-  const detailReasonLabels = input.detailPanel?.viewModel?.header.coverageReasonCodes.map((reasonCode) =>
-    t(`coverage:reasons.${reasonCode}`, { defaultValue: reasonCode }),
-  ) ?? [];
 
   if (input.screenState === "loading") {
     return <CabLoadingPanel label={t("pools:states.loading")} />;
@@ -148,52 +141,18 @@ export function PoolsComponent(input: PoolsComponentProps) {
       </div>
       {input.detailPanel ? (
         <aside className={styles.detailColumn}>
-          <CabCard density="compact">
-            <CabStack gap="$2">
-              <CabSectionHeader
-                title={t("pools:sections.detail")}
-                subtitle={input.detailPanel.viewModel?.formattedCoveredRange ? `${t("pools:totals.coveredRange")}: ${input.detailPanel.viewModel.formattedCoveredRange}` : undefined}
-                actions={(
-                  <CabButton tone="ghost" controlSize="sm" onPress={input.detailPanel.onClose}>
-                    {t("pools:actions.closeDetail")}
-                  </CabButton>
-                )}
-              />
-              {input.detailPanel.viewModel ? (
-                <CabStack gap="$2">
-                  <CabStack row gap="$2" flexWrap="wrap" alignItems="center">
-                    <CabCoverageBadge
-                      state={input.detailPanel.viewModel.header.coverageStatus}
-                      label={t(getPoolsCoverageLabelKey(input.detailPanel.viewModel.header.coverageStatus))}
-                    />
-                    <CabText variant="caption" color={cabColors.text.secondary}>
-                      {t("pools:values.status")}: {input.detailPanel.viewModel.header.status}
-                    </CabText>
-                  </CabStack>
-                  {detailReasonLabels.length > 0 ? (
-                    <CabText variant="caption" color={cabColors.text.secondary}>
-                      {detailReasonLabels.join(" • ")}
-                    </CabText>
-                  ) : null}
-                  {input.detailPanel.viewModel.header.strategyLabels.length > 0 ? (
-                    <CabText variant="caption" color={cabColors.text.secondary}>
-                      {t("pools:values.strategy")}: {input.detailPanel.viewModel.header.strategyLabels.join(", ")}
-                    </CabText>
-                  ) : null}
-                </CabStack>
-              ) : null}
-            </CabStack>
-          </CabCard>
           <div className={styles.detailBody}>
+            <CabCard density="compact">
             <PoolDetailComponent
               screenState={input.detailPanel.screenState}
               viewModel={input.detailPanel.viewModel}
               errorCode={input.detailPanel.errorCode}
               range={input.detailPanel.range}
-              embedded
+              onClose={input.detailPanel.onClose}
               onRangeChange={input.detailPanel.onRangeChange}
               onRetry={input.detailPanel.onRetry}
             />
+            </CabCard>
           </div>
         </aside>
       ) : null}

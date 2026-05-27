@@ -1,6 +1,10 @@
 "use client";
 
-import { CabPoolValueChart } from "@/design-system";
+import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
+
+import { CabLineChart } from "@/design-system";
+import { cabColors } from "@/design-system/tokens";
 
 export function PoolHistoryChart(input: {
   data: Array<{
@@ -12,5 +16,27 @@ export function PoolHistoryChart(input: {
   }>;
   title: string;
 }) {
-  return <CabPoolValueChart data={input.data} title={input.title} />;
+  const { i18n } = useTranslation();
+  const chartData = useMemo(() => {
+    const formatter = new Intl.DateTimeFormat(i18n.language, {
+      month: "short",
+      day: "numeric",
+    });
+
+    return input.data.map((point) => ({
+      dateLabel: formatter.format(new Date(point.timestamp)),
+      deployedValueUsd: point.deployedValueUsd,
+    }));
+  }, [i18n.language, input.data]);
+
+  return (
+    <CabLineChart
+      data={chartData}
+      xKey="dateLabel"
+      series={[{ key: "deployedValueUsd", label: input.title, color: cabColors.brandExtended.signalTealUi }]}
+      title={input.title}
+      height={180}
+      ariaLabel={input.title}
+    />
+  );
 }

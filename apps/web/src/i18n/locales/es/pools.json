@@ -4,6 +4,10 @@
   "sections": {
     "detail": "Detalle del pool",
     "history": "Evolución del valor del pool",
+    "performance": "Rendimiento del pool",
+    "exposure": "Mezcla de exposición",
+    "events": "Eventos recientes",
+    "metadata": "Metadatos del pool",
     "composition": "Composición",
     "related": "Enlaces relacionados",
     "timeline": "Línea de tiempo"
@@ -75,13 +79,28 @@
   "messages": {
     "estimatedMetrics": "Algunas métricas de Pools se estiman a partir de la composición actual y de la línea de tiempo analizada de eventos.",
     "confidence": "Confianza",
-    "activeInRangeMeta": "{{active}} de {{total}} pools activas en rango"
+    "activeInRangeMeta": "{{active}} de {{total}} pools activas en rango",
+    "noRelevantEvents": "No hay eventos recientes de alta señal en este pool."
+  },
+  "detail": {
+    "protocolLabel": "Protocolo",
+    "poolType": "Tipo de pool",
+    "feeTier": "Fee tier",
+    "tokenPair": "Par de tokens",
+    "poolAddress": "Dirección del pool",
+    "viewExplorer": "Ver en el explorador"
   },
   "values": {
     "unavailable": "No disponible",
     "manualExposure": "Exposición manual",
     "strategyExposure": "Estrategia automatizada",
     "residualExposure": "Atribución residual",
+    "inRange": "En rango",
+    "outOfRange": "Fuera de rango",
+    "statusActive": "Activo",
+    "statusInactive": "Inactivo",
+    "statusClosed": "Cerrado",
+    "statusUnknown": "Desconocido",
     "status": "Estado",
     "rewards": "Recompensas",
     "capitalIn": "Capital entrante",

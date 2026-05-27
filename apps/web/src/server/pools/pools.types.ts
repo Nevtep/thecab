@@ -37,6 +37,7 @@ export type PoolsListItem = {
   poolAddress: string;
   tokenSymbols: string[];
   feeTierLabel: string | null;
+  poolType: string | null;
   protocolFamily: string;
   status: "active" | "inactive" | "closed" | "unknown";
   exposureMix: "manual" | "automated" | "mixed" | "residual_only" | "unknown";
@@ -130,6 +131,8 @@ export type PoolDetailResponse = {
     poolAddress: string;
     tokenSymbols: string[];
     feeTierLabel: string | null;
+    poolType: string | null;
+    protocolFamily: string;
     status: "active" | "inactive" | "closed" | "unknown";
     currentAttributedValueUsd: number;
     capitalInvestedUsd: number;
@@ -141,6 +144,7 @@ export type PoolDetailResponse = {
     realizedPnlUsd: number | null;
     unrealizedPnlUsd: number | null;
     annualizedReturnPct: number | null;
+    isInRange: boolean | null;
     coverageStatus: "full" | "share_level" | "partial" | "unknown";
     coverageReasonCodes: string[];
     strategyLabels: string[];

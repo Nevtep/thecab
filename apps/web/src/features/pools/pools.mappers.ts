@@ -1,3 +1,4 @@
+import { getExplorerBaseUrl } from "@/chains/chains";
 import { formatCompactNumber, formatDateTime, formatDayRange, formatPercent, formatUsd } from "@/i18n/formatters";
 
 import type { PoolDetailResponse, PoolsListResponse } from "@/features/pools/pools.types";
@@ -17,6 +18,39 @@ function formatInvestedDays(value: number | null, locale: string) {
     unitDisplay: "short",
     maximumFractionDigits: 0,
   }).format(Math.max(1, Math.round(value)));
+}
+
+function formatAddressLabel(value: string) {
+  if (!value.startsWith("0x") || value.length < 12) {
+    return value;
+  }
+
+  return `${value.slice(0, 6)}...${value.slice(-4)}`;
+}
+
+function formatProtocolFamily(value: string) {
+  return value
+    .split(/[_\s-]+/)
+    .filter(Boolean)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(" ");
+}
+
+function formatPoolType(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  switch (value.trim().toLowerCase()) {
+    case "cl":
+      return "CL";
+    case "stable":
+      return "Stable";
+    case "volatile":
+      return "Volatile";
+    default:
+      return value.trim();
+  }
 }
 
 export function mapPoolsListResponseToViewModel(response: PoolsListResponse, locale: string) {
@@ -57,11 +91,26 @@ export function mapPoolsListResponseToViewModel(response: PoolsListResponse, loc
 }
 
 export function mapPoolDetailResponseToViewModel(response: PoolDetailResponse, locale: string) {
+  const explorerUrl = response.header.poolAddress
+    ? `${getExplorerBaseUrl(response.chainId)}/address/${response.header.poolAddress}`
+    : null;
+  const formattedPoolType = formatPoolType(response.header.poolType);
+
   return {
     ...response,
     formattedCoveredRange: formatDayRange(response.coveredRange.startDayUtc, response.coveredRange.endDayUtc, locale),
     header: {
       ...response.header,
+      formattedProtocolFamily: formatProtocolFamily(response.header.protocolFamily),
+      formattedPoolType,
+      formattedProtocolMetadata: [
+        formatProtocolFamily(response.header.protocolFamily),
+        formattedPoolType,
+        response.header.feeTierLabel,
+      ].filter((value): value is string => Boolean(value && value.trim().length > 0)).join(" • "),
+      formattedTokenPair: response.header.tokenSymbols.join(" / "),
+      shortPoolAddress: formatAddressLabel(response.header.poolAddress),
+      explorerUrl,
       formattedCurrentAttributedValueUsd: formatUsd(response.header.currentAttributedValueUsd, locale),
       formattedCapitalInvestedUsd: formatUsd(response.header.capitalInvestedUsd, locale),
       formattedCapitalEnteredUsd: formatUsd(response.header.capitalEnteredUsd, locale),

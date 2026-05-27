@@ -218,6 +218,7 @@ export async function listPoolSummaries(input: {
       poolAddress: typeof metadata.poolAddress === "string" ? metadata.poolAddress : "",
       tokenSymbols: asStringArray(metadata.tokenSymbols),
       feeTierLabel: typeof metadata.feeTierLabel === "string" ? metadata.feeTierLabel : null,
+      poolType: typeof metadata.poolType === "string" ? metadata.poolType : null,
       protocolFamily: "aerodrome",
       status,
       exposureMix: normalizeExposureMix(row.exposureMix),

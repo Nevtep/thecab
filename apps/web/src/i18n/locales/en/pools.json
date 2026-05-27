@@ -4,6 +4,10 @@
   "sections": {
     "detail": "Pool detail",
     "history": "Pool value evolution",
+    "performance": "Pool performance",
+    "exposure": "Exposure mix",
+    "events": "Recent events",
+    "metadata": "Pool metadata",
     "composition": "Composition",
     "related": "Related links",
     "timeline": "Timeline"
@@ -75,13 +79,28 @@
   "messages": {
     "estimatedMetrics": "Some Pools metrics are estimated from the current component composition and the analyzed event timeline.",
     "confidence": "Confidence",
-    "activeInRangeMeta": "{{active}} of {{total}} active pools in range"
+    "activeInRangeMeta": "{{active}} of {{total}} active pools in range",
+    "noRelevantEvents": "No recent high-signal events in the selected pool."
+  },
+  "detail": {
+    "protocolLabel": "Protocol",
+    "poolType": "Pool type",
+    "feeTier": "Fee tier",
+    "tokenPair": "Token pair",
+    "poolAddress": "Pool address",
+    "viewExplorer": "View in explorer"
   },
   "values": {
     "unavailable": "Unavailable",
     "manualExposure": "Manual exposure",
     "strategyExposure": "Automated strategy",
     "residualExposure": "Residual attribution",
+    "inRange": "In range",
+    "outOfRange": "Out of range",
+    "statusActive": "Active",
+    "statusInactive": "Inactive",
+    "statusClosed": "Closed",
+    "statusUnknown": "Unknown",
     "status": "Status",
     "rewards": "Rewards",
     "capitalIn": "Capital in",

@@ -1,7 +1,22 @@
+.headerMetaRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.headerRangeRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .summaryGrid {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr));
 }
 
 @media (max-width: 900px) {
@@ -11,6 +26,10 @@
 }
 
 @media (max-width: 540px) {
+  .headerRangeRow {
+    align-items: stretch;
+  }
+
   .summaryGrid {
     grid-template-columns: minmax(0, 1fr);
   }
