@@ -193,7 +193,7 @@ export function CabImpactMetricCard({
               variant="caption"
               fontSize={labelFontSize}
               color={accentColor}
-              style={{ marginTop: size === "compact" ? 6 : 2 }}
+              style={{ marginTop: size === "compact" ? 14 : 2 }}
             >
               {meta}
             </CabText>

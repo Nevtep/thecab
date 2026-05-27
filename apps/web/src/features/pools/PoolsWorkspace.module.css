@@ -24,9 +24,9 @@
  * rail stacks under the table so each surface keeps a usable width on
  * regular and laptop displays.
  */
-@media (min-width: 1920px) {
+@media (min-width: 1921px) {
   .withDetail {
-    grid-template-columns: minmax(0, 1fr) clamp(520px, 32vw, 720px);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .withDetail .detailColumn {
