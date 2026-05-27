@@ -24,6 +24,7 @@ import {
   CabText,
   CabTopNav,
   CabTooltip,
+  CabImpactMetricCard,
   ConnectedShell,
 } from "@/design-system";
 import { formatDateTime, formatPercent, formatRelativeTime, formatUsd } from "@/i18n/formatters";
@@ -40,7 +41,6 @@ import {
   mapOverviewAnalysisStatusToBadgeStatus,
 } from "@/features/overview/overview.mappers";
 import { CapitalAllocationSection } from "@/features/overview/CapitalAllocationSection";
-import { OverviewImpactMetricCard } from "@/features/overview/OverviewImpactMetricCard";
 import { portfolioEvolutionSeriesMeta } from "@/features/overview/portfolio-evolution/portfolioEvolution.meta";
 import { buildPortfolioEvolutionModel } from "@/features/overview/portfolio-evolution/portfolioEvolution.utils";
 import { PortfolioEvolutionSection } from "@/features/overview/portfolio-evolution/PortfolioEvolutionSection.component";
@@ -901,7 +901,7 @@ export function OverviewComponent({
               </>
             ) : (
               <>
-                <OverviewImpactMetricCard
+                <CabImpactMetricCard
                   label={t("metrics.netPortfolioValue")}
                   value={formatCurrencyValue(netPortfolioMetricValueUsd, locale, t("states.unavailableValue"))}
                   iconName="dashboard"
@@ -909,21 +909,21 @@ export function OverviewComponent({
                   series={portfolioEvolutionModel?.data.map((point) => point.totalValueUsd) ?? []}
                   meta={changeOverSelectedPeriodPct === null ? null : formatPercent(changeOverSelectedPeriodPct, locale)}
                 />
-                <OverviewImpactMetricCard
+                <CabImpactMetricCard
                   label={t("metrics.deployedValue")}
                   value={formatCurrencyValue(deployedMetricValueUsd, locale, t("states.unavailableValue"))}
                   iconName="arrowUpToLine"
                   accentColor={portfolioEvolutionSeriesMeta.deployed.color}
                   series={portfolioEvolutionModel?.data.map((point) => point.deployedValueUsd) ?? []}
                 />
-                <OverviewImpactMetricCard
+                <CabImpactMetricCard
                   label={t("metrics.idleValue")}
                   value={formatCurrencyValue(idleMetricValueUsd, locale, t("states.unavailableValue"))}
                   iconName="wallet"
                   accentColor={portfolioEvolutionSeriesMeta.idle.color}
                   series={portfolioEvolutionModel?.data.map((point) => point.idleValueUsd) ?? []}
                 />
-                <OverviewImpactMetricCard
+                <CabImpactMetricCard
                   label={t("metrics.estimatedRealizedRewards")}
                   value={formatCurrencyValue(estimatedRealizedRewardsMetricValueUsd, locale, t("states.unavailableValue"))}
                   iconName="rewards"

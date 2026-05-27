@@ -1,9 +1,13 @@
 "use client";
 
-import { CabCard, CabIcon, CabStack, CabText, type CabIconName } from "@/design-system";
+import { CabCard } from "@/design-system/primitives/CabCard";
+import { CabIcon } from "@/design-system/icons/CabIcon";
+import type { CabIconName } from "@/design-system/icons/iconRegistry";
+import { CabStack } from "@/design-system/primitives/CabStack";
+import { CabText } from "@/design-system/primitives/CabText";
 import { cabColors } from "@/design-system/tokens";
 
-type OverviewImpactMetricCardProps = {
+export type CabImpactMetricCardProps = {
   label: string;
   value: string;
   iconName: CabIconName;
@@ -56,7 +60,7 @@ function buildSparkline(series: Array<number | null>, width: number, height: num
   };
 }
 
-export function OverviewImpactMetricCard({
+export function CabImpactMetricCard({
   label,
   value,
   iconName,
@@ -64,10 +68,11 @@ export function OverviewImpactMetricCard({
   series = [],
   meta,
   size = "default",
-}: OverviewImpactMetricCardProps) {
+}: CabImpactMetricCardProps) {
+  const normalizedValueLength = value.trim().length;
   const sparklineHeight = size === "default" ? 84 : 64;
   const sparkline = buildSparkline(series, 240, sparklineHeight, 8);
-  const gradientId = `overview-impact-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${size}`;
+  const gradientId = `cab-impact-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${size}`;
   const contentPadding = size === "default" ? 18 : 14;
   const sparklineWidth = size === "default" ? 220 : 136;
   const sparklineDisplayHeight = size === "default" ? 82 : 46;
@@ -75,7 +80,12 @@ export function OverviewImpactMetricCard({
   const iconRadius = size === "default" ? 12 : 10;
   const iconGlyphSize = size === "default" ? 16 : 14;
   const labelFontSize = size === "default" ? 12 : 11;
-  const valueFontSize = size === "default" ? "clamp(28px, 1.45vw, 32px)" : "clamp(21px, 1.18vw, 24px)";
+  const compactValueFontSize = normalizedValueLength >= 18
+    ? "clamp(16px, 0.95vw, 18px)"
+    : normalizedValueLength >= 14
+      ? "clamp(18px, 1vw, 20px)"
+      : "clamp(21px, 1.18vw, 24px)";
+  const valueFontSize = size === "default" ? "clamp(28px, 1.45vw, 32px)" : compactValueFontSize;
   const valueMaxWidth = size === "default" ? "calc(100% - 72px)" : "100%";
 
   return (
@@ -171,13 +181,20 @@ export function OverviewImpactMetricCard({
               fontVariantNumeric: "tabular-nums",
               lineHeight: 1.05,
               maxWidth: valueMaxWidth,
+              marginTop: size === "compact" ? 14 : 0,
+              whiteSpace: "nowrap",
             }}
           >
             {value}
           </CabText>
 
           {meta ? (
-            <CabText variant="caption" fontSize={labelFontSize} color={accentColor}>
+            <CabText
+              variant="caption"
+              fontSize={labelFontSize}
+              color={accentColor}
+              style={{ marginTop: size === "compact" ? 6 : 2 }}
+            >
               {meta}
             </CabText>
           ) : null}

@@ -1,8 +1,7 @@
 "use client";
 
-import { CabCard, CabEmptyState, CabStack } from "@/design-system";
+import { CabCard, CabEmptyState, CabImpactMetricCard, CabStack } from "@/design-system";
 import { cabColors } from "@/design-system/tokens";
-import { OverviewImpactMetricCard } from "@/features/overview/OverviewImpactMetricCard";
 import type { OverviewRange, OverviewViewModel } from "@/features/overview/overview.types";
 import {
   PortfolioEvolutionChart,
@@ -203,7 +202,7 @@ export function PortfolioEvolutionSection({
             gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
           }}
         >
-          <OverviewImpactMetricCard
+          <CabImpactMetricCard
             label={t("portfolioEvolution.footer.accumulatedRewards")}
             value={resolvedModel.footer.accumulatedRewardsUsd === null ? t("states.unavailableValue") : formatUsd(resolvedModel.footer.accumulatedRewardsUsd, locale)}
             iconName="rewards"
@@ -211,7 +210,7 @@ export function PortfolioEvolutionSection({
             series={filteredData.map((point) => point.cumulativeRewardValueUsd)}
             size="compact"
           />
-          <OverviewImpactMetricCard
+          <CabImpactMetricCard
             label={t("portfolioEvolution.footer.capitalMoved")}
             value={resolvedModel.footer.capitalMovedBetweenStatesUsd === null ? t("states.unavailableValue") : formatUsd(resolvedModel.footer.capitalMovedBetweenStatesUsd, locale)}
             iconName="refreshCcw"
@@ -219,7 +218,7 @@ export function PortfolioEvolutionSection({
             series={capitalMovedSeries}
             size="compact"
           />
-          <OverviewImpactMetricCard
+          <CabImpactMetricCard
             label={t("portfolioEvolution.footer.latestEvent")}
             value={resolvedModel.footer.latestEvent ? t(`portfolioEvolution.events.${getPortfolioEvolutionEventLabelKeySuffix(resolvedModel.footer.latestEvent.type)}`) : t("states.unavailableValue")}
             iconName={resolvedModel.footer.latestEvent ? portfolioEvolutionEventIcons[resolvedModel.footer.latestEvent.type] : "activity"}
@@ -228,7 +227,7 @@ export function PortfolioEvolutionSection({
             meta={resolvedModel.footer.latestEvent ? formatRelativeTime(resolvedModel.footer.latestEvent.occurredAt, locale) : t("portfolioEvolution.footer.noEvents")}
             size="compact"
           />
-          <OverviewImpactMetricCard
+          <CabImpactMetricCard
             label={t("portfolioEvolution.footer.maxIdle")}
             value={resolvedModel.footer.maxIdleValueUsd === null ? t("states.unavailableValue") : formatUsd(resolvedModel.footer.maxIdleValueUsd, locale)}
             iconName="wallet"

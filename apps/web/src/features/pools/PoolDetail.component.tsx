@@ -8,6 +8,7 @@ import {
   CabCoverageBadge,
   CabEmptyState,
   CabErrorPanel,
+  CabImpactMetricCard,
   CabLoadingPanel,
   CabRangeSelector,
   CabSectionHeader,
@@ -15,7 +16,6 @@ import {
   CabText,
 } from "@/design-system";
 import { cabColors } from "@/design-system/tokens";
-import { OverviewImpactMetricCard } from "@/features/overview/OverviewImpactMetricCard";
 import { PoolExposureBar } from "@/features/pools/components/PoolExposureBar";
 import { PoolHistoryChart } from "@/features/pools/components/PoolHistoryChart";
 import { PoolMetadataFooter } from "@/features/pools/components/PoolMetadataFooter";
@@ -166,21 +166,21 @@ export function PoolDetailComponent(input: PoolDetailComponentProps) {
         </CabStack>
       </CabStack>
       <div className={styles.summaryGrid}>
-        <OverviewImpactMetricCard
+        <CabImpactMetricCard
           label={t("pools:metrics.currentValue")}
           value={header.formattedCurrentAttributedValueUsd}
           iconName="dashboard"
           accentColor={cabColors.brand.electricBlue}
           size="compact"
         />
-        <OverviewImpactMetricCard
+        <CabImpactMetricCard
           label={t("pools:metrics.totalRewards")}
           value={header.formattedTotalRewardsUsd}
           iconName="rewards"
           accentColor={cabColors.dataViz.mint}
           size="compact"
         />
-        <OverviewImpactMetricCard
+        <CabImpactMetricCard
           label={t("pools:metrics.apr")}
           value={header.formattedAnnualizedReturnPct ?? t("pools:values.unavailable")}
           iconName="activity"
@@ -188,7 +188,7 @@ export function PoolDetailComponent(input: PoolDetailComponentProps) {
           meta={header.formattedTotalReturnPct}
           size="compact"
         />
-        <OverviewImpactMetricCard
+        <CabImpactMetricCard
           label={t("pools:metrics.timeInvested")}
           value={header.formattedInvestedDays ?? t("pools:values.unavailable")}
           iconName="info"

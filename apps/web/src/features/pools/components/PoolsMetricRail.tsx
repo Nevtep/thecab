@@ -1,8 +1,7 @@
 "use client";
 
-import { CabKpiStrip } from "@/design-system";
+import { CabImpactMetricCard, CabKpiStrip } from "@/design-system";
 import { cabColors } from "@/design-system/tokens";
-import { OverviewImpactMetricCard } from "@/features/overview/OverviewImpactMetricCard";
 
 import styles from "@/features/pools/components/PoolsMetricRail.module.css";
 
@@ -40,7 +39,7 @@ export function PoolsMetricRail(input: {
   return (
     <CabKpiStrip>
       <div className={styles.grid}>
-        <OverviewImpactMetricCard
+        <CabImpactMetricCard
           label={input.labels.poolsWithPosition}
           value={input.values.poolCount}
           iconName="pools"
@@ -49,7 +48,7 @@ export function PoolsMetricRail(input: {
           meta={input.values.activePoolCount}
           size="compact"
         />
-        <OverviewImpactMetricCard
+        <CabImpactMetricCard
           label={input.labels.currentValue}
           value={input.values.currentAttributedValueUsd}
           iconName="dashboard"
@@ -57,7 +56,7 @@ export function PoolsMetricRail(input: {
           series={input.series.currentAttributedValueUsd}
           size="compact"
         />
-        <OverviewImpactMetricCard
+        <CabImpactMetricCard
           label={input.labels.impermanentLoss}
           value={input.values.estimatedImpermanentLossUsd ?? input.labels.unavailable}
           iconName="warning"
@@ -65,7 +64,7 @@ export function PoolsMetricRail(input: {
           series={[]}
           size="compact"
         />
-        <OverviewImpactMetricCard
+        <CabImpactMetricCard
           label={input.labels.rewards}
           value={input.values.totalRewardsUsd}
           iconName="rewards"
@@ -73,7 +72,7 @@ export function PoolsMetricRail(input: {
           series={input.series.totalRewardsUsd}
           size="compact"
         />
-        <OverviewImpactMetricCard
+        <CabImpactMetricCard
           label={input.labels.estimatedReturn}
           value={input.values.weightedAnnualizedReturnPct ?? input.labels.unavailable}
           iconName="activity"
@@ -81,7 +80,7 @@ export function PoolsMetricRail(input: {
           series={input.series.estimatedAnnualizedReturnPct}
           size="compact"
         />
-        <OverviewImpactMetricCard
+        <CabImpactMetricCard
           label={input.labels.activeInRange}
           value={input.values.activeInRangePoolCount}
           iconName="activity"
