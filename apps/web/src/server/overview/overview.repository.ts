@@ -17,6 +17,7 @@ import {
   walletContexts,
 } from "@/server/db/schema";
 import type { OverviewRequest } from "@/server/overview/overview.types";
+import { AERODROME_CL_POSITION_MANAGER_ADDRESS } from "@/server/protocol-positions/protocolMetadata";
 
 function normalizeAddress(value: unknown) {
   return typeof value === "string" && /^0x[a-fA-F0-9]{40}$/.test(value)
@@ -151,6 +152,36 @@ export async function readOverviewFreshness(input: ScopedWalletInput) {
     .limit(1);
 
   return rows[0] ?? null;
+}
+
+export async function readOverviewActiveAerodromePositionTokenIds(input: ScopedWalletInput) {
+  const positionManagerAddress = AERODROME_CL_POSITION_MANAGER_ADDRESS[input.chainId] ?? null;
+
+  if (!positionManagerAddress) {
+    return [] as string[];
+  }
+
+  const db = getDb();
+  const rows = await db
+    .select({ tokenId: deposits.tokenId })
+    .from(deposits)
+    .where(
+      and(
+        eq(deposits.walletAddress, input.walletAddress.toLowerCase()),
+        eq(deposits.chainId, input.chainId),
+        eq(deposits.positionManagerAddress, positionManagerAddress),
+        sql`${deposits.tokenId} is not null`,
+        sql`${deposits.status} <> 'closed'`,
+      ),
+    );
+
+  return Array.from(
+    new Set(
+      rows
+        .map((row) => row.tokenId)
+        .filter((tokenId): tokenId is string => typeof tokenId === "string" && tokenId.length > 0),
+    ),
+  );
 }
 
 export async function upsertOverviewFreshness(

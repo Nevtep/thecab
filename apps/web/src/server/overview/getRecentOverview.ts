@@ -18,6 +18,7 @@ import {
   getLatestOverviewPortfolioSnapshot,
   readLatestOverviewPricePoints,
   readKnownProtocolContracts,
+  readOverviewActiveAerodromePositionTokenIds,
   readOverviewAnalyzedPortfolioSnapshots,
   readRecentOverviewAnalyzedActivity,
   readOverviewPricePointsInRange,
@@ -1201,7 +1202,7 @@ export async function getRecentOverviewActivity(input: OverviewRequest): Promise
 
 export async function getRecentOverviewProtocolPositions(input: OverviewRequest): Promise<OverviewResponse> {
   const response = createEmptyRecentOverviewResponse(input);
-  const [tokensResult, historyResult, defiPositionsResult, latestRun, freshness, protocolMetadata] = await Promise.all([
+  const [tokensResult, historyResult, defiPositionsResult, latestRun, freshness, protocolMetadata, activeAerodromeTokenIds] = await Promise.all([
     getWalletTokens(input.walletAddress, input.chainId).then(
       (value) => ({ status: "fulfilled" as const, value }),
       (error) => ({ status: "rejected" as const, reason: sanitizeProviderError(error) }),
@@ -1217,6 +1218,7 @@ export async function getRecentOverviewProtocolPositions(input: OverviewRequest)
     getLatestAnalysisRun(input.walletAddress, input.chainId),
     readOverviewFreshness(input),
     readKnownProtocolContracts({ chainId: input.chainId }),
+    readOverviewActiveAerodromePositionTokenIds(input),
   ]);
 
   if (
@@ -1310,6 +1312,7 @@ export async function getRecentOverviewProtocolPositions(input: OverviewRequest)
     walletTokens: tokens,
     defiPositions,
     history,
+    manualPositionTokenIds: activeAerodromeTokenIds,
     now,
   });
 
@@ -2501,7 +2504,7 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
   const bucketConfig = getRecentOverviewBucketConfig(input.range);
   const bucketTimestamps = buildBucketTimestamps(input.range, now);
   const rangeStartAt = new Date(bucketTimestamps[0] ?? now.toISOString());
-  const [tokensResult, historyResult, defiPositionsResult, latestRun, freshness, protocolMetadata, realizedRewardRows] = await Promise.all([
+  const [tokensResult, historyResult, defiPositionsResult, latestRun, freshness, protocolMetadata, activeAerodromeTokenIds, realizedRewardRows] = await Promise.all([
     getWalletTokens(input.walletAddress, input.chainId).then(
       (value) => ({ status: "fulfilled" as const, value }),
       (error) => ({ status: "rejected" as const, reason: sanitizeProviderError(error) }),
@@ -2517,6 +2520,7 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
     getLatestAnalysisRun(input.walletAddress, input.chainId),
     readOverviewFreshness(input),
     readKnownProtocolContracts({ chainId: input.chainId }),
+    readOverviewActiveAerodromePositionTokenIds(input),
     readOverviewRealizedRewardEvents({
       walletAddress: input.walletAddress,
       chainId: input.chainId,
@@ -2793,6 +2797,7 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
     walletTokens: tokens,
     defiPositions,
     history,
+    manualPositionTokenIds: activeAerodromeTokenIds,
     now,
   });
   if (protocolPositions.artifacts.manualCurrentState) {

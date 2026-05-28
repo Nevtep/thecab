@@ -285,6 +285,26 @@ function promoteReconstructedStakedRows(input: {
   });
 }
 
+export function collectAerodromeManualPositionTokenIds(input: {
+  reconstructedRows: Array<Pick<OverviewProtocolPosition, "protocol" | "family" | "tokenId">>;
+  hintedTokenIds?: string[];
+}) {
+  return Array.from(
+    new Set([
+      ...(input.hintedTokenIds ?? []).filter((tokenId) => typeof tokenId === "string" && tokenId.length > 0),
+      ...input.reconstructedRows
+        .filter(
+          (row) =>
+            row.protocol === "aerodrome" &&
+            (row.family === "manual_deposit" || row.family === "staked_lp") &&
+            typeof row.tokenId === "string" &&
+            row.tokenId.length > 0,
+        )
+        .map((row) => row.tokenId as string),
+    ]),
+  );
+}
+
 export async function detectProtocolPositions(input: {
   walletAddress: string;
   chainId: number;
@@ -292,6 +312,7 @@ export async function detectProtocolPositions(input: {
   walletTokens: MoralisDefiPositionRecord[];
   defiPositions: MoralisDefiPositionRecord[];
   history: MoralisHistoryRecord[];
+  manualPositionTokenIds?: string[];
   now?: Date;
 }): Promise<DetectProtocolPositionsResult> {
   const now = input.now ?? new Date();
@@ -302,19 +323,10 @@ export async function detectProtocolPositions(input: {
     protocolMetadata: buildProtocolMetadataIndex(input.chainId, input.protocolContracts),
     now,
   });
-  const manualTokenIds = Array.from(
-    new Set(
-      reconstructed.rows
-        .filter(
-          (row) =>
-            row.protocol === "aerodrome" &&
-            row.family === "manual_deposit" &&
-            typeof row.tokenId === "string" &&
-            row.tokenId.length > 0,
-        )
-        .map((row) => row.tokenId as string),
-    ),
-  );
+  const manualTokenIds = collectAerodromeManualPositionTokenIds({
+    reconstructedRows: reconstructed.rows,
+    hintedTokenIds: input.manualPositionTokenIds,
+  });
   const manualCurrentState = await readAerodromeManualPositions({
     walletAddress: input.walletAddress,
     chainId: input.chainId,
