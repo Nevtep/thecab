@@ -90,7 +90,8 @@
     "feeTier": "Fee tier",
     "tokenPair": "Par de tokens",
     "poolAddress": "Dirección del pool",
-    "viewExplorer": "Ver en el explorador"
+    "viewExplorer": "Ver en el explorador",
+    "viewDeposits": "Ver depósitos en este pool"
   },
   "composition": {
     "manualDeposits": "Depósitos manuales",

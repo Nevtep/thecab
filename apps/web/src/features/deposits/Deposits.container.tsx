@@ -1,7 +1,8 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
@@ -15,6 +16,7 @@ import {
 import { getOverviewNavigationItems } from "@/features/overview/overview.mappers";
 import { DepositsComponent, type DepositsScreenState } from "@/features/deposits/Deposits.component";
 import { mapDepositsListResponseToViewModel } from "@/features/deposits/deposits.mappers";
+import { getStrategiesListHref } from "@/features/deposits/deposits.navigation";
 import type {
   DepositsReturnSignFilter,
   DepositsSortDirection,
@@ -30,13 +32,24 @@ import {
 } from "@/features/deposits/deposits.urlState";
 import { useDepositsViewPreferences } from "@/features/deposits/deposits.viewPrefs";
 import { useAnalysisStatusQuery, useDepositsListQuery } from "@/queries/hooks";
+import { queryKeys } from "@/queries/keys";
 import { SUPPORTED_CHAIN_ID } from "@/wallet/supportedChains";
 import { useCabWallet } from "@/wallet/useCabWallet";
 
+function isPendingAnalysisStatus(status: string | null) {
+  return status === "queued" || status === "running";
+}
+
+function isSettledAnalysisStatus(status: string | null) {
+  return status === "ready" || status === "stale" || status === "failed" || status === "not_analyzed";
+}
+
 export function DepositsContainer() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const { t, i18n } = useTranslation(["deposits", "navigation"]);
+  const previousAnalysisStatusRef = useRef<string | null>(null);
   const { address, chainId, isConnected, isAuthenticated, isSupportedChain, isAuthReady } = useCabWallet();
 
   const walletAddress = address?.toLowerCase() ?? "";
@@ -78,6 +91,35 @@ export function DepositsContainer() {
     [analysisStatusQuery.data?.status],
   );
 
+  useEffect(() => {
+    const nextStatus = analysisStatusQuery.data?.status ?? null;
+    const previousStatus = previousAnalysisStatusRef.current;
+
+    previousAnalysisStatusRef.current = nextStatus;
+
+    if (!walletAddress || !previousStatus || previousStatus === nextStatus) {
+      return;
+    }
+
+    if (!isPendingAnalysisStatus(previousStatus) || !isSettledAnalysisStatus(nextStatus)) {
+      return;
+    }
+
+    void queryClient.invalidateQueries({
+      queryKey: queryKeys.deposits({
+        chainId: resolvedChainId,
+        walletAddress,
+        filters: urlState as unknown as Record<string, unknown>,
+      }),
+    });
+
+    if (urlState.selectedDepositId) {
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.depositDetail(resolvedChainId, urlState.selectedDepositId),
+      });
+    }
+  }, [analysisStatusQuery.data?.status, queryClient, resolvedChainId, urlState, walletAddress]);
+
   const screenState: DepositsScreenState = useMemo(() => {
     if (!isWalletReady || analysisStatusQuery.isLoading || depositsQuery.isLoading) {
       return "loading";
@@ -94,7 +136,7 @@ export function DepositsContainer() {
         : "error";
     }
 
-    if (!depositsQuery.data || depositsQuery.data.items.length === 0) {
+    if (!depositsQuery.data || depositsQuery.data.summary.totalCount === 0) {
       return "empty";
     }
 
@@ -131,6 +173,22 @@ export function DepositsContainer() {
     [pushUrlState, urlState],
   );
 
+  const onClearPool = useCallback(() => {
+    pushUrlState({ ...urlState, poolId: null, page: 1 });
+  }, [pushUrlState, urlState]);
+
+  const onStartDayChange = useCallback((value: string | null) => {
+    pushUrlState({ ...urlState, startDayUtc: value, page: 1 });
+  }, [pushUrlState, urlState]);
+
+  const onEndDayChange = useCallback((value: string | null) => {
+    pushUrlState({ ...urlState, endDayUtc: value, page: 1 });
+  }, [pushUrlState, urlState]);
+
+  const onClearDateRange = useCallback(() => {
+    pushUrlState({ ...urlState, startDayUtc: null, endDayUtc: null, page: 1 });
+  }, [pushUrlState, urlState]);
+
   const onSortChange = useCallback(
     (sort: DepositsSortField, direction: DepositsSortDirection) => {
       pushUrlState({ ...urlState, sort, direction });
@@ -140,14 +198,41 @@ export function DepositsContainer() {
 
   const onSelectRow = useCallback(
     (depositId: string) => {
+      if (typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches) {
+        const currentQuery = serializeDepositsListUrlState(urlState);
+        const returnTo = currentQuery ? `/deposits?${currentQuery}` : "/deposits";
+        router.push(`/deposits/${depositId}?chainId=${resolvedChainId}&returnTo=${encodeURIComponent(returnTo)}`);
+        return;
+      }
       pushUrlState({ ...urlState, selectedDepositId: depositId });
     },
-    [pushUrlState, urlState],
+    [pushUrlState, resolvedChainId, router, urlState],
   );
+
+  const onCloseDetail = useCallback(() => {
+    const selectedRow = typeof document !== "undefined"
+      ? (document.querySelector('tr[aria-selected="true"]') as HTMLElement | null)
+      : null;
+
+    pushUrlState({ ...urlState, selectedDepositId: null });
+
+    if (selectedRow) {
+      requestAnimationFrame(() => {
+        selectedRow.focus();
+      });
+    }
+  }, [pushUrlState, urlState]);
 
   const onRetry = useCallback(() => {
     void depositsQuery.refetch();
   }, [depositsQuery]);
+
+  const onOpenStrategies = useCallback(() => {
+    const href = getStrategiesListHref();
+    if (href) {
+      router.push(href);
+    }
+  }, [router]);
 
   // Reference unused helper to indicate intentional API surface for downstream wiring.
   void buildDepositsApiQueryString;
@@ -186,18 +271,28 @@ export function DepositsContainer() {
         viewModel={viewModel}
         locale={i18n.language}
         status={urlState.status}
+        poolId={urlState.poolId}
+        startDayUtc={urlState.startDayUtc}
+        endDayUtc={urlState.endDayUtc}
         returnSign={urlState.returnSign}
         sort={urlState.sort}
         direction={urlState.direction}
         density={preferences.density}
         hiddenColumns={preferences.hiddenColumns}
         selectedDepositId={urlState.selectedDepositId}
+        selectedDepositReturnTo={serializeDepositsListUrlState(urlState) ? `/deposits?${serializeDepositsListUrlState(urlState)}` : "/deposits"}
         errorCode={depositsQuery.error instanceof Error ? depositsQuery.error.message : null}
         onRetry={onRetry}
         onStatusChange={onStatusChange}
+        onClearPool={onClearPool}
+        onStartDayChange={onStartDayChange}
+        onEndDayChange={onEndDayChange}
+        onClearDateRange={onClearDateRange}
         onReturnSignChange={onReturnSignChange}
         onSortChange={onSortChange}
         onSelectRow={onSelectRow}
+        onCloseDetail={onCloseDetail}
+        onOpenStrategies={onOpenStrategies}
       />
     </ConnectedShell>
   );

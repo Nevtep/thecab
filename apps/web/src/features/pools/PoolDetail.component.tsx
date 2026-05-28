@@ -32,6 +32,7 @@ type PoolDetailComponentProps = {
   range: PoolDetailRange;
   onClose: () => void;
   onRangeChange: (range: PoolDetailRange) => void;
+  onOpenDeposits?: () => void;
   onRetry: () => void;
 };
 
@@ -81,6 +82,7 @@ export function PoolDetailComponent(input: PoolDetailComponentProps) {
   const detailReasonLabels = header.coverageReasonCodes.map((reasonCode) =>
     t(`coverage:reasons.${reasonCode}`, { defaultValue: reasonCode }),
   );
+  const hasManualDeposits = input.viewModel.positions.manualDeposits.length > 0;
   const rangeStatusLabel = header.isInRange === null
     ? null
     : header.isInRange
@@ -144,6 +146,11 @@ export function PoolDetailComponent(input: PoolDetailComponentProps) {
             <CabText variant="caption" color={cabColors.text.secondary}>
               {t("pools:values.strategy")}: {header.strategyLabels.join(", ")}
             </CabText>
+          ) : null}
+          {hasManualDeposits && input.onOpenDeposits ? (
+            <CabButton tone="secondary" controlSize="sm" onPress={input.onOpenDeposits}>
+              {t("pools:detail.viewDeposits")}
+            </CabButton>
           ) : null}
           <div className={styles.headerRangeRow}>
             <CabText variant="caption" color={cabColors.text.secondary}>

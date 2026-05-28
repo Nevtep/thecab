@@ -51,6 +51,19 @@
     "protocolValuationPartial": "Some protocol positions have partial or unavailable valuation",
     "strategyShareLevelOnly": "Some strategy positions are only available at share level",
     "governanceValueUnavailable": "Governance locks remain visible even without a defendable USD value",
-    "positionMetadataIncomplete": "Some protocol positions have incomplete metadata"
+    "positionMetadataIncomplete": "Some protocol positions have incomplete metadata",
+    "transferInOrigin": "This position entered the wallet by transfer-in",
+    "unattributedResidual": "Some return remains unattributed",
+    "priceUnavailable": "No defendable historical price was available",
+    "rangeUnavailable": "Range metadata is unavailable for this position",
+    "priceFallbackDca": "A nearest historical price fallback was used",
+    "coverageGap": "There is a gap in covered history",
+    "lowConfidenceClassification": "Some event classification is lower confidence"
+  },
+  "confidence": {
+    "high": "High confidence",
+    "medium": "Medium confidence",
+    "degraded": "Degraded confidence",
+    "unknown": "Unknown confidence"
   }
 }

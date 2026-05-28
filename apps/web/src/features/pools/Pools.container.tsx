@@ -10,6 +10,7 @@ import { getOverviewNavigationItems } from "@/features/overview/overview.mappers
 import { PoolsComponent } from "@/features/pools/Pools.component";
 import { mapPoolDetailResponseToViewModel, mapPoolsListResponseToViewModel } from "@/features/pools/pools.mappers";
 import { createDefaultPoolsListFilters } from "@/features/pools/pools.queries";
+import { buildDepositsPoolHref } from "@/features/deposits/deposits.navigation"; // Import buildDepositsPoolHref
 import type { PoolDetailRange } from "@/features/pools/pools.types";
 import { useAnalysisStatusQuery, usePoolDetailQuery, usePoolsQuery } from "@/queries/hooks";
 import { queryKeys } from "@/queries/keys";
@@ -225,6 +226,7 @@ export function PoolsContainer({ selectedPoolId = null }: { selectedPoolId?: str
           errorCode: detailQuery.error instanceof Error ? detailQuery.error.message : null,
           range: detailRange,
           onRangeChange: setDetailRange,
+          onOpenDeposits: () => router.push(buildDepositsPoolHref({ chainId: resolvedChainId, poolId: selectedPoolId })), // Added onOpenDeposits
           onRetry: () => void detailQuery.refetch(),
           onClose: () => router.push("/pools"),
         } : null}

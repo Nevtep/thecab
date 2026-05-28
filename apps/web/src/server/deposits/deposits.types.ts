@@ -1,16 +1,34 @@
-export type DepositsAnalysisStatus = "ready" | "stale";
+import type {
+  DepositConfidence,
+  DepositCoverageStatus,
+  DepositLifecycleEventType,
+  DepositPoolKind,
+  DepositPriceSource,
+  DepositSummaryStatus,
+  DepositValueChartGapReasonCode,
+  DepositValueChartSeriesKey,
+  DepositsAnalysisStatus,
+  DepositsReturnSignFilter,
+  DepositsSortDirection,
+  DepositsSortField,
+  DepositsStatusFilter,
+} from "@/server/deposits/deposits.contract";
 
-export type DepositsStatusFilter = "all" | "open_active" | "open_out_of_range" | "closed";
-export type DepositsReturnSignFilter = "all" | "positive" | "negative";
-export type DepositsSortField =
-  | "openedAt"
-  | "currentValue"
-  | "totalReturn"
-  | "totalRewards"
-  | "estApr";
-export type DepositsSortDirection = "asc" | "desc";
-
-export type DepositSummaryStatus = "open_active" | "open_out_of_range" | "closed";
+export type {
+  DepositConfidence,
+  DepositCoverageStatus,
+  DepositLifecycleEventType,
+  DepositPoolKind,
+  DepositPriceSource,
+  DepositSummaryStatus,
+  DepositValueChartGapReasonCode,
+  DepositValueChartSeriesKey,
+  DepositsAnalysisStatus,
+  DepositsReturnSignFilter,
+  DepositsSortDirection,
+  DepositsSortField,
+  DepositsStatusFilter,
+};
 
 export type DepositsListRequest = {
   walletAddress: string;
@@ -37,7 +55,7 @@ export type DepositSummaryView = {
   poolId: string;
   poolLabel: string;
   positionLabel: string;
-  poolKind: "cl" | "basic_stable" | "basic_volatile" | "unknown";
+  poolKind: DepositPoolKind;
   feeTierBps: number | null;
   tokenId: string | null;
   token0Symbol: string | null;
@@ -59,11 +77,12 @@ export type DepositSummaryView = {
   isInRange: boolean | null;
   rangeLowerPrice: number | null;
   rangeUpperPrice: number | null;
-  coverageStatus: "full" | "share_level" | "partial" | "unknown";
-  confidence: "high" | "medium" | "degraded" | "unknown";
+  coverageStatus: DepositCoverageStatus;
+  confidence: DepositConfidence;
   coverageReasonCodes: string[];
   coveredStartDayUtc: string | null;
   coveredEndDayUtc: string | null;
+  mellowStrategyCrossLinkId?: string | null;
 };
 
 export type DepositsListSummary = {
@@ -75,8 +94,83 @@ export type DepositsListSummary = {
   totalRewardsUsd: number;
   weightedAnnualizedReturnPct: number | null;
   capitalDeployedPctOfManual: number | null;
-  coverageStatus: "full" | "share_level" | "partial" | "unknown";
+  hasAutomatedExposure: boolean;
+  coverageStatus: DepositCoverageStatus;
   coverageReasonCodes: string[];
+};
+
+export type DepositLifecycleTokenDelta = {
+  tokenAddress: string | null;
+  symbol: string | null;
+  direction: "in" | "out";
+  amountRaw: string;
+  amountFormatted: string | null;
+  usdValue: number | null;
+  priceSource: DepositPriceSource | null;
+};
+
+export type DepositLifecycleEventView = {
+  id: string;
+  sequenceIndex: number;
+  eventType: DepositLifecycleEventType;
+  occurredAt: string;
+  txHash: string;
+  logIndex: number;
+  blockNumber: number;
+  usdValue: number | null;
+  signedTokenDeltas: DepositLifecycleTokenDelta[];
+  priceSource: DepositPriceSource | null;
+  confidence: DepositConfidence;
+  inferredActionId: string | null;
+  coverageReasonCodes: string[];
+  metadata: Record<string, unknown>;
+};
+
+export type DepositPerformanceDecompositionView = {
+  totalReturnUsd: number;
+  rewardsUsd: number;
+  feesUsd: number;
+  assetPriceEffectUsd: number;
+  rebalanceEffectUsd: number;
+  realizedPnlUsd: number;
+  unrealizedPnlUsd: number;
+  unattributedUsd: number;
+  unattributedReasonCodes: string[];
+  componentPercentages: Record<string, number>;
+};
+
+export type DepositValueChartPoint = {
+  occurredAt: string;
+  usd: number;
+  lifecycleEventId: string | null;
+};
+
+export type DepositValueChartSeries = {
+  key: DepositValueChartSeriesKey;
+  points: DepositValueChartPoint[];
+};
+
+export type DepositValueChartGap = {
+  fromOccurredAt: string;
+  toOccurredAt: string;
+  reasonCode: DepositValueChartGapReasonCode;
+};
+
+export type DepositValueChartView = {
+  series: DepositValueChartSeries[];
+  gaps: DepositValueChartGap[];
+};
+
+export type DepositDetailView = DepositSummaryView & {
+  tickLower: number | null;
+  tickUpper: number | null;
+  token0Address: string | null;
+  token1Address: string | null;
+  capitalEnteredUsd: number;
+  capitalWithdrawnUsd: number;
+  decomposition: DepositPerformanceDecompositionView;
+  lifecycle: DepositLifecycleEventView[];
+  mellowStrategyCrossLinkId: string | null;
 };
 
 export type DepositsCoveredRange = {
@@ -103,5 +197,7 @@ export type DepositDetailResponse = {
   walletAddress: string;
   chainId: number;
   analysisStatus: DepositsAnalysisStatus;
-  deposit: DepositSummaryView;
+  coveredRange: DepositsCoveredRange;
+  deposit: DepositDetailView;
+  valueChart: DepositValueChartView;
 };

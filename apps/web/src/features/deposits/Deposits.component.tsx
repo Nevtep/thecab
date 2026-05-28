@@ -1,18 +1,24 @@
 "use client";
 
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
 import {
+  CabCard,
+  CabDashboardGrid,
   CabEmptyState,
   CabErrorPanel,
   CabLoadingPanel,
   CabSectionHeader,
   CabStack,
+  DataTableEmptyState,
 } from "@/design-system";
+import { DepositDetailContainer } from "@/features/deposits/DepositDetail.container";
 import { DepositsEmptyState } from "@/features/deposits/components/DepositsEmptyState";
 import { DepositsFiltersBar } from "@/features/deposits/components/DepositsFiltersBar";
 import { DepositsKpiStrip } from "@/features/deposits/components/DepositsKpiStrip";
 import { DepositsTable } from "@/features/deposits/components/DepositsTable";
+import { getStrategiesListHref } from "@/features/deposits/deposits.navigation";
 import type { DepositsListViewModel } from "@/features/deposits/deposits.mappers";
 import type {
   DepositsReturnSignFilter,
@@ -33,22 +39,53 @@ type DepositsComponentProps = {
   viewModel: DepositsListViewModel | null;
   locale: string;
   status: DepositsStatusFilter;
+  poolId: string | null;
+  startDayUtc: string | null;
+  endDayUtc: string | null;
   returnSign: DepositsReturnSignFilter;
   sort: DepositsSortField;
   direction: DepositsSortDirection;
   density: DepositsTableDensity;
   hiddenColumns: DepositsTableColumnKey[];
   selectedDepositId: string | null;
+  selectedDepositReturnTo: string | null;
   errorCode: string | null;
   onRetry: () => void;
   onStatusChange: (value: DepositsStatusFilter) => void;
+  onClearPool: () => void;
+  onStartDayChange: (value: string | null) => void;
+  onEndDayChange: (value: string | null) => void;
+  onClearDateRange: () => void;
   onReturnSignChange: (value: DepositsReturnSignFilter) => void;
   onSortChange: (sort: DepositsSortField, direction: DepositsSortDirection) => void;
   onSelectRow: (depositId: string) => void;
+  onCloseDetail: () => void;
+  onOpenStrategies: () => void;
 };
 
 export function DepositsComponent(input: DepositsComponentProps) {
+  const { onCloseDetail, selectedDepositId } = input;
   const { t } = useTranslation(["deposits"]);
+
+  useEffect(() => {
+    if (!selectedDepositId) {
+      return;
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") {
+        return;
+      }
+
+      event.preventDefault();
+      onCloseDetail();
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [onCloseDetail, selectedDepositId]);
 
   if (input.screenState === "loading") {
     return <CabLoadingPanel label={t("deposits:list.loading")} />;
@@ -75,12 +112,16 @@ export function DepositsComponent(input: DepositsComponentProps) {
   }
 
   if (input.screenState === "empty" || !input.viewModel) {
+    const hasAutomatedExposure = input.viewModel?.summary.hasAutomatedExposure ?? false;
+    const strategiesHref = getStrategiesListHref();
     return (
       <DepositsEmptyState
-        title={t("deposits:list.empty.title")}
-        description={t("deposits:list.empty.description")}
-        actionLabel={t("deposits:list.empty.actionLabel")}
-        onAction={input.onRetry}
+        title={hasAutomatedExposure ? t("deposits:list.emptyAutomated.title") : t("deposits:list.empty.title")}
+        description={hasAutomatedExposure ? t("deposits:list.emptyAutomated.description") : t("deposits:list.empty.description")}
+        actionLabel={hasAutomatedExposure ? t("deposits:list.emptyAutomated.actionLabel") : t("deposits:list.empty.actionLabel")}
+        onAction={hasAutomatedExposure && strategiesHref ? input.onOpenStrategies : input.onRetry}
+        actionDisabled={hasAutomatedExposure && !strategiesHref}
+        actionHint={hasAutomatedExposure ? t("deposits:strategiesCrossLink.placeholder") : undefined}
       />
     );
   }
@@ -112,8 +153,16 @@ export function DepositsComponent(input: DepositsComponentProps) {
     confidence: t("deposits:list.columns.confidence"),
   };
 
+  const filteredEmptyState = (
+    <DataTableEmptyState
+      title={t("deposits:list.filteredEmpty.title")}
+      description={t("deposits:list.filteredEmpty.description")}
+    />
+  );
+
   return (
     <CabStack gap="$4">
+      {/* Deposits keeps coverage inline per row/detail; it must not mount a duplicate global coverage banner. */}
       <CabSectionHeader title={t("deposits:title")} subtitle={t("deposits:subtitle")} />
       <DepositsKpiStrip
         summary={input.viewModel.summary}
@@ -129,6 +178,9 @@ export function DepositsComponent(input: DepositsComponentProps) {
       />
       <DepositsFiltersBar
         status={input.status}
+        poolId={input.poolId}
+        startDayUtc={input.startDayUtc}
+        endDayUtc={input.endDayUtc}
         returnSign={input.returnSign}
         labels={{
           status: {
@@ -144,8 +196,27 @@ export function DepositsComponent(input: DepositsComponentProps) {
             positive: t("deposits:list.filters.returnSign.positive"),
             negative: t("deposits:list.filters.returnSign.negative"),
           },
+          pool: {
+            label: t("deposits:list.filters.pool.label"),
+            active: t("deposits:list.filters.pool.active"),
+            clear: t("deposits:list.filters.pool.clear"),
+            all: t("deposits:list.filters.pool.all"),
+          },
+          dateRange: {
+            label: t("deposits:list.filters.dateRange.label"),
+            start: t("deposits:list.filters.dateRange.start"),
+            end: t("deposits:list.filters.dateRange.end"),
+            clear: t("deposits:list.filters.dateRange.clear"),
+          },
+          more: {
+            label: t("deposits:list.filters.more"),
+          },
         }}
         onStatusChange={input.onStatusChange}
+        onClearPool={input.onClearPool}
+        onStartDayChange={input.onStartDayChange}
+        onEndDayChange={input.onEndDayChange}
+        onClearDateRange={input.onClearDateRange}
         onReturnSignChange={input.onReturnSignChange}
       />
       <DepositsTable
@@ -163,9 +234,21 @@ export function DepositsComponent(input: DepositsComponentProps) {
             tooltip: t("deposits:transferIn.tooltip"),
           },
         }}
+        emptyState={filteredEmptyState}
         onSortChange={input.onSortChange}
         onSelectRow={input.onSelectRow}
       />
+      {input.selectedDepositId ? (
+        <CabDashboardGrid>
+          <CabCard density="spacious">
+            <DepositDetailContainer
+              depositId={input.selectedDepositId}
+              onClose={input.onCloseDetail}
+              backHref={input.selectedDepositReturnTo}
+            />
+          </CabCard>
+        </CabDashboardGrid>
+      ) : null}
     </CabStack>
   );
 }

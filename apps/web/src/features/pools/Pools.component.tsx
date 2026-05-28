@@ -40,6 +40,7 @@ type PoolsComponentProps = {
     onRangeChange: (range: PoolDetailRange) => void;
     onRetry: () => void;
     onClose: () => void;
+    onOpenDeposits?: () => void; // Added onOpenDeposits
   } | null;
   onRetry: () => void;
   onSearchChange: (value: string) => void;
@@ -190,6 +191,7 @@ export function PoolsComponent(input: PoolsComponentProps) {
               onClose={input.detailPanel.onClose}
               onRangeChange={input.detailPanel.onRangeChange}
               onRetry={input.detailPanel.onRetry}
+              onOpenDeposits={input.detailPanel.onOpenDeposits} // Pass onOpenDeposits to PoolDetailComponent
             />
             </CabCard>
           </div>

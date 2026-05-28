@@ -1,7 +1,22 @@
 {
   "title": "Depósitos",
-  "subtitle": "Ciclo de vida por posición, retornos y contabilidad de pérdida impermanente para tus posiciones manuales en Aerodrome.",
+  "subtitle": "Ciclo de vida por posición, retornos y contabilidad de pérdida impermanente para posiciones manuales de Aerodrome.",
+  "howItWorks": {
+    "label": "Cómo funciona",
+    "description": "Los depósitos se reconstruyen a partir del historial analizado de la wallet y se valorizan solo con datos ya materializados por el análisis."
+  },
+  "gating": {
+    "title": "Ejecuta el análisis para desbloquear Depósitos",
+    "message": "Depósitos se habilita cuando el análisis está listo para esta wallet y esta red."
+  },
+  "poolKind": {
+    "cl": "LP concentrado",
+    "basic_stable": "Básico estable",
+    "basic_volatile": "Básico volátil",
+    "feeTier": "Nivel de comisión"
+  },
   "list": {
+    "count": "{{count}} depósitos",
     "kpis": {
       "totalDeposits": "Depósitos totales",
       "totalDepositsValue": "{{count}} posiciones",
@@ -9,7 +24,7 @@
       "totalRewards": "Recompensas totales",
       "weightedAnnualizedReturn": "Anualizado estimado ponderado",
       "capitalDeployed": "Capital desplegado",
-      "capitalDeployedHint": "Porcentaje del capital manual aún desplegado."
+      "capitalDeployedHint": "Porcentaje del capital manual que sigue desplegado."
     },
     "filters": {
       "status": {
@@ -27,13 +42,17 @@
       },
       "pool": {
         "label": "Pool",
-        "all": "Todos los pools"
+        "all": "Todos los pools",
+        "active": "Pool",
+        "clear": "Limpiar"
       },
       "dateRange": {
         "label": "Rango de fechas",
         "start": "Desde",
-        "end": "Hasta"
+        "end": "Hasta",
+        "clear": "Limpiar"
       },
+      "more": "Más filtros",
       "columns": {
         "label": "Columnas",
         "density": "Densidad",
@@ -59,22 +78,39 @@
       "confidence": "Confianza",
       "performance": "Rendimiento"
     },
+    "density": {
+      "table": "Tabla",
+      "compact": "Compacta"
+    },
     "empty": {
       "title": "Sin depósitos aún",
-      "description": "Cuando tu análisis detecte posiciones en Aerodrome, aparecerán aquí con su ciclo de vida y desglose de retornos.",
+      "description": "Cuando el análisis detecte posiciones manuales en Aerodrome, aparecerán aquí con su ciclo de vida y desglose de retornos.",
       "actionLabel": "Actualizar análisis"
+    },
+    "emptyAutomated": {
+      "title": "No hay depósitos manuales en esta wallet",
+      "description": "Esta wallet sí tiene exposición automatizada en Strategies, pero no depósitos manuales de Aerodrome para mostrar aquí.",
+      "actionLabel": "Abrir strategies"
+    },
+    "emptyAll": "No se encontraron depósitos manuales en el historial analizado.",
+    "emptyFiltered": "Ningún depósito coincide con los filtros activos.",
+    "filteredEmpty": {
+      "title": "Ningún depósito coincide con estos filtros",
+      "description": "Ajusta los filtros actuales para volver a mostrar posiciones."
     },
     "loading": "Cargando depósitos…",
     "error": {
       "title": "No pudimos cargar tus depósitos",
-      "description": "Por favor reintenta. Si el problema persiste, contacta a soporte.",
+      "description": "Por favor, reintenta. Si el problema persiste, contacta a soporte.",
       "actionLabel": "Reintentar"
     },
     "pagination": {
       "page": "Página {{page}}",
       "of": "de {{total}}",
       "previous": "Anterior",
-      "next": "Siguiente"
+      "next": "Siguiente",
+      "showing": "Mostrando {{start}} a {{end}} de {{total}}",
+      "pageSize": "Filas"
     }
   },
   "status": {
@@ -82,8 +118,129 @@
     "open_out_of_range": "Abierta · fuera de rango",
     "closed": "Cerrada"
   },
+  "detail": {
+    "loading": "Cargando el detalle del depósito…",
+    "currentValue": "Valor actual",
+    "totalReturn": "Retorno total",
+    "viewInExplorer": "Ver en el explorador",
+    "share": "Compartir",
+    "close": "Cerrar",
+    "empty": {
+      "title": "Depósito no encontrado",
+      "description": "Este depósito ya no está disponible dentro del conjunto analizado."
+    },
+    "error": {
+      "title": "No pudimos cargar este depósito",
+      "description": "Por favor, reintenta."
+    },
+    "secondary": {
+      "title": "Estadísticas secundarias",
+      "estApr": "APR est.",
+      "totalRewards": "Recompensas totales",
+      "realizedPnl": "PnL realizado",
+      "unrealizedPnl": "PnL no realizado",
+      "coverage": "Cobertura",
+      "confidence": "Confianza"
+    },
+    "coveredRange": {
+      "title": "Rango cubierto",
+      "shorterThanWindow": "El rango cubierto es más corto que la ventana solicitada."
+    },
+    "range": {
+      "title": "Rango",
+      "lower": "Inferior",
+      "upper": "Superior",
+      "inRange": "Dentro del rango",
+      "outOfRange": "Fuera del rango",
+      "unavailable": "No disponible",
+      "token1Denom": "Denominado en token1"
+    },
+    "valueChart": {
+      "title": "Gráfico de valor",
+      "gapTitle": "Cobertura parcial",
+      "gapDescription": "El gráfico se corta en ventanas sin cobertura en lugar de interpolar valores faltantes."
+    },
+    "timeline": {
+      "title": "Ciclo de vida",
+      "empty": "Todavía no se materializaron eventos de ciclo de vida para este depósito."
+    },
+    "events": {
+      "viewAll": "Ver todos los eventos"
+    },
+    "movements": {
+      "token": "Token",
+      "direction": "Dirección",
+      "amount": "Cantidad",
+      "usdValue": "USD en el evento",
+      "priceSource": "Fuente de precio",
+      "priceSourceValues": {
+        "event": "Precio del evento",
+        "pricePointFallback": "Fallback de precio",
+        "unavailable": "No disponible"
+      }
+    },
+    "decomposition": {
+      "title": "Descomposición del rendimiento",
+      "totalReturn": "Retorno total",
+      "estAnnualizedReturn": "Retorno anualizado est.",
+      "attribution": {
+        "title": "Atribución del retorno"
+      },
+      "flow": {
+        "title": "Flujo de capital",
+        "context": "Contexto de flujo",
+        "entered": "Capital ingresado",
+        "withdrawn": "Capital retirado"
+      },
+      "components": {
+        "rewards": "Recompensas",
+        "fees": "Comisiones",
+        "assetPriceEffect": "Efecto de precio del activo",
+        "rebalanceEffect": "Efecto de rebalanceo / IL",
+        "realizedPnl": "PnL realizado",
+        "unrealizedPnl": "PnL no realizado",
+        "unattributed": "Sin atribuir"
+      }
+    }
+  },
+  "events": {
+    "mint_position": "Crear posición",
+    "increase_liquidity": "Aumentar liquidez",
+    "stake": "Staking",
+    "claim_reward": "Cobrar recompensa",
+    "unstake": "Retirar del staking",
+    "decrease_liquidity": "Reducir liquidez",
+    "collect_fees": "Cobrar comisiones",
+    "withdraw": "Retirar",
+    "burn": "Quemar",
+    "close": "Cerrar",
+    "transfer_in": "Transferencia entrante"
+  },
   "transferIn": {
     "badge": "Heredada",
-    "tooltip": "Posición abierta por transferencia entrante. El historial previo no es atribuible."
+    "tooltip": "Posición abierta por transferencia entrante. El historial previo no es atribuible.",
+    "explainer": "La historia anterior de esta posición existía antes de llegar a la wallet actual."
+  },
+  "strategiesCrossLink": {
+    "label": "Estrategia relacionada",
+    "placeholder": "La navegación a Strategies todavía no está activa. Este marcador conserva el id de estrategia destino.",
+    "available": "Abrir estrategia"
+  },
+  "unattributed": {
+    "badge": "Sin atribuir",
+    "explainer": "Retorno residual que no pudo asignarse a un componente específico con alta confianza.",
+    "reasonCodes": {
+      "missingHistoricalPrice": "Precio histórico no disponible",
+      "unresolvedRewardClaim": "Reclamo de recompensa sin resolver",
+      "coverageGap": "Cobertura parcial",
+      "lowConfidenceClassification": "Clasificación de baja confianza",
+      "priceUnavailable": "Sin precio disponible"
+    }
+  },
+  "a11y": {
+    "openDetail": "Abrir detalle del depósito",
+    "closeDetail": "Cerrar detalle del depósito",
+    "clearFilter": "Limpiar filtro",
+    "sortBy": "Ordenar por {{column}}"
   }
 }

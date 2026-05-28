@@ -46,6 +46,30 @@ export type DecodeAerodromeDepositLifecycleResult = {
   artifacts: Awaited<ReturnType<typeof readAerodromeManualPositions>>["artifacts"];
 };
 
+export function resolveAerodromeRewardCandidateTokenId(input: {
+  lifecycleTokenId: string | null;
+  poolAddress: string | null;
+  currentManualPositions: Array<{ tokenId: string; poolAddress: string | null }>;
+}) {
+  if (input.lifecycleTokenId) {
+    return input.lifecycleTokenId;
+  }
+
+  const poolAddress = normalizeAddress(input.poolAddress);
+  if (!poolAddress) {
+    return null;
+  }
+
+  const matchingTokenIds = Array.from(new Set(
+    input.currentManualPositions
+      .filter((position) => normalizeAddress(position.poolAddress) === poolAddress)
+      .map((position) => position.tokenId)
+      .filter((tokenId): tokenId is string => Boolean(tokenId)),
+  ));
+
+  return matchingTokenIds.length === 1 ? matchingTokenIds[0] : null;
+}
+
 function parseTimestamp(record: MoralisHistoryRecord) {
   const value = asString(record.block_timestamp) ?? asString(record.block_time) ?? asString(record.created_at);
   if (!value) {
@@ -127,9 +151,14 @@ function buildLifecycleRecords(input: {
     const touchesGauge = knownContracts.some((address) =>
       metadata.byAddress.get(address)?.contractType.toLowerCase().includes("gauge"),
     );
-    if (touchesGauge) {
+    if (touchesGauge && action !== "collect") {
       continue;
     }
+
+    const gaugePoolAddresses = knownContracts
+      .filter((address) => metadata.byAddress.get(address)?.contractType.toLowerCase().includes("gauge"))
+      .map((address) => normalizeAddress(asString(metadata.byAddress.get(address)?.metadataJson.poolAddress)))
+      .filter((value): value is string => Boolean(value));
 
     const positionManagerAddress = normalizeAddress(
       knownContracts.find((address) => metadata.byAddress.get(address)?.contractType.toLowerCase().includes("position"))
@@ -138,6 +167,7 @@ function buildLifecycleRecords(input: {
     );
     const poolAddress = normalizeAddress(
       knownContracts.find((address) => metadata.byAddress.get(address)?.contractType.toLowerCase().includes("pool"))
+        ?? (gaugePoolAddresses.length === 1 ? gaugePoolAddresses[0] : null)
         ?? null,
     );
 
@@ -222,7 +252,11 @@ export async function decodeAerodromeDepositLifecycle(input: {
         summary: record.summary,
         protocol: "aerodrome" as const,
         targetType: "deposit" as const,
-        targetTokenId: record.tokenId,
+        targetTokenId: resolveAerodromeRewardCandidateTokenId({
+          lifecycleTokenId: record.tokenId,
+          poolAddress: record.poolAddress,
+          currentManualPositions: currentState.artifacts?.positions ?? [],
+        }),
       })),
     providerPartial: currentState.providerPartial,
     failedTokenIds: currentState.failedTokenIds,

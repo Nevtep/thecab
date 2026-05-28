@@ -1,4 +1,10 @@
 export type {
+  DepositConfidence,
+  DepositCoverageStatus,
+  DepositDetailView,
+  DepositLifecycleEventView,
+  DepositPerformanceDecompositionView,
+  DepositValueChartView,
   DepositsAnalysisStatus,
   DepositsStatusFilter,
   DepositsReturnSignFilter,

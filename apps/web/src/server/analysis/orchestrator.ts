@@ -21,6 +21,17 @@ function addUtcDays(input: Date, days: number) {
   return next;
 }
 
+function isSliceStrictlyBeforeDay(input: {
+  sliceEndUtc: Date;
+  dayStartUtc: Date | null;
+}) {
+  if (!input.dayStartUtc) {
+    return false;
+  }
+
+  return input.sliceEndUtc.getTime() <= input.dayStartUtc.getTime();
+}
+
 export function resolveAnalysisMode(input: {
   requestedMode?: AnalysisMode | null;
   hasCompletedRun: boolean;
@@ -40,9 +51,10 @@ export function planAnalysisSlices(input: {
   const env = getEnv();
   const sliceDays = env.ANALYSIS_SLICE_DAYS;
   const horizonStart = addUtcDays(startOfUtcDay(input.triggeredAtUtc), -env.ANALYSIS_HISTORY_DAYS);
+  const triggerDayStartUtc = startOfUtcDay(input.triggeredAtUtc);
   const latestBoundary = addUtcDays(startOfUtcDay(input.triggeredAtUtc), 1);
-  const cursorBoundary = input.lastProcessedDayUtc
-    ? addUtcDays(new Date(`${input.lastProcessedDayUtc}T00:00:00.000Z`), 1)
+  const cursorDayStartUtc = input.lastProcessedDayUtc
+    ? new Date(`${input.lastProcessedDayUtc}T00:00:00.000Z`)
     : null;
 
   let currentEnd = latestBoundary;
@@ -52,7 +64,14 @@ export function planAnalysisSlices(input: {
   while (currentEnd > horizonStart) {
     const currentStart = currentEnd > horizonStart ? addUtcDays(currentEnd, -sliceDays) : horizonStart;
     const boundedStart = currentStart < horizonStart ? horizonStart : currentStart;
-    const isFullyCached = input.mode === "incremental" && Boolean(cursorBoundary && currentEnd <= cursorBoundary);
+    const isStrictlyHistoricalSlice = isSliceStrictlyBeforeDay({
+      sliceEndUtc: currentEnd,
+      dayStartUtc: triggerDayStartUtc,
+    });
+    const isFullyCached =
+      input.mode === "incremental" &&
+      isStrictlyHistoricalSlice &&
+      Boolean(cursorDayStartUtc && currentEnd.getTime() <= cursorDayStartUtc.getTime());
 
     slices.push({
       sliceIndex,

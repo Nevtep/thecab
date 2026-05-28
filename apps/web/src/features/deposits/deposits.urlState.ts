@@ -1,3 +1,12 @@
+import {
+  DEPOSITS_RETURN_SIGN_FILTER_VALUES,
+  DEPOSITS_SORT_DIRECTION_VALUES,
+  DEPOSITS_SORT_FIELD_VALUES,
+  DEPOSITS_STATUS_FILTER_VALUES,
+  normalizeOneOf,
+  parseNamedDepositsSort,
+  toNamedDepositsSort,
+} from "@/server/deposits/deposits.contract";
 import type {
   DepositsReturnSignFilter,
   DepositsSortDirection,
@@ -33,17 +42,8 @@ export function createDefaultDepositsListUrlState(): DepositsListUrlState {
   };
 }
 
-const STATUS_VALUES: DepositsStatusFilter[] = ["all", "open_active", "open_out_of_range", "closed"];
-const RETURN_SIGN_VALUES: DepositsReturnSignFilter[] = ["all", "positive", "negative"];
-const SORT_VALUES: DepositsSortField[] = ["openedAt", "currentValue", "totalReturn", "totalRewards", "estApr"];
-const DIRECTION_VALUES: DepositsSortDirection[] = ["asc", "desc"];
 const DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const UUID_PATTERN = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
-
-function pickEnum<T extends string>(value: string | null, allowed: T[], fallback: T): T {
-  if (!value) return fallback;
-  return (allowed as readonly string[]).includes(value) ? (value as T) : fallback;
-}
 
 function pickInt(value: string | null, fallback: number, { min, max }: { min: number; max: number }) {
   if (!value) return fallback;
@@ -64,16 +64,34 @@ function pickUuid(value: string | null): string | null {
   return UUID_PATTERN.test(value) ? value : null;
 }
 
+function pickFirst(searchParams: URLSearchParams, keys: string[]) {
+  for (const key of keys) {
+    const value = searchParams.get(key);
+    if (value !== null) {
+      return value;
+    }
+  }
+  return null;
+}
+
+function normalizeReturnSign(value: string | null, fallback: DepositsReturnSignFilter) {
+  if (value === "any") {
+    return "all" satisfies DepositsReturnSignFilter;
+  }
+  return normalizeOneOf(value, DEPOSITS_RETURN_SIGN_FILTER_VALUES, fallback);
+}
+
 export function parseDepositsListUrlState(searchParams: URLSearchParams): DepositsListUrlState {
   const defaults = createDefaultDepositsListUrlState();
+  const namedSort = parseNamedDepositsSort(searchParams.get("sort"));
   return {
-    status: pickEnum(searchParams.get("status"), STATUS_VALUES, defaults.status),
-    poolId: pickUuid(searchParams.get("poolId")),
-    startDayUtc: pickDay(searchParams.get("startDayUtc")),
-    endDayUtc: pickDay(searchParams.get("endDayUtc")),
-    returnSign: pickEnum(searchParams.get("returnSign"), RETURN_SIGN_VALUES, defaults.returnSign),
-    sort: pickEnum(searchParams.get("sort"), SORT_VALUES, defaults.sort),
-    direction: pickEnum(searchParams.get("direction"), DIRECTION_VALUES, defaults.direction),
+    status: normalizeOneOf(searchParams.get("status"), DEPOSITS_STATUS_FILTER_VALUES, defaults.status),
+    poolId: pickUuid(pickFirst(searchParams, ["pool", "poolId"])),
+    startDayUtc: pickDay(pickFirst(searchParams, ["from", "startDayUtc"])),
+    endDayUtc: pickDay(pickFirst(searchParams, ["to", "endDayUtc"])),
+    returnSign: normalizeReturnSign(searchParams.get("returnSign"), defaults.returnSign),
+    sort: namedSort?.sort ?? normalizeOneOf(searchParams.get("sort"), DEPOSITS_SORT_FIELD_VALUES, defaults.sort),
+    direction: namedSort?.direction ?? normalizeOneOf(searchParams.get("direction"), DEPOSITS_SORT_DIRECTION_VALUES, defaults.direction),
     page: pickInt(searchParams.get("page"), defaults.page, { min: 1, max: 10000 }),
     pageSize: pickInt(searchParams.get("pageSize"), defaults.pageSize, { min: 1, max: 100 }),
     selectedDepositId: pickUuid(searchParams.get("selectedDepositId")),
@@ -84,12 +102,19 @@ export function serializeDepositsListUrlState(state: DepositsListUrlState): stri
   const params = new URLSearchParams();
   const defaults = createDefaultDepositsListUrlState();
   if (state.status !== defaults.status) params.set("status", state.status);
-  if (state.poolId) params.set("poolId", state.poolId);
-  if (state.startDayUtc) params.set("startDayUtc", state.startDayUtc);
-  if (state.endDayUtc) params.set("endDayUtc", state.endDayUtc);
+  if (state.poolId) params.set("pool", state.poolId);
+  if (state.startDayUtc) params.set("from", state.startDayUtc);
+  if (state.endDayUtc) params.set("to", state.endDayUtc);
   if (state.returnSign !== defaults.returnSign) params.set("returnSign", state.returnSign);
-  if (state.sort !== defaults.sort) params.set("sort", state.sort);
-  if (state.direction !== defaults.direction) params.set("direction", state.direction);
+  const namedSort = toNamedDepositsSort(state.sort, state.direction);
+  if (namedSort) {
+    if (namedSort !== toNamedDepositsSort(defaults.sort, defaults.direction)) {
+      params.set("sort", namedSort);
+    }
+  } else {
+    if (state.sort !== defaults.sort) params.set("sort", state.sort);
+    if (state.direction !== defaults.direction) params.set("direction", state.direction);
+  }
   if (state.page !== defaults.page) params.set("page", String(state.page));
   if (state.pageSize !== defaults.pageSize) params.set("pageSize", String(state.pageSize));
   if (state.selectedDepositId) params.set("selectedDepositId", state.selectedDepositId);
@@ -103,12 +128,17 @@ export function buildDepositsApiQueryString(input: {
   const params = new URLSearchParams();
   params.set("chainId", String(input.chainId));
   if (input.state.status !== "all") params.set("status", input.state.status);
-  if (input.state.poolId) params.set("poolId", input.state.poolId);
-  if (input.state.startDayUtc) params.set("startDayUtc", input.state.startDayUtc);
-  if (input.state.endDayUtc) params.set("endDayUtc", input.state.endDayUtc);
+  if (input.state.poolId) params.set("pool", input.state.poolId);
+  if (input.state.startDayUtc) params.set("from", input.state.startDayUtc);
+  if (input.state.endDayUtc) params.set("to", input.state.endDayUtc);
   if (input.state.returnSign !== "all") params.set("returnSign", input.state.returnSign);
-  params.set("sort", input.state.sort);
-  params.set("direction", input.state.direction);
+  const namedSort = toNamedDepositsSort(input.state.sort, input.state.direction);
+  if (namedSort) {
+    params.set("sort", namedSort);
+  } else {
+    params.set("sort", input.state.sort);
+    params.set("direction", input.state.direction);
+  }
   params.set("page", String(input.state.page));
   params.set("pageSize", String(input.state.pageSize));
   return params.toString();

@@ -56,6 +56,20 @@ test("planAnalysisSlices keeps the full-year horizon for incremental runs while 
   assert.equal(slices.some((slice) => !slice.isFullyCached), true);
 });
 
+test("planAnalysisSlices never cache-skips the slice that contains the trigger day", () => {
+  const triggeredAtUtc = new Date("2026-05-24T20:15:00.000Z");
+  const slices = planAnalysisSlices({
+    triggeredAtUtc,
+    mode: "incremental",
+    lastProcessedDayUtc: "2026-05-24",
+  });
+
+  assert.equal(slices.length > 0, true);
+  assert.equal(slices[0]?.sliceEndUtc.toISOString(), "2026-05-25T00:00:00.000Z");
+  assert.equal(slices[0]?.isFullyCached, false);
+  assert.equal(slices.some((slice) => slice.isFullyCached), true);
+});
+
 test("projectAnalysisStatus reports partial coverage after retry exhaustion while preserving canonical status", () => {
   const projected = projectAnalysisStatus({
     latestRunStatus: "complete",

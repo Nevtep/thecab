@@ -1,7 +1,22 @@
 {
   "title": "Deposits",
   "subtitle": "Per-position lifecycle, returns, and impermanent-loss accounting for manual Aerodrome positions.",
+  "howItWorks": {
+    "label": "How it works",
+    "description": "Deposits are reconstructed from analyzed wallet history and priced only from stored analysis data."
+  },
+  "gating": {
+    "title": "Run analysis to unlock deposits",
+    "message": "Deposits becomes available once analysis is ready for this wallet and chain."
+  },
+  "poolKind": {
+    "cl": "Concentrated LP",
+    "basic_stable": "Basic stable",
+    "basic_volatile": "Basic volatile",
+    "feeTier": "Fee tier"
+  },
   "list": {
+    "count": "{{count}} deposits",
     "kpis": {
       "totalDeposits": "Total deposits",
       "totalDepositsValue": "{{count}} positions",
@@ -27,13 +42,17 @@
       },
       "pool": {
         "label": "Pool",
-        "all": "All pools"
+        "all": "All pools",
+        "active": "Pool",
+        "clear": "Clear"
       },
       "dateRange": {
         "label": "Date range",
         "start": "From",
-        "end": "To"
+        "end": "To",
+        "clear": "Clear"
       },
+      "more": "More filters",
       "columns": {
         "label": "Columns",
         "density": "Density",
@@ -59,10 +78,25 @@
       "confidence": "Confidence",
       "performance": "Performance"
     },
+    "density": {
+      "table": "Table",
+      "compact": "Compact"
+    },
     "empty": {
       "title": "No deposits yet",
       "description": "Once your analysis run identifies Aerodrome positions, they will appear here with full lifecycle and return breakdowns.",
       "actionLabel": "Refresh analysis"
+    },
+    "emptyAutomated": {
+      "title": "No manual deposits in this wallet",
+      "description": "This wallet has automated strategy exposure, but no manual Aerodrome deposits to show here.",
+      "actionLabel": "Open strategies"
+    },
+    "emptyAll": "No manual deposits were found for the analyzed history.",
+    "emptyFiltered": "No deposits match the active filters.",
+    "filteredEmpty": {
+      "title": "No deposits match these filters",
+      "description": "Adjust the current filters to bring positions back into view."
     },
     "loading": "Loading deposits…",
     "error": {
@@ -74,7 +108,9 @@
       "page": "Page {{page}}",
       "of": "of {{total}}",
       "previous": "Previous",
-      "next": "Next"
+      "next": "Next",
+      "showing": "Showing {{start}} to {{end}} of {{total}}",
+      "pageSize": "Rows"
     }
   },
   "status": {
@@ -82,8 +118,129 @@
     "open_out_of_range": "Open · out of range",
     "closed": "Closed"
   },
+  "detail": {
+    "loading": "Loading deposit detail…",
+    "currentValue": "Current value",
+    "totalReturn": "Total return",
+    "viewInExplorer": "View in explorer",
+    "share": "Share",
+    "close": "Close",
+    "empty": {
+      "title": "Deposit not found",
+      "description": "This deposit is no longer available in the analyzed set."
+    },
+    "error": {
+      "title": "We couldn’t load this deposit",
+      "description": "Please retry."
+    },
+    "secondary": {
+      "title": "Secondary stats",
+      "estApr": "Est. APR",
+      "totalRewards": "Total rewards",
+      "realizedPnl": "Realized PnL",
+      "unrealizedPnl": "Unrealized PnL",
+      "coverage": "Coverage",
+      "confidence": "Confidence"
+    },
+    "coveredRange": {
+      "title": "Covered range",
+      "shorterThanWindow": "Covered range is shorter than the requested window."
+    },
+    "range": {
+      "title": "Range",
+      "lower": "Lower",
+      "upper": "Upper",
+      "inRange": "In range",
+      "outOfRange": "Out of range",
+      "unavailable": "Unavailable",
+      "token1Denom": "Token1 denominated"
+    },
+    "valueChart": {
+      "title": "Value chart",
+      "gapTitle": "Partial coverage",
+      "gapDescription": "The chart breaks across uncovered windows instead of interpolating missing values."
+    },
+    "timeline": {
+      "title": "Lifecycle",
+      "empty": "No lifecycle events were materialized for this deposit yet."
+    },
+    "events": {
+      "viewAll": "View all events"
+    },
+    "movements": {
+      "token": "Token",
+      "direction": "Direction",
+      "amount": "Amount",
+      "usdValue": "USD at event",
+      "priceSource": "Price source",
+      "priceSourceValues": {
+        "event": "Event price",
+        "pricePointFallback": "Price fallback",
+        "unavailable": "Unavailable"
+      }
+    },
+    "decomposition": {
+      "title": "Performance decomposition",
+      "totalReturn": "Total return",
+      "estAnnualizedReturn": "Est. annualized return",
+      "attribution": {
+        "title": "Return attribution"
+      },
+      "flow": {
+        "title": "Capital flow",
+        "context": "Flow context",
+        "entered": "Capital entered",
+        "withdrawn": "Capital withdrawn"
+      },
+      "components": {
+        "rewards": "Rewards",
+        "fees": "Fees",
+        "assetPriceEffect": "Asset price effect",
+        "rebalanceEffect": "Rebalance / IL effect",
+        "realizedPnl": "Realized PnL",
+        "unrealizedPnl": "Unrealized PnL",
+        "unattributed": "Unattributed"
+      }
+    }
+  },
+  "events": {
+    "mint_position": "Mint position",
+    "increase_liquidity": "Increase liquidity",
+    "stake": "Stake",
+    "claim_reward": "Claim reward",
+    "unstake": "Unstake",
+    "decrease_liquidity": "Decrease liquidity",
+    "collect_fees": "Collect fees",
+    "withdraw": "Withdraw",
+    "burn": "Burn",
+    "close": "Close",
+    "transfer_in": "Transfer in"
+  },
   "transferIn": {
     "badge": "Inherited",
-    "tooltip": "Position opened by transfer-in. Pre-transfer history is not attributable."
+    "tooltip": "Position opened by transfer-in. Pre-transfer history is not attributable.",
+    "explainer": "Earlier history for this position existed before it reached the current wallet."
+  },
+  "strategiesCrossLink": {
+    "label": "Related strategy",
+    "placeholder": "Strategies routing is not live yet. This placeholder preserves the target strategy id.",
+    "available": "Open strategy"
+  },
+  "unattributed": {
+    "badge": "Unattributed",
+    "explainer": "Residual return that could not be assigned to a specific component with high confidence.",
+    "reasonCodes": {
+      "missingHistoricalPrice": "Missing historical price",
+      "unresolvedRewardClaim": "Unresolved reward claim",
+      "coverageGap": "Coverage gap",
+      "lowConfidenceClassification": "Low-confidence classification",
+      "priceUnavailable": "Price unavailable"
+    }
+  },
+  "a11y": {
+    "openDetail": "Open deposit detail",
+    "closeDetail": "Close deposit detail",
+    "clearFilter": "Clear filter",
+    "sortBy": "Sort by {{column}}"
   }
 }

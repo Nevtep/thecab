@@ -1,8 +1,20 @@
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 
 import { getDb } from "@/server/db/client";
-import { depositWalletSummaries, pools } from "@/server/db/schema";
-import type { DepositSummaryView } from "@/server/deposits/deposits.types";
+import {
+  depositLifecycleEvents,
+  depositPerformanceDecompositions,
+  depositWalletSummaries,
+  pools,
+  strategyExposures,
+} from "@/server/db/schema";
+import type {
+  DepositDetailView,
+  DepositLifecycleEventView,
+  DepositLifecycleTokenDelta,
+  DepositPerformanceDecompositionView,
+  DepositSummaryView,
+} from "@/server/deposits/deposits.types";
 
 function asNumber(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -17,6 +29,16 @@ function asNumber(value: unknown) {
 
 function asNullableNumber(value: unknown) {
   return asNumber(value);
+}
+
+function asString(value: unknown) {
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 }
 
 function normalizeStatus(value: string): DepositSummaryView["status"] {
@@ -69,6 +91,52 @@ function toIso(value: Date | string | null): string | null {
   if (!value) return null;
   if (value instanceof Date) return value.toISOString();
   return value;
+}
+
+function normalizePriceSource(value: string | null): DepositLifecycleEventView["priceSource"] {
+  switch (value) {
+    case "event":
+    case "pricePointFallback":
+    case "unavailable":
+      return value;
+    default:
+      return null;
+  }
+}
+
+function normalizeLifecycleEventType(value: string): DepositLifecycleEventView["eventType"] {
+  switch (value) {
+    case "mint_position":
+    case "increase_liquidity":
+    case "stake":
+    case "claim_reward":
+    case "unstake":
+    case "decrease_liquidity":
+    case "collect_fees":
+    case "withdraw":
+    case "burn":
+    case "close":
+    case "transfer_in":
+      return value;
+    default:
+      return "claim_reward";
+  }
+}
+
+function parseSignedTokenDeltas(value: unknown): DepositLifecycleTokenDelta[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((entry) => {
+    const record = asRecord(entry);
+    return {
+      tokenAddress: asString(record.tokenAddress),
+      symbol: asString(record.symbol),
+      direction: record.direction === "out" ? "out" : "in",
+      amountRaw: asString(record.amountRaw) ?? "0",
+      amountFormatted: asString(record.amountFormatted),
+      usdValue: asNullableNumber(record.usdValue),
+      priceSource: normalizePriceSource(asString(record.priceSource)),
+    };
+  });
 }
 
 export async function findDepositSummaries(input: {
@@ -158,7 +226,7 @@ export async function findDepositDetail(input: {
   walletAddress: string;
   chainId: number;
   depositId: string;
-}): Promise<DepositSummaryView | null> {
+}): Promise<DepositDetailView | null> {
   const db = await getDb();
   const rows = await db
     .select({
@@ -169,7 +237,9 @@ export async function findDepositDetail(input: {
       poolKind: depositWalletSummaries.poolKind,
       feeTierBps: depositWalletSummaries.feeTierBps,
       tokenId: depositWalletSummaries.tokenId,
+      token0Address: depositWalletSummaries.token0Address,
       token0Symbol: depositWalletSummaries.token0Symbol,
+      token1Address: depositWalletSummaries.token1Address,
       token1Symbol: depositWalletSummaries.token1Symbol,
       status: depositWalletSummaries.status,
       openedAt: depositWalletSummaries.openedAt,
@@ -185,6 +255,8 @@ export async function findDepositDetail(input: {
       totalReturnUsd: depositWalletSummaries.totalReturnUsd,
       totalReturnPct: depositWalletSummaries.totalReturnPct,
       estimatedAnnualizedReturnPct: depositWalletSummaries.estimatedAnnualizedReturnPct,
+      tickLower: depositWalletSummaries.tickLower,
+      tickUpper: depositWalletSummaries.tickUpper,
       isInRange: depositWalletSummaries.isInRange,
       rangeLowerPrice: depositWalletSummaries.rangeLowerPrice,
       rangeUpperPrice: depositWalletSummaries.rangeUpperPrice,
@@ -193,6 +265,7 @@ export async function findDepositDetail(input: {
       coverageReasonCodes: depositWalletSummaries.coverageReasonCodes,
       coveredStartDayUtc: depositWalletSummaries.coveredStartDayUtc,
       coveredEndDayUtc: depositWalletSummaries.coveredEndDayUtc,
+      mellowStrategyCrossLinkId: depositWalletSummaries.mellowStrategyCrossLinkId,
     })
     .from(depositWalletSummaries)
     .innerJoin(pools, eq(pools.id, depositWalletSummaries.poolId))
@@ -208,6 +281,62 @@ export async function findDepositDetail(input: {
   const row = rows[0];
   if (!row) return null;
 
+  const [decompositionRows, lifecycleRows] = await Promise.all([
+    db
+      .select()
+      .from(depositPerformanceDecompositions)
+      .where(
+        and(
+          eq(depositPerformanceDecompositions.chainId, input.chainId),
+          eq(depositPerformanceDecompositions.walletAddress, input.walletAddress),
+          eq(depositPerformanceDecompositions.depositId, input.depositId),
+        ),
+      )
+      .limit(1),
+    db
+      .select()
+      .from(depositLifecycleEvents)
+      .where(
+        and(
+          eq(depositLifecycleEvents.chainId, input.chainId),
+          eq(depositLifecycleEvents.walletAddress, input.walletAddress),
+          eq(depositLifecycleEvents.depositId, input.depositId),
+        ),
+      )
+      .orderBy(asc(depositLifecycleEvents.sequenceIndex)),
+  ]);
+
+  const decompositionRow = decompositionRows[0];
+  const decomposition: DepositPerformanceDecompositionView = {
+    totalReturnUsd: asNumber(decompositionRow?.totalReturnUsd) ?? asNumber(row.totalReturnUsd) ?? 0,
+    rewardsUsd: asNumber(decompositionRow?.rewardsUsd) ?? asNumber(row.totalRewardsUsd) ?? 0,
+    feesUsd: asNumber(decompositionRow?.feesUsd) ?? 0,
+    assetPriceEffectUsd: asNumber(decompositionRow?.assetPriceEffectUsd) ?? 0,
+    rebalanceEffectUsd: asNumber(decompositionRow?.rebalanceEffectUsd) ?? 0,
+    realizedPnlUsd: asNumber(decompositionRow?.realizedPnlUsd) ?? asNumber(row.realizedPnlUsd) ?? 0,
+    unrealizedPnlUsd: asNumber(decompositionRow?.unrealizedPnlUsd) ?? asNumber(row.unrealizedPnlUsd) ?? 0,
+    unattributedUsd: asNumber(decompositionRow?.unattributedUsd) ?? 0,
+    unattributedReasonCodes: decompositionRow?.unattributedReasonCodes ?? [],
+    componentPercentages: (decompositionRow?.componentPercentages ?? {}) as Record<string, number>,
+  };
+
+  const lifecycle: DepositLifecycleEventView[] = lifecycleRows.map((eventRow) => ({
+    id: eventRow.id,
+    sequenceIndex: eventRow.sequenceIndex,
+    eventType: normalizeLifecycleEventType(eventRow.eventType),
+    occurredAt: toIso(eventRow.occurredAt) ?? new Date(0).toISOString(),
+    txHash: eventRow.txHash,
+    logIndex: eventRow.logIndex,
+    blockNumber: eventRow.blockNumber,
+    usdValue: asNullableNumber(eventRow.usdValue),
+    signedTokenDeltas: parseSignedTokenDeltas(eventRow.signedTokenDeltas),
+    priceSource: normalizePriceSource(eventRow.priceSource),
+    confidence: normalizeConfidence(eventRow.confidence),
+    inferredActionId: eventRow.inferredActionId,
+    coverageReasonCodes: eventRow.coverageReasonCodes ?? [],
+    metadata: (eventRow.metadataJson ?? {}) as Record<string, unknown>,
+  }));
+
   return {
     depositId: row.depositId,
     poolId: row.poolId,
@@ -216,7 +345,9 @@ export async function findDepositDetail(input: {
     poolKind: normalizePoolKind(row.poolKind),
     feeTierBps: row.feeTierBps,
     tokenId: row.tokenId,
+    token0Address: row.token0Address,
     token0Symbol: row.token0Symbol,
+    token1Address: row.token1Address,
     token1Symbol: row.token1Symbol,
     status: normalizeStatus(row.status),
     openedAt: toIso(row.openedAt),
@@ -232,6 +363,8 @@ export async function findDepositDetail(input: {
     totalReturnUsd: asNumber(row.totalReturnUsd) ?? 0,
     totalReturnPct: asNullableNumber(row.totalReturnPct),
     estimatedAnnualizedReturnPct: asNullableNumber(row.estimatedAnnualizedReturnPct),
+    tickLower: row.tickLower,
+    tickUpper: row.tickUpper,
     isInRange: row.isInRange,
     rangeLowerPrice: asNullableNumber(row.rangeLowerPrice),
     rangeUpperPrice: asNullableNumber(row.rangeUpperPrice),
@@ -240,5 +373,27 @@ export async function findDepositDetail(input: {
     coverageReasonCodes: row.coverageReasonCodes ?? [],
     coveredStartDayUtc: row.coveredStartDayUtc,
     coveredEndDayUtc: row.coveredEndDayUtc,
+    decomposition,
+    lifecycle,
+    mellowStrategyCrossLinkId: row.mellowStrategyCrossLinkId,
   };
+}
+
+export async function hasAutomatedStrategyExposure(input: {
+  walletAddress: string;
+  chainId: number;
+}): Promise<boolean> {
+  const db = await getDb();
+  const rows = await db
+    .select({ id: strategyExposures.id })
+    .from(strategyExposures)
+    .where(
+      and(
+        eq(strategyExposures.chainId, input.chainId),
+        eq(strategyExposures.walletAddress, input.walletAddress),
+      ),
+    )
+    .limit(1);
+
+  return rows.length > 0;
 }

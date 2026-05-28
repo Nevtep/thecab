@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
 
 import { CabSidebar, CabSidebarNavItem, CabStack, CabText, CabTopNav, ConnectedShell } from "@/design-system";
+import { buildDepositsPoolHref } from "@/features/deposits/deposits.navigation";
 import { getOverviewNavigationItems } from "@/features/overview/overview.mappers";
 import { PoolDetailComponent } from "@/features/pools/PoolDetail.component";
 import { mapPoolDetailResponseToViewModel } from "@/features/pools/pools.mappers";
@@ -103,6 +104,7 @@ export function PoolDetailContainer({ poolId }: { poolId: string }) {
         range={range}
         onClose={() => router.push("/pools")}
         onRangeChange={setRange}
+        onOpenDeposits={() => router.push(buildDepositsPoolHref({ chainId: resolvedChainId, poolId }))}
         onRetry={() => void detailQuery.refetch()}
       />
     </ConnectedShell>

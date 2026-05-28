@@ -2,6 +2,13 @@ import { cookies } from "next/headers";
 import { z } from "zod";
 
 import { assertSupportedChain, SUPPORTED_CHAIN_ID } from "@/server/chains";
+import {
+  DEPOSITS_SORT_DIRECTION_VALUES,
+  DEPOSITS_SORT_FIELD_VALUES,
+  DEPOSITS_STATUS_FILTER_VALUES,
+  isOneOf,
+  parseNamedDepositsSort,
+} from "@/server/deposits/deposits.contract";
 import type {
   DepositDetailRequest,
   DepositsListRequest,
@@ -14,13 +21,16 @@ const dayString = z.string().regex(DAY_PATTERN, "INVALID_DAY_FORMAT");
 
 const depositsListQuerySchema = z.object({
   chainId: z.coerce.number().int().positive().default(SUPPORTED_CHAIN_ID),
-  status: z.enum(["all", "open_active", "open_out_of_range", "closed"] as const).default("all"),
+  status: z.enum(DEPOSITS_STATUS_FILTER_VALUES).default("all"),
   poolId: z.string().trim().uuid().optional(),
+  pool: z.string().trim().uuid().optional(),
   startDayUtc: dayString.optional(),
+  from: dayString.optional(),
   endDayUtc: dayString.optional(),
-  returnSign: z.enum(["all", "positive", "negative"] as const).default("all"),
-  sort: z.enum(["openedAt", "currentValue", "totalReturn", "totalRewards", "estApr"] as const).default("openedAt"),
-  direction: z.enum(["asc", "desc"] as const).default("desc"),
+  to: dayString.optional(),
+  returnSign: z.enum(["all", "positive", "negative", "any"]).default("all"),
+  sort: z.string().optional(),
+  direction: z.enum(DEPOSITS_SORT_DIRECTION_VALUES).optional(),
   page: z.coerce.number().int().min(1).max(10000).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
 });
@@ -56,8 +66,11 @@ export async function parseDepositsListRequest(request: Request): Promise<Deposi
     chainId: searchParams.get("chainId") ?? SUPPORTED_CHAIN_ID,
     status: searchParams.get("status") ?? undefined,
     poolId: searchParams.get("poolId") ?? undefined,
+    pool: searchParams.get("pool") ?? undefined,
     startDayUtc: searchParams.get("startDayUtc") ?? undefined,
+    from: searchParams.get("from") ?? undefined,
     endDayUtc: searchParams.get("endDayUtc") ?? undefined,
+    to: searchParams.get("to") ?? undefined,
     returnSign: searchParams.get("returnSign") ?? undefined,
     sort: searchParams.get("sort") ?? undefined,
     direction: searchParams.get("direction") ?? undefined,
@@ -65,19 +78,25 @@ export async function parseDepositsListRequest(request: Request): Promise<Deposi
     pageSize: searchParams.get("pageSize") ?? undefined,
   });
 
+  const namedSort = parseNamedDepositsSort(parsed.sort ?? null);
+  const fallbackSort = isOneOf(parsed.sort, DEPOSITS_SORT_FIELD_VALUES) ? parsed.sort : null;
+  if (parsed.sort && namedSort === null && fallbackSort === null) {
+    throw new Error("DEPOSITS_REQUEST_FAILED:INVALID_PAYLOAD");
+  }
+
   assertSupportedChain(parsed.chainId);
-  clampDateRange(parsed.startDayUtc ?? null, parsed.endDayUtc ?? null);
+  clampDateRange(parsed.from ?? parsed.startDayUtc ?? null, parsed.to ?? parsed.endDayUtc ?? null);
 
   return {
     walletAddress: await readAuthenticatedWalletAddress(),
     chainId: parsed.chainId,
     status: parsed.status,
-    poolId: parsed.poolId ?? null,
-    startDayUtc: parsed.startDayUtc ?? null,
-    endDayUtc: parsed.endDayUtc ?? null,
-    returnSign: parsed.returnSign,
-    sort: parsed.sort,
-    direction: parsed.direction,
+    poolId: parsed.pool ?? parsed.poolId ?? null,
+    startDayUtc: parsed.from ?? parsed.startDayUtc ?? null,
+    endDayUtc: parsed.to ?? parsed.endDayUtc ?? null,
+    returnSign: parsed.returnSign === "any" ? "all" : parsed.returnSign,
+    sort: namedSort?.sort ?? fallbackSort ?? "openedAt",
+    direction: namedSort?.direction ?? parsed.direction ?? "desc",
     page: parsed.page,
     pageSize: parsed.pageSize,
   };

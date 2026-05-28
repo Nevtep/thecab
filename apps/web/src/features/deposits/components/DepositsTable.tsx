@@ -2,7 +2,8 @@
 
 import { createColumnHelper, type SortingState } from "@tanstack/react-table";
 import type { ColumnDef } from "@tanstack/react-table";
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 import {
   CabBadge,
@@ -13,7 +14,11 @@ import {
   DataTableValueCell,
 } from "@/design-system";
 import { formatDate, formatPercent, formatUsd } from "@/i18n/formatters";
-import type { DepositSummaryRowViewModel } from "@/features/deposits/deposits.mappers";
+import {
+  getDepositConfidenceLabelKey,
+  getDepositCoverageLabelKey,
+  type DepositSummaryRowViewModel,
+} from "@/features/deposits/deposits.mappers";
 import type {
   DepositsSortDirection,
   DepositsSortField,
@@ -41,6 +46,30 @@ function toneForReturn(value: number) {
   return "neutral" as const;
 }
 
+const SORT_FIELD_TO_COLUMN_ID: Record<DepositsSortField, string> = {
+  openedAt: "opened",
+  currentValue: "currentValue",
+  totalReturn: "totalReturn",
+  totalRewards: "totalRewards",
+  estApr: "estApr",
+};
+
+const COLUMN_ID_TO_SORT_FIELD: Record<string, DepositsSortField> = {
+  opened: "openedAt",
+  currentValue: "currentValue",
+  totalReturn: "totalReturn",
+  totalRewards: "totalRewards",
+  estApr: "estApr",
+};
+
+function sortFieldToColumnId(sort: DepositsSortField): string {
+  return SORT_FIELD_TO_COLUMN_ID[sort] ?? "opened";
+}
+
+function columnIdToSortField(columnId: string): DepositsSortField {
+  return COLUMN_ID_TO_SORT_FIELD[columnId] ?? "openedAt";
+}
+
 function toneForConfidence(confidence: DepositSummaryRowViewModel["confidence"]) {
   switch (confidence) {
     case "high":
@@ -61,6 +90,7 @@ type DepositsTableProps = {
   sort: DepositsSortField;
   direction: DepositsSortDirection;
   selectedDepositId?: string | null;
+  emptyState?: ReactNode;
   labels: {
     columns: Record<DepositsTableColumnKey, string>;
     status: Record<DepositSummaryStatus, string>;
@@ -77,12 +107,14 @@ export function DepositsTable({
   sort,
   direction,
   selectedDepositId,
+  emptyState,
   labels,
   onSortChange,
   onSelectRow,
 }: DepositsTableProps) {
+  const { t } = useTranslation(["coverage"]);
   const sorting: SortingState = useMemo(
-    () => [{ id: sort, desc: direction === "desc" }],
+    () => [{ id: sortFieldToColumnId(sort), desc: direction === "desc" }],
     [sort, direction],
   );
 
@@ -191,13 +223,20 @@ export function DepositsTable({
       columnHelper.accessor((row) => row.coverageStatus, {
         id: "coverage",
         header: () => labels.columns.coverage,
-        cell: (info) => <CabCoverageBadge state={info.getValue()} label={info.getValue()} />,
+        cell: (info) => (
+          <CabCoverageBadge
+            state={info.getValue()}
+            label={t(getDepositCoverageLabelKey(info.getValue()), { defaultValue: info.getValue() })}
+          />
+        ),
       }),
       columnHelper.accessor((row) => row.confidence, {
         id: "confidence",
         header: () => labels.columns.confidence,
         cell: (info) => (
-          <CabBadge tone={toneForConfidence(info.getValue())}>{info.getValue()}</CabBadge>
+          <CabBadge tone={toneForConfidence(info.getValue())}>
+            {t(getDepositConfidenceLabelKey(info.getValue()), { defaultValue: info.getValue() })}
+          </CabBadge>
         ),
       }),
     ];
@@ -206,7 +245,7 @@ export function DepositsTable({
       const key = (column.id ?? "") as DepositsTableColumnKey;
       return !hidden.has(key);
     }) as Array<ColumnDef<DepositSummaryRowViewModel, unknown>>;
-  }, [hiddenColumns, labels, locale]);
+  }, [hiddenColumns, labels, locale, t]);
 
   return (
     <DataTable
@@ -218,10 +257,11 @@ export function DepositsTable({
         const next = typeof updater === "function" ? updater(sorting) : updater;
         const first = next[0];
         if (!first) return;
-        onSortChange(first.id as DepositsSortField, first.desc ? "desc" : "asc");
+        onSortChange(columnIdToSortField(first.id), first.desc ? "desc" : "asc");
       }}
       selectedRowId={selectedDepositId ?? null}
       onRowSelect={onSelectRow}
+      emptyState={emptyState}
     />
   );
 }
