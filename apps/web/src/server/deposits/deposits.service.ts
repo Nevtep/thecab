@@ -23,6 +23,85 @@ function compareNullableNumber(left: number | null, right: number | null) {
   return left - right;
 }
 
+export function buildDepositsListResponse(input: {
+  walletAddress: string;
+  chainId: number;
+  analysisStatus: "ready" | "stale";
+  request: Pick<DepositsListRequest, "status" | "poolId" | "returnSign" | "startDayUtc" | "endDayUtc" | "sort" | "direction" | "page" | "pageSize">;
+  rows: DepositSummaryView[];
+  hasAutomatedExposure: boolean;
+}): DepositsListResponse {
+  const allFiltered = input.rows.filter((row) => {
+    if (input.request.status !== "all" && row.status !== input.request.status) return false;
+    if (input.request.poolId && row.poolId !== input.request.poolId) return false;
+    if (input.request.returnSign === "positive" && row.totalReturnUsd < 0) return false;
+    if (input.request.returnSign === "negative" && row.totalReturnUsd >= 0) return false;
+    if (!matchesDateRange(row, input.request.startDayUtc, input.request.endDayUtc)) return false;
+    return true;
+  });
+
+  allFiltered.sort((left, right) => {
+    let cmp = 0;
+    switch (input.request.sort) {
+      case "openedAt":
+        cmp = (left.openedAt ?? "").localeCompare(right.openedAt ?? "");
+        break;
+      case "currentValue":
+        cmp = left.currentValueUsd - right.currentValueUsd;
+        break;
+      case "totalReturn":
+        cmp = left.totalReturnUsd - right.totalReturnUsd;
+        break;
+      case "totalRewards":
+        cmp = left.totalRewardsUsd - right.totalRewardsUsd;
+        break;
+      case "estApr":
+        cmp = compareNullableNumber(left.estimatedAnnualizedReturnPct, right.estimatedAnnualizedReturnPct);
+        break;
+    }
+    if (cmp === 0) {
+      cmp = left.depositId.localeCompare(right.depositId);
+    }
+    return input.request.direction === "asc" ? cmp : -cmp;
+  });
+
+  const totalCount = allFiltered.length;
+  const startIndex = (input.request.page - 1) * input.request.pageSize;
+  const items = allFiltered.slice(startIndex, startIndex + input.request.pageSize);
+  const summary = {
+    ...aggregateSummary(input.rows),
+    hasAutomatedExposure: input.hasAutomatedExposure,
+  };
+
+  for (const item of items) {
+    const componentsSum = item.totalRewardsUsd + item.realizedPnlUsd + item.unrealizedPnlUsd;
+    if (Math.abs(item.totalReturnUsd - componentsSum) > 1) {
+      throw new Error("DEPOSITS_REQUEST_FAILED:RECONCILIATION_DRIFT");
+    }
+  }
+
+  const coveredStartDays = input.rows.map((r) => r.coveredStartDayUtc).filter((v): v is string => Boolean(v));
+  const coveredEndDays = input.rows.map((r) => r.coveredEndDayUtc).filter((v): v is string => Boolean(v));
+
+  return {
+    walletAddress: input.walletAddress,
+    chainId: input.chainId,
+    analysisStatus: input.analysisStatus,
+    coveredRange: {
+      startDayUtc: coveredStartDays.length > 0 ? coveredStartDays.sort()[0] : null,
+      endDayUtc: coveredEndDays.length > 0 ? coveredEndDays.sort().at(-1) ?? null : null,
+    },
+    summary,
+    items,
+    page: {
+      page: input.request.page,
+      pageSize: input.request.pageSize,
+      totalCount,
+      hasMore: startIndex + items.length < totalCount,
+    },
+  };
+}
+
 async function assertDepositsAccessible(input: { walletAddress: string; chainId: number }) {
   const { run, freshness, slices } = await readAnalysisStatusContext(input);
   const failedSlices = slices.filter((slice) => slice.status === "failed").length;
@@ -227,6 +306,41 @@ function assertDepositReconciliation(input: { totalReturnUsd: number; components
   }
 }
 
+export function buildDepositDetailResponse(input: {
+  walletAddress: string;
+  chainId: number;
+  analysisStatus: "ready" | "stale";
+  deposit: NonNullable<Awaited<ReturnType<typeof findDepositDetail>>>;
+}): DepositDetailResponse {
+  assertDepositReconciliation({
+    totalReturnUsd: input.deposit.decomposition.totalReturnUsd,
+    components: [
+      input.deposit.decomposition.rewardsUsd,
+      input.deposit.decomposition.feesUsd,
+      input.deposit.decomposition.assetPriceEffectUsd,
+      input.deposit.decomposition.rebalanceEffectUsd,
+      input.deposit.decomposition.realizedPnlUsd,
+      input.deposit.decomposition.unrealizedPnlUsd,
+      input.deposit.decomposition.unattributedUsd,
+    ],
+  });
+
+  return {
+    walletAddress: input.walletAddress,
+    chainId: input.chainId,
+    analysisStatus: input.analysisStatus,
+    coveredRange: {
+      startDayUtc: input.deposit.coveredStartDayUtc,
+      endDayUtc: input.deposit.coveredEndDayUtc,
+    },
+    deposit: input.deposit,
+    valueChart: {
+      series: deriveValueChartSeries({ deposit: input.deposit }),
+      gaps: deriveValueChartGaps(input.deposit.lifecycle),
+    },
+  };
+}
+
 export async function getDepositsList(input: DepositsListRequest): Promise<DepositsListResponse> {
   const access = await assertDepositsAccessible({
     walletAddress: input.walletAddress,
@@ -244,78 +358,14 @@ export async function getDepositsList(input: DepositsListRequest): Promise<Depos
     }),
   ]);
 
-  const allFiltered = rows.filter((row) => {
-    if (input.status !== "all" && row.status !== input.status) return false;
-    if (input.poolId && row.poolId !== input.poolId) return false;
-    if (input.returnSign === "positive" && row.totalReturnUsd < 0) return false;
-    if (input.returnSign === "negative" && row.totalReturnUsd >= 0) return false;
-    if (!matchesDateRange(row, input.startDayUtc, input.endDayUtc)) return false;
-    return true;
-  });
-
-  allFiltered.sort((left, right) => {
-    let cmp = 0;
-    switch (input.sort) {
-      case "openedAt":
-        cmp = (left.openedAt ?? "").localeCompare(right.openedAt ?? "");
-        break;
-      case "currentValue":
-        cmp = left.currentValueUsd - right.currentValueUsd;
-        break;
-      case "totalReturn":
-        cmp = left.totalReturnUsd - right.totalReturnUsd;
-        break;
-      case "totalRewards":
-        cmp = left.totalRewardsUsd - right.totalRewardsUsd;
-        break;
-      case "estApr":
-        cmp = compareNullableNumber(left.estimatedAnnualizedReturnPct, right.estimatedAnnualizedReturnPct);
-        break;
-    }
-    if (cmp === 0) {
-      cmp = left.depositId.localeCompare(right.depositId);
-    }
-    return input.direction === "asc" ? cmp : -cmp;
-  });
-
-  const totalCount = allFiltered.length;
-  const startIndex = (input.page - 1) * input.pageSize;
-  const items = allFiltered.slice(startIndex, startIndex + input.pageSize);
-  const summary = {
-    ...aggregateSummary(rows),
-    hasAutomatedExposure,
-  };
-
-  // Reconciliation defensive assertion (per data-model §3.10): total_return roughly == components sum.
-  // Read-side guard against drift (engine enforces canonical invariant).
-  for (const item of items) {
-    const componentsSum = item.totalRewardsUsd + item.realizedPnlUsd + item.unrealizedPnlUsd;
-    if (Math.abs(item.totalReturnUsd - componentsSum) > 1) {
-      // Drift > $1 indicates upstream materializer corruption — surface as internal_error.
-      throw new Error("DEPOSITS_REQUEST_FAILED:RECONCILIATION_DRIFT");
-    }
-  }
-
-  const coveredStartDays = rows.map((r) => r.coveredStartDayUtc).filter((v): v is string => Boolean(v));
-  const coveredEndDays = rows.map((r) => r.coveredEndDayUtc).filter((v): v is string => Boolean(v));
-
-  return {
+  return buildDepositsListResponse({
     walletAddress: input.walletAddress,
     chainId: input.chainId,
     analysisStatus: access.analysisStatus,
-    coveredRange: {
-      startDayUtc: coveredStartDays.length > 0 ? coveredStartDays.sort()[0] : null,
-      endDayUtc: coveredEndDays.length > 0 ? coveredEndDays.sort().at(-1) ?? null : null,
-    },
-    summary,
-    items,
-    page: {
-      page: input.page,
-      pageSize: input.pageSize,
-      totalCount,
-      hasMore: startIndex + items.length < totalCount,
-    },
-  };
+    request: input,
+    rows,
+    hasAutomatedExposure,
+  });
 }
 
 export async function getDepositDetail(input: DepositDetailRequest): Promise<DepositDetailResponse> {
@@ -329,31 +379,10 @@ export async function getDepositDetail(input: DepositDetailRequest): Promise<Dep
     throw new Error("DEPOSITS_REQUEST_FAILED:DEPOSIT_NOT_FOUND");
   }
 
-  assertDepositReconciliation({
-    totalReturnUsd: deposit.decomposition.totalReturnUsd,
-    components: [
-      deposit.decomposition.rewardsUsd,
-      deposit.decomposition.feesUsd,
-      deposit.decomposition.assetPriceEffectUsd,
-      deposit.decomposition.rebalanceEffectUsd,
-      deposit.decomposition.realizedPnlUsd,
-      deposit.decomposition.unrealizedPnlUsd,
-      deposit.decomposition.unattributedUsd,
-    ],
-  });
-
-  return {
+  return buildDepositDetailResponse({
     walletAddress: input.walletAddress,
     chainId: input.chainId,
     analysisStatus: access.analysisStatus,
-    coveredRange: {
-      startDayUtc: deposit.coveredStartDayUtc,
-      endDayUtc: deposit.coveredEndDayUtc,
-    },
     deposit,
-    valueChart: {
-      series: deriveValueChartSeries({ deposit }),
-      gaps: deriveValueChartGaps(deposit.lifecycle),
-    },
-  };
+  });
 }

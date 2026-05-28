@@ -93,9 +93,9 @@
 - [X]  [US1] Implement `findDepositSummaries` query in [apps/web/src/server/deposits/deposits.repository.ts](apps/web/src/server/deposits/deposits.repository.ts) honoring status/pool/date/returnSign filters, named sorts, pagination, and computing `totals`, `coveredRange`, and `sparklines`.
 - [X]  [US1] Implement list path of [apps/web/src/server/deposits/deposits.service.ts](apps/web/src/server/deposits/deposits.service.ts) with validation rules from [contracts/deposits-api.md](contracts/deposits-api.md): required `chainId`, allowed enums, ≤ 365-day range, pageSize ∈ {10,25,50}.
 - [X]  [US1] Create [apps/web/src/app/api/deposits/route.ts](apps/web/src/app/api/deposits/route.ts) wiring the App Router `GET` to `deposits.route.ts`; ensure `Cache-Control: no-store` and stable error envelope.
-- [ ] T033 [P] [US1] Author [apps/web/src/server/deposits/deposits.repository.test.ts](apps/web/src/server/deposits/deposits.repository.test.ts) for filter combinations, sort stability, pagination boundaries, and totals math.
-- [ ] T034 [P] [US1] Author [apps/web/src/server/deposits/deposits.service.test.ts](apps/web/src/server/deposits/deposits.service.test.ts) for analysis-ready gating, chain support, error envelope mapping, and 365-day cap.
-- [ ] T035 [P] [US1] Author [apps/web/src/server/deposits/deposits.route.test.ts](apps/web/src/server/deposits/deposits.route.test.ts) covering authenticated success, `wallet_not_authenticated`, `chain_unsupported`, `analysis_not_ready`, and `invalid_request` cases.
+- [X] T033 [P] [US1] Author [apps/web/src/server/deposits/deposits.repository.test.ts](apps/web/src/server/deposits/deposits.repository.test.ts) for filter combinations, sort stability, pagination boundaries, and totals math.
+- [X] T034 [P] [US1] Author [apps/web/src/server/deposits/deposits.service.test.ts](apps/web/src/server/deposits/deposits.service.test.ts) for analysis-ready gating, chain support, error envelope mapping, and 365-day cap.
+- [X] T035 [P] [US1] Author [apps/web/src/server/deposits/deposits.route.test.ts](apps/web/src/server/deposits/deposits.route.test.ts) covering authenticated success, `wallet_not_authenticated`, `chain_unsupported`, `analysis_not_ready`, and `invalid_request` cases.
 
 ### List UI composition
 
@@ -134,7 +134,7 @@
 - [X] T052 [US2] Implement `findDepositDetail` in [apps/web/src/server/deposits/deposits.repository.ts](apps/web/src/server/deposits/deposits.repository.ts) with a single summary read, a single decomposition read, and an ordered scan of lifecycle events.
 - [X] T053 [US2] Implement detail path of [apps/web/src/server/deposits/deposits.service.ts](apps/web/src/server/deposits/deposits.service.ts) with `deposit_not_found` (ownership check), defensive reconciliation assertion that maps to `internal_error` on violation, and derivation of the `valueChart` series + `gaps` from the ordered lifecycle events per data-model §6 (FR-009).
 - [X] T054 [US2] Create [apps/web/src/app/api/deposits/[depositId]/route.ts](apps/web/src/app/api/deposits/[depositId]/route.ts) wiring `GET` to the service.
-- [ ] T055 [P] [US2] Extend [apps/web/src/server/deposits/deposits.repository.test.ts](apps/web/src/server/deposits/deposits.repository.test.ts) with detail-shape assertions.
+- [X] T055 [P] [US2] Extend [apps/web/src/server/deposits/deposits.repository.test.ts](apps/web/src/server/deposits/deposits.repository.test.ts) with detail-shape assertions.
 - [ ] T056 [P] [US2] Extend [apps/web/src/server/deposits/deposits.route.test.ts](apps/web/src/server/deposits/deposits.route.test.ts) covering `deposit_not_found`, ownership mismatch, and reconciliation defensive failure.
 
 ### Detail UI composition

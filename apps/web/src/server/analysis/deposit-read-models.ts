@@ -151,7 +151,7 @@ function pricePointKey(tokenAddress: string, dayUtc: string) {
   return `${tokenAddress}:${dayUtc}`;
 }
 
-function parseFeeTierBps(feeTierLabel: string | null): number | null {
+export function parseFeeTierBps(feeTierLabel: string | null): number | null {
   if (!feeTierLabel) return null;
   const match = /([0-9]+(?:\.[0-9]+)?)\s*%/.exec(feeTierLabel);
   if (!match) return null;
@@ -160,7 +160,7 @@ function parseFeeTierBps(feeTierLabel: string | null): number | null {
   return Math.round(pct * 10_000);
 }
 
-function derivePositionLabel(input: {
+export function derivePositionLabel(input: {
   tokenSymbols: string[];
   feeTierLabel: string | null;
   poolKind: string;
@@ -174,7 +174,7 @@ function derivePositionLabel(input: {
   return `${segments.join(" · ")}${idSuffix}`;
 }
 
-function derivePositionStatus(input: { rawStatus: string; isInRange: boolean | null }) {
+export function derivePositionStatus(input: { rawStatus: string; isInRange: boolean | null }) {
   if (input.rawStatus === "closed") {
     return "closed" as const;
   }
@@ -195,7 +195,7 @@ function normalizeCoverageStatus(value: string | null): "full" | "share_level" |
   }
 }
 
-function deriveConfidence(input: {
+export function deriveConfidence(input: {
   coverageStatus: "full" | "share_level" | "partial" | "unknown";
   openedByTransferIn: boolean;
 }): "high" | "medium" | "degraded" | "unknown" {
@@ -262,6 +262,24 @@ type RewardLikeRow = {
   }>;
 };
 
+type DepositTimelineRow = {
+  id: string;
+  relatedDepositId: string | null;
+  eventType: string;
+  occurredAt: Date;
+  sourceLedgerEventId: string | null;
+  confidence: string | null;
+  coverageStatus: string | null;
+  attributedValueUsd: unknown;
+  metadataJson: Record<string, unknown> | null;
+};
+
+type LifecycleLedgerRow = {
+  txHash: string;
+  logIndex: number;
+  metadataJson: unknown;
+};
+
 function buildEmptyAggregate(): DepositTimelineAggregate {
   return {
     capitalEnteredUsd: 0,
@@ -296,7 +314,7 @@ function summarizeSingleTokenMovements(movements: PricedMovement[]) {
   };
 }
 
-function resolveMintValuationUsd(input: {
+export function resolveMintValuationUsd(input: {
   deposit: DepositRow;
   mintLedgerEventByTxHash: Map<string, { id: string; occurredAt: Date }>;
   movementsByLedgerEventId: Map<string, Array<{ tokenAddress: string; amountRaw: string; symbol: string | null }>>;
@@ -416,7 +434,7 @@ export function resolveUsdValuation(input: {
   };
 }
 
-function buildSignedTokenDeltas(input: {
+export function buildSignedTokenDeltas(input: {
   occurredAt: Date;
   movements: Array<{
     tokenAddress: string;
@@ -474,6 +492,381 @@ function buildSignedTokenDeltas(input: {
     deltas,
     reasonCodes: mergeReasonCodes(reasonCodes),
     eventPriceSource,
+  };
+}
+
+export function buildDepositReadModelRows(input: {
+  runId: string;
+  walletAddress: string;
+  chainId: number;
+  startDayUtc: string;
+  endDayUtc: string;
+  capturedAt: Date;
+  eligibleDeposits: Array<DepositRow & { poolId: string }>;
+  poolById: Map<string, PoolRow>;
+  aggregates: Map<string, DepositTimelineAggregate>;
+  rewardsByDepositId: Map<string, number>;
+  mintLedgerEventByTxHash: Map<string, { id: string; occurredAt: Date }>;
+  mintOutflowsByLedgerEventId: Map<string, Array<{ tokenAddress: string; amountRaw: string; symbol: string | null }>>;
+  priceByTokenDay: Map<string, number>;
+  timelineRows: DepositTimelineRow[];
+  lifecycleLedgerById: Map<string, LifecycleLedgerRow>;
+  pricedLifecycleMovements: Map<string, PricedMovement[]>;
+  inferredActionIdByLedgerEventId: Map<string, string>;
+  strategyIdByPoolId: Map<string, string>;
+  resolvedRewardRows: RewardLikeRow[];
+}) {
+  const lifecycleRowsToInsert: Array<typeof depositLifecycleEvents.$inferInsert> = [];
+  const decompositionRowsToInsert: Array<typeof depositPerformanceDecompositions.$inferInsert> = [];
+
+  const summaryRows = input.eligibleDeposits.map((deposit) => {
+    const pool = input.poolById.get(deposit.poolId);
+    const depositMetadata = asRecord(deposit.metadataJson);
+    const depositRuntimeMetadata = asRecord(depositMetadata.metadata);
+    const poolMetadata = (pool?.metadataJson as Record<string, unknown> | undefined) ?? {};
+    const mintTxHash = typeof deposit.mintTxHash === "string" ? deposit.mintTxHash.toLowerCase() : null;
+    const tokenSymbols = [
+      asString(depositMetadata.primaryTokenSymbol),
+      asString(depositMetadata.secondaryTokenSymbol),
+    ].filter((value): value is string => Boolean(value));
+    const resolvedTokenSymbols = tokenSymbols.length > 0 ? tokenSymbols : asStringArray(poolMetadata.tokenSymbols);
+    const feeTierLabel = asString(depositRuntimeMetadata.feeTierLabel) ?? asString(poolMetadata.feeTierLabel);
+    const poolKind = asString(poolMetadata.poolType) ?? "cl";
+    const aggregate = input.aggregates.get(deposit.id) ?? buildEmptyAggregate();
+    const rewards = input.rewardsByDepositId.get(deposit.id) ?? 0;
+    const currentValueFromMetadataUsd = asNullableNumber(depositMetadata.valueUsd);
+    const isInRange = asBoolean(depositRuntimeMetadata.isInRange);
+    const openedValueUsd = resolveMintValuationUsd({
+      deposit,
+      mintLedgerEventByTxHash: input.mintLedgerEventByTxHash,
+      movementsByLedgerEventId: input.mintOutflowsByLedgerEventId,
+      priceByTokenDay: input.priceByTokenDay,
+    }) ?? aggregate.openedValueUsd;
+    const status = derivePositionStatus({ rawStatus: deposit.status, isInRange });
+    const coverageStatus = normalizeCoverageStatus(deposit.coverageStatus);
+
+    const capitalEntered = openedValueUsd > 0 ? openedValueUsd : aggregate.capitalEnteredUsd;
+    const closedWithoutWithdrawalEvent =
+      status === "closed" && aggregate.capitalWithdrawnUsd === 0 && capitalEntered > 0;
+    const capitalWithdrawn = closedWithoutWithdrawalEvent
+      ? capitalEntered
+      : aggregate.capitalWithdrawnUsd;
+    const netInvested = Math.max(capitalEntered - capitalWithdrawn, 0);
+    const currentValueUsd = status === "closed" ? 0 : (currentValueFromMetadataUsd ?? netInvested);
+
+    const realizedPnlUsd = status === "closed" ? capitalWithdrawn - capitalEntered : 0;
+    const unrealizedPnlUsd = status === "closed" ? 0 : currentValueUsd - netInvested;
+    const totalReturnUsd = rewards + realizedPnlUsd + unrealizedPnlUsd;
+    const totalReturnPct = capitalEntered > 0 ? totalReturnUsd / capitalEntered : null;
+
+    let estimatedAnnualizedReturnPct: number | null = null;
+    if (aggregate.openedAt && totalReturnPct !== null) {
+      const endRef = aggregate.closedAt ?? input.capturedAt;
+      const days = Math.max(1, Math.round((endRef.getTime() - aggregate.openedAt.getTime()) / MS_PER_DAY));
+      estimatedAnnualizedReturnPct = totalReturnPct * (365 / days);
+    }
+
+    const positionLabel = derivePositionLabel({
+      tokenSymbols: resolvedTokenSymbols,
+      feeTierLabel,
+      poolKind,
+      tokenId: deposit.tokenId,
+    });
+
+    const openingTimelineRow = input.timelineRows.find((row) => row.relatedDepositId === deposit.id && (
+      row.eventType === "deposit" || row.eventType === "rebalance" || row.eventType === "redeploy"
+    ));
+    const openingLedgerEvent = mintTxHash ? input.mintLedgerEventByTxHash.get(mintTxHash) : null;
+    const lifecycleCandidates: Array<{
+      occurredAt: Date;
+      logIndex: number;
+      eventType: string;
+      txHash: string;
+      blockNumber: number;
+      usdValue: number | null;
+      signedTokenDeltas: unknown[];
+      priceSource: "event" | "pricePointFallback" | "unavailable" | null;
+      confidence: "high" | "medium" | "degraded" | "unknown";
+      inferredActionId: string | null;
+      coverageReasonCodes: string[];
+      metadataJson: Record<string, unknown>;
+    }> = [];
+
+    if (openingLedgerEvent) {
+      const openingMovements = input.pricedLifecycleMovements.get(openingLedgerEvent.id) ?? [];
+      const openingDeltas = buildSignedTokenDeltas({
+        occurredAt: openingLedgerEvent.occurredAt,
+        movements: openingMovements,
+        priceByTokenDay: input.priceByTokenDay,
+      });
+      lifecycleCandidates.push({
+        occurredAt: openingLedgerEvent.occurredAt,
+        logIndex: 0,
+        eventType: aggregate.openedByTransferIn ? "transfer_in" : "mint_position",
+        txHash: mintTxHash ?? "unknown",
+        blockNumber: 0,
+        usdValue: openingDeltas.signedUsdTotal,
+        signedTokenDeltas: openingDeltas.deltas,
+        priceSource: openingDeltas.eventPriceSource,
+        confidence: normalizeDepositConfidence(aggregate.openedByTransferIn ? "degraded" : coverageStatus === "full" ? "high" : "medium"),
+        inferredActionId: null,
+        coverageReasonCodes: mergeReasonCodes(openingDeltas.reasonCodes, aggregate.openedByTransferIn ? ["transferInOrigin"] : []),
+        metadataJson: {
+          source: "mint_ledger_event",
+        },
+      });
+    } else if (openingTimelineRow) {
+      const ledgerEvent = openingTimelineRow.sourceLedgerEventId ? input.lifecycleLedgerById.get(openingTimelineRow.sourceLedgerEventId) : null;
+      const openingMovements = openingTimelineRow.sourceLedgerEventId
+        ? (input.pricedLifecycleMovements.get(openingTimelineRow.sourceLedgerEventId) ?? [])
+        : [];
+      const openingDeltas = buildSignedTokenDeltas({
+        occurredAt: openingTimelineRow.occurredAt,
+        movements: openingMovements,
+        priceByTokenDay: input.priceByTokenDay,
+      });
+      lifecycleCandidates.push({
+        occurredAt: openingTimelineRow.occurredAt,
+        logIndex: ledgerEvent?.logIndex ?? 0,
+        eventType: aggregate.openedByTransferIn ? "transfer_in" : "mint_position",
+        txHash: ledgerEvent?.txHash ?? "unknown",
+        blockNumber: resolveBlockNumber(ledgerEvent?.metadataJson),
+        usdValue: openingDeltas.signedUsdTotal !== 0 ? openingDeltas.signedUsdTotal : asNullableNumber(openingTimelineRow.attributedValueUsd),
+        signedTokenDeltas: openingDeltas.deltas,
+        priceSource: openingDeltas.eventPriceSource,
+        confidence: normalizeDepositConfidence(openingTimelineRow.confidence),
+        inferredActionId: openingTimelineRow.sourceLedgerEventId ? (input.inferredActionIdByLedgerEventId.get(openingTimelineRow.sourceLedgerEventId) ?? null) : null,
+        coverageReasonCodes: deriveTimelineCoverageReasonCodes({
+          valuationReasonCodes: openingDeltas.reasonCodes,
+          coverageStatus: openingTimelineRow.coverageStatus,
+          confidence: openingTimelineRow.confidence,
+          openedByTransferIn: aggregate.openedByTransferIn,
+        }),
+        metadataJson: {
+          source: "timeline_opening_event",
+          timelineEventType: openingTimelineRow.eventType,
+        },
+      });
+    }
+
+    const depositTimelineRows = input.timelineRows.filter((row) => row.relatedDepositId === deposit.id);
+    for (const row of depositTimelineRows) {
+      const isOpeningEvent = row === openingTimelineRow;
+      if (isOpeningEvent && openingLedgerEvent) {
+        continue;
+      }
+
+      const eventType = mapTimelineEventToLifecycleType({
+        rawEventType: row.eventType,
+        isOpeningEvent,
+        openedByTransferIn: aggregate.openedByTransferIn,
+      });
+      if (!eventType) continue;
+
+      const ledgerEvent = row.sourceLedgerEventId ? input.lifecycleLedgerById.get(row.sourceLedgerEventId) : null;
+      const movements = row.sourceLedgerEventId ? (input.pricedLifecycleMovements.get(row.sourceLedgerEventId) ?? []) : [];
+      const eventDeltas = buildSignedTokenDeltas({
+        occurredAt: row.occurredAt,
+        movements,
+        priceByTokenDay: input.priceByTokenDay,
+      });
+
+      lifecycleCandidates.push({
+        occurredAt: row.occurredAt,
+        logIndex: ledgerEvent?.logIndex ?? 0,
+        eventType,
+        txHash: ledgerEvent?.txHash ?? "unknown",
+        blockNumber: resolveBlockNumber(ledgerEvent?.metadataJson),
+        usdValue: eventDeltas.signedUsdTotal !== 0 ? eventDeltas.signedUsdTotal : asNullableNumber(row.attributedValueUsd),
+        signedTokenDeltas: eventDeltas.deltas,
+        priceSource: eventDeltas.eventPriceSource,
+        confidence: normalizeDepositConfidence(row.confidence),
+        inferredActionId: row.sourceLedgerEventId ? (input.inferredActionIdByLedgerEventId.get(row.sourceLedgerEventId) ?? null) : null,
+        coverageReasonCodes: deriveTimelineCoverageReasonCodes({
+          valuationReasonCodes: eventDeltas.reasonCodes,
+          coverageStatus: row.coverageStatus,
+          confidence: row.confidence,
+        }),
+        metadataJson: {
+          source: "pool_timeline_event",
+          timelineEventType: row.eventType,
+          timelineEventId: row.id,
+        },
+      });
+    }
+
+    const depositRewardRows = input.resolvedRewardRows.filter((row) => row.depositOrStrategyId === deposit.id);
+    for (const row of depositRewardRows) {
+      lifecycleCandidates.push({
+        occurredAt: row.occurredAt,
+        logIndex: row.logIndex,
+        eventType: "claim_reward",
+        txHash: row.txHash,
+        blockNumber: asInteger(asRecord(row.metadataJson).blockNumber) ?? 0,
+        usdValue: row.resolvedAmountUsd,
+        signedTokenDeltas: row.resolvedTokenDeltas,
+        priceSource: row.priceSource,
+        confidence: normalizeDepositConfidence(row.reasonCodes.length > 0 ? "degraded" : "high"),
+        inferredActionId: null,
+        coverageReasonCodes: row.reasonCodes,
+        metadataJson: {
+          source: "reward_event",
+          rewardEventId: row.id,
+          rewardType: row.rewardType,
+          resolutionStatus: row.resolutionStatus,
+        },
+      });
+    }
+
+    lifecycleCandidates.sort((left, right) => {
+      const timeDelta = left.occurredAt.getTime() - right.occurredAt.getTime();
+      if (timeDelta !== 0) return timeDelta;
+      return left.logIndex - right.logIndex;
+    });
+
+    const lifecycleReasonCodes = mergeReasonCodes(...lifecycleCandidates.map((candidate) => candidate.coverageReasonCodes));
+
+    lifecycleCandidates.forEach((candidate, index) => {
+      lifecycleRowsToInsert.push({
+        chainId: input.chainId,
+        walletAddress: input.walletAddress,
+        depositId: deposit.id,
+        sequenceIndex: index + 1,
+        latestRunId: input.runId,
+        eventType: candidate.eventType,
+        occurredAt: candidate.occurredAt,
+        txHash: candidate.txHash,
+        logIndex: candidate.logIndex,
+        blockNumber: candidate.blockNumber,
+        usdValue: candidate.usdValue !== null ? String(candidate.usdValue) : null,
+        signedTokenDeltas: candidate.signedTokenDeltas,
+        priceSource: candidate.priceSource,
+        confidence: candidate.confidence,
+        inferredActionId: candidate.inferredActionId,
+        coverageReasonCodes: candidate.coverageReasonCodes,
+        metadataJson: candidate.metadataJson,
+      });
+    });
+
+    const baseReasonCodes = deriveCoverageReasonCodes({
+      coverageStatus,
+      openedByTransferIn: aggregate.openedByTransferIn,
+    });
+    if (poolKind === "cl" && status !== "closed" && isInRange === null) {
+      baseReasonCodes.push("rangeUnavailable");
+    }
+
+    const reasonCodes = mergeReasonCodes(baseReasonCodes, lifecycleReasonCodes);
+    const finalCoverageStatus = reasonCodes.length > 0 && coverageStatus === "full"
+      ? "partial"
+      : coverageStatus;
+    const confidence = deriveConfidence({
+      coverageStatus: finalCoverageStatus,
+      openedByTransferIn: aggregate.openedByTransferIn,
+    });
+
+    const rewardsUsd = rewards;
+    const feesUsd = 0;
+    const assetPriceEffectUsd = 0;
+    const rebalanceEffectUsd = 0;
+    const unattributedUsd = totalReturnUsd - (
+      rewardsUsd +
+      feesUsd +
+      assetPriceEffectUsd +
+      rebalanceEffectUsd +
+      realizedPnlUsd +
+      unrealizedPnlUsd
+    );
+    const unattributedReasonCodes = Math.abs(unattributedUsd) > 1e-9
+      ? mergeReasonCodes(reasonCodes, ["unattributedResidual"])
+      : reasonCodes;
+    const denominator = totalReturnUsd === 0 ? null : totalReturnUsd;
+
+    decompositionRowsToInsert.push({
+      chainId: input.chainId,
+      walletAddress: input.walletAddress,
+      depositId: deposit.id,
+      latestRunId: input.runId,
+      totalReturnUsd: String(totalReturnUsd),
+      rewardsUsd: String(rewardsUsd),
+      feesUsd: String(feesUsd),
+      assetPriceEffectUsd: String(assetPriceEffectUsd),
+      rebalanceEffectUsd: String(rebalanceEffectUsd),
+      realizedPnlUsd: String(realizedPnlUsd),
+      unrealizedPnlUsd: String(unrealizedPnlUsd),
+      unattributedUsd: String(unattributedUsd),
+      unattributedReasonCodes,
+      componentPercentages: denominator === null
+        ? {}
+        : {
+            rewardsUsd: rewardsUsd / denominator,
+            feesUsd: feesUsd / denominator,
+            assetPriceEffectUsd: assetPriceEffectUsd / denominator,
+            rebalanceEffectUsd: rebalanceEffectUsd / denominator,
+            realizedPnlUsd: realizedPnlUsd / denominator,
+            unrealizedPnlUsd: unrealizedPnlUsd / denominator,
+            unattributedUsd: unattributedUsd / denominator,
+          },
+    });
+
+    return {
+      chainId: input.chainId,
+      walletAddress: input.walletAddress,
+      depositId: deposit.id,
+      poolId: deposit.poolId,
+      latestRunId: input.runId,
+      positionLabel,
+      poolKind,
+      feeTierBps: parseFeeTierBps(feeTierLabel),
+      tokenId: deposit.tokenId,
+      token0Address: pool?.token0Address ?? null,
+      token0Symbol: resolvedTokenSymbols[0] ?? null,
+      token1Address: pool?.token1Address ?? null,
+      token1Symbol: resolvedTokenSymbols[1] ?? null,
+      status,
+      openedAt: aggregate.openedAt,
+      closedAt:
+        aggregate.closedAt ??
+        (status === "closed" ? (deposit.updatedAt instanceof Date ? deposit.updatedAt : null) : null),
+      openedByTransferIn: aggregate.openedByTransferIn,
+      openedValueUsd: openedValueUsd.toString(),
+      currentValueUsd: currentValueUsd.toString(),
+      capitalEnteredUsd: capitalEntered.toString(),
+      capitalWithdrawnUsd: capitalWithdrawn.toString(),
+      totalRewardsUsd: rewards.toString(),
+      realizedPnlUsd: realizedPnlUsd.toString(),
+      unrealizedPnlUsd: unrealizedPnlUsd.toString(),
+      totalReturnUsd: totalReturnUsd.toString(),
+      totalReturnPct: totalReturnPct !== null ? totalReturnPct.toString() : null,
+      estimatedAnnualizedReturnPct:
+        estimatedAnnualizedReturnPct !== null ? estimatedAnnualizedReturnPct.toString() : null,
+      tickLower: asInteger(depositRuntimeMetadata.rangeLowerTick),
+      tickUpper: asInteger(depositRuntimeMetadata.rangeUpperTick),
+      rangeLowerPrice:
+        asNullableNumber(depositRuntimeMetadata.rangeLowerPrice) !== null
+          ? String(asNullableNumber(depositRuntimeMetadata.rangeLowerPrice))
+          : null,
+      rangeUpperPrice:
+        asNullableNumber(depositRuntimeMetadata.rangeUpperPrice) !== null
+          ? String(asNullableNumber(depositRuntimeMetadata.rangeUpperPrice))
+          : null,
+      isInRange: status === "closed" ? null : isInRange,
+      coverageStatus: finalCoverageStatus,
+      confidence,
+      coverageReasonCodes: reasonCodes,
+      coveredStartDayUtc: input.startDayUtc,
+      coveredEndDayUtc: input.endDayUtc,
+      mellowStrategyCrossLinkId: input.strategyIdByPoolId.get(deposit.poolId) ?? null,
+      metadataJson: {
+        materializerVersion: "010-detail-1",
+      } as Record<string, unknown>,
+    };
+  });
+
+  return {
+    summaryRows,
+    lifecycleRowsToInsert,
+    decompositionRowsToInsert,
   };
 }
 
@@ -1231,360 +1624,26 @@ export async function materializeDepositReadModels(
     rewardsByDepositId.set(row.depositOrStrategyId, prev + row.resolvedAmountUsd);
   }
 
-  const lifecycleRowsToInsert: Array<typeof depositLifecycleEvents.$inferInsert> = [];
-  const decompositionRowsToInsert: Array<typeof depositPerformanceDecompositions.$inferInsert> = [];
-  const lifecycleReasonCodesByDepositId = new Map<string, string[]>();
-
-  const summaryRows = eligibleDeposits.map((deposit) => {
-    const pool = poolById.get(deposit.poolId);
-    const depositMetadata = asRecord(deposit.metadataJson);
-    const depositRuntimeMetadata = asRecord(depositMetadata.metadata);
-    const poolMetadata = (pool?.metadataJson as Record<string, unknown> | undefined) ?? {};
-    const mintTxHash = typeof deposit.mintTxHash === "string" ? deposit.mintTxHash.toLowerCase() : null;
-    const tokenSymbols = [
-      asString(depositMetadata.primaryTokenSymbol),
-      asString(depositMetadata.secondaryTokenSymbol),
-    ].filter((value): value is string => Boolean(value));
-    const resolvedTokenSymbols = tokenSymbols.length > 0 ? tokenSymbols : asStringArray(poolMetadata.tokenSymbols);
-    const feeTierLabel = asString(depositRuntimeMetadata.feeTierLabel) ?? asString(poolMetadata.feeTierLabel);
-    const poolKind = asString(poolMetadata.poolType) ?? "cl";
-    const aggregate = aggregates.get(deposit.id) ?? buildEmptyAggregate();
-    const rewards = rewardsByDepositId.get(deposit.id) ?? 0;
-    const currentValueFromMetadataUsd = asNullableNumber(depositMetadata.valueUsd);
-    const isInRange = asBoolean(depositRuntimeMetadata.isInRange);
-    const openedValueUsd = resolveMintValuationUsd({
-      deposit,
-      mintLedgerEventByTxHash,
-      movementsByLedgerEventId: mintOutflowsByLedgerEventId,
-      priceByTokenDay,
-    }) ?? aggregate.openedValueUsd;
-    const status = derivePositionStatus({ rawStatus: deposit.status, isInRange });
-    const coverageStatus = normalizeCoverageStatus(deposit.coverageStatus);
-
-    const capitalEntered = openedValueUsd > 0 ? openedValueUsd : aggregate.capitalEnteredUsd;
-    // Capital-preservation fallback: when a deposit is closed but the timeline
-    // didn't record an explicit withdraw/close (typical for rebalance-driven
-    // exits where capital rolled into a successor deposit), assume the
-    // entered capital was preserved. Real PnL attribution arrives with US2.
-    const closedWithoutWithdrawalEvent =
-      status === "closed" && aggregate.capitalWithdrawnUsd === 0 && capitalEntered > 0;
-    const capitalWithdrawn = closedWithoutWithdrawalEvent
-      ? capitalEntered
-      : aggregate.capitalWithdrawnUsd;
-    const netInvested = Math.max(capitalEntered - capitalWithdrawn, 0);
-    const currentValueUsd = status === "closed" ? 0 : (currentValueFromMetadataUsd ?? netInvested);
-
-    const realizedPnlUsd = status === "closed" ? capitalWithdrawn - capitalEntered : 0;
-    const unrealizedPnlUsd = status === "closed" ? 0 : currentValueUsd - netInvested;
-    const totalReturnUsd = rewards + realizedPnlUsd + unrealizedPnlUsd;
-    const totalReturnPct = capitalEntered > 0 ? totalReturnUsd / capitalEntered : null;
-
-    let estimatedAnnualizedReturnPct: number | null = null;
-    if (aggregate.openedAt && totalReturnPct !== null) {
-      const endRef = aggregate.closedAt ?? input.capturedAt;
-      const days = Math.max(1, Math.round((endRef.getTime() - aggregate.openedAt.getTime()) / MS_PER_DAY));
-      estimatedAnnualizedReturnPct = totalReturnPct * (365 / days);
-    }
-
-    const positionLabel = derivePositionLabel({
-      tokenSymbols: resolvedTokenSymbols,
-      feeTierLabel,
-      poolKind,
-      tokenId: deposit.tokenId,
-    });
-
-    const openingTimelineRow = timelineRows.find((row) => row.relatedDepositId === deposit.id && (
-      row.eventType === "deposit" || row.eventType === "rebalance" || row.eventType === "redeploy"
-    ));
-    const openingLedgerEvent = mintTxHash ? mintLedgerEventByTxHash.get(mintTxHash) : null;
-    const lifecycleCandidates: Array<{
-      occurredAt: Date;
-      logIndex: number;
-      eventType: string;
-      txHash: string;
-      blockNumber: number;
-      usdValue: number | null;
-      signedTokenDeltas: unknown[];
-      priceSource: "event" | "pricePointFallback" | "unavailable" | null;
-      confidence: "high" | "medium" | "degraded" | "unknown";
-      inferredActionId: string | null;
-      coverageReasonCodes: string[];
-      metadataJson: Record<string, unknown>;
-    }> = [];
-
-    if (openingLedgerEvent) {
-      const openingMovements = pricedLifecycleMovements.get(openingLedgerEvent.id) ?? [];
-      const openingDeltas = buildSignedTokenDeltas({
-        occurredAt: openingLedgerEvent.occurredAt,
-        movements: openingMovements,
-        priceByTokenDay,
-      });
-      lifecycleCandidates.push({
-        occurredAt: openingLedgerEvent.occurredAt,
-        logIndex: 0,
-        eventType: aggregate.openedByTransferIn ? "transfer_in" : "mint_position",
-        txHash: mintTxHash ?? "unknown",
-        blockNumber: 0,
-        usdValue: openingDeltas.signedUsdTotal,
-        signedTokenDeltas: openingDeltas.deltas,
-        priceSource: openingDeltas.eventPriceSource,
-        confidence: normalizeDepositConfidence(aggregate.openedByTransferIn ? "degraded" : coverageStatus === "full" ? "high" : "medium"),
-        inferredActionId: null,
-        coverageReasonCodes: mergeReasonCodes(openingDeltas.reasonCodes, aggregate.openedByTransferIn ? ["transferInOrigin"] : []),
-        metadataJson: {
-          source: "mint_ledger_event",
-        },
-      });
-    } else if (openingTimelineRow) {
-      const ledgerEvent = openingTimelineRow.sourceLedgerEventId ? lifecycleLedgerById.get(openingTimelineRow.sourceLedgerEventId) : null;
-      const openingMovements = openingTimelineRow.sourceLedgerEventId
-        ? (pricedLifecycleMovements.get(openingTimelineRow.sourceLedgerEventId) ?? [])
-        : [];
-      const openingDeltas = buildSignedTokenDeltas({
-        occurredAt: openingTimelineRow.occurredAt,
-        movements: openingMovements,
-        priceByTokenDay,
-      });
-      lifecycleCandidates.push({
-        occurredAt: openingTimelineRow.occurredAt,
-        logIndex: ledgerEvent?.logIndex ?? 0,
-        eventType: aggregate.openedByTransferIn ? "transfer_in" : "mint_position",
-        txHash: ledgerEvent?.txHash ?? "unknown",
-        blockNumber: resolveBlockNumber(ledgerEvent?.metadataJson),
-        usdValue: openingDeltas.signedUsdTotal !== 0 ? openingDeltas.signedUsdTotal : asNullableNumber(openingTimelineRow.attributedValueUsd),
-        signedTokenDeltas: openingDeltas.deltas,
-        priceSource: openingDeltas.eventPriceSource,
-        confidence: normalizeDepositConfidence(openingTimelineRow.confidence),
-        inferredActionId: openingTimelineRow.sourceLedgerEventId ? (inferredActionIdByLedgerEventId.get(openingTimelineRow.sourceLedgerEventId) ?? null) : null,
-        coverageReasonCodes: deriveTimelineCoverageReasonCodes({
-          valuationReasonCodes: openingDeltas.reasonCodes,
-          coverageStatus: openingTimelineRow.coverageStatus,
-          confidence: openingTimelineRow.confidence,
-          openedByTransferIn: aggregate.openedByTransferIn,
-        }),
-        metadataJson: {
-          source: "timeline_opening_event",
-          timelineEventType: openingTimelineRow.eventType,
-        },
-      });
-    }
-
-    const depositTimelineRows = timelineRows.filter((row) => row.relatedDepositId === deposit.id);
-    for (const row of depositTimelineRows) {
-      const isOpeningEvent = row === openingTimelineRow;
-      if (isOpeningEvent && openingLedgerEvent) {
-        continue;
-      }
-
-      const eventType = mapTimelineEventToLifecycleType({
-        rawEventType: row.eventType,
-        isOpeningEvent,
-        openedByTransferIn: aggregate.openedByTransferIn,
-      });
-      if (!eventType) continue;
-
-      const ledgerEvent = row.sourceLedgerEventId ? lifecycleLedgerById.get(row.sourceLedgerEventId) : null;
-      const movements = row.sourceLedgerEventId ? (pricedLifecycleMovements.get(row.sourceLedgerEventId) ?? []) : [];
-      const eventDeltas = buildSignedTokenDeltas({
-        occurredAt: row.occurredAt,
-        movements,
-        priceByTokenDay,
-      });
-
-      lifecycleCandidates.push({
-        occurredAt: row.occurredAt,
-        logIndex: ledgerEvent?.logIndex ?? 0,
-        eventType,
-        txHash: ledgerEvent?.txHash ?? "unknown",
-        blockNumber: resolveBlockNumber(ledgerEvent?.metadataJson),
-        usdValue: eventDeltas.signedUsdTotal !== 0 ? eventDeltas.signedUsdTotal : asNullableNumber(row.attributedValueUsd),
-        signedTokenDeltas: eventDeltas.deltas,
-        priceSource: eventDeltas.eventPriceSource,
-        confidence: normalizeDepositConfidence(row.confidence),
-        inferredActionId: row.sourceLedgerEventId ? (inferredActionIdByLedgerEventId.get(row.sourceLedgerEventId) ?? null) : null,
-        coverageReasonCodes: deriveTimelineCoverageReasonCodes({
-          valuationReasonCodes: eventDeltas.reasonCodes,
-          coverageStatus: row.coverageStatus,
-          confidence: row.confidence,
-        }),
-        metadataJson: {
-          source: "pool_timeline_event",
-          timelineEventType: row.eventType,
-          timelineEventId: row.id,
-        },
-      });
-    }
-
-    const depositRewardRows = resolvedRewardRows.filter((row) => row.depositOrStrategyId === deposit.id);
-    for (const row of depositRewardRows) {
-      lifecycleCandidates.push({
-        occurredAt: row.occurredAt,
-        logIndex: row.logIndex,
-        eventType: "claim_reward",
-        txHash: row.txHash,
-        blockNumber: asInteger(asRecord(row.metadataJson).blockNumber) ?? 0,
-        usdValue: row.resolvedAmountUsd,
-        signedTokenDeltas: row.resolvedTokenDeltas,
-        priceSource: row.priceSource,
-        confidence: normalizeDepositConfidence(row.reasonCodes.length > 0 ? "degraded" : "high"),
-        inferredActionId: null,
-        coverageReasonCodes: row.reasonCodes,
-        metadataJson: {
-          source: "reward_event",
-          rewardEventId: row.id,
-          rewardType: row.rewardType,
-          resolutionStatus: row.resolutionStatus,
-        },
-      });
-    }
-
-    lifecycleCandidates.sort((left, right) => {
-      const timeDelta = left.occurredAt.getTime() - right.occurredAt.getTime();
-      if (timeDelta !== 0) return timeDelta;
-      return left.logIndex - right.logIndex;
-    });
-
-    const lifecycleReasonCodes = mergeReasonCodes(...lifecycleCandidates.map((candidate) => candidate.coverageReasonCodes));
-    lifecycleReasonCodesByDepositId.set(deposit.id, lifecycleReasonCodes);
-
-    lifecycleCandidates.forEach((candidate, index) => {
-      lifecycleRowsToInsert.push({
-        chainId: input.chainId,
-        walletAddress: input.walletAddress,
-        depositId: deposit.id,
-        sequenceIndex: index + 1,
-        latestRunId: input.runId,
-        eventType: candidate.eventType,
-        occurredAt: candidate.occurredAt,
-        txHash: candidate.txHash,
-        logIndex: candidate.logIndex,
-        blockNumber: candidate.blockNumber,
-        usdValue: candidate.usdValue !== null ? String(candidate.usdValue) : null,
-        signedTokenDeltas: candidate.signedTokenDeltas,
-        priceSource: candidate.priceSource,
-        confidence: candidate.confidence,
-        inferredActionId: candidate.inferredActionId,
-        coverageReasonCodes: candidate.coverageReasonCodes,
-        metadataJson: candidate.metadataJson,
-      });
-    });
-
-    const baseReasonCodes = deriveCoverageReasonCodes({
-      coverageStatus,
-      openedByTransferIn: aggregate.openedByTransferIn,
-    });
-    if (poolKind === "cl" && status !== "closed" && isInRange === null) {
-      baseReasonCodes.push("rangeUnavailable");
-    }
-
-    const reasonCodes = mergeReasonCodes(baseReasonCodes, lifecycleReasonCodes);
-    const finalCoverageStatus = reasonCodes.length > 0 && coverageStatus === "full"
-      ? "partial"
-      : coverageStatus;
-    const confidence = deriveConfidence({
-      coverageStatus: finalCoverageStatus,
-      openedByTransferIn: aggregate.openedByTransferIn,
-    });
-
-    const rewardsUsd = rewards;
-    const feesUsd = 0;
-    const assetPriceEffectUsd = 0;
-    const rebalanceEffectUsd = 0;
-    const unattributedUsd = totalReturnUsd - (
-      rewardsUsd +
-      feesUsd +
-      assetPriceEffectUsd +
-      rebalanceEffectUsd +
-      realizedPnlUsd +
-      unrealizedPnlUsd
-    );
-    const unattributedReasonCodes = Math.abs(unattributedUsd) > 1e-9
-      ? mergeReasonCodes(reasonCodes, ["unattributedResidual"])
-      : reasonCodes;
-    const denominator = totalReturnUsd === 0 ? null : totalReturnUsd;
-
-    decompositionRowsToInsert.push({
-      chainId: input.chainId,
-      walletAddress: input.walletAddress,
-      depositId: deposit.id,
-      latestRunId: input.runId,
-      totalReturnUsd: String(totalReturnUsd),
-      rewardsUsd: String(rewardsUsd),
-      feesUsd: String(feesUsd),
-      assetPriceEffectUsd: String(assetPriceEffectUsd),
-      rebalanceEffectUsd: String(rebalanceEffectUsd),
-      realizedPnlUsd: String(realizedPnlUsd),
-      unrealizedPnlUsd: String(unrealizedPnlUsd),
-      unattributedUsd: String(unattributedUsd),
-      unattributedReasonCodes,
-      componentPercentages: denominator === null
-        ? {}
-        : {
-            rewardsUsd: rewardsUsd / denominator,
-            feesUsd: feesUsd / denominator,
-            assetPriceEffectUsd: assetPriceEffectUsd / denominator,
-            rebalanceEffectUsd: rebalanceEffectUsd / denominator,
-            realizedPnlUsd: realizedPnlUsd / denominator,
-            unrealizedPnlUsd: unrealizedPnlUsd / denominator,
-            unattributedUsd: unattributedUsd / denominator,
-          },
-    });
-
-    return {
-      chainId: input.chainId,
-      walletAddress: input.walletAddress,
-      depositId: deposit.id,
-      poolId: deposit.poolId,
-      latestRunId: input.runId,
-      positionLabel,
-      poolKind,
-      feeTierBps: parseFeeTierBps(feeTierLabel),
-      tokenId: deposit.tokenId,
-      token0Address: pool?.token0Address ?? null,
-      token0Symbol: resolvedTokenSymbols[0] ?? null,
-      token1Address: pool?.token1Address ?? null,
-      token1Symbol: resolvedTokenSymbols[1] ?? null,
-      status,
-      openedAt: aggregate.openedAt,
-      // Fallback: when the timeline never recorded a "close"/"withdraw" event
-      // (common when deposits are drained via rebalances pointing at successors),
-      // approximate closedAt with the canonical deposits row's last update.
-      closedAt:
-        aggregate.closedAt ??
-        (status === "closed" ? (deposit.updatedAt instanceof Date ? deposit.updatedAt : null) : null),
-      openedByTransferIn: aggregate.openedByTransferIn,
-      openedValueUsd: openedValueUsd.toString(),
-      currentValueUsd: currentValueUsd.toString(),
-      capitalEnteredUsd: capitalEntered.toString(),
-      capitalWithdrawnUsd: capitalWithdrawn.toString(),
-      totalRewardsUsd: rewards.toString(),
-      realizedPnlUsd: realizedPnlUsd.toString(),
-      unrealizedPnlUsd: unrealizedPnlUsd.toString(),
-      totalReturnUsd: totalReturnUsd.toString(),
-      totalReturnPct: totalReturnPct !== null ? totalReturnPct.toString() : null,
-      estimatedAnnualizedReturnPct:
-        estimatedAnnualizedReturnPct !== null ? estimatedAnnualizedReturnPct.toString() : null,
-      tickLower: asInteger(depositRuntimeMetadata.rangeLowerTick),
-      tickUpper: asInteger(depositRuntimeMetadata.rangeUpperTick),
-      rangeLowerPrice:
-        asNullableNumber(depositRuntimeMetadata.rangeLowerPrice) !== null
-          ? String(asNullableNumber(depositRuntimeMetadata.rangeLowerPrice))
-          : null,
-      rangeUpperPrice:
-        asNullableNumber(depositRuntimeMetadata.rangeUpperPrice) !== null
-          ? String(asNullableNumber(depositRuntimeMetadata.rangeUpperPrice))
-          : null,
-      isInRange: status === "closed" ? null : isInRange,
-      coverageStatus: finalCoverageStatus,
-      confidence,
-      coverageReasonCodes: reasonCodes,
-      coveredStartDayUtc: input.startDayUtc,
-      coveredEndDayUtc: input.endDayUtc,
-      mellowStrategyCrossLinkId: strategyIdByPoolId.get(deposit.poolId) ?? null,
-      metadataJson: {
-        materializerVersion: "010-detail-1",
-      } as Record<string, unknown>,
-    };
+  const { summaryRows, lifecycleRowsToInsert, decompositionRowsToInsert } = buildDepositReadModelRows({
+    runId: input.runId,
+    walletAddress: input.walletAddress,
+    chainId: input.chainId,
+    startDayUtc: input.startDayUtc,
+    endDayUtc: input.endDayUtc,
+    capturedAt: input.capturedAt,
+    eligibleDeposits,
+    poolById,
+    aggregates,
+    rewardsByDepositId,
+    mintLedgerEventByTxHash,
+    mintOutflowsByLedgerEventId,
+    priceByTokenDay,
+    timelineRows,
+    lifecycleLedgerById,
+    pricedLifecycleMovements,
+    inferredActionIdByLedgerEventId,
+    strategyIdByPoolId,
+    resolvedRewardRows,
   });
 
   let summariesWritten = 0;

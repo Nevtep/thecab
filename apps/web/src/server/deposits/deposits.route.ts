@@ -60,8 +60,7 @@ function clampDateRange(start: string | null, end: string | null) {
   }
 }
 
-export async function parseDepositsListRequest(request: Request): Promise<DepositsListRequest> {
-  const { searchParams } = new URL(request.url);
+export function normalizeDepositsListQueryParams(searchParams: URLSearchParams): Omit<DepositsListRequest, "walletAddress"> {
   const parsed = depositsListQuerySchema.parse({
     chainId: searchParams.get("chainId") ?? SUPPORTED_CHAIN_ID,
     status: searchParams.get("status") ?? undefined,
@@ -88,7 +87,6 @@ export async function parseDepositsListRequest(request: Request): Promise<Deposi
   clampDateRange(parsed.from ?? parsed.startDayUtc ?? null, parsed.to ?? parsed.endDayUtc ?? null);
 
   return {
-    walletAddress: await readAuthenticatedWalletAddress(),
     chainId: parsed.chainId,
     status: parsed.status,
     poolId: parsed.pool ?? parsed.poolId ?? null,
@@ -102,12 +100,21 @@ export async function parseDepositsListRequest(request: Request): Promise<Deposi
   };
 }
 
+export async function parseDepositsListRequest(request: Request): Promise<DepositsListRequest> {
+  const { searchParams } = new URL(request.url);
+  const normalized = normalizeDepositsListQueryParams(searchParams);
+
+  return {
+    walletAddress: await readAuthenticatedWalletAddress(),
+    ...normalized,
+  };
+}
+
 const depositDetailQuerySchema = z.object({
   chainId: z.coerce.number().int().positive().default(SUPPORTED_CHAIN_ID),
 });
 
-export async function parseDepositDetailRequest(request: Request, depositId: string): Promise<DepositDetailRequest> {
-  const { searchParams } = new URL(request.url);
+export function normalizeDepositDetailQueryParams(searchParams: URLSearchParams, depositId: string): Omit<DepositDetailRequest, "walletAddress"> {
   const parsed = depositDetailQuerySchema.parse({
     chainId: searchParams.get("chainId") ?? SUPPORTED_CHAIN_ID,
   });
@@ -118,9 +125,18 @@ export async function parseDepositDetailRequest(request: Request, depositId: str
   }
 
   return {
-    walletAddress: await readAuthenticatedWalletAddress(),
     chainId: parsed.chainId,
     depositId,
+  };
+}
+
+export async function parseDepositDetailRequest(request: Request, depositId: string): Promise<DepositDetailRequest> {
+  const { searchParams } = new URL(request.url);
+  const normalized = normalizeDepositDetailQueryParams(searchParams, depositId);
+
+  return {
+    walletAddress: await readAuthenticatedWalletAddress(),
+    ...normalized,
   };
 }
 

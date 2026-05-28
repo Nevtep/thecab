@@ -123,6 +123,78 @@ function normalizeLifecycleEventType(value: string): DepositLifecycleEventView["
   }
 }
 
+export type DepositSummaryRowRecord = {
+  depositId: string;
+  poolId: string;
+  poolLabel: string;
+  positionLabel: string;
+  poolKind: string;
+  feeTierBps: number | null;
+  tokenId: string | null;
+  token0Symbol: string | null;
+  token1Symbol: string | null;
+  status: string;
+  openedAt: Date | string | null;
+  closedAt: Date | string | null;
+  openedByTransferIn: boolean;
+  openedValueUsd: unknown;
+  currentValueUsd: unknown;
+  capitalEnteredUsd: unknown;
+  capitalWithdrawnUsd: unknown;
+  totalRewardsUsd: unknown;
+  realizedPnlUsd: unknown;
+  unrealizedPnlUsd: unknown;
+  totalReturnUsd: unknown;
+  totalReturnPct: unknown;
+  estimatedAnnualizedReturnPct: unknown;
+  isInRange: boolean | null;
+  rangeLowerPrice: unknown;
+  rangeUpperPrice: unknown;
+  coverageStatus: string;
+  confidence: string;
+  coverageReasonCodes: string[] | null;
+  coveredStartDayUtc: string | null;
+  coveredEndDayUtc: string | null;
+};
+
+export type DepositLifecycleEventRowRecord = {
+  id: string;
+  sequenceIndex: number;
+  eventType: string;
+  occurredAt: Date | string | null;
+  txHash: string;
+  logIndex: number;
+  blockNumber: number;
+  usdValue: unknown;
+  signedTokenDeltas: unknown;
+  priceSource: string | null;
+  confidence: unknown;
+  inferredActionId: string | null;
+  coverageReasonCodes: string[] | null;
+  metadataJson: Record<string, unknown> | null;
+};
+
+export type DepositDecompositionRowRecord = {
+  totalReturnUsd: unknown;
+  rewardsUsd: unknown;
+  feesUsd: unknown;
+  assetPriceEffectUsd: unknown;
+  rebalanceEffectUsd: unknown;
+  realizedPnlUsd: unknown;
+  unrealizedPnlUsd: unknown;
+  unattributedUsd: unknown;
+  unattributedReasonCodes: string[] | null;
+  componentPercentages: Record<string, number> | null;
+};
+
+export type DepositDetailRowRecord = DepositSummaryRowRecord & {
+  token0Address: string | null;
+  token1Address: string | null;
+  tickLower: number | null;
+  tickUpper: number | null;
+  mellowStrategyCrossLinkId: string | null;
+};
+
 function parseSignedTokenDeltas(value: unknown): DepositLifecycleTokenDelta[] {
   if (!Array.isArray(value)) return [];
   return value.map((entry) => {
@@ -137,6 +209,92 @@ function parseSignedTokenDeltas(value: unknown): DepositLifecycleTokenDelta[] {
       priceSource: normalizePriceSource(asString(record.priceSource)),
     };
   });
+}
+
+export function mapDepositLifecycleEventRow(eventRow: DepositLifecycleEventRowRecord): DepositLifecycleEventView {
+  return {
+    id: eventRow.id,
+    sequenceIndex: eventRow.sequenceIndex,
+    eventType: normalizeLifecycleEventType(eventRow.eventType),
+    occurredAt: toIso(eventRow.occurredAt) ?? new Date(0).toISOString(),
+    txHash: eventRow.txHash,
+    logIndex: eventRow.logIndex,
+    blockNumber: eventRow.blockNumber,
+    usdValue: asNullableNumber(eventRow.usdValue),
+    signedTokenDeltas: parseSignedTokenDeltas(eventRow.signedTokenDeltas),
+    priceSource: normalizePriceSource(eventRow.priceSource),
+    confidence: normalizeConfidence(String(eventRow.confidence ?? "unknown")),
+    inferredActionId: eventRow.inferredActionId,
+    coverageReasonCodes: eventRow.coverageReasonCodes ?? [],
+    metadata: (eventRow.metadataJson ?? {}) as Record<string, unknown>,
+  };
+}
+
+export function mapDepositSummaryRow(row: DepositSummaryRowRecord): DepositSummaryView {
+  return {
+    depositId: row.depositId,
+    poolId: row.poolId,
+    poolLabel: row.poolLabel,
+    positionLabel: row.positionLabel,
+    poolKind: normalizePoolKind(row.poolKind),
+    feeTierBps: row.feeTierBps,
+    tokenId: row.tokenId,
+    token0Symbol: row.token0Symbol,
+    token1Symbol: row.token1Symbol,
+    status: normalizeStatus(row.status),
+    openedAt: toIso(row.openedAt),
+    closedAt: toIso(row.closedAt),
+    openedByTransferIn: row.openedByTransferIn,
+    openedValueUsd: asNumber(row.openedValueUsd) ?? 0,
+    currentValueUsd: asNumber(row.currentValueUsd) ?? 0,
+    capitalEnteredUsd: asNumber(row.capitalEnteredUsd) ?? 0,
+    capitalWithdrawnUsd: asNumber(row.capitalWithdrawnUsd) ?? 0,
+    totalRewardsUsd: asNumber(row.totalRewardsUsd) ?? 0,
+    realizedPnlUsd: asNumber(row.realizedPnlUsd) ?? 0,
+    unrealizedPnlUsd: asNumber(row.unrealizedPnlUsd) ?? 0,
+    totalReturnUsd: asNumber(row.totalReturnUsd) ?? 0,
+    totalReturnPct: asNullableNumber(row.totalReturnPct),
+    estimatedAnnualizedReturnPct: asNullableNumber(row.estimatedAnnualizedReturnPct),
+    isInRange: row.isInRange,
+    rangeLowerPrice: asNullableNumber(row.rangeLowerPrice),
+    rangeUpperPrice: asNullableNumber(row.rangeUpperPrice),
+    coverageStatus: normalizeCoverage(row.coverageStatus),
+    confidence: normalizeConfidence(row.confidence),
+    coverageReasonCodes: row.coverageReasonCodes ?? [],
+    coveredStartDayUtc: row.coveredStartDayUtc,
+    coveredEndDayUtc: row.coveredEndDayUtc,
+  };
+}
+
+export function mapDepositDetailRows(input: {
+  row: DepositDetailRowRecord;
+  decompositionRow?: DepositDecompositionRowRecord | null;
+  lifecycleRows: DepositLifecycleEventRowRecord[];
+}): DepositDetailView {
+  const decompositionRow = input.decompositionRow ?? null;
+  const decomposition: DepositPerformanceDecompositionView = {
+    totalReturnUsd: asNumber(decompositionRow?.totalReturnUsd) ?? asNumber(input.row.totalReturnUsd) ?? 0,
+    rewardsUsd: asNumber(decompositionRow?.rewardsUsd) ?? asNumber(input.row.totalRewardsUsd) ?? 0,
+    feesUsd: asNumber(decompositionRow?.feesUsd) ?? 0,
+    assetPriceEffectUsd: asNumber(decompositionRow?.assetPriceEffectUsd) ?? 0,
+    rebalanceEffectUsd: asNumber(decompositionRow?.rebalanceEffectUsd) ?? 0,
+    realizedPnlUsd: asNumber(decompositionRow?.realizedPnlUsd) ?? asNumber(input.row.realizedPnlUsd) ?? 0,
+    unrealizedPnlUsd: asNumber(decompositionRow?.unrealizedPnlUsd) ?? asNumber(input.row.unrealizedPnlUsd) ?? 0,
+    unattributedUsd: asNumber(decompositionRow?.unattributedUsd) ?? 0,
+    unattributedReasonCodes: decompositionRow?.unattributedReasonCodes ?? [],
+    componentPercentages: (decompositionRow?.componentPercentages ?? {}) as Record<string, number>,
+  };
+
+  return {
+    ...mapDepositSummaryRow(input.row),
+    token0Address: input.row.token0Address,
+    token1Address: input.row.token1Address,
+    tickLower: input.row.tickLower,
+    tickUpper: input.row.tickUpper,
+    decomposition,
+    lifecycle: input.lifecycleRows.map((eventRow) => mapDepositLifecycleEventRow(eventRow)),
+    mellowStrategyCrossLinkId: input.row.mellowStrategyCrossLinkId,
+  };
 }
 
 export async function findDepositSummaries(input: {
@@ -187,39 +345,7 @@ export async function findDepositSummaries(input: {
       ),
     );
 
-  return rows.map((row) => ({
-    depositId: row.depositId,
-    poolId: row.poolId,
-    poolLabel: row.poolLabel,
-    positionLabel: row.positionLabel,
-    poolKind: normalizePoolKind(row.poolKind),
-    feeTierBps: row.feeTierBps,
-    tokenId: row.tokenId,
-    token0Symbol: row.token0Symbol,
-    token1Symbol: row.token1Symbol,
-    status: normalizeStatus(row.status),
-    openedAt: toIso(row.openedAt),
-    closedAt: toIso(row.closedAt),
-    openedByTransferIn: row.openedByTransferIn,
-    openedValueUsd: asNumber(row.openedValueUsd) ?? 0,
-    currentValueUsd: asNumber(row.currentValueUsd) ?? 0,
-    capitalEnteredUsd: asNumber(row.capitalEnteredUsd) ?? 0,
-    capitalWithdrawnUsd: asNumber(row.capitalWithdrawnUsd) ?? 0,
-    totalRewardsUsd: asNumber(row.totalRewardsUsd) ?? 0,
-    realizedPnlUsd: asNumber(row.realizedPnlUsd) ?? 0,
-    unrealizedPnlUsd: asNumber(row.unrealizedPnlUsd) ?? 0,
-    totalReturnUsd: asNumber(row.totalReturnUsd) ?? 0,
-    totalReturnPct: asNullableNumber(row.totalReturnPct),
-    estimatedAnnualizedReturnPct: asNullableNumber(row.estimatedAnnualizedReturnPct),
-    isInRange: row.isInRange,
-    rangeLowerPrice: asNullableNumber(row.rangeLowerPrice),
-    rangeUpperPrice: asNullableNumber(row.rangeUpperPrice),
-    coverageStatus: normalizeCoverage(row.coverageStatus),
-    confidence: normalizeConfidence(row.confidence),
-    coverageReasonCodes: row.coverageReasonCodes ?? [],
-    coveredStartDayUtc: row.coveredStartDayUtc,
-    coveredEndDayUtc: row.coveredEndDayUtc,
-  }));
+  return rows.map((row) => mapDepositSummaryRow(row));
 }
 
 export async function findDepositDetail(input: {
@@ -306,77 +432,11 @@ export async function findDepositDetail(input: {
       .orderBy(asc(depositLifecycleEvents.sequenceIndex)),
   ]);
 
-  const decompositionRow = decompositionRows[0];
-  const decomposition: DepositPerformanceDecompositionView = {
-    totalReturnUsd: asNumber(decompositionRow?.totalReturnUsd) ?? asNumber(row.totalReturnUsd) ?? 0,
-    rewardsUsd: asNumber(decompositionRow?.rewardsUsd) ?? asNumber(row.totalRewardsUsd) ?? 0,
-    feesUsd: asNumber(decompositionRow?.feesUsd) ?? 0,
-    assetPriceEffectUsd: asNumber(decompositionRow?.assetPriceEffectUsd) ?? 0,
-    rebalanceEffectUsd: asNumber(decompositionRow?.rebalanceEffectUsd) ?? 0,
-    realizedPnlUsd: asNumber(decompositionRow?.realizedPnlUsd) ?? asNumber(row.realizedPnlUsd) ?? 0,
-    unrealizedPnlUsd: asNumber(decompositionRow?.unrealizedPnlUsd) ?? asNumber(row.unrealizedPnlUsd) ?? 0,
-    unattributedUsd: asNumber(decompositionRow?.unattributedUsd) ?? 0,
-    unattributedReasonCodes: decompositionRow?.unattributedReasonCodes ?? [],
-    componentPercentages: (decompositionRow?.componentPercentages ?? {}) as Record<string, number>,
-  };
-
-  const lifecycle: DepositLifecycleEventView[] = lifecycleRows.map((eventRow) => ({
-    id: eventRow.id,
-    sequenceIndex: eventRow.sequenceIndex,
-    eventType: normalizeLifecycleEventType(eventRow.eventType),
-    occurredAt: toIso(eventRow.occurredAt) ?? new Date(0).toISOString(),
-    txHash: eventRow.txHash,
-    logIndex: eventRow.logIndex,
-    blockNumber: eventRow.blockNumber,
-    usdValue: asNullableNumber(eventRow.usdValue),
-    signedTokenDeltas: parseSignedTokenDeltas(eventRow.signedTokenDeltas),
-    priceSource: normalizePriceSource(eventRow.priceSource),
-    confidence: normalizeConfidence(eventRow.confidence),
-    inferredActionId: eventRow.inferredActionId,
-    coverageReasonCodes: eventRow.coverageReasonCodes ?? [],
-    metadata: (eventRow.metadataJson ?? {}) as Record<string, unknown>,
-  }));
-
-  return {
-    depositId: row.depositId,
-    poolId: row.poolId,
-    poolLabel: row.poolLabel,
-    positionLabel: row.positionLabel,
-    poolKind: normalizePoolKind(row.poolKind),
-    feeTierBps: row.feeTierBps,
-    tokenId: row.tokenId,
-    token0Address: row.token0Address,
-    token0Symbol: row.token0Symbol,
-    token1Address: row.token1Address,
-    token1Symbol: row.token1Symbol,
-    status: normalizeStatus(row.status),
-    openedAt: toIso(row.openedAt),
-    closedAt: toIso(row.closedAt),
-    openedByTransferIn: row.openedByTransferIn,
-    openedValueUsd: asNumber(row.openedValueUsd) ?? 0,
-    currentValueUsd: asNumber(row.currentValueUsd) ?? 0,
-    capitalEnteredUsd: asNumber(row.capitalEnteredUsd) ?? 0,
-    capitalWithdrawnUsd: asNumber(row.capitalWithdrawnUsd) ?? 0,
-    totalRewardsUsd: asNumber(row.totalRewardsUsd) ?? 0,
-    realizedPnlUsd: asNumber(row.realizedPnlUsd) ?? 0,
-    unrealizedPnlUsd: asNumber(row.unrealizedPnlUsd) ?? 0,
-    totalReturnUsd: asNumber(row.totalReturnUsd) ?? 0,
-    totalReturnPct: asNullableNumber(row.totalReturnPct),
-    estimatedAnnualizedReturnPct: asNullableNumber(row.estimatedAnnualizedReturnPct),
-    tickLower: row.tickLower,
-    tickUpper: row.tickUpper,
-    isInRange: row.isInRange,
-    rangeLowerPrice: asNullableNumber(row.rangeLowerPrice),
-    rangeUpperPrice: asNullableNumber(row.rangeUpperPrice),
-    coverageStatus: normalizeCoverage(row.coverageStatus),
-    confidence: normalizeConfidence(row.confidence),
-    coverageReasonCodes: row.coverageReasonCodes ?? [],
-    coveredStartDayUtc: row.coveredStartDayUtc,
-    coveredEndDayUtc: row.coveredEndDayUtc,
-    decomposition,
-    lifecycle,
-    mellowStrategyCrossLinkId: row.mellowStrategyCrossLinkId,
-  };
+  return mapDepositDetailRows({
+    row,
+    decompositionRow: decompositionRows[0],
+    lifecycleRows,
+  });
 }
 
 export async function hasAutomatedStrategyExposure(input: {
