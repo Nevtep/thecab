@@ -121,6 +121,20 @@ export function serializeDepositsListUrlState(state: DepositsListUrlState): stri
   return params.toString();
 }
 
+export function normalizeFiltersForQueryKey(state: DepositsListUrlState) {
+  return {
+    status: state.status,
+    poolId: state.poolId,
+    startDayUtc: state.startDayUtc,
+    endDayUtc: state.endDayUtc,
+    returnSign: state.returnSign,
+    sort: state.sort,
+    direction: state.direction,
+    page: state.page,
+    pageSize: state.pageSize,
+  };
+}
+
 export function buildDepositsApiQueryString(input: {
   chainId: number;
   state: DepositsListUrlState;

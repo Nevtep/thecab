@@ -151,6 +151,81 @@ function dayUtcFromDate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+export function pricePointLookupKey(tokenAddress: string, dayUtc: string) {
+  return `${tokenAddress.toLowerCase()}:${dayUtc}`;
+}
+
+export function hydrateHistoricalPriceLookup(input: {
+  priceRows: Array<{
+    tokenAddress: string;
+    pricedAt: Date;
+    priceUsd: number | string | null;
+  }>;
+  target?: Map<string, number>;
+}) {
+  const target = input.target ?? new Map<string, number>();
+
+  for (const row of input.priceRows) {
+    const priceUsd = asNumber(row.priceUsd);
+    if (priceUsd === null) continue;
+
+    const key = pricePointLookupKey(row.tokenAddress, dayUtcFromDate(row.pricedAt));
+    if (!target.has(key)) {
+      target.set(key, priceUsd);
+    }
+  }
+
+  return target;
+}
+
+export function resolveHistoricalUsdBackfill(input: {
+  chainId: number;
+  occurredAt: Date;
+  tokenAddress: string | null;
+  symbol: string | null;
+  amountRaw: string;
+  directAmountUsd: number | null;
+  priceByTokenDay: Map<string, number>;
+}) {
+  if (input.directAmountUsd !== null) {
+    return {
+      usdValue: input.directAmountUsd,
+      priceSource: "event" as const,
+      reasonCodes: [] as string[],
+    };
+  }
+
+  const decimals = resolveKnownTokenDecimals({
+    chainId: input.chainId,
+    tokenAddress: input.tokenAddress,
+    symbol: input.symbol,
+    decimals: null,
+  });
+
+  if (decimals === null || !input.tokenAddress) {
+    return {
+      usdValue: null,
+      priceSource: "unavailable" as const,
+      reasonCodes: ["priceUnavailable"],
+    };
+  }
+
+  const priceUsd = input.priceByTokenDay.get(pricePointLookupKey(input.tokenAddress, dayUtcFromDate(input.occurredAt)));
+  if (priceUsd === undefined) {
+    return {
+      usdValue: null,
+      priceSource: "unavailable" as const,
+      reasonCodes: ["priceUnavailable"],
+    };
+  }
+
+  return {
+    usdValue: (Number(input.amountRaw) / 10 ** decimals) * priceUsd,
+    priceSource: "pricePointFallback" as const,
+    reasonCodes: ["priceFallbackDca"],
+  };
+}
+
 function endOfDayUtc(dayUtc: string): Date {
   const d = new Date(`${dayUtc}T00:00:00.000Z`);
   d.setUTCDate(d.getUTCDate() + 1);

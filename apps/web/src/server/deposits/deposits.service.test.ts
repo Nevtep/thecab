@@ -115,6 +115,7 @@ function createDetail(overrides: Partial<DepositDetailView> = {}): DepositDetail
       },
     ],
     ...overrides,
+    mellowStrategyCrossLinkId: overrides.mellowStrategyCrossLinkId ?? null,
   };
 }
 

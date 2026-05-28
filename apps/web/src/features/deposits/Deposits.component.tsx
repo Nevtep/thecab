@@ -5,7 +5,6 @@ import { useTranslation } from "react-i18next";
 
 import {
   CabCard,
-  CabDashboardGrid,
   CabEmptyState,
   CabErrorPanel,
   CabLoadingPanel,
@@ -31,6 +30,8 @@ import type {
   DepositsTableColumnKey,
   DepositsTableDensity,
 } from "@/features/deposits/deposits.viewPrefs";
+
+import styles from "@/features/deposits/DepositsWorkspace.module.css";
 
 export type DepositsScreenState = "loading" | "locked" | "error" | "empty" | "ready";
 
@@ -161,94 +162,100 @@ export function DepositsComponent(input: DepositsComponentProps) {
   );
 
   return (
-    <CabStack gap="$4">
-      {/* Deposits keeps coverage inline per row/detail; it must not mount a duplicate global coverage banner. */}
-      <CabSectionHeader title={t("deposits:title")} subtitle={t("deposits:subtitle")} />
-      <DepositsKpiStrip
-        summary={input.viewModel.summary}
-        locale={input.locale}
-        labels={{
-          totalDeposits: t("deposits:list.kpis.totalDeposits"),
-          totalDepositsValue,
-          currentValue: t("deposits:list.kpis.currentValue"),
-          totalRewards: t("deposits:list.kpis.totalRewards"),
-          weightedAnnualizedReturn: t("deposits:list.kpis.weightedAnnualizedReturn"),
-          capitalDeployed: t("deposits:list.kpis.capitalDeployed"),
-        }}
-      />
-      <DepositsFiltersBar
-        status={input.status}
-        poolId={input.poolId}
-        startDayUtc={input.startDayUtc}
-        endDayUtc={input.endDayUtc}
-        returnSign={input.returnSign}
-        labels={{
-          status: {
-            label: t("deposits:list.filters.status.label"),
-            all: t("deposits:list.filters.status.all"),
-            open_active: t("deposits:list.filters.status.open_active"),
-            open_out_of_range: t("deposits:list.filters.status.open_out_of_range"),
-            closed: t("deposits:list.filters.status.closed"),
-          },
-          returnSign: {
-            label: t("deposits:list.filters.returnSign.label"),
-            all: t("deposits:list.filters.returnSign.all"),
-            positive: t("deposits:list.filters.returnSign.positive"),
-            negative: t("deposits:list.filters.returnSign.negative"),
-          },
-          pool: {
-            label: t("deposits:list.filters.pool.label"),
-            active: t("deposits:list.filters.pool.active"),
-            clear: t("deposits:list.filters.pool.clear"),
-            all: t("deposits:list.filters.pool.all"),
-          },
-          dateRange: {
-            label: t("deposits:list.filters.dateRange.label"),
-            start: t("deposits:list.filters.dateRange.start"),
-            end: t("deposits:list.filters.dateRange.end"),
-            clear: t("deposits:list.filters.dateRange.clear"),
-          },
-          more: {
-            label: t("deposits:list.filters.more"),
-          },
-        }}
-        onStatusChange={input.onStatusChange}
-        onClearPool={input.onClearPool}
-        onStartDayChange={input.onStartDayChange}
-        onEndDayChange={input.onEndDayChange}
-        onClearDateRange={input.onClearDateRange}
-        onReturnSignChange={input.onReturnSignChange}
-      />
-      <DepositsTable
-        items={input.viewModel.items}
-        locale={input.locale}
-        hiddenColumns={input.hiddenColumns}
-        sort={input.sort}
-        direction={input.direction}
-        selectedDepositId={input.selectedDepositId}
-        labels={{
-          columns: columnLabels,
-          status: statusLabels,
-          transferIn: {
-            badge: t("deposits:transferIn.badge"),
-            tooltip: t("deposits:transferIn.tooltip"),
-          },
-        }}
-        emptyState={filteredEmptyState}
-        onSortChange={input.onSortChange}
-        onSelectRow={input.onSelectRow}
-      />
+    <div className={[styles.workspace, input.selectedDepositId ? styles.withDetail : ""].filter(Boolean).join(" ")}>
+      <div className={styles.listColumn}>
+        <CabStack gap="$4">
+          {/* Deposits keeps coverage inline per row/detail; it must not mount a duplicate global coverage banner. */}
+          <CabSectionHeader title={t("deposits:title")} subtitle={t("deposits:subtitle")} />
+          <DepositsKpiStrip
+            summary={input.viewModel.summary}
+            locale={input.locale}
+            labels={{
+              totalDeposits: t("deposits:list.kpis.totalDeposits"),
+              totalDepositsValue,
+              currentValue: t("deposits:list.kpis.currentValue"),
+              totalRewards: t("deposits:list.kpis.totalRewards"),
+              weightedAnnualizedReturn: t("deposits:list.kpis.weightedAnnualizedReturn"),
+              capitalDeployed: t("deposits:list.kpis.capitalDeployed"),
+            }}
+          />
+          <DepositsFiltersBar
+            status={input.status}
+            poolId={input.poolId}
+            startDayUtc={input.startDayUtc}
+            endDayUtc={input.endDayUtc}
+            returnSign={input.returnSign}
+            labels={{
+              status: {
+                label: t("deposits:list.filters.status.label"),
+                all: t("deposits:list.filters.status.all"),
+                open_active: t("deposits:list.filters.status.open_active"),
+                open_out_of_range: t("deposits:list.filters.status.open_out_of_range"),
+                closed: t("deposits:list.filters.status.closed"),
+              },
+              returnSign: {
+                label: t("deposits:list.filters.returnSign.label"),
+                all: t("deposits:list.filters.returnSign.all"),
+                positive: t("deposits:list.filters.returnSign.positive"),
+                negative: t("deposits:list.filters.returnSign.negative"),
+              },
+              pool: {
+                label: t("deposits:list.filters.pool.label"),
+                active: t("deposits:list.filters.pool.active"),
+                clear: t("deposits:list.filters.pool.clear"),
+                all: t("deposits:list.filters.pool.all"),
+              },
+              dateRange: {
+                label: t("deposits:list.filters.dateRange.label"),
+                start: t("deposits:list.filters.dateRange.start"),
+                end: t("deposits:list.filters.dateRange.end"),
+                clear: t("deposits:list.filters.dateRange.clear"),
+              },
+              more: {
+                label: t("deposits:list.filters.more"),
+              },
+            }}
+            onStatusChange={input.onStatusChange}
+            onClearPool={input.onClearPool}
+            onStartDayChange={input.onStartDayChange}
+            onEndDayChange={input.onEndDayChange}
+            onClearDateRange={input.onClearDateRange}
+            onReturnSignChange={input.onReturnSignChange}
+          />
+          <DepositsTable
+            items={input.viewModel.items}
+            locale={input.locale}
+            hiddenColumns={input.hiddenColumns}
+            sort={input.sort}
+            direction={input.direction}
+            selectedDepositId={input.selectedDepositId}
+            labels={{
+              columns: columnLabels,
+              status: statusLabels,
+              transferIn: {
+                badge: t("deposits:transferIn.badge"),
+                tooltip: t("deposits:transferIn.tooltip"),
+              },
+            }}
+            emptyState={filteredEmptyState}
+            onSortChange={input.onSortChange}
+            onSelectRow={input.onSelectRow}
+          />
+        </CabStack>
+      </div>
       {input.selectedDepositId ? (
-        <CabDashboardGrid>
-          <CabCard density="spacious">
-            <DepositDetailContainer
-              depositId={input.selectedDepositId}
-              onClose={input.onCloseDetail}
-              backHref={input.selectedDepositReturnTo}
-            />
-          </CabCard>
-        </CabDashboardGrid>
+        <aside className={styles.detailColumn}>
+          <div className={styles.detailBody}>
+            <CabCard density="spacious">
+              <DepositDetailContainer
+                depositId={input.selectedDepositId}
+                onClose={input.onCloseDetail}
+                backHref={input.selectedDepositReturnTo}
+              />
+            </CabCard>
+          </div>
+        </aside>
       ) : null}
-    </CabStack>
+    </div>
   );
 }

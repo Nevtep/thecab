@@ -171,11 +171,14 @@ test("buildDepositReadModelRows materializes summary lifecycle and decomposition
     capturedAt: new Date("2026-05-28T00:00:00.000Z"),
     eligibleDeposits: [
       {
+        chainId: 8453,
         id: "deposit-open",
         poolId: "pool-1",
+        walletAddress: "0xabc",
         mintTxHash: "0xmint-open",
         status: "open",
         tokenId: "71093441",
+        createdAt: new Date("2026-05-20T00:00:00.000Z"),
         metadataJson: {
           primaryTokenSymbol: "WETH",
           secondaryTokenSymbol: "cbBTC",
@@ -189,34 +192,51 @@ test("buildDepositReadModelRows materializes summary lifecycle and decomposition
             isInRange: true,
           },
         },
+        positionManagerAddress: null,
         coverageStatus: "full",
         updatedAt: new Date("2026-05-28T00:00:00.000Z"),
       },
       {
+        chainId: 8453,
         id: "deposit-closed",
         poolId: "pool-2",
+        walletAddress: "0xabc",
         mintTxHash: null,
         status: "closed",
         tokenId: "2",
+        createdAt: new Date("2026-05-21T00:00:00.000Z"),
         metadataJson: {
           primaryTokenSymbol: "USDC",
           secondaryTokenSymbol: "cbBTC",
           metadata: {},
         },
+        positionManagerAddress: null,
         coverageStatus: "full",
         updatedAt: new Date("2026-05-27T00:00:00.000Z"),
       },
     ] as Parameters<typeof buildDepositReadModelRows>[0]["eligibleDeposits"],
     poolById: new Map([
       ["pool-1", {
+        chainId: 8453,
+        id: "pool-1",
         token0Address: "0x4200000000000000000000000000000000000006",
         token1Address: "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf",
+        createdAt: new Date("2026-05-20T00:00:00.000Z"),
         metadataJson: { tokenSymbols: ["WETH", "cbBTC"], poolType: "cl", feeTierLabel: "100" },
+        updatedAt: new Date("2026-05-20T00:00:00.000Z"),
+        poolAddress: "0xpool-1",
+        label: "WETH / cbBTC 100",
       }],
       ["pool-2", {
+        chainId: 8453,
+        id: "pool-2",
         token0Address: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
         token1Address: "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf",
+        createdAt: new Date("2026-05-21T00:00:00.000Z"),
         metadataJson: { tokenSymbols: ["USDC", "cbBTC"], poolType: "cl", feeTierLabel: "100" },
+        updatedAt: new Date("2026-05-21T00:00:00.000Z"),
+        poolAddress: "0xpool-2",
+        label: "USDC / cbBTC 100",
       }],
     ]) as Parameters<typeof buildDepositReadModelRows>[0]["poolById"],
     aggregates: new Map([
@@ -244,7 +264,10 @@ test("buildDepositReadModelRows materializes summary lifecycle and decomposition
       amountRaw: "400000000000000000",
       symbol: "WETH",
     }]]]),
-    priceByTokenDay: new Map([["0x4200000000000000000000000000000000000006:2026-05-20", 2500]]),
+    priceByTokenDay: new Map([
+      ["0x4200000000000000000000000000000000000006:2026-05-20", 2500],
+      ["0x4200000000000000000000000000000000000006:2026-05-28", 3750],
+    ]),
     timelineRows: [],
     lifecycleLedgerById: new Map(),
     pricedLifecycleMovements: new Map([["ledger-open", [{
@@ -283,12 +306,474 @@ test("buildDepositReadModelRows materializes summary lifecycle and decomposition
 
   const openSummary = result.summaryRows.find((row) => row.depositId === "deposit-open");
   const closedSummary = result.summaryRows.find((row) => row.depositId === "deposit-closed");
+  const openDecomposition = result.decompositionRowsToInsert.find((row) => row.depositId === "deposit-open");
   assert.equal(openSummary?.totalReturnUsd, "520");
   assert.equal(openSummary?.mellowStrategyCrossLinkId, "strategy-1");
+  assert.equal(openSummary?.positionLabel, "WETH / cbBTC · CL · 100 #71093441");
+  assert.equal(openSummary?.rangeLowerPrice, "0.0269");
+  assert.equal(openSummary?.rangeUpperPrice, "0.0283");
   assert.equal(closedSummary?.capitalWithdrawnUsd, "2000");
   assert.equal(closedSummary?.closedAt?.toISOString(), "2026-05-27T00:00:00.000Z");
 
   const lifecycleTypes = result.lifecycleRowsToInsert.map((row) => row.eventType);
   assert.deepEqual(lifecycleTypes, ["mint_position", "claim_reward"]);
-  assert.equal(result.decompositionRowsToInsert[0]?.unattributedUsd, "0");
+  assert.equal(openDecomposition?.assetPriceEffectUsd, "500");
+  assert.equal(openDecomposition?.rebalanceEffectUsd, "0");
+  assert.equal(openDecomposition?.unattributedUsd, "0");
+  assert.equal(openDecomposition?.componentPercentages?.rewardsUsd ?? null, 20 / 520);
+  assert.ok(openDecomposition);
+  assert.ok(
+    Math.abs(
+      Number(openDecomposition.totalReturnUsd) - (
+        Number(openDecomposition.rewardsUsd)
+        + Number(openDecomposition.feesUsd)
+        + Number(openDecomposition.assetPriceEffectUsd)
+        + Number(openDecomposition.rebalanceEffectUsd)
+        + Number(openDecomposition.realizedPnlUsd)
+        + Number(openDecomposition.unrealizedPnlUsd)
+        + Number(openDecomposition.unattributedUsd)
+      ),
+    ) < 1e-9,
+  );
+});
+
+test("buildDepositReadModelRows returns empty read-model batches when no eligible deposits exist", () => {
+  const result = buildDepositReadModelRows({
+    runId: "run-empty",
+    walletAddress: "0xabc",
+    chainId: 8453,
+    startDayUtc: "2026-05-20",
+    endDayUtc: "2026-05-28",
+    capturedAt: new Date("2026-05-28T00:00:00.000Z"),
+    eligibleDeposits: [],
+    poolById: new Map(),
+    aggregates: new Map(),
+    rewardsByDepositId: new Map(),
+    mintLedgerEventByTxHash: new Map(),
+    mintOutflowsByLedgerEventId: new Map(),
+    priceByTokenDay: new Map(),
+    timelineRows: [],
+    lifecycleLedgerById: new Map(),
+    pricedLifecycleMovements: new Map(),
+    inferredActionIdByLedgerEventId: new Map(),
+    strategyIdByPoolId: new Map(),
+    resolvedRewardRows: [],
+  });
+
+  assert.deepEqual(result, {
+    summaryRows: [],
+    lifecycleRowsToInsert: [],
+    decompositionRowsToInsert: [],
+  });
+});
+
+test("buildDepositReadModelRows degrades transfer-in deposits and keeps origin reason codes visible", () => {
+  const result = buildDepositReadModelRows({
+    runId: "run-transfer-in",
+    walletAddress: "0xabc",
+    chainId: 8453,
+    startDayUtc: "2026-05-01",
+    endDayUtc: "2026-05-28",
+    capturedAt: new Date("2026-05-28T00:00:00.000Z"),
+    eligibleDeposits: [
+      {
+        chainId: 8453,
+        id: "deposit-transfer-in",
+        poolId: "pool-1",
+        walletAddress: "0xabc",
+        mintTxHash: null,
+        status: "open",
+        tokenId: "44",
+        createdAt: new Date("2026-05-05T00:00:00.000Z"),
+        metadataJson: {
+          primaryTokenSymbol: "WETH",
+          secondaryTokenSymbol: "cbBTC",
+          valueUsd: 900,
+          metadata: {
+            feeTierLabel: "100",
+            isInRange: false,
+          },
+        },
+        positionManagerAddress: null,
+        coverageStatus: "full",
+        updatedAt: new Date("2026-05-28T00:00:00.000Z"),
+      },
+    ] as Parameters<typeof buildDepositReadModelRows>[0]["eligibleDeposits"],
+    poolById: new Map([[
+      "pool-1",
+      {
+        chainId: 8453,
+        id: "pool-1",
+        token0Address: "0x4200000000000000000000000000000000000006",
+        token1Address: "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf",
+        createdAt: new Date("2026-05-05T00:00:00.000Z"),
+        metadataJson: { tokenSymbols: ["WETH", "cbBTC"], poolType: "cl", feeTierLabel: "100" },
+        updatedAt: new Date("2026-05-05T00:00:00.000Z"),
+        poolAddress: "0xpool-1",
+        label: "WETH / cbBTC 100",
+      },
+    ]]) as Parameters<typeof buildDepositReadModelRows>[0]["poolById"],
+    aggregates: new Map([[
+      "deposit-transfer-in",
+      {
+        capitalEnteredUsd: 1000,
+        capitalWithdrawnUsd: 0,
+        openedAt: new Date("2026-05-05T00:00:00.000Z"),
+        closedAt: null,
+        openedValueUsd: 1000,
+        openedByTransferIn: true,
+      },
+    ]]),
+    rewardsByDepositId: new Map(),
+    mintLedgerEventByTxHash: new Map(),
+    mintOutflowsByLedgerEventId: new Map(),
+    priceByTokenDay: new Map(),
+    timelineRows: [
+      {
+        id: "timeline-open",
+        relatedDepositId: "deposit-transfer-in",
+        sourceLedgerEventId: null,
+        eventType: "deposit",
+        occurredAt: new Date("2026-05-05T00:00:00.000Z"),
+        attributedValueUsd: 1000,
+        confidence: "degraded",
+        coverageStatus: "full",
+      },
+    ] as Parameters<typeof buildDepositReadModelRows>[0]["timelineRows"],
+    lifecycleLedgerById: new Map(),
+    pricedLifecycleMovements: new Map(),
+    inferredActionIdByLedgerEventId: new Map(),
+    strategyIdByPoolId: new Map(),
+    resolvedRewardRows: [],
+  });
+
+  assert.equal(result.summaryRows.length, 1);
+  assert.equal(result.lifecycleRowsToInsert.length, 1);
+
+  const summary = result.summaryRows[0];
+  const lifecycle = result.lifecycleRowsToInsert[0];
+  const decomposition = result.decompositionRowsToInsert[0];
+
+  assert.equal(summary?.status, "open_out_of_range");
+  assert.equal(summary?.coverageStatus, "partial");
+  assert.equal(summary?.confidence, "degraded");
+  assert.deepEqual(summary?.coverageReasonCodes, ["transferInOrigin", "lowConfidenceClassification"]);
+
+  assert.equal(lifecycle?.eventType, "transfer_in");
+  assert.equal(lifecycle?.usdValue, "1000");
+  assert.deepEqual(lifecycle?.coverageReasonCodes, ["transferInOrigin", "lowConfidenceClassification"]);
+  assert.equal(lifecycle?.confidence, "degraded");
+
+  assert.equal(decomposition?.unattributedUsd, "0");
+  assert.deepEqual(decomposition?.unattributedReasonCodes, ["transferInOrigin", "lowConfidenceClassification"]);
+});
+
+test("buildDepositReadModelRows attributes CL withdrawals to asset-price and rebalance effects", () => {
+  const result = buildDepositReadModelRows({
+    runId: "run-cl-close",
+    walletAddress: "0xabc",
+    chainId: 8453,
+    startDayUtc: "2026-05-01",
+    endDayUtc: "2026-05-28",
+    capturedAt: new Date("2026-05-28T00:00:00.000Z"),
+    eligibleDeposits: [
+      {
+        chainId: 8453,
+        id: "deposit-cl-close",
+        poolId: "pool-1",
+        walletAddress: "0xabc",
+        mintTxHash: null,
+        status: "closed",
+        tokenId: "55",
+        createdAt: new Date("2026-05-01T00:00:00.000Z"),
+        metadataJson: {
+          primaryTokenSymbol: "WETH",
+          secondaryTokenSymbol: "USDC",
+          metadata: {
+            feeTierLabel: "100",
+            rangeLowerTick: -1,
+            rangeUpperTick: 1,
+            rangeLowerPrice: 1000,
+            rangeUpperPrice: 2500,
+            isInRange: false,
+          },
+        },
+        positionManagerAddress: null,
+        coverageStatus: "full",
+        updatedAt: new Date("2026-05-20T00:00:00.000Z"),
+      },
+    ] as Parameters<typeof buildDepositReadModelRows>[0]["eligibleDeposits"],
+    poolById: new Map([[
+      "pool-1",
+      {
+        chainId: 8453,
+        id: "pool-1",
+        token0Address: "0x4200000000000000000000000000000000000006",
+        token1Address: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+        createdAt: new Date("2026-05-01T00:00:00.000Z"),
+        metadataJson: { tokenSymbols: ["WETH", "USDC"], poolType: "cl", feeTierLabel: "100" },
+        updatedAt: new Date("2026-05-01T00:00:00.000Z"),
+        poolAddress: "0xpool-1",
+        label: "WETH / USDC 100",
+      },
+    ]]) as Parameters<typeof buildDepositReadModelRows>[0]["poolById"],
+    aggregates: new Map([[
+      "deposit-cl-close",
+      {
+        capitalEnteredUsd: 2000,
+        capitalWithdrawnUsd: 2800,
+        openedAt: new Date("2026-05-01T00:00:00.000Z"),
+        closedAt: new Date("2026-05-20T00:00:00.000Z"),
+        openedValueUsd: 2000,
+        openedByTransferIn: false,
+      },
+    ]]),
+    rewardsByDepositId: new Map(),
+    mintLedgerEventByTxHash: new Map(),
+    mintOutflowsByLedgerEventId: new Map(),
+    priceByTokenDay: new Map([
+      ["0x4200000000000000000000000000000000000006:2026-05-01", 1000],
+      ["0x833589fcd6edb6e08f4c7c32d4f71b54bda02913:2026-05-01", 1],
+      ["0x4200000000000000000000000000000000000006:2026-05-20", 2000],
+      ["0x833589fcd6edb6e08f4c7c32d4f71b54bda02913:2026-05-20", 1],
+    ]),
+    timelineRows: [
+      {
+        id: "timeline-open",
+        relatedDepositId: "deposit-cl-close",
+        sourceLedgerEventId: "ledger-open",
+        eventType: "deposit",
+        occurredAt: new Date("2026-05-01T00:00:00.000Z"),
+        attributedValueUsd: 2000,
+        confidence: "high",
+        coverageStatus: "full",
+        metadataJson: {},
+      },
+      {
+        id: "timeline-close",
+        relatedDepositId: "deposit-cl-close",
+        sourceLedgerEventId: "ledger-close",
+        eventType: "close",
+        occurredAt: new Date("2026-05-20T00:00:00.000Z"),
+        attributedValueUsd: 2000,
+        confidence: "high",
+        coverageStatus: "full",
+        metadataJson: {},
+      },
+    ] as Parameters<typeof buildDepositReadModelRows>[0]["timelineRows"],
+    lifecycleLedgerById: new Map([
+      ["ledger-open", { txHash: "0xopen", logIndex: 0, metadataJson: { blockNumber: 1 } }],
+      ["ledger-close", { txHash: "0xclose", logIndex: 1, metadataJson: { blockNumber: 2 } }],
+    ]),
+    pricedLifecycleMovements: new Map([
+      ["ledger-open", [
+        {
+          tokenAddress: "0x4200000000000000000000000000000000000006",
+          directionIn: false,
+          amountRaw: "1000000000000000000",
+          amountUsd: 1000,
+          symbol: "WETH",
+        },
+        {
+          tokenAddress: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+          directionIn: false,
+          amountRaw: "1000000000",
+          amountUsd: 1000,
+          symbol: "USDC",
+        },
+      ]],
+      ["ledger-close", [
+        {
+          tokenAddress: "0x4200000000000000000000000000000000000006",
+          directionIn: true,
+          amountRaw: "1400000000000000000",
+          amountUsd: 2800,
+          symbol: "WETH",
+        },
+      ]],
+    ]),
+    inferredActionIdByLedgerEventId: new Map(),
+    strategyIdByPoolId: new Map(),
+    resolvedRewardRows: [],
+  });
+
+  const decomposition = result.decompositionRowsToInsert[0];
+  const closeEvent = result.lifecycleRowsToInsert.find((row) => row.eventType === "close");
+
+  assert.equal(decomposition?.assetPriceEffectUsd, "1000");
+  assert.equal(decomposition?.rebalanceEffectUsd, "-200");
+  assert.equal(decomposition?.realizedPnlUsd, "0");
+  assert.equal(decomposition?.unrealizedPnlUsd, "0");
+  assert.equal(decomposition?.unattributedUsd, "0");
+  assert.equal((closeEvent?.metadataJson as Record<string, unknown>)?.rebalanceEffectUsd, -200);
+  assert.equal((closeEvent?.metadataJson as Record<string, unknown>)?.hodlBenchmarkUsd, 3000);
+});
+
+test("buildDepositReadModelRows keeps post-withdrawal swaps in realized pnl only", () => {
+  const result = buildDepositReadModelRows({
+    runId: "run-post-withdrawal-swap",
+    walletAddress: "0xabc",
+    chainId: 8453,
+    startDayUtc: "2026-05-01",
+    endDayUtc: "2026-05-28",
+    capturedAt: new Date("2026-05-28T00:00:00.000Z"),
+    eligibleDeposits: [
+      {
+        chainId: 8453,
+        id: "deposit-swap",
+        poolId: "pool-1",
+        walletAddress: "0xabc",
+        mintTxHash: null,
+        status: "closed",
+        tokenId: "77",
+        createdAt: new Date("2026-05-01T00:00:00.000Z"),
+        metadataJson: {
+          primaryTokenSymbol: "WETH",
+          secondaryTokenSymbol: "USDC",
+          metadata: {
+            feeTierLabel: "100",
+            isInRange: false,
+          },
+        },
+        positionManagerAddress: null,
+        coverageStatus: "full",
+        updatedAt: new Date("2026-05-25T00:00:00.000Z"),
+      },
+    ] as Parameters<typeof buildDepositReadModelRows>[0]["eligibleDeposits"],
+    poolById: new Map([[
+      "pool-1",
+      {
+        chainId: 8453,
+        id: "pool-1",
+        token0Address: "0x4200000000000000000000000000000000000006",
+        token1Address: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+        createdAt: new Date("2026-05-01T00:00:00.000Z"),
+        metadataJson: { tokenSymbols: ["WETH", "USDC"], poolType: "cl", feeTierLabel: "100" },
+        updatedAt: new Date("2026-05-01T00:00:00.000Z"),
+        poolAddress: "0xpool-1",
+        label: "WETH / USDC 100",
+      },
+    ]]) as Parameters<typeof buildDepositReadModelRows>[0]["poolById"],
+    aggregates: new Map([[
+      "deposit-swap",
+      {
+        capitalEnteredUsd: 2000,
+        capitalWithdrawnUsd: 2800,
+        openedAt: new Date("2026-05-01T00:00:00.000Z"),
+        closedAt: new Date("2026-05-25T00:00:00.000Z"),
+        openedValueUsd: 2000,
+        openedByTransferIn: false,
+      },
+    ]]),
+    rewardsByDepositId: new Map(),
+    mintLedgerEventByTxHash: new Map(),
+    mintOutflowsByLedgerEventId: new Map(),
+    priceByTokenDay: new Map([
+      ["0x4200000000000000000000000000000000000006:2026-05-01", 1000],
+      ["0x833589fcd6edb6e08f4c7c32d4f71b54bda02913:2026-05-01", 1],
+      ["0x4200000000000000000000000000000000000006:2026-05-20", 2000],
+      ["0x833589fcd6edb6e08f4c7c32d4f71b54bda02913:2026-05-20", 1],
+      ["0x4200000000000000000000000000000000000006:2026-05-25", 1900],
+      ["0x4200000000000000000000000000000000000006:2026-05-28", 1900],
+      ["0x833589fcd6edb6e08f4c7c32d4f71b54bda02913:2026-05-25", 1],
+      ["0x833589fcd6edb6e08f4c7c32d4f71b54bda02913:2026-05-28", 1],
+    ]),
+    timelineRows: [
+      {
+        id: "timeline-open",
+        relatedDepositId: "deposit-swap",
+        sourceLedgerEventId: "ledger-open",
+        eventType: "deposit",
+        occurredAt: new Date("2026-05-01T00:00:00.000Z"),
+        attributedValueUsd: 2000,
+        confidence: "high",
+        coverageStatus: "full",
+        metadataJson: {},
+      },
+      {
+        id: "timeline-withdraw",
+        relatedDepositId: "deposit-swap",
+        sourceLedgerEventId: "ledger-withdraw",
+        eventType: "withdraw",
+        occurredAt: new Date("2026-05-20T00:00:00.000Z"),
+        attributedValueUsd: 2000,
+        confidence: "high",
+        coverageStatus: "full",
+        metadataJson: {},
+      },
+      {
+        id: "timeline-swap",
+        relatedDepositId: "deposit-swap",
+        sourceLedgerEventId: "ledger-swap",
+        eventType: "partial_swap_attribution",
+        occurredAt: new Date("2026-05-25T00:00:00.000Z"),
+        attributedValueUsd: 1400,
+        confidence: "high",
+        coverageStatus: "full",
+        metadataJson: {},
+      },
+    ] as Parameters<typeof buildDepositReadModelRows>[0]["timelineRows"],
+    lifecycleLedgerById: new Map([
+      ["ledger-open", { txHash: "0xopen", logIndex: 0, metadataJson: { blockNumber: 1 } }],
+      ["ledger-withdraw", { txHash: "0xwithdraw", logIndex: 1, metadataJson: { blockNumber: 2 } }],
+      ["ledger-swap", { txHash: "0xswap", logIndex: 2, metadataJson: { blockNumber: 3 } }],
+    ]),
+    pricedLifecycleMovements: new Map([
+      ["ledger-open", [
+        {
+          tokenAddress: "0x4200000000000000000000000000000000000006",
+          directionIn: false,
+          amountRaw: "1000000000000000000",
+          amountUsd: 1000,
+          symbol: "WETH",
+        },
+        {
+          tokenAddress: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+          directionIn: false,
+          amountRaw: "1000000000",
+          amountUsd: 1000,
+          symbol: "USDC",
+        },
+      ]],
+      ["ledger-withdraw", [
+        {
+          tokenAddress: "0x4200000000000000000000000000000000000006",
+          directionIn: true,
+          amountRaw: "1400000000000000000",
+          amountUsd: 2700,
+          symbol: "WETH",
+        },
+      ]],
+      ["ledger-swap", [
+        {
+          tokenAddress: "0x4200000000000000000000000000000000000006",
+          directionIn: false,
+          amountRaw: "700000000000000000",
+          amountUsd: 1350,
+          symbol: "WETH",
+        },
+        {
+          tokenAddress: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+          directionIn: true,
+          amountRaw: "1450000000",
+          amountUsd: 1450,
+          symbol: "USDC",
+        },
+      ]],
+    ]),
+    inferredActionIdByLedgerEventId: new Map(),
+    strategyIdByPoolId: new Map(),
+    resolvedRewardRows: [],
+  });
+
+  const decomposition = result.decompositionRowsToInsert[0];
+  const swapEvent = result.lifecycleRowsToInsert.find((row) => row.txHash === "0xswap");
+
+  assert.equal(decomposition?.assetPriceEffectUsd, "1000");
+  assert.equal(decomposition?.rebalanceEffectUsd, "-300");
+  assert.equal(decomposition?.realizedPnlUsd, "100");
+  assert.equal(decomposition?.unrealizedPnlUsd, "0");
+  assert.equal(decomposition?.unattributedUsd, "0");
+  assert.equal((swapEvent?.metadataJson as Record<string, unknown>)?.realizedPnlUsd, 100);
+  assert.equal((swapEvent?.metadataJson as Record<string, unknown>)?.realizedCostBasisUsd, 1350);
 });

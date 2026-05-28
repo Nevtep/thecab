@@ -1,0 +1,31 @@
+.workspace {
+  display: grid;
+  gap: 16px;
+  align-items: start;
+}
+
+.listColumn {
+  min-width: 0;
+}
+
+.detailColumn {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+  align-self: start;
+}
+
+.detailBody {
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .withDetail {
+    grid-template-columns: minmax(0, 1.35fr) minmax(320px, 1fr);
+  }
+
+  .withDetail .detailColumn {
+    position: sticky;
+    top: 12px;
+  }
+}

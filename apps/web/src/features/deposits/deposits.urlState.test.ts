@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   createDefaultDepositsListUrlState,
+  normalizeFiltersForQueryKey,
   parseDepositsListUrlState,
   serializeDepositsListUrlState,
 } from "@/features/deposits/deposits.urlState";
@@ -81,5 +82,32 @@ test("parseDepositsListUrlState accepts legacy params and any return-sign alias"
     page: 1,
     pageSize: 25,
     selectedDepositId: null,
+  });
+});
+
+test("normalizeFiltersForQueryKey excludes detail selection from the list query identity", () => {
+  const filters = normalizeFiltersForQueryKey({
+    status: "open_active",
+    poolId: "123e4567-e89b-12d3-a456-426614174000",
+    startDayUtc: "2026-01-01",
+    endDayUtc: "2026-05-28",
+    returnSign: "positive",
+    sort: "totalReturn",
+    direction: "asc",
+    page: 2,
+    pageSize: 50,
+    selectedDepositId: "123e4567-e89b-12d3-a456-426614174111",
+  });
+
+  assert.deepEqual(filters, {
+    status: "open_active",
+    poolId: "123e4567-e89b-12d3-a456-426614174000",
+    startDayUtc: "2026-01-01",
+    endDayUtc: "2026-05-28",
+    returnSign: "positive",
+    sort: "totalReturn",
+    direction: "asc",
+    page: 2,
+    pageSize: 50,
   });
 });

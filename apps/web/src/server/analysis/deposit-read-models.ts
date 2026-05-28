@@ -20,6 +20,7 @@
 import { and, asc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 
 import { getDb } from "@/server/db/client";
+import { hydrateHistoricalPriceLookup, resolveHistoricalUsdBackfill } from "@/server/analysis/computeSnapshots";
 import {
   assetMovements,
   deposits,
@@ -280,6 +281,44 @@ type LifecycleLedgerRow = {
   metadataJson: unknown;
 };
 
+type MaterializedLifecycleCandidate = {
+  occurredAt: Date;
+  logIndex: number;
+  eventType: string;
+  txHash: string;
+  blockNumber: number;
+  usdValue: number | null;
+  signedTokenDeltas: Array<{
+    tokenAddress: string | null;
+    symbol: string | null;
+    direction: string;
+    amountRaw: string;
+    amountFormatted: string | null;
+    usdValue: number | null;
+    priceSource: string | null;
+  }>;
+  priceSource: "event" | "pricePointFallback" | "unavailable" | null;
+  confidence: "high" | "medium" | "degraded" | "unknown";
+  inferredActionId: string | null;
+  coverageReasonCodes: string[];
+  metadataJson: Record<string, unknown>;
+  principalFlowUsd: number | null;
+};
+
+type BenchmarkLot = {
+  tokenAddress: string | null;
+  symbol: string | null;
+  amount: number;
+  principalUsd: number;
+};
+
+type InventoryLot = {
+  tokenAddress: string | null;
+  symbol: string | null;
+  amount: number;
+  costBasisUsd: number;
+};
+
 function buildEmptyAggregate(): DepositTimelineAggregate {
   return {
     capitalEnteredUsd: 0,
@@ -368,6 +407,349 @@ function mergeReasonCodes(...values: Array<string[]>) {
   return Array.from(new Set(values.flatMap((value) => value)));
 }
 
+function resolveAmountFormattedToNumber(value: string | null): number | null {
+  if (!value) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function sumCandidateMovementUsd(
+  candidate: Pick<MaterializedLifecycleCandidate, "signedTokenDeltas" | "usdValue">,
+  direction: "in" | "out",
+) {
+  let total = 0;
+  let hasResolvedMovement = false;
+
+  for (const delta of candidate.signedTokenDeltas) {
+    if (delta.direction !== direction || delta.usdValue === null) continue;
+    total += Math.abs(delta.usdValue);
+    hasResolvedMovement = true;
+  }
+
+  if (hasResolvedMovement) {
+    return total;
+  }
+
+  return candidate.usdValue === null ? null : Math.abs(candidate.usdValue);
+}
+
+function candidateMovementBreakdown(
+  candidate: Pick<MaterializedLifecycleCandidate, "signedTokenDeltas">,
+  direction: "in" | "out",
+) {
+  return candidate.signedTokenDeltas
+    .filter((delta) => delta.direction === direction)
+    .map((delta) => ({
+      tokenAddress: delta.tokenAddress,
+      symbol: delta.symbol,
+      amount: resolveAmountFormattedToNumber(delta.amountFormatted),
+      usdValue: delta.usdValue === null ? null : Math.abs(delta.usdValue),
+    }))
+    .filter((delta) => delta.amount !== null && delta.amount > 0);
+}
+
+function buildBenchmarkLotsFromCapitalInCandidate(input: {
+  candidate: MaterializedLifecycleCandidate;
+  principalFlowUsd: number;
+}) {
+  const outflows = candidateMovementBreakdown(input.candidate, "out");
+  if (outflows.length === 0 || input.principalFlowUsd <= 0) {
+    return [] as BenchmarkLot[];
+  }
+
+  const totalOutflowUsd = outflows.reduce((sum, delta) => sum + (delta.usdValue ?? 0), 0);
+  const weightedByUsd = totalOutflowUsd > 0;
+
+  return outflows.map((delta, index) => {
+    const weight = weightedByUsd
+      ? ((delta.usdValue ?? 0) / totalOutflowUsd)
+      : (1 / outflows.length);
+    const principalUsd = index === outflows.length - 1
+      ? Math.max(
+          0,
+          input.principalFlowUsd - outflows
+            .slice(0, index)
+            .reduce((sum, previous) => sum + input.principalFlowUsd * (weightedByUsd
+              ? ((previous.usdValue ?? 0) / totalOutflowUsd)
+              : (1 / outflows.length)), 0),
+        )
+      : input.principalFlowUsd * weight;
+
+    return {
+      tokenAddress: delta.tokenAddress,
+      symbol: delta.symbol,
+      amount: delta.amount ?? 0,
+      principalUsd,
+    } satisfies BenchmarkLot;
+  });
+}
+
+function totalLotPrincipalUsd(lots: BenchmarkLot[]) {
+  return lots.reduce((sum, lot) => sum + lot.principalUsd, 0);
+}
+
+function valueBenchmarkLotsAtDate(input: {
+  lots: Array<Pick<BenchmarkLot, "tokenAddress" | "symbol" | "amount">>;
+  occurredAt: Date;
+  priceByTokenDay: Map<string, number>;
+}) {
+  let usdValue = 0;
+  const reasonCodes: string[] = [];
+
+  for (const lot of input.lots) {
+    if (lot.amount <= 0) continue;
+    const tokenAddress = normalizeTokenAddress(lot.tokenAddress);
+    if (!tokenAddress) {
+      reasonCodes.push("priceUnavailable");
+      return { usdValue: null, reasonCodes: mergeReasonCodes(reasonCodes) };
+    }
+
+    const priceUsd = input.priceByTokenDay.get(pricePointKey(tokenAddress, dayUtcFromDate(input.occurredAt)));
+    if (priceUsd === undefined) {
+      reasonCodes.push("priceUnavailable");
+      return { usdValue: null, reasonCodes: mergeReasonCodes(reasonCodes) };
+    }
+
+    usdValue += lot.amount * priceUsd;
+  }
+
+  return { usdValue, reasonCodes: mergeReasonCodes(reasonCodes) };
+}
+
+function consumeBenchmarkLotsByPrincipal(input: {
+  lots: BenchmarkLot[];
+  principalUsd: number;
+}) {
+  const remainingPrincipalUsd = totalLotPrincipalUsd(input.lots);
+  if (input.principalUsd <= 0 || remainingPrincipalUsd <= 0) {
+    return { consumedLots: [] as BenchmarkLot[], consumedPrincipalUsd: 0 };
+  }
+
+  const ratio = Math.min(1, input.principalUsd / remainingPrincipalUsd);
+  const consumedLots: BenchmarkLot[] = [];
+
+  input.lots.forEach((lot, index) => {
+    const lotRatio = index === input.lots.length - 1 ? 1 : ratio;
+    const consumedAmount = index === input.lots.length - 1
+      ? lot.amount * ratio
+      : lot.amount * lotRatio;
+    const consumedPrincipalUsd = index === input.lots.length - 1
+      ? Math.max(0, lot.principalUsd - lot.principalUsd * (1 - ratio))
+      : lot.principalUsd * lotRatio;
+
+    if (consumedAmount <= 0 || consumedPrincipalUsd <= 0) {
+      return;
+    }
+
+    consumedLots.push({
+      tokenAddress: lot.tokenAddress,
+      symbol: lot.symbol,
+      amount: consumedAmount,
+      principalUsd: consumedPrincipalUsd,
+    });
+
+    lot.amount = Math.max(0, lot.amount - consumedAmount);
+    lot.principalUsd = Math.max(0, lot.principalUsd - consumedPrincipalUsd);
+  });
+
+  for (let index = input.lots.length - 1; index >= 0; index -= 1) {
+    const lot = input.lots[index];
+    if (!lot || (lot.amount <= 1e-12 && lot.principalUsd <= 1e-9)) {
+      input.lots.splice(index, 1);
+    }
+  }
+
+  return {
+    consumedLots,
+    consumedPrincipalUsd: consumedLots.reduce((sum, lot) => sum + lot.principalUsd, 0),
+  };
+}
+
+function appendInventoryLotsFromCandidate(input: {
+  candidate: MaterializedLifecycleCandidate;
+  target: InventoryLot[];
+}) {
+  for (const delta of candidateMovementBreakdown(input.candidate, "in")) {
+    if ((delta.usdValue ?? 0) <= 0) continue;
+    input.target.push({
+      tokenAddress: delta.tokenAddress,
+      symbol: delta.symbol,
+      amount: delta.amount ?? 0,
+      costBasisUsd: delta.usdValue ?? 0,
+    });
+  }
+}
+
+function consumeInventoryLotsByOutflows(input: {
+  candidate: MaterializedLifecycleCandidate;
+  inventoryLots: InventoryLot[];
+}) {
+  let consumedCostBasisUsd = 0;
+
+  for (const delta of candidateMovementBreakdown(input.candidate, "out")) {
+    let remainingAmount = delta.amount ?? 0;
+    if (remainingAmount <= 0) continue;
+
+    for (const lot of input.inventoryLots) {
+      if (remainingAmount <= 1e-12) break;
+      if (normalizeTokenAddress(lot.tokenAddress) !== normalizeTokenAddress(delta.tokenAddress)) continue;
+      if (lot.amount <= 1e-12) continue;
+
+      const consumedAmount = Math.min(lot.amount, remainingAmount);
+      const ratio = consumedAmount / lot.amount;
+      const consumedCostBasis = lot.costBasisUsd * ratio;
+
+      lot.amount = Math.max(0, lot.amount - consumedAmount);
+      lot.costBasisUsd = Math.max(0, lot.costBasisUsd - consumedCostBasis);
+      remainingAmount -= consumedAmount;
+      consumedCostBasisUsd += consumedCostBasis;
+    }
+  }
+
+  for (let index = input.inventoryLots.length - 1; index >= 0; index -= 1) {
+    const lot = input.inventoryLots[index];
+    if (!lot || (lot.amount <= 1e-12 && lot.costBasisUsd <= 1e-9)) {
+      input.inventoryLots.splice(index, 1);
+    }
+  }
+
+  return consumedCostBasisUsd;
+}
+
+function deriveDepositPerformanceDecomposition(input: {
+  lifecycleCandidates: MaterializedLifecycleCandidate[];
+  currentValueUsd: number;
+  rewardsUsd: number;
+  totalReturnUsd: number;
+  capturedAt: Date;
+  priceByTokenDay: Map<string, number>;
+}) {
+  const benchmarkLots: BenchmarkLot[] = [];
+  const withdrawnInventoryLots: InventoryLot[] = [];
+  const reasonCodes: string[] = [];
+  let unmodeledPrincipalUsd = 0;
+
+  let feesUsd = 0;
+  let assetPriceEffectUsd = 0;
+  let rebalanceEffectUsd = 0;
+  let realizedPnlUsd = 0;
+  let unrealizedPnlUsd = 0;
+
+  for (const candidate of input.lifecycleCandidates) {
+    const rawTimelineEventType = asString(candidate.metadataJson.timelineEventType);
+
+    if (candidate.eventType === "collect_fees") {
+      feesUsd += sumCandidateMovementUsd(candidate, "in") ?? Math.abs(candidate.usdValue ?? 0);
+      continue;
+    }
+
+    if (candidate.eventType === "claim_reward") {
+      continue;
+    }
+
+    if (["mint_position", "increase_liquidity", "transfer_in", "stake"].includes(candidate.eventType)) {
+      const principalFlowUsd = Math.abs(candidate.principalFlowUsd ?? candidate.usdValue ?? 0);
+      const newLots = buildBenchmarkLotsFromCapitalInCandidate({
+        candidate,
+        principalFlowUsd,
+      });
+      if (newLots.length === 0 && principalFlowUsd > 0) {
+        unmodeledPrincipalUsd += principalFlowUsd;
+      }
+      benchmarkLots.push(...newLots);
+      continue;
+    }
+
+    if (rawTimelineEventType === "partial_swap_attribution") {
+      const proceedsUsd = sumCandidateMovementUsd(candidate, "in") ?? Math.abs(candidate.usdValue ?? 0);
+      const consumedCostBasisUsd = consumeInventoryLotsByOutflows({
+        candidate,
+        inventoryLots: withdrawnInventoryLots,
+      });
+      const realizedContributionUsd = proceedsUsd - consumedCostBasisUsd;
+      realizedPnlUsd += realizedContributionUsd;
+      candidate.metadataJson.realizedPnlUsd = realizedContributionUsd;
+      candidate.metadataJson.realizedCostBasisUsd = consumedCostBasisUsd;
+      candidate.metadataJson.swapProceedsUsd = proceedsUsd;
+      continue;
+    }
+
+    if (["withdraw", "decrease_liquidity", "close", "burn", "unstake"].includes(candidate.eventType)) {
+      const principalFlowUsd = Math.abs(candidate.principalFlowUsd ?? 0);
+      const actualWithdrawalUsd = sumCandidateMovementUsd(candidate, "in") ?? Math.abs(candidate.usdValue ?? 0);
+      const { consumedLots, consumedPrincipalUsd } = consumeBenchmarkLotsByPrincipal({
+        lots: benchmarkLots,
+        principalUsd: principalFlowUsd,
+      });
+      const benchmarkValuation = valueBenchmarkLotsAtDate({
+        lots: consumedLots,
+        occurredAt: candidate.occurredAt,
+        priceByTokenDay: input.priceByTokenDay,
+      });
+
+      if (benchmarkValuation.usdValue === null) {
+        reasonCodes.push(...benchmarkValuation.reasonCodes);
+      } else {
+        const priceEffectContributionUsd = benchmarkValuation.usdValue - consumedPrincipalUsd;
+        const rebalanceContributionUsd = actualWithdrawalUsd - benchmarkValuation.usdValue;
+        assetPriceEffectUsd += priceEffectContributionUsd;
+        rebalanceEffectUsd += rebalanceContributionUsd;
+        candidate.metadataJson.priceEffectUsd = priceEffectContributionUsd;
+        candidate.metadataJson.rebalanceEffectUsd = rebalanceContributionUsd;
+        candidate.metadataJson.hodlBenchmarkUsd = benchmarkValuation.usdValue;
+        candidate.metadataJson.withdrawalValueUsd = actualWithdrawalUsd;
+      }
+
+      appendInventoryLotsFromCandidate({
+        candidate,
+        target: withdrawnInventoryLots,
+      });
+    }
+  }
+
+  const remainingBenchmarkPrincipalUsd = totalLotPrincipalUsd(benchmarkLots);
+  if (remainingBenchmarkPrincipalUsd > 0) {
+    const remainingBenchmarkValuation = valueBenchmarkLotsAtDate({
+      lots: benchmarkLots,
+      occurredAt: input.capturedAt,
+      priceByTokenDay: input.priceByTokenDay,
+    });
+    if (remainingBenchmarkValuation.usdValue === null) {
+      reasonCodes.push(...remainingBenchmarkValuation.reasonCodes);
+    } else {
+      assetPriceEffectUsd += remainingBenchmarkValuation.usdValue - remainingBenchmarkPrincipalUsd;
+      rebalanceEffectUsd += input.currentValueUsd - remainingBenchmarkValuation.usdValue;
+    }
+  }
+
+  if (remainingBenchmarkPrincipalUsd <= 0 && unmodeledPrincipalUsd > 0) {
+    unrealizedPnlUsd += input.currentValueUsd - unmodeledPrincipalUsd;
+  }
+
+  const unattributedUsd = input.totalReturnUsd - (
+    input.rewardsUsd +
+    feesUsd +
+    assetPriceEffectUsd +
+    rebalanceEffectUsd +
+    realizedPnlUsd +
+    unrealizedPnlUsd
+  );
+  const unattributedReasonCodes = Math.abs(unattributedUsd) > 1e-9
+    ? mergeReasonCodes(reasonCodes, ["unattributedResidual"])
+    : mergeReasonCodes(reasonCodes);
+
+  return {
+    rewardsUsd: input.rewardsUsd,
+    feesUsd,
+    assetPriceEffectUsd,
+    rebalanceEffectUsd,
+    realizedPnlUsd,
+    unrealizedPnlUsd,
+    unattributedUsd,
+    unattributedReasonCodes,
+  };
+}
+
 export function deriveTimelineCoverageReasonCodes(input: {
   valuationReasonCodes: string[];
   coverageStatus: string | null | undefined;
@@ -390,6 +772,7 @@ function formatAmountRaw(input: { amountRaw: string; tokenAddress: string | null
 }
 
 export function resolveUsdValuation(input: {
+  chainId?: number;
   occurredAt: Date;
   tokenAddress: string | null;
   symbol: string | null;
@@ -397,44 +780,19 @@ export function resolveUsdValuation(input: {
   directAmountUsd: number | null;
   priceByTokenDay: Map<string, number>;
 }) {
-  if (input.directAmountUsd !== null) {
-    return {
-      usdValue: input.directAmountUsd,
-      priceSource: "event" as const,
-      reasonCodes: [] as string[],
-    };
-  }
-
-  const decimals = resolveKnownTokenDecimals({
+  return resolveHistoricalUsdBackfill({
+    chainId: input.chainId ?? 8453,
+    occurredAt: input.occurredAt,
     tokenAddress: input.tokenAddress,
     symbol: input.symbol,
+    amountRaw: input.amountRaw,
+    directAmountUsd: input.directAmountUsd,
+    priceByTokenDay: input.priceByTokenDay,
   });
-
-  if (decimals === null || !input.tokenAddress) {
-    return {
-      usdValue: null,
-      priceSource: "unavailable" as const,
-      reasonCodes: ["priceUnavailable"],
-    };
-  }
-
-  const priceUsd = input.priceByTokenDay.get(pricePointKey(input.tokenAddress, dayUtcFromDate(input.occurredAt)));
-  if (priceUsd === undefined) {
-    return {
-      usdValue: null,
-      priceSource: "unavailable" as const,
-      reasonCodes: ["priceUnavailable"],
-    };
-  }
-
-  return {
-    usdValue: (Number(input.amountRaw) / 10 ** decimals) * priceUsd,
-    priceSource: "pricePointFallback" as const,
-    reasonCodes: ["priceFallbackDca"],
-  };
 }
 
 export function buildSignedTokenDeltas(input: {
+  chainId?: number;
   occurredAt: Date;
   movements: Array<{
     tokenAddress: string;
@@ -451,6 +809,7 @@ export function buildSignedTokenDeltas(input: {
 
   const deltas = input.movements.map((movement) => {
     const resolved = resolveUsdValuation({
+      chainId: input.chainId,
       occurredAt: input.occurredAt,
       tokenAddress: movement.tokenAddress,
       symbol: movement.symbol,
@@ -577,24 +936,12 @@ export function buildDepositReadModelRows(input: {
       row.eventType === "deposit" || row.eventType === "rebalance" || row.eventType === "redeploy"
     ));
     const openingLedgerEvent = mintTxHash ? input.mintLedgerEventByTxHash.get(mintTxHash) : null;
-    const lifecycleCandidates: Array<{
-      occurredAt: Date;
-      logIndex: number;
-      eventType: string;
-      txHash: string;
-      blockNumber: number;
-      usdValue: number | null;
-      signedTokenDeltas: unknown[];
-      priceSource: "event" | "pricePointFallback" | "unavailable" | null;
-      confidence: "high" | "medium" | "degraded" | "unknown";
-      inferredActionId: string | null;
-      coverageReasonCodes: string[];
-      metadataJson: Record<string, unknown>;
-    }> = [];
+    const lifecycleCandidates: MaterializedLifecycleCandidate[] = [];
 
     if (openingLedgerEvent) {
       const openingMovements = input.pricedLifecycleMovements.get(openingLedgerEvent.id) ?? [];
       const openingDeltas = buildSignedTokenDeltas({
+        chainId: input.chainId,
         occurredAt: openingLedgerEvent.occurredAt,
         movements: openingMovements,
         priceByTokenDay: input.priceByTokenDay,
@@ -614,6 +961,7 @@ export function buildDepositReadModelRows(input: {
         metadataJson: {
           source: "mint_ledger_event",
         },
+        principalFlowUsd: Math.abs(openedValueUsd),
       });
     } else if (openingTimelineRow) {
       const ledgerEvent = openingTimelineRow.sourceLedgerEventId ? input.lifecycleLedgerById.get(openingTimelineRow.sourceLedgerEventId) : null;
@@ -621,6 +969,7 @@ export function buildDepositReadModelRows(input: {
         ? (input.pricedLifecycleMovements.get(openingTimelineRow.sourceLedgerEventId) ?? [])
         : [];
       const openingDeltas = buildSignedTokenDeltas({
+        chainId: input.chainId,
         occurredAt: openingTimelineRow.occurredAt,
         movements: openingMovements,
         priceByTokenDay: input.priceByTokenDay,
@@ -646,13 +995,14 @@ export function buildDepositReadModelRows(input: {
           source: "timeline_opening_event",
           timelineEventType: openingTimelineRow.eventType,
         },
+        principalFlowUsd: asNullableNumber(openingTimelineRow.attributedValueUsd),
       });
     }
 
     const depositTimelineRows = input.timelineRows.filter((row) => row.relatedDepositId === deposit.id);
     for (const row of depositTimelineRows) {
       const isOpeningEvent = row === openingTimelineRow;
-      if (isOpeningEvent && openingLedgerEvent) {
+      if (isOpeningEvent) {
         continue;
       }
 
@@ -666,6 +1016,7 @@ export function buildDepositReadModelRows(input: {
       const ledgerEvent = row.sourceLedgerEventId ? input.lifecycleLedgerById.get(row.sourceLedgerEventId) : null;
       const movements = row.sourceLedgerEventId ? (input.pricedLifecycleMovements.get(row.sourceLedgerEventId) ?? []) : [];
       const eventDeltas = buildSignedTokenDeltas({
+        chainId: input.chainId,
         occurredAt: row.occurredAt,
         movements,
         priceByTokenDay: input.priceByTokenDay,
@@ -692,6 +1043,7 @@ export function buildDepositReadModelRows(input: {
           timelineEventType: row.eventType,
           timelineEventId: row.id,
         },
+        principalFlowUsd: asNullableNumber(row.attributedValueUsd),
       });
     }
 
@@ -715,6 +1067,7 @@ export function buildDepositReadModelRows(input: {
           rewardType: row.rewardType,
           resolutionStatus: row.resolutionStatus,
         },
+        principalFlowUsd: null,
       });
     }
 
@@ -756,7 +1109,19 @@ export function buildDepositReadModelRows(input: {
       baseReasonCodes.push("rangeUnavailable");
     }
 
-    const reasonCodes = mergeReasonCodes(baseReasonCodes, lifecycleReasonCodes);
+    const provisionalReasonCodes = mergeReasonCodes(baseReasonCodes, lifecycleReasonCodes);
+
+    const decomposition = deriveDepositPerformanceDecomposition({
+      lifecycleCandidates,
+      currentValueUsd,
+      rewardsUsd: rewards,
+      totalReturnUsd,
+      capturedAt: input.capturedAt,
+      priceByTokenDay: input.priceByTokenDay,
+    });
+    const reasonCodes = decomposition.unattributedReasonCodes.length > 0
+      ? mergeReasonCodes(provisionalReasonCodes, decomposition.unattributedReasonCodes)
+      : provisionalReasonCodes;
     const finalCoverageStatus = reasonCodes.length > 0 && coverageStatus === "full"
       ? "partial"
       : coverageStatus;
@@ -764,22 +1129,6 @@ export function buildDepositReadModelRows(input: {
       coverageStatus: finalCoverageStatus,
       openedByTransferIn: aggregate.openedByTransferIn,
     });
-
-    const rewardsUsd = rewards;
-    const feesUsd = 0;
-    const assetPriceEffectUsd = 0;
-    const rebalanceEffectUsd = 0;
-    const unattributedUsd = totalReturnUsd - (
-      rewardsUsd +
-      feesUsd +
-      assetPriceEffectUsd +
-      rebalanceEffectUsd +
-      realizedPnlUsd +
-      unrealizedPnlUsd
-    );
-    const unattributedReasonCodes = Math.abs(unattributedUsd) > 1e-9
-      ? mergeReasonCodes(reasonCodes, ["unattributedResidual"])
-      : reasonCodes;
     const denominator = totalReturnUsd === 0 ? null : totalReturnUsd;
 
     decompositionRowsToInsert.push({
@@ -788,24 +1137,24 @@ export function buildDepositReadModelRows(input: {
       depositId: deposit.id,
       latestRunId: input.runId,
       totalReturnUsd: String(totalReturnUsd),
-      rewardsUsd: String(rewardsUsd),
-      feesUsd: String(feesUsd),
-      assetPriceEffectUsd: String(assetPriceEffectUsd),
-      rebalanceEffectUsd: String(rebalanceEffectUsd),
-      realizedPnlUsd: String(realizedPnlUsd),
-      unrealizedPnlUsd: String(unrealizedPnlUsd),
-      unattributedUsd: String(unattributedUsd),
-      unattributedReasonCodes,
+      rewardsUsd: String(decomposition.rewardsUsd),
+      feesUsd: String(decomposition.feesUsd),
+      assetPriceEffectUsd: String(decomposition.assetPriceEffectUsd),
+      rebalanceEffectUsd: String(decomposition.rebalanceEffectUsd),
+      realizedPnlUsd: String(decomposition.realizedPnlUsd),
+      unrealizedPnlUsd: String(decomposition.unrealizedPnlUsd),
+      unattributedUsd: String(decomposition.unattributedUsd),
+      unattributedReasonCodes: reasonCodes,
       componentPercentages: denominator === null
         ? {}
         : {
-            rewardsUsd: rewardsUsd / denominator,
-            feesUsd: feesUsd / denominator,
-            assetPriceEffectUsd: assetPriceEffectUsd / denominator,
-            rebalanceEffectUsd: rebalanceEffectUsd / denominator,
-            realizedPnlUsd: realizedPnlUsd / denominator,
-            unrealizedPnlUsd: unrealizedPnlUsd / denominator,
-            unattributedUsd: unattributedUsd / denominator,
+        rewardsUsd: decomposition.rewardsUsd / denominator,
+        feesUsd: decomposition.feesUsd / denominator,
+        assetPriceEffectUsd: decomposition.assetPriceEffectUsd / denominator,
+        rebalanceEffectUsd: decomposition.rebalanceEffectUsd / denominator,
+        realizedPnlUsd: decomposition.realizedPnlUsd / denominator,
+        unrealizedPnlUsd: decomposition.unrealizedPnlUsd / denominator,
+        unattributedUsd: decomposition.unattributedUsd / denominator,
           },
     });
 
@@ -1053,13 +1402,9 @@ export async function materializeDepositReadModels(
         )
       : [];
 
-  const priceByTokenDay = new Map<string, number>();
-  for (const row of pricePointRows) {
-    const key = pricePointKey(row.tokenAddress.toLowerCase(), dayUtcFromDate(row.pricedAt));
-    if (!priceByTokenDay.has(key)) {
-      priceByTokenDay.set(key, asNumber(row.priceUsd));
-    }
-  }
+  const priceByTokenDay = hydrateHistoricalPriceLookup({
+    priceRows: pricePointRows,
+  });
 
   const timelineRows = await db
     .select({
@@ -1459,12 +1804,10 @@ export async function materializeDepositReadModels(
         )
       : [];
 
-  for (const row of extendedPricePointRows) {
-    const key = pricePointKey(row.tokenAddress.toLowerCase(), dayUtcFromDate(row.pricedAt));
-    if (!priceByTokenDay.has(key)) {
-      priceByTokenDay.set(key, asNumber(row.priceUsd));
-    }
-  }
+  hydrateHistoricalPriceLookup({
+    priceRows: extendedPricePointRows,
+    target: priceByTokenDay,
+  });
 
   const inferredActionRows = sourceLedgerEventIds.length > 0
     ? await db
@@ -1512,6 +1855,7 @@ export async function materializeDepositReadModels(
     const occurredAt = row.occurredAt instanceof Date ? row.occurredAt : input.capturedAt;
     const amountRaw = typeof row.amountRaw === "string" ? row.amountRaw : String(row.amountRaw ?? "0");
     const directResolved = resolveUsdValuation({
+      chainId: input.chainId,
       occurredAt,
       tokenAddress,
       symbol,
@@ -1525,6 +1869,7 @@ export async function materializeDepositReadModels(
       : [];
     const movementFallback = directResolved.usdValue === null && fallbackMovements.length > 0
       ? buildSignedTokenDeltas({
+        chainId: input.chainId,
         occurredAt,
         movements: fallbackMovements,
         priceByTokenDay,
@@ -1581,6 +1926,7 @@ export async function materializeDepositReadModels(
     }
 
     const resolved = buildSignedTokenDeltas({
+      chainId: input.chainId,
       occurredAt: row.occurredAt,
       movements,
       priceByTokenDay,

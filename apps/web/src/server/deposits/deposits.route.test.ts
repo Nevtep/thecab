@@ -73,5 +73,7 @@ test("getDepositsErrorStatus maps request failures to stable codes", () => {
   assert.equal(getDepositsErrorStatus(new Error("DEPOSITS_REQUEST_FAILED:UNAUTHORIZED")).code, "unauthorized");
   assert.equal(getDepositsErrorStatus(new Error("DEPOSITS_REQUEST_FAILED:ANALYSIS_REQUIRED")).code, "analysis_required");
   assert.equal(getDepositsErrorStatus(new Error("DEPOSITS_REQUEST_FAILED:DEPOSIT_NOT_FOUND")).code, "deposit_not_found");
+  assert.equal(getDepositsErrorStatus(new Error("DEPOSITS_REQUEST_FAILED:DEPOSIT_NOT_FOUND:OWNERSHIP_MISMATCH")).code, "deposit_not_found");
+  assert.equal(getDepositsErrorStatus(new Error("DEPOSITS_REQUEST_FAILED:RECONCILIATION_DRIFT")).code, "internal_error");
   assert.equal(getDepositsErrorStatus(new Error("unexpected boom")).code, "internal_error");
 });

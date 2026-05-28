@@ -26,10 +26,12 @@ import type {
 import {
   buildDepositsApiQueryString,
   createDefaultDepositsListUrlState,
+  normalizeFiltersForQueryKey,
   parseDepositsListUrlState,
   serializeDepositsListUrlState,
   type DepositsListUrlState,
 } from "@/features/deposits/deposits.urlState";
+import { deriveDepositsScreenState } from "@/features/deposits/deposits.validation";
 import { useDepositsViewPreferences } from "@/features/deposits/deposits.viewPrefs";
 import { useAnalysisStatusQuery, useDepositsListQuery } from "@/queries/hooks";
 import { queryKeys } from "@/queries/keys";
@@ -109,7 +111,7 @@ export function DepositsContainer() {
       queryKey: queryKeys.deposits({
         chainId: resolvedChainId,
         walletAddress,
-        filters: urlState as unknown as Record<string, unknown>,
+        filters: normalizeFiltersForQueryKey(urlState),
       }),
     });
 
@@ -120,35 +122,24 @@ export function DepositsContainer() {
     }
   }, [analysisStatusQuery.data?.status, queryClient, resolvedChainId, urlState, walletAddress]);
 
-  const screenState: DepositsScreenState = useMemo(() => {
-    if (!isWalletReady || analysisStatusQuery.isLoading || depositsQuery.isLoading) {
-      return "loading";
-    }
-
-    const status = analysisStatusQuery.data?.status;
-    if (status && status !== "ready" && status !== "stale") {
-      return "locked";
-    }
-
-    if (depositsQuery.error) {
-      return depositsQuery.error instanceof Error && depositsQuery.error.message === "analysis_required"
-        ? "locked"
-        : "error";
-    }
-
-    if (!depositsQuery.data || depositsQuery.data.summary.totalCount === 0) {
-      return "empty";
-    }
-
-    return "ready";
-  }, [
-    analysisStatusQuery.data?.status,
-    analysisStatusQuery.isLoading,
-    depositsQuery.data,
-    depositsQuery.error,
-    depositsQuery.isLoading,
-    isWalletReady,
-  ]);
+  const screenState: DepositsScreenState = useMemo(
+    () => deriveDepositsScreenState({
+      isWalletReady,
+      analysisStatus: analysisStatusQuery.data?.status,
+      analysisStatusIsLoading: analysisStatusQuery.isLoading,
+      depositsIsLoading: depositsQuery.isLoading,
+      depositsErrorCode: depositsQuery.error instanceof Error ? depositsQuery.error.message : null,
+      totalCount: depositsQuery.data?.summary.totalCount ?? null,
+    }),
+    [
+      analysisStatusQuery.data?.status,
+      analysisStatusQuery.isLoading,
+      depositsQuery.data?.summary.totalCount,
+      depositsQuery.error,
+      depositsQuery.isLoading,
+      isWalletReady,
+    ],
+  );
 
   const pushUrlState = useCallback(
     (next: DepositsListUrlState) => {

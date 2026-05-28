@@ -5,7 +5,7 @@ import type { DepositDetailResponse, DepositsListResponse } from "@/features/dep
 import type {
   DepositsListUrlState,
 } from "@/features/deposits/deposits.urlState";
-import { buildDepositsApiQueryString } from "@/features/deposits/deposits.urlState";
+import { buildDepositsApiQueryString, normalizeFiltersForQueryKey } from "@/features/deposits/deposits.urlState";
 import type { PoolDetailRange, PoolDetailResponse, PoolsListFilters, PoolsListResponse } from "@/features/pools/pools.types";
 import type { SettingsResponse, SettingsUpdateRequest } from "@/features/settings/settings.types";
 import {
@@ -165,7 +165,7 @@ export function useDepositsListQuery(
     queryKey: queryKeys.deposits({
       chainId: input.chainId,
       walletAddress: input.walletAddress,
-      filters: input.state as unknown as Record<string, unknown>,
+      filters: normalizeFiltersForQueryKey(input.state),
     }),
     queryFn: () =>
       apiClient<DepositsListResponse>(

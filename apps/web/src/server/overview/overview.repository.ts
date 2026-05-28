@@ -19,12 +19,6 @@ import {
 import type { OverviewRequest } from "@/server/overview/overview.types";
 import { AERODROME_CL_POSITION_MANAGER_ADDRESS } from "@/server/protocol-positions/protocolMetadata";
 
-function normalizeAddress(value: unknown) {
-  return typeof value === "string" && /^0x[a-fA-F0-9]{40}$/.test(value)
-    ? value.toLowerCase()
-    : null;
-}
-
 type ScopedWalletInput = Pick<OverviewRequest, "walletAddress" | "chainId">;
 
 function getSnapshotKind(metadataJson: Record<string, unknown> | null | undefined) {
