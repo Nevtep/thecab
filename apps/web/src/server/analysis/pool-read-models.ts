@@ -120,6 +120,16 @@ type PoolTokenDeltaEvent = {
   metadataJson: Record<string, unknown>;
 };
 
+type SyntheticGaugeClaimCandidate = {
+  ledgerEventId: string;
+  txHash: string;
+  occurredAt: Date;
+  poolId: string;
+  gaugeAddress: string;
+  methodLabel: string;
+  metadataJson: Record<string, unknown>;
+};
+
 type PoolTokenBalanceEvent = {
   occurredAt: Date;
   dayUtc: string;
@@ -653,6 +663,54 @@ function resolveRewardValueUsd(input: {
   });
 
   return priceUsd > 0 ? amount * priceUsd : (persistedAmountUsd ?? 0);
+}
+
+export function buildSyntheticGaugeClaimCandidates(input: {
+  lifecycleRows: Array<Pick<LifecycleLedgerRow, "id" | "txHash" | "classification" | "occurredAt" | "metadataJson">>;
+  rewardTxHashSet: Set<string>;
+  protocolContractPoolIdByAddress: Map<string, string>;
+  poolIdByAddress: Map<string, string>;
+}) {
+  const claimMethodLabels = new Set(["getreward", "getrewards", "claim", "collect"]);
+
+  return input.lifecycleRows.flatMap((row): SyntheticGaugeClaimCandidate[] => {
+    if (!row.id || row.classification !== "claim") {
+      return [];
+    }
+
+    const txHash = row.txHash.toLowerCase();
+    if (input.rewardTxHashSet.has(txHash)) {
+      return [];
+    }
+
+    const metadata = row.metadataJson ?? {};
+    const gaugeAddress = normalizeTokenAddress(asString(metadata.toAddress));
+    const methodLabel = asString(metadata.methodLabel)?.toLowerCase() ?? null;
+    if (!gaugeAddress || !methodLabel || !claimMethodLabels.has(methodLabel)) {
+      return [];
+    }
+
+    const poolId = input.protocolContractPoolIdByAddress.get(gaugeAddress)
+      ?? input.poolIdByAddress.get(gaugeAddress)
+      ?? null;
+    if (!poolId) {
+      return [];
+    }
+
+    return [{
+      ledgerEventId: row.id,
+      txHash,
+      occurredAt: row.occurredAt,
+      poolId,
+      gaugeAddress,
+      methodLabel,
+      metadataJson: metadata,
+    }];
+  });
+}
+
+export function buildSyntheticGaugeClaimEventKey(input: Pick<SyntheticGaugeClaimCandidate, "txHash" | "ledgerEventId">) {
+  return `reward:${input.txHash}:${input.ledgerEventId}`;
 }
 
 function computeTrackedTokenBalanceValueUsd(input: {
@@ -1195,6 +1253,11 @@ export async function materializePoolReadModels(input: MaterializePoolReadModels
     } satisfies LifecycleLedgerRow]),
   );
   const normalizedLifecycleRows = Array.from(lifecycleLedgerByTxHash.values()).sort((left, right) => left.occurredAt.getTime() - right.occurredAt.getTime());
+  const rewardTxHashSet = new Set(
+    rewardRows
+      .map((row) => (typeof row.txHash === "string" ? row.txHash.toLowerCase() : null))
+      .filter((value): value is string => Boolean(value)),
+  );
   const depositTimelineCandidates: PoolDepositTimelineCandidate[] = [];
   const residualTimelineCandidates: PoolResidualTimelineCandidate[] = [];
   const capitalFlowEvents: PoolCapitalFlowEvent[] = [];
@@ -1602,6 +1665,23 @@ export async function materializePoolReadModels(input: MaterializePoolReadModels
     }
   }
 
+  const syntheticGaugeClaimCandidates = buildSyntheticGaugeClaimCandidates({
+    lifecycleRows: normalizedLifecycleRows,
+    rewardTxHashSet,
+    protocolContractPoolIdByAddress,
+    poolIdByAddress,
+  });
+
+  for (const candidate of syntheticGaugeClaimCandidates) {
+    for (const movement of lifecycleMovementsByLedgerEventId.get(candidate.ledgerEventId) ?? []) {
+      if (!movement.directionIn) {
+        continue;
+      }
+
+      relevantTokenAddresses.add(movement.tokenAddress.toLowerCase());
+    }
+  }
+
   if (relevantTokenAddresses.size > 0) {
     await hydrateHistoricalPoolPrices({
       chainId: input.chainId,
@@ -1816,6 +1896,64 @@ export async function materializePoolReadModels(input: MaterializePoolReadModels
           rewardType: reward.rewardType,
           txHash: reward.txHash,
           ...(reward.metadataJson ?? {}),
+        },
+      });
+    }
+
+    for (const candidate of syntheticGaugeClaimCandidates) {
+      const pool = poolsById.get(candidate.poolId);
+      if (!pool) {
+        continue;
+      }
+
+      const accumulator = getOrCreatePoolAccumulator({
+        map: accumulators,
+        poolId: candidate.poolId,
+        poolAddress: pool.poolAddress,
+        label: pool.label,
+        tokenSymbols: [],
+        feeTierLabel: asString((pool.metadataJson ?? {}).feeTierLabel),
+      });
+      const dayUtc = dayUtcFromDate(candidate.occurredAt);
+      const inboundMovements = (lifecycleMovementsByLedgerEventId.get(candidate.ledgerEventId) ?? [])
+        .filter((movement) => movement.directionIn);
+      if (inboundMovements.length === 0) {
+        continue;
+      }
+
+      const amountUsd = inboundMovements.reduce((sum, movement) => sum + resolveRewardValueUsd({
+        chainId: input.chainId,
+        rewardAmountUsd: movement.amountUsd,
+        rewardAmountRaw: movement.amountRaw,
+        rewardTokenAddress: movement.tokenAddress,
+        rewardMetadata: movement.metadataJson,
+        dayUtc,
+        latestPriceByToken,
+        earliestPriceDayByToken,
+        priceByTokenAndDay,
+      }), 0);
+      if (amountUsd <= 0) {
+        continue;
+      }
+
+      accumulator.totalRewardsUsd += amountUsd;
+      accumulator.rewardValueByDay.set(dayUtc, (accumulator.rewardValueByDay.get(dayUtc) ?? 0) + amountUsd);
+      accumulator.lastParticipatedAt = mergeDateBounds(accumulator.lastParticipatedAt, candidate.occurredAt, "max");
+      accumulator.timeline.push({
+        eventKey: buildSyntheticGaugeClaimEventKey(candidate),
+        eventType: "claim",
+        occurredAt: candidate.occurredAt,
+        confidence: "medium",
+        coverageStatus: accumulator.coverageStatus,
+        attributedValueUsd: amountUsd,
+        sourceLedgerEventId: candidate.ledgerEventId,
+        relatedDepositId: null,
+        relatedStrategyId: null,
+        metadataJson: {
+          source: "manual_gauge_claim_fallback",
+          gaugeAddress: candidate.gaugeAddress,
+          methodLabel: candidate.methodLabel,
+          txHash: candidate.txHash,
         },
       });
     }
