@@ -669,7 +669,6 @@ export function buildSyntheticGaugeClaimCandidates(input: {
   lifecycleRows: Array<Pick<LifecycleLedgerRow, "id" | "txHash" | "classification" | "occurredAt" | "metadataJson">>;
   rewardTxHashSet: Set<string>;
   protocolContractPoolIdByAddress: Map<string, string>;
-  poolIdByAddress: Map<string, string>;
 }) {
   const claimMethodLabels = new Set(["getreward", "getrewards", "claim", "collect"]);
 
@@ -691,7 +690,6 @@ export function buildSyntheticGaugeClaimCandidates(input: {
     }
 
     const poolId = input.protocolContractPoolIdByAddress.get(gaugeAddress)
-      ?? input.poolIdByAddress.get(gaugeAddress)
       ?? null;
     if (!poolId) {
       return [];
@@ -1207,6 +1205,7 @@ export async function materializePoolReadModels(input: MaterializePoolReadModels
   const poolIdByAddress = new Map(poolRows.map((row) => [row.poolAddress.toLowerCase(), row.id] as const));
   const protocolContractPoolIdByAddress = new Map(
     protocolContractRows
+      .filter((row) => row.contractType === "gauge")
       .map((row) => {
         const metadata = row.metadataJson ?? {};
         const directPoolId = asString(metadata.poolId);
@@ -1669,7 +1668,6 @@ export async function materializePoolReadModels(input: MaterializePoolReadModels
     lifecycleRows: normalizedLifecycleRows,
     rewardTxHashSet,
     protocolContractPoolIdByAddress,
-    poolIdByAddress,
   });
 
   for (const candidate of syntheticGaugeClaimCandidates) {

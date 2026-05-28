@@ -5,8 +5,11 @@ import { resolveManualDepositMintTxHash } from "@/server/analysis/enginePersiste
 import {
   buildOverviewAnalyzedActivityReadInput,
   buildOverviewApprovalDetail,
+  buildOverviewChartEvents,
   buildOverviewDepositMintDetail,
+  buildOverviewRewardPriceState,
   buildOverviewRewardFallbackEvents,
+  resolveOverviewClaimRewardValueUsd,
 } from "@/server/overview/getRecentOverview";
 
 function ensureTestEnv() {
@@ -153,4 +156,100 @@ test("buildOverviewAnalyzedActivityReadInput keeps activity lists limited but ch
       },
     );
   }
+});
+
+test("resolveOverviewClaimRewardValueUsd backfills claim USD from historical prices when movement USD is null", () => {
+  const rewardPriceState = buildOverviewRewardPriceState({
+    granularity: "day",
+    tokenAddresses: ["0x940181a94a35a4569e4529a3cdfb74e38fd98631"],
+    currentPriceLookup: new Map(),
+    priceRows: [
+      {
+        tokenAddress: "0x940181a94a35a4569e4529a3cdfb74e38fd98631",
+        pricedAt: new Date("2026-04-27T00:00:00.000Z"),
+        priceUsd: "2.5",
+      },
+    ],
+  });
+
+  const rewardValueUsd = resolveOverviewClaimRewardValueUsd({
+    chainId: 8453,
+    occurredAt: new Date("2026-04-27T15:45:49.000Z"),
+    granularity: "day",
+    movements: [
+      {
+        tokenAddress: "0x940181a94a35a4569e4529a3cdfb74e38fd98631",
+        amountRaw: "2000000000000000000",
+        directionIn: true,
+        amountUsd: null,
+        metadataJson: {
+          symbol: "AERO",
+          decimals: 18,
+        },
+      },
+    ],
+    priceState: rewardPriceState,
+  });
+
+  assert.equal(rewardValueUsd, 5);
+});
+
+test("buildOverviewChartEvents keeps governance reward-like activity out of overview rewards", () => {
+  const events = buildOverviewChartEvents({
+    chainId: 8453,
+    range: "30d",
+    rows: [
+      {
+        id: "ledger-gov",
+        txHash: "0xgov",
+        eventType: "claim",
+        occurredAt: new Date("2026-05-28T15:45:49.000Z"),
+        classification: "governance",
+        confidence: "high",
+        metadataJson: {
+          summary: "Vote on Aerodrome voting escrow",
+        },
+        movements: [
+          {
+            ledgerEventId: "ledger-gov",
+            tokenAddress: "0x940181a94a35a4569e4529a3cdfb74e38fd98631",
+            amountRaw: "1000000000000000000",
+            directionIn: true,
+            amountUsd: null,
+            metadataJson: {
+              symbol: "AERO",
+              decimals: 18,
+            },
+          },
+        ],
+        depositContext: null,
+        approvalContext: null,
+        rebalanceMembership: null,
+      },
+    ],
+    rewardValueByTxHash: new Map([["0xgov", 123]]),
+    rewardPriceState: buildOverviewRewardPriceState({
+      granularity: "day",
+      tokenAddresses: ["0x940181a94a35a4569e4529a3cdfb74e38fd98631"],
+      currentPriceLookup: new Map(),
+      priceRows: [
+        {
+          tokenAddress: "0x940181a94a35a4569e4529a3cdfb74e38fd98631",
+          pricedAt: new Date("2026-05-28T00:00:00.000Z"),
+          priceUsd: "3",
+        },
+      ],
+    }),
+    rewardRows: [
+      {
+        txHash: "0xgov",
+        occurredAt: new Date("2026-05-28T15:45:49.000Z"),
+        amountUsd: "123",
+      },
+    ],
+  });
+
+  assert.equal(events.length, 1);
+  assert.equal(events[0]?.type, "vote");
+  assert.equal(events[0]?.rewardValueUsd, null);
 });

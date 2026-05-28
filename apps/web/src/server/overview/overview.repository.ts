@@ -698,6 +698,7 @@ export async function readRecentOverviewAnalyzedActivity(input: ScopedWalletInpu
     .select({
       ledgerEventId: assetMovements.ledgerEventId,
       tokenAddress: assetMovements.tokenAddress,
+      amountRaw: assetMovements.amountRaw,
       directionIn: assetMovements.directionIn,
       amountUsd: assetMovements.amountUsd,
       metadataJson: assetMovements.metadataJson,

@@ -21,7 +21,6 @@ test("buildSyntheticGaugeClaimCandidates keeps unmatched gauge claims for known 
     protocolContractPoolIdByAddress: new Map([
       ["0x1111111111111111111111111111111111111111", "pool-1"],
     ]),
-    poolIdByAddress: new Map(),
   });
 
   assert.deepEqual(candidates, [
@@ -78,7 +77,28 @@ test("buildSyntheticGaugeClaimCandidates skips claims already covered by reward 
     protocolContractPoolIdByAddress: new Map([
       ["0x1111111111111111111111111111111111111111", "pool-1"],
     ]),
-    poolIdByAddress: new Map(),
+  });
+
+  assert.deepEqual(candidates, []);
+});
+
+test("buildSyntheticGaugeClaimCandidates skips claim targets that are not mapped as gauges", () => {
+  const candidates = buildSyntheticGaugeClaimCandidates({
+    lifecycleRows: [
+      {
+        id: "ledger-1",
+        txHash: "0xgov",
+        classification: "claim",
+        occurredAt: new Date("2026-05-28T00:00:00.000Z"),
+        metadataJson: {
+          toAddress: "0x3333333333333333333333333333333333333333",
+          methodLabel: "getReward",
+          summary: "Aerodrome voting escrow claim",
+        },
+      },
+    ],
+    rewardTxHashSet: new Set<string>(),
+    protocolContractPoolIdByAddress: new Map(),
   });
 
   assert.deepEqual(candidates, []);

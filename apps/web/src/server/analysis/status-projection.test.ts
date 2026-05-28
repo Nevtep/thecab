@@ -142,3 +142,52 @@ test("projectAnalysisProgress exposes slice and phase progress for the UI contra
   assert.equal(projected.phases.pools.status, "queued");
   assert.equal(projected.slices[1]?.coverageReasons[0], "providerError");
 });
+
+test("projectAnalysisProgress marks zero-slice and failed runs across all phases", () => {
+  const queued = projectAnalysisProgress({
+    latestRunStatus: "queued",
+    currentStage: null,
+    totalSlices: 0,
+    completedSlices: 0,
+    failedSlices: 0,
+    slices: [],
+  });
+  const failed = projectAnalysisProgress({
+    latestRunStatus: "failed",
+    currentStage: "pools",
+    totalSlices: 2,
+    completedSlices: 1,
+    failedSlices: 1,
+    slices: [],
+  });
+
+  assert.equal(queued.phases.deposits.status, "queued");
+  assert.equal(queued.phases.activity.status, "queued");
+  assert.equal(failed.phases.deposits.status, "failed");
+  assert.equal(failed.phases.activity.status, "failed");
+  assert.equal(failed.phases.pools.status, "failed");
+  assert.equal(failed.phases.finalize.status, "failed");
+});
+
+test("projectAnalysisStatus reports stale and canonical coverage transitions", () => {
+  const oldDate = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+
+  const staleCancelled = projectAnalysisStatus({
+    latestRunStatus: "cancelled",
+    lastSuccessfulRunAt: oldDate,
+  });
+  const failedWithoutSuccess = projectAnalysisStatus({
+    latestRunStatus: "failed",
+    lastSuccessfulRunAt: null,
+  });
+  const completeWithoutReasons = projectAnalysisStatus({
+    latestRunStatus: "complete",
+    lastSuccessfulRunAt: new Date(),
+  });
+
+  assert.equal(staleCancelled.status, "stale");
+  assert.equal(failedWithoutSuccess.status, "failed");
+  assert.equal(failedWithoutSuccess.coverage, "unknown");
+  assert.equal(completeWithoutReasons.status, "ready");
+  assert.equal(completeWithoutReasons.coverage, "full");
+});

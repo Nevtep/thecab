@@ -164,31 +164,203 @@ function sumMovementUsd(
   }, 0);
 }
 
-function isAeroMovement(input: {
+type OverviewRewardPriceState = {
+  latestPriceByToken: Map<string, number>;
+  earliestBucketByToken: Map<string, string>;
+  priceByTokenAndBucket: Map<string, Map<string, number>>;
+};
+
+function resolveOverviewKnownTokenDecimals(input: {
+  chainId: number;
+  tokenAddress: string | null;
+  symbol: string | null;
+  decimals: unknown;
+}) {
+  const explicitDecimals = asNumber(input.decimals);
+  if (explicitDecimals !== null && explicitDecimals >= 0) {
+    return Math.trunc(explicitDecimals);
+  }
+
+  if (input.chainId === 8453) {
+    const normalizedAddress = input.tokenAddress?.toLowerCase() ?? null;
+    const normalizedSymbol = normalizeTokenMetadata(input.symbol);
+
+    if (normalizedAddress === BASE_WETH_ADDRESS || normalizedSymbol === "weth" || normalizedSymbol === "eth") {
+      return 18;
+    }
+
+    if (normalizedAddress === BASE_AERO_ADDRESS || normalizedSymbol === "aero") {
+      return 18;
+    }
+
+    if (normalizedAddress === BASE_USDC_ADDRESS || normalizedSymbol === "usdc") {
+      return 6;
+    }
+
+    if (normalizedAddress === BASE_CBBTC_ADDRESS || normalizedSymbol === "cbbtc") {
+      return 8;
+    }
+  }
+
+  return null;
+}
+
+function parseOverviewTokenAmount(rawAmount: string, decimals: number | null) {
+  if (decimals === null || !/^\d+$/.test(rawAmount)) {
+    return 0;
+  }
+
+  const digits = rawAmount.padStart(decimals + 1, "0");
+  const integerPart = digits.slice(0, digits.length - decimals);
+  const fractionalPart = digits.slice(digits.length - decimals);
+  const parsed = Number(`${integerPart}.${fractionalPart}`);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function resolveOverviewRewardTokenPrice(input: {
+  tokenAddress: string;
+  bucketTimestamp: string;
+  priceState: OverviewRewardPriceState;
+}) {
+  const bucketPrice = input.priceState.priceByTokenAndBucket.get(input.tokenAddress)?.get(input.bucketTimestamp);
+  if (typeof bucketPrice === "number") {
+    return bucketPrice;
+  }
+
+  const earliestBucketTimestamp = input.priceState.earliestBucketByToken.get(input.tokenAddress);
+  if (earliestBucketTimestamp && input.bucketTimestamp < earliestBucketTimestamp) {
+    return 0;
+  }
+
+  return input.priceState.latestPriceByToken.get(input.tokenAddress) ?? 0;
+}
+
+function normalizeOverviewRewardPricingAddress(input: {
+  chainId: number;
   tokenAddress: string | null;
   metadataJson: Record<string, unknown>;
 }) {
-  const normalizedAddress = input.tokenAddress?.toLowerCase() ?? null;
-  const normalizedSymbol = asString(input.metadataJson.symbol)?.trim().toLowerCase() ?? null;
-  const normalizedName = asString(input.metadataJson.name)?.trim().toLowerCase() ?? null;
-
-  return normalizedAddress === BASE_AERO_ADDRESS || normalizedSymbol === "aero" || normalizedName === "aerodrome";
+  return resolveAlchemyPricingAddress(
+    input.chainId,
+    input.tokenAddress,
+    asString(input.metadataJson.symbol),
+    {
+      name: asString(input.metadataJson.name),
+    },
+  );
 }
 
-function resolveAeroRewardValueUsd(
-  movements: Array<{
+export function buildOverviewRewardPriceState(input: {
+  granularity: "hour" | "day";
+  tokenAddresses: string[];
+  currentPriceLookup: Map<string, { priceUsd: number; pricedAt: string | null; confidence: "high" | "medium" }>;
+  priceRows: Array<{
     tokenAddress: string;
+    pricedAt: Date;
+    priceUsd: string | number;
+  }>;
+}) {
+  const latestPriceByToken = new Map<string, number>();
+  const earliestBucketByToken = new Map<string, string>();
+  const priceByTokenAndBucket = new Map<string, Map<string, number>>();
+
+  for (const tokenAddress of input.tokenAddresses) {
+    const normalizedAddress = tokenAddress.toLowerCase();
+    const currentPriceEntry = input.currentPriceLookup.get(normalizedAddress);
+    if (currentPriceEntry) {
+      latestPriceByToken.set(normalizedAddress, currentPriceEntry.priceUsd);
+    }
+  }
+
+  for (const row of input.priceRows) {
+    const tokenAddress = row.tokenAddress.toLowerCase();
+    const priceUsd = asNumber(row.priceUsd);
+    if (priceUsd === null || priceUsd <= 0) {
+      continue;
+    }
+
+    const bucketTimestamp = toBucketTimestamp(row.pricedAt.toISOString(), input.granularity);
+    const priceByBucket = priceByTokenAndBucket.get(tokenAddress) ?? new Map<string, number>();
+    if (!priceByTokenAndBucket.has(tokenAddress)) {
+      priceByTokenAndBucket.set(tokenAddress, priceByBucket);
+    }
+    if (!priceByBucket.has(bucketTimestamp)) {
+      priceByBucket.set(bucketTimestamp, priceUsd);
+    }
+
+    if (!latestPriceByToken.has(tokenAddress)) {
+      latestPriceByToken.set(tokenAddress, priceUsd);
+    }
+
+    const earliestBucketTimestamp = earliestBucketByToken.get(tokenAddress);
+    if (!earliestBucketTimestamp || bucketTimestamp < earliestBucketTimestamp) {
+      earliestBucketByToken.set(tokenAddress, bucketTimestamp);
+    }
+  }
+
+  return {
+    latestPriceByToken,
+    earliestBucketByToken,
+    priceByTokenAndBucket,
+  } satisfies OverviewRewardPriceState;
+}
+
+export function resolveOverviewClaimRewardValueUsd(input: {
+  chainId: number;
+  occurredAt: Date;
+  granularity: "hour" | "day";
+  movements: Array<{
+    tokenAddress: string | null;
+    amountRaw?: string | null;
     directionIn: boolean;
     amountUsd: string | number | null;
     metadataJson: Record<string, unknown>;
-  }>,
-) {
-  const rewardValueUsd = movements.reduce((sum, movement) => {
-    if (!movement.directionIn || !isAeroMovement(movement)) {
+  }>;
+  priceState: OverviewRewardPriceState;
+}) {
+  const bucketTimestamp = toBucketTimestamp(input.occurredAt.toISOString(), input.granularity);
+
+  const rewardValueUsd = input.movements.reduce((sum, movement) => {
+    if (!movement.directionIn) {
       return sum;
     }
 
-    return sum + (asNumber(movement.amountUsd) ?? 0);
+    const persistedAmountUsd = asNumber(movement.amountUsd);
+    if (persistedAmountUsd !== null && persistedAmountUsd > 0) {
+      return sum + persistedAmountUsd;
+    }
+
+    if (typeof movement.amountRaw !== "string" || movement.amountRaw.length === 0) {
+      return sum;
+    }
+
+    const pricingAddress = normalizeOverviewRewardPricingAddress({
+      chainId: input.chainId,
+      tokenAddress: movement.tokenAddress,
+      metadataJson: movement.metadataJson,
+    });
+    if (!pricingAddress) {
+      return sum;
+    }
+
+    const decimals = resolveOverviewKnownTokenDecimals({
+      chainId: input.chainId,
+      tokenAddress: pricingAddress,
+      symbol: asString(movement.metadataJson.symbol),
+      decimals: movement.metadataJson.tokenDecimals ?? movement.metadataJson.decimals,
+    });
+    const amount = parseOverviewTokenAmount(movement.amountRaw, decimals);
+    if (amount <= 0) {
+      return sum;
+    }
+
+    const priceUsd = resolveOverviewRewardTokenPrice({
+      tokenAddress: pricingAddress,
+      bucketTimestamp,
+      priceState: input.priceState,
+    });
+
+    return priceUsd > 0 ? sum + amount * priceUsd : sum;
   }, 0);
 
   return rewardValueUsd > 0 ? rewardValueUsd : null;
@@ -603,10 +775,12 @@ export function buildOverviewRewardFallbackEvents(input: {
   );
 }
 
-function buildOverviewChartEvents(input: {
+export function buildOverviewChartEvents(input: {
+  chainId: number;
   rows: Awaited<ReturnType<typeof readRecentOverviewAnalyzedActivity>>;
   range: OverviewRange;
   rewardValueByTxHash?: Map<string, number>;
+  rewardPriceState?: OverviewRewardPriceState;
   rewardRows?: Array<{
     occurredAt: Date;
     amountUsd: string | number | null;
@@ -635,7 +809,17 @@ function buildOverviewChartEvents(input: {
       movements: row.movements,
     });
     const rewardValueUsd = classification === "claim"
-      ? input.rewardValueByTxHash?.get(row.txHash.toLowerCase()) ?? resolveAeroRewardValueUsd(row.movements)
+      ? input.rewardValueByTxHash?.get(row.txHash.toLowerCase()) ?? (
+          input.rewardPriceState
+            ? resolveOverviewClaimRewardValueUsd({
+                chainId: input.chainId,
+                occurredAt: row.occurredAt,
+                granularity,
+                movements: row.movements,
+                priceState: input.rewardPriceState,
+              })
+            : null
+        )
       : null;
     const type = mapOverviewActivityItemToChartEventType({
       classification,
@@ -2362,6 +2546,28 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
         }),
       )
     : [];
+  const claimRewardPricingAddresses = Array.from(
+    new Set(
+      analyzedActivityRows.flatMap((row) => {
+        if (row.classification !== "claim") {
+          return [];
+        }
+
+        return row.movements.flatMap((movement) => {
+          if (!movement.directionIn) {
+            return [];
+          }
+
+          const pricingAddress = normalizeOverviewRewardPricingAddress({
+            chainId: input.chainId,
+            tokenAddress: movement.tokenAddress,
+            metadataJson: movement.metadataJson,
+          });
+          return pricingAddress ? [pricingAddress] : [];
+        });
+      }),
+    ),
+  );
 
   const tokens = tokensResult.status === "fulfilled" ? (tokensResult.value.result ?? []) : [];
   const history = historyResult.status === "fulfilled" ? (historyResult.value.result ?? []) : [];
@@ -2434,7 +2640,14 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
 
   const uniqueTokenAddresses = Array.from(
     new Map(
-      [...tokenPricingContexts]
+      [
+        ...tokenPricingContexts,
+        ...claimRewardPricingAddresses.map((pricingAddress) => ({
+          pricingAddress,
+          isPriorityPricingAsset: isPriorityPricingAsset(pricingAddress),
+          moralisValueUsd: null,
+        })),
+      ]
         .sort((left, right) => {
           if (left.isPriorityPricingAsset !== right.isPriorityPricingAsset) {
             return Number(right.isPriorityPricingAsset) - Number(left.isPriorityPricingAsset);
@@ -2699,6 +2912,21 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
       .filter((row) => (asNumber(row.amountUsd) ?? 0) > 0)
       .map((row) => [row.txHash.toLowerCase(), asNumber(row.amountUsd) ?? 0] as const),
   );
+  const rewardPriceRows = claimRewardPricingAddresses.length > 0
+    ? await readOverviewPricePointsInRange({
+        chainId: input.chainId,
+        tokenAddresses: claimRewardPricingAddresses,
+        startAt: rangeStartAt,
+        endAt: now,
+        resolution: bucketConfig.granularity === "hour" ? "1h" : "1d",
+      })
+    : [];
+  const rewardPriceState = buildOverviewRewardPriceState({
+    granularity: bucketConfig.granularity,
+    tokenAddresses: claimRewardPricingAddresses,
+    currentPriceLookup: priceLookup,
+    priceRows: rewardPriceRows,
+  });
 
   const chartSeries = buildChartPoints(
     bucketTimestamps,
@@ -2797,9 +3025,11 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
     hasRewardMarkers,
     points: chartSeries.points,
     events: buildOverviewChartEvents({
+      chainId: input.chainId,
       rows: analyzedActivityRows,
       range: input.range,
       rewardValueByTxHash,
+      rewardPriceState,
       rewardRows: realizedRewardRows,
     }),
   };
