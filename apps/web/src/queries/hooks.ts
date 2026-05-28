@@ -1,6 +1,11 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 
 import type { AnalysisMode, AnalysisStatus, AnalysisStatusResponse } from "@/analysis/analysisStatus";
+import type { DepositDetailResponse, DepositsListResponse } from "@/features/deposits/deposits.types";
+import type {
+  DepositsListUrlState,
+} from "@/features/deposits/deposits.urlState";
+import { buildDepositsApiQueryString } from "@/features/deposits/deposits.urlState";
 import type { PoolDetailRange, PoolDetailResponse, PoolsListFilters, PoolsListResponse } from "@/features/pools/pools.types";
 import type { SettingsResponse, SettingsUpdateRequest } from "@/features/settings/settings.types";
 import {
@@ -152,11 +157,42 @@ export function useDepositsQuery(input: WalletScopedInput) {
   });
 }
 
+export function useDepositsListQuery(
+  input: WalletScopedInput & { state: DepositsListUrlState },
+  options?: { enabled?: boolean },
+) {
+  return useQuery<DepositsListResponse>({
+    queryKey: queryKeys.deposits({
+      chainId: input.chainId,
+      walletAddress: input.walletAddress,
+      filters: input.state as unknown as Record<string, unknown>,
+    }),
+    queryFn: () =>
+      apiClient<DepositsListResponse>(
+        `/api/deposits?${buildDepositsApiQueryString({ chainId: input.chainId, state: input.state })}`,
+      ),
+    enabled: (options?.enabled ?? true) && Boolean(input.walletAddress),
+  });
+}
+
 export function useDepositDetailQuery(chainId: number, depositId: string) {
   return useQuery({
     queryKey: queryKeys.depositDetail(chainId, depositId),
     queryFn: () => apiClient(`/api/deposits/${depositId}?chainId=${chainId}`),
     enabled: false,
+  });
+}
+
+export function useDepositDetailViewQuery(
+  input: WalletScopedInput & { depositId: string | null },
+  options?: { enabled?: boolean },
+) {
+  return useQuery<DepositDetailResponse>({
+    queryKey: queryKeys.depositDetail(input.chainId, input.depositId ?? ""),
+    queryFn: () =>
+      apiClient<DepositDetailResponse>(`/api/deposits/${input.depositId}?chainId=${input.chainId}`),
+    enabled:
+      (options?.enabled ?? true) && Boolean(input.walletAddress) && Boolean(input.depositId),
   });
 }
 

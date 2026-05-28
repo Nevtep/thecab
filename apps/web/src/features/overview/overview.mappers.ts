@@ -252,8 +252,9 @@ export function getOverviewNavigationItems(
       key: "deposits",
       iconName: "deposits",
       labelKey: "navigation:items.deposits",
-      stateKey: analysisReady ? "comingSoon" : "requiresAnalysis",
-      disabled: true,
+      href: analysisReady ? "/deposits" : undefined,
+      stateKey: analysisReady ? "active" : "requiresAnalysis",
+      disabled: !analysisReady,
     },
     {
       key: "strategies",

@@ -124,6 +124,18 @@ async function main() {
         query: `delete from pool_wallet_summaries where wallet_address = $1 and chain_id = $2`,
       },
       {
+        label: "deposit_lifecycle_events",
+        query: `delete from deposit_lifecycle_events where wallet_address = $1 and chain_id = $2`,
+      },
+      {
+        label: "deposit_performance_decompositions",
+        query: `delete from deposit_performance_decompositions where wallet_address = $1 and chain_id = $2`,
+      },
+      {
+        label: "deposit_wallet_summaries",
+        query: `delete from deposit_wallet_summaries where wallet_address = $1 and chain_id = $2`,
+      },
+      {
         label: "governance_events",
         query: `delete from governance_events where wallet_address = $1 and chain_id = $2`,
       },

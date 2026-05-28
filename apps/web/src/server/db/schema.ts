@@ -760,4 +760,129 @@ export const userPreferences = pgTable(
   ],
 );
 
+export const depositWalletSummaries = pgTable(
+  "deposit_wallet_summaries",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    chainId: integer("chain_id").notNull(),
+    walletAddress: varchar("wallet_address", { length: 42 }).notNull(),
+    depositId: uuid("deposit_id")
+      .notNull()
+      .references(() => deposits.id, { onDelete: "cascade" }),
+    poolId: uuid("pool_id")
+      .notNull()
+      .references(() => pools.id, { onDelete: "cascade" }),
+    latestRunId: uuid("latest_run_id")
+      .notNull()
+      .references(() => analysisRuns.id, { onDelete: "cascade" }),
+    positionLabel: text("position_label").notNull(),
+    poolKind: varchar("pool_kind", { length: 24 }).notNull().default("cl"),
+    feeTierBps: integer("fee_tier_bps"),
+    tokenId: text("token_id"),
+    token0Address: varchar("token0_address", { length: 42 }),
+    token0Symbol: varchar("token0_symbol", { length: 32 }),
+    token1Address: varchar("token1_address", { length: 42 }),
+    token1Symbol: varchar("token1_symbol", { length: 32 }),
+    status: varchar("status", { length: 24 }).notNull().default("open_active"),
+    openedAt: timestamp("opened_at", { withTimezone: true }),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    openedByTransferIn: boolean("opened_by_transfer_in").notNull().default(false),
+    openedValueUsd: numeric("opened_value_usd", { precision: 38, scale: 18 }).notNull().default("0"),
+    currentValueUsd: numeric("current_value_usd", { precision: 38, scale: 18 }).notNull().default("0"),
+    capitalEnteredUsd: numeric("capital_entered_usd", { precision: 38, scale: 18 }).notNull().default("0"),
+    capitalWithdrawnUsd: numeric("capital_withdrawn_usd", { precision: 38, scale: 18 }).notNull().default("0"),
+    totalRewardsUsd: numeric("total_rewards_usd", { precision: 38, scale: 18 }).notNull().default("0"),
+    realizedPnlUsd: numeric("realized_pnl_usd", { precision: 38, scale: 18 }).notNull().default("0"),
+    unrealizedPnlUsd: numeric("unrealized_pnl_usd", { precision: 38, scale: 18 }).notNull().default("0"),
+    totalReturnUsd: numeric("total_return_usd", { precision: 38, scale: 18 }).notNull().default("0"),
+    totalReturnPct: numeric("total_return_pct", { precision: 12, scale: 6 }),
+    estimatedAnnualizedReturnPct: numeric("estimated_annualized_return_pct", { precision: 12, scale: 6 }),
+    tickLower: integer("tick_lower"),
+    tickUpper: integer("tick_upper"),
+    rangeLowerPrice: numeric("range_lower_price", { precision: 38, scale: 18 }),
+    rangeUpperPrice: numeric("range_upper_price", { precision: 38, scale: 18 }),
+    isInRange: boolean("is_in_range"),
+    coverageStatus: varchar("coverage_status", { length: 24 }).notNull().default("unknown"),
+    confidence: varchar("confidence", { length: 16 }).notNull().default("unknown"),
+    coverageReasonCodes: text("coverage_reason_codes").array().notNull().default(sql`'{}'::text[]`),
+    coveredStartDayUtc: varchar("covered_start_day_utc", { length: 10 }),
+    coveredEndDayUtc: varchar("covered_end_day_utc", { length: 10 }),
+    mellowStrategyCrossLinkId: uuid("mellow_strategy_cross_link_id").references(() => strategies.id, { onDelete: "set null" }),
+    metadataJson: jsonb("metadata_json").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).$defaultFn(now).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).$defaultFn(now).notNull(),
+  },
+  (table) => [
+    uniqueIndex("deposit_wallet_summaries_identity_uidx").on(table.chainId, table.walletAddress, table.depositId),
+    index("deposit_wallet_summaries_status_idx").on(table.chainId, table.walletAddress, table.status),
+    index("deposit_wallet_summaries_opened_idx").on(table.chainId, table.walletAddress, table.openedAt),
+    index("deposit_wallet_summaries_pool_idx").on(table.chainId, table.walletAddress, table.poolId),
+    index("deposit_wallet_summaries_coverage_idx").on(table.chainId, table.walletAddress, table.coverageStatus),
+  ],
+);
+
+export const depositLifecycleEvents = pgTable(
+  "deposit_lifecycle_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    chainId: integer("chain_id").notNull(),
+    walletAddress: varchar("wallet_address", { length: 42 }).notNull(),
+    depositId: uuid("deposit_id")
+      .notNull()
+      .references(() => deposits.id, { onDelete: "cascade" }),
+    sequenceIndex: integer("sequence_index").notNull(),
+    latestRunId: uuid("latest_run_id")
+      .notNull()
+      .references(() => analysisRuns.id, { onDelete: "cascade" }),
+    eventType: varchar("event_type", { length: 32 }).notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+    txHash: varchar("tx_hash", { length: 66 }).notNull(),
+    logIndex: integer("log_index").notNull(),
+    blockNumber: integer("block_number").notNull(),
+    usdValue: numeric("usd_value", { precision: 38, scale: 18 }),
+    signedTokenDeltas: jsonb("signed_token_deltas").$type<unknown[]>().notNull().default([]),
+    priceSource: varchar("price_source", { length: 24 }),
+    confidence: varchar("confidence", { length: 16 }).notNull().default("unknown"),
+    inferredActionId: uuid("inferred_action_id").references(() => inferredActions.id, { onDelete: "set null" }),
+    coverageReasonCodes: text("coverage_reason_codes").array().notNull().default(sql`'{}'::text[]`),
+    metadataJson: jsonb("metadata_json").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).$defaultFn(now).notNull(),
+  },
+  (table) => [
+    uniqueIndex("deposit_lifecycle_events_identity_uidx").on(table.chainId, table.walletAddress, table.depositId, table.sequenceIndex),
+    index("deposit_lifecycle_events_occurred_idx").on(table.chainId, table.walletAddress, table.depositId, table.occurredAt),
+    index("deposit_lifecycle_events_type_idx").on(table.chainId, table.walletAddress, table.depositId, table.eventType),
+  ],
+);
+
+export const depositPerformanceDecompositions = pgTable(
+  "deposit_performance_decompositions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    chainId: integer("chain_id").notNull(),
+    walletAddress: varchar("wallet_address", { length: 42 }).notNull(),
+    depositId: uuid("deposit_id")
+      .notNull()
+      .references(() => deposits.id, { onDelete: "cascade" }),
+    latestRunId: uuid("latest_run_id")
+      .notNull()
+      .references(() => analysisRuns.id, { onDelete: "cascade" }),
+    totalReturnUsd: numeric("total_return_usd", { precision: 38, scale: 18 }).notNull().default("0"),
+    rewardsUsd: numeric("rewards_usd", { precision: 38, scale: 18 }).notNull().default("0"),
+    feesUsd: numeric("fees_usd", { precision: 38, scale: 18 }).notNull().default("0"),
+    assetPriceEffectUsd: numeric("asset_price_effect_usd", { precision: 38, scale: 18 }).notNull().default("0"),
+    rebalanceEffectUsd: numeric("rebalance_effect_usd", { precision: 38, scale: 18 }).notNull().default("0"),
+    realizedPnlUsd: numeric("realized_pnl_usd", { precision: 38, scale: 18 }).notNull().default("0"),
+    unrealizedPnlUsd: numeric("unrealized_pnl_usd", { precision: 38, scale: 18 }).notNull().default("0"),
+    unattributedUsd: numeric("unattributed_usd", { precision: 38, scale: 18 }).notNull().default("0"),
+    unattributedReasonCodes: text("unattributed_reason_codes").array().notNull().default(sql`'{}'::text[]`),
+    componentPercentages: jsonb("component_percentages").$type<Record<string, number>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).$defaultFn(now).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).$defaultFn(now).notNull(),
+  },
+  (table) => [
+    uniqueIndex("deposit_performance_decompositions_identity_uidx").on(table.chainId, table.walletAddress, table.depositId),
+  ],
+);
+
 export type AnalysisRun = typeof analysisRuns.$inferSelect;

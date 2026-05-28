@@ -1,3 +1,89 @@
 {
-  "title": "TODO"
+  "title": "Deposits",
+  "subtitle": "Per-position lifecycle, returns, and impermanent-loss accounting for manual Aerodrome positions.",
+  "list": {
+    "kpis": {
+      "totalDeposits": "Total deposits",
+      "totalDepositsValue": "{{count}} positions",
+      "currentValue": "Current value",
+      "totalRewards": "Total rewards",
+      "weightedAnnualizedReturn": "Weighted est. annualized",
+      "capitalDeployed": "Capital deployed",
+      "capitalDeployedHint": "Share of manual capital still deployed."
+    },
+    "filters": {
+      "status": {
+        "label": "Status",
+        "all": "All",
+        "open_active": "Open · in range",
+        "open_out_of_range": "Open · out of range",
+        "closed": "Closed"
+      },
+      "returnSign": {
+        "label": "Return",
+        "all": "All",
+        "positive": "Positive",
+        "negative": "Negative"
+      },
+      "pool": {
+        "label": "Pool",
+        "all": "All pools"
+      },
+      "dateRange": {
+        "label": "Date range",
+        "start": "From",
+        "end": "To"
+      },
+      "columns": {
+        "label": "Columns",
+        "density": "Density",
+        "comfortable": "Comfortable",
+        "compact": "Compact",
+        "reset": "Reset"
+      }
+    },
+    "columns": {
+      "position": "Position",
+      "pool": "Pool",
+      "status": "Status",
+      "opened": "Opened",
+      "closed": "Closed",
+      "openedValue": "Opened value",
+      "currentValue": "Current value",
+      "totalRewards": "Total rewards",
+      "realizedPnl": "Realized PnL",
+      "unrealizedPnl": "Unrealized PnL",
+      "totalReturn": "Total return",
+      "estApr": "Est. APR",
+      "coverage": "Coverage",
+      "confidence": "Confidence",
+      "performance": "Performance"
+    },
+    "empty": {
+      "title": "No deposits yet",
+      "description": "Once your analysis run identifies Aerodrome positions, they will appear here with full lifecycle and return breakdowns.",
+      "actionLabel": "Refresh analysis"
+    },
+    "loading": "Loading deposits…",
+    "error": {
+      "title": "We couldn’t load your deposits",
+      "description": "Please retry. If the problem persists, contact support.",
+      "actionLabel": "Try again"
+    },
+    "pagination": {
+      "page": "Page {{page}}",
+      "of": "of {{total}}",
+      "previous": "Previous",
+      "next": "Next"
+    }
+  },
+  "status": {
+    "open_active": "Open · in range",
+    "open_out_of_range": "Open · out of range",
+    "closed": "Closed"
+  },
+  "transferIn": {
+    "badge": "Inherited",
+    "tooltip": "Position opened by transfer-in. Pre-transfer history is not attributable."
+  }
 }

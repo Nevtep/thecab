@@ -28,8 +28,8 @@ export const queryKeys = {
     ["pools", chainId, walletAddress ?? "", JSON.stringify(filters ?? {})] as const,
   poolDetail: (chainId: number, poolId: string, range = "90d") =>
     ["pool", chainId, poolId, range] as const,
-  deposits: ({ chainId, walletAddress }: BaseParams) =>
-    ["deposits", chainId, walletAddress ?? ""] as const,
+  deposits: ({ chainId, walletAddress, filters }: BaseParams & { filters?: Record<string, unknown> }) =>
+    ["deposits", chainId, walletAddress ?? "", JSON.stringify(filters ?? {})] as const,
   depositDetail: (chainId: number, depositId: string) =>
     ["deposit", chainId, depositId] as const,
   strategies: ({ chainId, walletAddress }: BaseParams) =>

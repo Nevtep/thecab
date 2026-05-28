@@ -10,6 +10,7 @@ import {
 import { listRunSlices, resolveRunSliceDayWindow } from "@/server/analysis/analysis-slice.repository";
 import { computeSnapshots, type WalletTokenSnapshot } from "@/server/analysis/computeSnapshots";
 import { materializePoolReadModels } from "@/server/analysis/pool-read-models";
+import { materializeDepositReadModels } from "@/server/analysis/deposit-read-models";
 import { getDb } from "@/server/db/client";
 import { rawProviderRecords } from "@/server/db/schema";
 import { upsertProcessingCursor } from "@/server/analysis/processing-cursor.repository";
@@ -156,6 +157,14 @@ export const phaseFinalizeTask = task({
       walletTokens,
     });
     const poolReadModels = await materializePoolReadModels({
+      runId: payload.runId,
+      walletAddress: payload.walletAddress,
+      chainId: payload.chainId,
+      startDayUtc: sliceDayWindow.startDayUtc,
+      endDayUtc: sliceDayWindow.endDayUtc,
+      capturedAt,
+    });
+    await materializeDepositReadModels({
       runId: payload.runId,
       walletAddress: payload.walletAddress,
       chainId: payload.chainId,

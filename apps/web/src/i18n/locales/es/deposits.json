@@ -1,3 +1,89 @@
 {
-  "title": "PENDIENTE"
+  "title": "Depósitos",
+  "subtitle": "Ciclo de vida por posición, retornos y contabilidad de pérdida impermanente para tus posiciones manuales en Aerodrome.",
+  "list": {
+    "kpis": {
+      "totalDeposits": "Depósitos totales",
+      "totalDepositsValue": "{{count}} posiciones",
+      "currentValue": "Valor actual",
+      "totalRewards": "Recompensas totales",
+      "weightedAnnualizedReturn": "Anualizado estimado ponderado",
+      "capitalDeployed": "Capital desplegado",
+      "capitalDeployedHint": "Porcentaje del capital manual aún desplegado."
+    },
+    "filters": {
+      "status": {
+        "label": "Estado",
+        "all": "Todos",
+        "open_active": "Abierta · en rango",
+        "open_out_of_range": "Abierta · fuera de rango",
+        "closed": "Cerrada"
+      },
+      "returnSign": {
+        "label": "Retorno",
+        "all": "Todos",
+        "positive": "Positivo",
+        "negative": "Negativo"
+      },
+      "pool": {
+        "label": "Pool",
+        "all": "Todos los pools"
+      },
+      "dateRange": {
+        "label": "Rango de fechas",
+        "start": "Desde",
+        "end": "Hasta"
+      },
+      "columns": {
+        "label": "Columnas",
+        "density": "Densidad",
+        "comfortable": "Cómoda",
+        "compact": "Compacta",
+        "reset": "Restablecer"
+      }
+    },
+    "columns": {
+      "position": "Posición",
+      "pool": "Pool",
+      "status": "Estado",
+      "opened": "Apertura",
+      "closed": "Cierre",
+      "openedValue": "Valor inicial",
+      "currentValue": "Valor actual",
+      "totalRewards": "Recompensas totales",
+      "realizedPnl": "PnL realizado",
+      "unrealizedPnl": "PnL no realizado",
+      "totalReturn": "Retorno total",
+      "estApr": "APR est.",
+      "coverage": "Cobertura",
+      "confidence": "Confianza",
+      "performance": "Rendimiento"
+    },
+    "empty": {
+      "title": "Sin depósitos aún",
+      "description": "Cuando tu análisis detecte posiciones en Aerodrome, aparecerán aquí con su ciclo de vida y desglose de retornos.",
+      "actionLabel": "Actualizar análisis"
+    },
+    "loading": "Cargando depósitos…",
+    "error": {
+      "title": "No pudimos cargar tus depósitos",
+      "description": "Por favor reintenta. Si el problema persiste, contacta a soporte.",
+      "actionLabel": "Reintentar"
+    },
+    "pagination": {
+      "page": "Página {{page}}",
+      "of": "de {{total}}",
+      "previous": "Anterior",
+      "next": "Siguiente"
+    }
+  },
+  "status": {
+    "open_active": "Abierta · en rango",
+    "open_out_of_range": "Abierta · fuera de rango",
+    "closed": "Cerrada"
+  },
+  "transferIn": {
+    "badge": "Heredada",
+    "tooltip": "Posición abierta por transferencia entrante. El historial previo no es atribuible."
+  }
 }
