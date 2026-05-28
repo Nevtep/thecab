@@ -9,6 +9,7 @@ import {
   CircleHelp,
   Coins,
   Compass,
+  Copy,
   Landmark,
   Gauge,
   Layers,
@@ -40,6 +41,7 @@ export const cabIconRegistry = {
   arrowDownToLine: ArrowDownToLine,
   arrowUpToLine: ArrowUpToLine,
   coins: Coins,
+  copy: Copy,
   lock: Lock,
   refreshCcw: RefreshCcw,
 } as const satisfies Record<string, LucideIcon>;

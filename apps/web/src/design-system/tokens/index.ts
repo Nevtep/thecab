@@ -5,5 +5,6 @@ export * from "@/design-system/tokens/spacing";
 export * from "@/design-system/tokens/radius";
 export * from "@/design-system/tokens/shadows";
 export * from "@/design-system/tokens/tamaguiColorTokens";
+export * from "@/design-system/tokens/tokenAssets";
 export * from "@/design-system/tokens/touchTarget";
 export * from "@/design-system/tokens/zIndex";

@@ -11,6 +11,25 @@ const tamaguiPlugin = withTamagui({
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   transpilePackages: ["react-native-web", "tamagui", "@tamagui/core"],
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "assets-cdn.trustwallet.com",
+        pathname: "/blockchains/**",
+      },
+      {
+        protocol: "https",
+        hostname: "assets.coingecko.com",
+        pathname: "/coins/images/**",
+      },
+      {
+        protocol: "https",
+        hostname: "ethereum-optimism.github.io",
+        pathname: "/data/**",
+      },
+    ],
+  },
   webpack(config) {
     config.ignoreWarnings = [
       ...(config.ignoreWarnings ?? []),

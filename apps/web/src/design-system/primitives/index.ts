@@ -2,6 +2,7 @@ export * from "@/design-system/primitives/CabBadge";
 export * from "@/design-system/primitives/CabBox";
 export * from "@/design-system/primitives/CabButton";
 export * from "@/design-system/primitives/CabCard";
+export * from "@/design-system/primitives/CabEyebrow";
 export * from "@/design-system/primitives/CabInput";
 export * from "@/design-system/primitives/CabSeparator";
 export * from "@/design-system/primitives/CabStack";

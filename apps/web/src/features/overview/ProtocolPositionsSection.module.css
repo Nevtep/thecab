@@ -1,0 +1,300 @@
+.root {
+  display: grid;
+  gap: 20px;
+}
+
+.headerBlock {
+  display: grid;
+  gap: 10px;
+}
+
+.headerMeta {
+  display: grid;
+  gap: 8px;
+}
+
+.headerCoverage {
+  max-width: 78ch;
+}
+
+.summaryChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.summaryZone {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr);
+}
+
+.summaryMetricsGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.distributionShell {
+  display: grid;
+  gap: 14px;
+}
+
+.distributionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.distributionHeaderValue {
+  white-space: nowrap;
+}
+
+.distributionLegend {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
+.distributionLegendItem {
+  display: grid;
+  gap: 6px;
+}
+
+.groups {
+  display: grid;
+  gap: 16px;
+}
+
+.groupCard {
+  display: grid;
+  gap: 0;
+}
+
+.groupHeader {
+  display: grid;
+  gap: 14px;
+  padding: 16px 16px 14px;
+}
+
+.groupHeaderTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.groupIdentity {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.groupMetaRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.groupValue {
+  display: grid;
+  gap: 4px;
+  justify-items: end;
+  text-align: right;
+}
+
+.groupSplit {
+  display: grid;
+  gap: 8px;
+}
+
+.groupSplitLabels {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.groupSplitLabelStart,
+.groupSplitLabelEnd {
+  min-width: 0;
+}
+
+.groupSplitLabelEnd {
+  text-align: right;
+}
+
+.rowList {
+  display: grid;
+  border-top: 1px solid rgba(184, 199, 230, 0.08);
+}
+
+.row {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px;
+  border-top: 1px solid rgba(184, 199, 230, 0.08);
+  background: linear-gradient(180deg, rgba(17, 26, 39, 0.64) 0%, rgba(11, 18, 30, 0.82) 100%);
+}
+
+.row:first-child {
+  border-top: 0;
+}
+
+.rowGrid {
+  display: grid;
+  gap: 12px 16px;
+  grid-template-columns:
+    minmax(130px, 1.05fr)
+    minmax(128px, 0.95fr)
+    minmax(220px, 1.45fr)
+    minmax(200px, 1.35fr)
+    minmax(150px, 1fr)
+    minmax(124px, 0.85fr)
+    minmax(132px, 0.85fr);
+  align-items: start;
+}
+
+.cell {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.tokenReference {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.tokenReferenceLabel {
+  min-width: 0;
+}
+
+.copyButton {
+  min-width: 32px;
+  width: 32px;
+  padding-left: 0;
+  padding-right: 0;
+  border-color: rgba(184, 199, 230, 0.18);
+  background: rgba(234, 241, 255, 0.05);
+}
+
+.tokenReferenceSubline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.typeCell {
+  display: grid;
+  gap: 6px;
+}
+
+.typeBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.rangeFallback,
+.secondaryText {
+  color: #8494B2;
+}
+
+.underlyingList {
+  display: grid;
+  gap: 8px;
+}
+
+.underlyingItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.underlyingAmount {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.coverageCell {
+  display: grid;
+  gap: 6px;
+}
+
+.updatedText {
+  color: #B8C7E6;
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid rgba(184, 199, 230, 0.12);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(16, 24, 38, 0.72) 0%, rgba(9, 16, 28, 0.92) 100%);
+}
+
+.footerNote {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.footerRefresh {
+  margin-left: auto;
+}
+
+@media (max-width: 1280px) {
+  .summaryZone {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rowGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 860px) {
+  .summaryMetricsGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .groupHeaderTop {
+    flex-direction: column;
+  }
+
+  .groupValue {
+    justify-items: start;
+    text-align: left;
+  }
+
+  .groupSplitLabels {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .groupSplitLabelEnd {
+    text-align: left;
+  }
+
+  .rowGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .footerRefresh {
+    margin-left: 0;
+    width: 100%;
+  }
+}

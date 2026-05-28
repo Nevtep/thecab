@@ -255,9 +255,33 @@
     "positionValue": "{{value}} · {{status}}",
     "tokenId": "Token ID {{value}}",
     "lockEndAt": "El bloqueo termina {{value}}",
+    "lastRefreshedAt": "Ultima actualización {{value}}",
     "valueUpdatedAt": "Valor actualizado {{value}}",
     "poolGroupCount_one": "1 posición en este grupo",
     "poolGroupCount_other": "{{count}} posiciones en este grupo",
+    "columns": {
+      "idToken": "ID / token",
+      "type": "Tipo",
+      "range": "Rango",
+      "underlying": "Activos subyacentes",
+      "value": "Valor actual",
+      "coverage": "Cobertura",
+      "updated": "Actualizado"
+    },
+    "actions": {
+      "copyReference": "Copiar referencia del token",
+      "copied": "Copiado"
+    },
+    "metrics": {
+      "totalProtocolValue": "Valor total de protocolo",
+      "positionsDetected": "Posiciones detectadas",
+      "strategyExposures": "Exposiciones a estrategia",
+      "poolsCovered": "Pools cubiertos",
+      "distributionByPool": "Distribución de valor por pool",
+      "lpExposure": "LP en staking",
+      "strategyExposure": "Exposición a estrategia",
+      "groupExposureAria": "Distribución de exposición para {{pool}}"
+    },
     "coverageStatus": {
       "full": "Cobertura actual",
       "share_level": "Cobertura a nivel de participación",

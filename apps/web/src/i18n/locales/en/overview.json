@@ -255,9 +255,33 @@
     "positionValue": "{{value}} · {{status}}",
     "tokenId": "Token ID {{value}}",
     "lockEndAt": "Lock ends {{value}}",
+    "lastRefreshedAt": "Last refresh {{value}}",
     "valueUpdatedAt": "Value updated {{value}}",
     "poolGroupCount_one": "1 position in this group",
     "poolGroupCount_other": "{{count}} positions in this group",
+    "columns": {
+      "idToken": "ID / token",
+      "type": "Type",
+      "range": "Range",
+      "underlying": "Underlying assets",
+      "value": "Current value",
+      "coverage": "Coverage",
+      "updated": "Updated"
+    },
+    "actions": {
+      "copyReference": "Copy token reference",
+      "copied": "Copied"
+    },
+    "metrics": {
+      "totalProtocolValue": "Total protocol value",
+      "positionsDetected": "Positions detected",
+      "strategyExposures": "Strategy exposures",
+      "poolsCovered": "Pools covered",
+      "distributionByPool": "Distribution of value by pool",
+      "lpExposure": "LP exposure",
+      "strategyExposure": "Strategy exposure",
+      "groupExposureAria": "Exposure split for {{pool}}"
+    },
     "coverageStatus": {
       "full": "Current coverage",
       "share_level": "Share-level coverage",
