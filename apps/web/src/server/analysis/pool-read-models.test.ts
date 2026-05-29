@@ -1,7 +1,31 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildSyntheticGaugeClaimCandidates, buildSyntheticGaugeClaimEventKey } from "@/server/analysis/pool-read-models";
+import {
+  buildSyntheticGaugeClaimCandidates,
+  buildSyntheticGaugeClaimEventKey,
+  resolvePoolRewardTargetPoolId,
+} from "@/server/analysis/pool-read-models";
+
+test("resolvePoolRewardTargetPoolId only uses deposit or strategy ownership", () => {
+  assert.equal(resolvePoolRewardTargetPoolId({
+    relatedId: "deposit-1",
+    depositToPoolId: new Map([["deposit-1", "pool-1"]]),
+    strategyToPoolId: new Map([["strategy-1", "pool-2"]]),
+  }), "pool-1");
+
+  assert.equal(resolvePoolRewardTargetPoolId({
+    relatedId: "strategy-1",
+    depositToPoolId: new Map([["deposit-1", "pool-1"]]),
+    strategyToPoolId: new Map([["strategy-1", "pool-2"]]),
+  }), "pool-2");
+
+  assert.equal(resolvePoolRewardTargetPoolId({
+    relatedId: "unresolved",
+    depositToPoolId: new Map([["deposit-1", "pool-1"]]),
+    strategyToPoolId: new Map([["strategy-1", "pool-2"]]),
+  }), null);
+});
 
 test("buildSyntheticGaugeClaimCandidates keeps unmatched gauge claims for known pools", () => {
   const candidates = buildSyntheticGaugeClaimCandidates({
@@ -34,6 +58,42 @@ test("buildSyntheticGaugeClaimCandidates keeps unmatched gauge claims for known 
       metadataJson: {
         toAddress: "0x1111111111111111111111111111111111111111",
         methodLabel: "getReward",
+      },
+    },
+  ]);
+});
+
+test("buildSyntheticGaugeClaimCandidates keeps unmatched gauge unstake rewards for known pools", () => {
+  const candidates = buildSyntheticGaugeClaimCandidates({
+    lifecycleRows: [
+      {
+        id: "ledger-unstake",
+        txHash: "0xunstake",
+        classification: "unstake",
+        occurredAt: new Date("2026-05-28T00:00:00.000Z"),
+        metadataJson: {
+          toAddress: "0x1111111111111111111111111111111111111111",
+          methodLabel: "withdraw",
+        },
+      },
+    ],
+    rewardTxHashSet: new Set<string>(),
+    protocolContractPoolIdByAddress: new Map([
+      ["0x1111111111111111111111111111111111111111", "pool-1"],
+    ]),
+  });
+
+  assert.deepEqual(candidates, [
+    {
+      ledgerEventId: "ledger-unstake",
+      txHash: "0xunstake",
+      occurredAt: new Date("2026-05-28T00:00:00.000Z"),
+      poolId: "pool-1",
+      gaugeAddress: "0x1111111111111111111111111111111111111111",
+      methodLabel: "withdraw",
+      metadataJson: {
+        toAddress: "0x1111111111111111111111111111111111111111",
+        methodLabel: "withdraw",
       },
     },
   ]);

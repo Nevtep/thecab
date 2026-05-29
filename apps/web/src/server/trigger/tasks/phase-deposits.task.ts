@@ -111,6 +111,20 @@ function toLatestWalletTokenSnapshot(token: Record<string, unknown>) {
   };
 }
 
+export function normalizeAerodromeLifecycleForPersistence(input: {
+  lifecycle: Awaited<ReturnType<typeof decodeAerodromeDepositLifecycle>>["lifecycle"];
+  rewardCandidatesByHash: Map<string, { targetTokenId?: string | null }>;
+}) {
+  return input.lifecycle.map((record) => {
+    if (record.action !== "collect" || record.tokenId) {
+      return record;
+    }
+
+    const resolvedTokenId = input.rewardCandidatesByHash.get(record.txHash.toLowerCase())?.targetTokenId ?? null;
+    return resolvedTokenId ? { ...record, tokenId: resolvedTokenId } : record;
+  });
+}
+
 export async function collectSliceHistoryPages(input: {
   walletAddress: string;
   chainId: number;
@@ -374,6 +388,11 @@ export const phaseDepositsTask = task({
       rewardCandidatesByHash.set(candidate.txHash.toLowerCase(), candidate);
     }
 
+    const normalizedAerodromeLifecycle = normalizeAerodromeLifecycleForPersistence({
+      lifecycle: aerodromeLifecycle.lifecycle,
+      rewardCandidatesByHash,
+    });
+
     const latestWalletTokens = tokens
       .map((token) => toLatestWalletTokenSnapshot(token))
       .filter((token): token is NonNullable<typeof token> => token !== null);
@@ -452,7 +471,7 @@ export const phaseDepositsTask = task({
       chainId: payload.chainId,
       positions: mergedProtocolRows,
       manualArtifacts: aerodromeLifecycle.artifacts,
-      manualLifecycle: aerodromeLifecycle.lifecycle,
+      manualLifecycle: normalizedAerodromeLifecycle,
       mellowArtifacts: mellowAccounting.artifacts,
     });
     const persistedHistory = await persistSliceHistory({

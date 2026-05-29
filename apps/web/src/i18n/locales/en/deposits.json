@@ -20,7 +20,7 @@
     "kpis": {
       "totalDeposits": "Total deposits",
       "totalDepositsValue": "{{count}} positions",
-      "currentValue": "Current value",
+      "currentValue": "Latest valuation",
       "totalRewards": "Total rewards",
       "weightedAnnualizedReturn": "Weighted est. annualized",
       "capitalDeployed": "Capital deployed",
@@ -68,7 +68,7 @@
       "opened": "Opened",
       "closed": "Closed",
       "openedValue": "Opened value",
-      "currentValue": "Current value",
+      "currentValue": "Latest valuation",
       "totalRewards": "Total rewards",
       "realizedPnl": "Realized PnL",
       "unrealizedPnl": "Unrealized PnL",
@@ -120,7 +120,7 @@
   },
   "detail": {
     "loading": "Loading deposit detail…",
-    "currentValue": "Current value",
+    "currentValue": "Latest valuation",
     "totalReturn": "Total return",
     "viewInExplorer": "View in explorer",
     "share": "Share",

@@ -134,14 +134,18 @@ function aggregateSummary(items: DepositSummaryView[]): DepositsListSummary {
   let coverageStatus: DepositsListSummary["coverageStatus"] = "full";
 
   for (const item of items) {
-    currentValueUsd += item.currentValueUsd;
     totalRewardsUsd += item.totalRewardsUsd;
     capitalEnteredTotal += item.capitalEnteredUsd;
     if (item.status === "closed") closedCount += 1;
     else if (item.status === "open_out_of_range") openOutOfRangeCount += 1;
     else openActiveCount += 1;
 
+    // "Última valuación" KPI: sum of the live value of currently open deposits
+    // only — matches the Overview/Pools current-valuation KPI. Closed deposits
+    // carry their close-tx exit value in `currentValueUsd`, which would inflate
+    // this aggregate if included.
     if (item.status !== "closed") {
+      currentValueUsd += item.currentValueUsd;
       currentDeployed += item.currentValueUsd;
     }
 
@@ -253,7 +257,23 @@ function deriveValueChartSeries(input: {
     }
   }
 
-  if (input.deposit.status !== "closed" && input.deposit.coveredEndDayUtc) {
+  if (input.deposit.status === "closed") {
+    // For closed deposits the "latest valuation" anchor sits at the close
+    // event so the area chart spans the deposit lifespan (open → close)
+    // instead of only emitting a single opening point.
+    const closeAnchor =
+      input.deposit.closedAt ??
+      (input.deposit.coveredEndDayUtc
+        ? `${input.deposit.coveredEndDayUtc}T00:00:00.000Z`
+        : null);
+    if (closeAnchor) {
+      series.closedValue.push({
+        occurredAt: closeAnchor,
+        usd: input.deposit.currentValueUsd,
+        lifecycleEventId: null,
+      });
+    }
+  } else if (input.deposit.coveredEndDayUtc) {
     series.currentValue.push({
       occurredAt: `${input.deposit.coveredEndDayUtc}T00:00:00.000Z`,
       usd: input.deposit.currentValueUsd,

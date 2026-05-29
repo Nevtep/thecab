@@ -86,6 +86,17 @@ export type ManualDepositLifecycleRecord = {
   summary?: string | null;
 };
 
+export type PersistedManualDepositLifecycleRecord = {
+  txHash: string;
+  action: ManualDepositLifecycleRecord["action"];
+  occurredAt: string | null;
+  positionManagerAddress: string | null;
+  poolAddress: string | null;
+  category: string | null;
+  methodLabel: string | null;
+  summary: string | null;
+};
+
 export type SliceHistoryRecord = Record<string, unknown>;
 
 type SliceWindow = {
@@ -108,6 +119,24 @@ export function resolveManualDepositMintTxHash(input: {
   }
 
   return null;
+}
+
+export function serializeManualDepositLifecycle(input: {
+  tokenId: string;
+  lifecycle?: ManualDepositLifecycleRecord[];
+}): PersistedManualDepositLifecycleRecord[] {
+  return (input.lifecycle ?? [])
+    .filter((record) => record.tokenId === input.tokenId)
+    .map((record) => ({
+      txHash: record.txHash.toLowerCase(),
+      action: record.action,
+      occurredAt: record.occurredAt instanceof Date ? record.occurredAt.toISOString() : null,
+      positionManagerAddress: record.positionManagerAddress?.toLowerCase() ?? null,
+      poolAddress: record.poolAddress?.toLowerCase() ?? null,
+      category: record.category ?? null,
+      methodLabel: record.methodLabel ?? null,
+      summary: record.summary ?? null,
+    }));
 }
 
 function asRecordArray(value: unknown) {
@@ -683,6 +712,7 @@ export async function persistProtocolPositions(input: {
         ...(position?.metadata ?? {}),
         positionContractAddress: positionManagerAddress,
       },
+      lifecycle: serializeManualDepositLifecycle({ tokenId, lifecycle }),
       historicalPersistenceSource: lifecycle.length > 0 ? "manual_lifecycle" : "current_position",
     } satisfies Record<string, unknown>;
 
@@ -1430,6 +1460,50 @@ function buildSyntheticRewardSnapshotTxHash(input: {
   return `0x${hash}`;
 }
 
+export function buildAccrualRewardSnapshotRows(input: {
+  walletAddress: string;
+  chainId: number;
+  sliceEndUtc: Date;
+  accrualSnapshotDayUtc: string;
+  accrualSnapshots: Array<{
+    depositOrStrategyId: string;
+    rewardType: string;
+    protocol: string | null;
+    targetType: "deposit" | "strategy";
+    targetTokenId?: string | null;
+    targetWrapperAddress?: string | null;
+  }>;
+}) {
+  const walletAddress = input.walletAddress.toLowerCase();
+
+  return input.accrualSnapshots.map((snapshot) => ({
+    chainId: input.chainId,
+    walletAddress,
+    txHash: buildSyntheticRewardSnapshotTxHash({
+      chainId: input.chainId,
+      walletAddress,
+      depositOrStrategyId: snapshot.depositOrStrategyId,
+      dayUtc: input.accrualSnapshotDayUtc,
+      rewardType: snapshot.rewardType,
+    }),
+    // Synthetic accrual snapshots have no real log ordering. Keep this stable so reruns upsert cleanly.
+    logIndex: 0,
+    rewardType: snapshot.rewardType,
+    depositOrStrategyId: snapshot.depositOrStrategyId,
+    occurredAt: input.sliceEndUtc,
+    accrualSnapshotDayUtc: input.accrualSnapshotDayUtc,
+    isAccrualSnapshot: true,
+    resolutionStatus: "resolved" as const,
+    metadataJson: {
+      protocol: snapshot.protocol,
+      targetType: snapshot.targetType,
+      targetTokenId: snapshot.targetTokenId ?? null,
+      targetWrapperAddress: snapshot.targetWrapperAddress ?? null,
+      valuationMethod: "extrapolated",
+    },
+  }));
+}
+
 export async function persistResolvedRewardEvents(input: {
   walletAddress: string;
   chainId: number;
@@ -1502,44 +1576,29 @@ export async function persistResolvedRewardEvents(input: {
   }
 
   if (input.accrualSnapshots.length > 0) {
+    const accrualSnapshotRows = buildAccrualRewardSnapshotRows({
+      walletAddress,
+      chainId: input.chainId,
+      sliceEndUtc: input.sliceEndUtc,
+      accrualSnapshotDayUtc,
+      accrualSnapshots: input.accrualSnapshots,
+    });
+
     await db
       .insert(rewardEvents)
-      .values(
-        input.accrualSnapshots.map((snapshot, index) => ({
-          chainId: input.chainId,
-          walletAddress,
-          txHash: buildSyntheticRewardSnapshotTxHash({
-            chainId: input.chainId,
-            walletAddress,
-            depositOrStrategyId: snapshot.depositOrStrategyId,
-            dayUtc: accrualSnapshotDayUtc,
-            rewardType: snapshot.rewardType,
-          }),
-          logIndex: index,
-          rewardType: snapshot.rewardType,
-          depositOrStrategyId: snapshot.depositOrStrategyId,
+      .values(accrualSnapshotRows)
+      .onConflictDoUpdate({
+        target: [rewardEvents.chainId, rewardEvents.depositOrStrategyId, rewardEvents.accrualSnapshotDayUtc],
+        targetWhere: sql`${rewardEvents.isAccrualSnapshot} = true`,
+        set: {
+          txHash: sql`excluded.tx_hash`,
+          logIndex: sql`excluded.log_index`,
+          rewardType: sql`excluded.reward_type`,
           occurredAt: input.sliceEndUtc,
           accrualSnapshotDayUtc,
           isAccrualSnapshot: true,
           resolutionStatus: "resolved",
-          metadataJson: {
-            protocol: snapshot.protocol,
-            targetType: snapshot.targetType,
-            targetTokenId: snapshot.targetTokenId ?? null,
-            targetWrapperAddress: snapshot.targetWrapperAddress ?? null,
-            valuationMethod: "extrapolated",
-          },
-        })),
-      )
-      .onConflictDoUpdate({
-        target: [rewardEvents.chainId, rewardEvents.txHash, rewardEvents.logIndex, rewardEvents.rewardType],
-        set: {
-          occurredAt: input.sliceEndUtc,
-          accrualSnapshotDayUtc,
-          isAccrualSnapshot: true,
-          metadataJson: {
-            valuationMethod: "extrapolated",
-          },
+          metadataJson: sql`COALESCE(${rewardEvents.metadataJson}, '{}'::jsonb) || COALESCE(excluded.metadata_json, '{}'::jsonb) || jsonb_build_object('valuationMethod', 'extrapolated')`,
         },
       });
   }

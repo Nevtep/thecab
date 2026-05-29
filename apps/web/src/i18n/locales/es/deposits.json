@@ -20,7 +20,7 @@
     "kpis": {
       "totalDeposits": "Depósitos totales",
       "totalDepositsValue": "{{count}} posiciones",
-      "currentValue": "Valor actual",
+      "currentValue": "Última valuación",
       "totalRewards": "Recompensas totales",
       "weightedAnnualizedReturn": "Anualizado estimado ponderado",
       "capitalDeployed": "Capital desplegado",
@@ -68,7 +68,7 @@
       "opened": "Apertura",
       "closed": "Cierre",
       "openedValue": "Valor inicial",
-      "currentValue": "Valor actual",
+      "currentValue": "Última valuación",
       "totalRewards": "Recompensas totales",
       "realizedPnl": "PnL realizado",
       "unrealizedPnl": "PnL no realizado",
@@ -120,7 +120,7 @@
   },
   "detail": {
     "loading": "Cargando el detalle del depósito…",
-    "currentValue": "Valor actual",
+    "currentValue": "Última valuación",
     "totalReturn": "Retorno total",
     "viewInExplorer": "Ver en el explorador",
     "share": "Compartir",

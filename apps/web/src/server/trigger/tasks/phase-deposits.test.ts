@@ -119,3 +119,40 @@ test("loadSliceHistoryWithAdaptiveSplitting still reports paginationTruncated wh
 
   assert.equal(result.paginationTruncated, true);
 });
+
+test("normalizeAerodromeLifecycleForPersistence fills collect token ids from resolved reward candidates", async () => {
+  const { normalizeAerodromeLifecycleForPersistence } = await import("@/server/trigger/tasks/phase-deposits.task");
+
+  const normalized = normalizeAerodromeLifecycleForPersistence({
+    lifecycle: [
+      {
+        txHash: "0xcollect",
+        occurredAt: new Date("2026-05-07T15:14:11.000Z"),
+        tokenId: null,
+        action: "collect",
+        positionManagerAddress: null,
+        poolAddress: "0xpool",
+        category: "claim",
+        methodLabel: "getReward",
+        summary: "Claimed rewards",
+      },
+      {
+        txHash: "0xmint",
+        occurredAt: new Date("2026-05-02T05:08:23.000Z"),
+        tokenId: "69133516",
+        action: "mint",
+        positionManagerAddress: null,
+        poolAddress: "0xpool",
+        category: "mint",
+        methodLabel: "mint",
+        summary: "Minted 1 NFT",
+      },
+    ],
+    rewardCandidatesByHash: new Map([
+      ["0xcollect", { targetTokenId: "69133516" }],
+    ]),
+  });
+
+  assert.equal(normalized[0]?.tokenId, "69133516");
+  assert.equal(normalized[1]?.tokenId, "69133516");
+});

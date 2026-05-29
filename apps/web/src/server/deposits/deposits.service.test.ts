@@ -188,6 +188,43 @@ test("buildDepositDetailResponse derives chart series and coverage gaps", () => 
   assert.equal(result.valueChart.gaps[0]?.reasonCode, "priceFallbackDca");
 });
 
+test("buildDepositDetailResponse emits closedValue anchor for closed deposits", () => {
+  const result = buildDepositDetailResponse({
+    walletAddress: "0xabc",
+    chainId: 8453,
+    analysisStatus: "ready",
+    deposit: createDetail({
+      status: "closed",
+      closedAt: "2026-05-25T12:00:00.000Z",
+      currentValueUsd: 950,
+      capitalWithdrawnUsd: 950,
+      realizedPnlUsd: -50,
+      unrealizedPnlUsd: 0,
+      totalReturnUsd: -40,
+      totalRewardsUsd: 10,
+      decomposition: {
+        totalReturnUsd: -40,
+        rewardsUsd: 10,
+        feesUsd: 0,
+        assetPriceEffectUsd: -40,
+        rebalanceEffectUsd: 0,
+        realizedPnlUsd: -10,
+        unrealizedPnlUsd: 0,
+        unattributedUsd: 0,
+        unattributedReasonCodes: [],
+        componentPercentages: {},
+      },
+    }),
+  });
+
+  const closedSeries = result.valueChart.series.find((series) => series.key === "closedValue");
+  assert.equal(closedSeries?.points.length, 1);
+  assert.equal(closedSeries?.points[0]?.usd, 950);
+  assert.equal(closedSeries?.points[0]?.occurredAt, "2026-05-25T12:00:00.000Z");
+  const currentSeries = result.valueChart.series.find((series) => series.key === "currentValue");
+  assert.equal(currentSeries?.points.length, 0, "closed deposits do not emit a currentValue anchor");
+});
+
 test("buildDepositDetailResponse rejects decomposition drift", () => {
   assert.throws(() => buildDepositDetailResponse({
     walletAddress: "0xabc",
