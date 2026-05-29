@@ -235,10 +235,10 @@ Existing identity `(chain_id, tx_hash, log_index, event_type)` is preserved. Add
 
 | Column | Type | Notes |
 |---|---|---|
-| `classification` | `varchar(32)` nullable | NEW. Enriched by Phase D: `manual_deposit | manual_withdrawal | rebalance_withdraw | rebalance_deposit | mellow_deposit | mellow_withdraw | strategy_deposit | strategy_withdraw | claim | other`. |
+| `classification` | `varchar(32)` nullable | NEW. Enriched by Phase D with first-order activity classes such as `manual_deposit | manual_withdrawal | mellow_deposit | mellow_withdraw | strategy_deposit | strategy_withdraw | swap | claim | other`. Higher-order same-pool rebalance/redeploy and residual cash-out semantics are derived from deterministic source-lot attribution, not encoded as standalone ledger-event heuristics. |
 | `classification_run_id` | `uuid` FK → `analysis_runs.id` nullable | NEW. Provenance for the Phase D pass that wrote `classification`. |
 
-**Phase D rule** (FR-019, FR-051, research.md §R6): Rebalance detection matches `decreaseLiquidity`/withdraw of token T from pool P → swap touching T → deposit into pool P within a bounded window (default 24h, configurable via `ANALYSIS_REBALANCE_WINDOW_HOURS`). The window MUST be a config constant, not a magic number (research.md §R14.3).
+**Phase D rule** (FR-019, FR-051, research.md §R6): Phase D writes first-order ledger classifications plus deterministic source-lot attribution state. Higher-order same-pool `rebalance` and `redeploy` semantics come only from canonical residual/source-lot links across the run; bounded time windows MUST NOT decide them.
 
 ---
 
@@ -407,6 +407,6 @@ These do not block planning; they are flagged for implementation per research.md
 
 - **R14.1 Mellow event coverage** — Confirm exact event set per Mellow wrapper before locking Phase A discovery (`strategy_exposures` schema supports `metadata_json.eventCoverage`).
 - **R14.2 Gauge → pool discovery** for CL vs stable vs volatile pool types; cache discoveries in `protocol_contracts` with `source_reference`.
-- **R14.3 Rebalance window default** — 24h is the starting value; surface as `ANALYSIS_REBALANCE_WINDOW_HOURS` env var.
+- **R14.3 Canonical inferred-action coverage** — validate deterministic residual/source-lot classification on real wallets, especially same-pool rebalance/redeploy and cross-slice residual-consumption paths.
 - **R14.4 Trigger.dev plan sizing** — measure worst-case run-minutes against chosen plan; document self-host fallback.
 - **R14.5 Unclaimed-reward valuation method** — contract read at slice-end block vs extrapolation; schema supports both via `reward_events.metadata_json.valuationMethod`.

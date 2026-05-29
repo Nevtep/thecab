@@ -47,6 +47,19 @@ import {
   type WaterfallSourceLot,
 } from "@/server/analysis/sourceOfFundsWaterfall";
 
+type ResidualConsumptionActionSummary = {
+  actionType: "rebalance_same_pool" | "liquidation_from_residual" | "cash_out_from_residual";
+  primaryPoolId: string | null;
+  classificationBasis: "residual_flow";
+  allocationBreakdown: Array<{ source: string; amount: bigint }>;
+  candidatePoolResidualConsumedRaw: bigint;
+  candidatePoolResidualShare: number | null;
+  mixedFunding: boolean;
+  excessAllocationBuckets: Array<{ source: string; amount: bigint }>;
+  counterpartyPoolId: string | null;
+  sourcePoolBreakdown: Array<{ poolId: string; amount: bigint }>;
+};
+
 const erc721ApproveAbi = [
   {
     type: "function",
@@ -141,7 +154,8 @@ function isConsumingClassification(classification: string | null): boolean {
     classification === "manual_deposit" ||
     classification === "strategy_deposit" ||
     classification === "stake" ||
-    classification === "swap"
+    classification === "swap" ||
+    classification === "cash_out"
   );
 }
 
@@ -151,6 +165,77 @@ function isResidualEmittingClassification(classification: string | null): boolea
     classification === "strategy_withdraw" ||
     classification === "unstake"
   );
+}
+
+export function summarizeResidualConsumptionAction(input: {
+  classification: string | null;
+  candidatePoolId: string | null;
+  legAllocations: WaterfallAllocation[];
+}): ResidualConsumptionActionSummary | null {
+  if (input.classification !== "swap" && input.classification !== "cash_out") {
+    return null;
+  }
+
+  const totals = new Map<string, bigint>();
+  const residualByPool = new Map<string, bigint>();
+  let grandTotal = 0n;
+
+  for (const allocation of input.legAllocations) {
+    for (const attribution of allocation.attributions) {
+      totals.set(attribution.source, (totals.get(attribution.source) ?? 0n) + attribution.amount);
+      grandTotal += attribution.amount;
+      if (attribution.poolId) {
+        residualByPool.set(
+          attribution.poolId,
+          (residualByPool.get(attribution.poolId) ?? 0n) + attribution.amount,
+        );
+      }
+    }
+  }
+
+  if (grandTotal === 0n || residualByPool.size === 0) {
+    return null;
+  }
+
+  const allocationBreakdown = [
+    "candidate_pool_residual",
+    "matching_cash_in",
+    "liquidation_or_reward",
+    "other_pool_residual",
+    "unknown",
+  ].flatMap((source) => {
+    const amount = totals.get(source) ?? 0n;
+    return amount > 0n ? [{ source, amount }] : [];
+  });
+  const candidatePoolResidualConsumedRaw = totals.get("candidate_pool_residual") ?? 0n;
+  const candidatePoolResidualShare =
+    grandTotal > 0n ? Number((candidatePoolResidualConsumedRaw * 10000n) / grandTotal) / 10000 : null;
+  const excessAllocationBuckets = allocationBreakdown.filter(
+    (entry) => entry.source !== "candidate_pool_residual",
+  );
+  const mixedFunding = candidatePoolResidualConsumedRaw > 0n && excessAllocationBuckets.length > 0;
+  const sourcePoolBreakdown = Array.from(residualByPool.entries())
+    .map(([poolId, amount]) => ({ poolId, amount }))
+    .sort((left, right) => left.poolId.localeCompare(right.poolId));
+  const primaryPoolId = sourcePoolBreakdown.length === 1 ? (sourcePoolBreakdown[0]?.poolId ?? null) : null;
+
+  return {
+    actionType:
+      input.classification === "cash_out"
+        ? "cash_out_from_residual"
+        : candidatePoolResidualConsumedRaw > 0n
+          ? "rebalance_same_pool"
+          : "liquidation_from_residual",
+    primaryPoolId,
+    classificationBasis: "residual_flow",
+    allocationBreakdown,
+    candidatePoolResidualConsumedRaw,
+    candidatePoolResidualShare,
+    mixedFunding,
+    excessAllocationBuckets,
+    counterpartyPoolId: input.classification === "swap" ? input.candidatePoolId : null,
+    sourcePoolBreakdown,
+  };
 }
 
 export async function runCanonicalInference(input: RunInput): Promise<{
@@ -466,6 +551,64 @@ export async function runCanonicalInference(input: RunInput): Promise<{
         }
       }
 
+      const residualConsumptionAction = summarizeResidualConsumptionAction({
+        classification: event.classification,
+        candidatePoolId: event.candidatePoolId,
+        legAllocations,
+      });
+      if (residualConsumptionAction) {
+        const consumingLedgerEventIds = new Set<string>();
+        for (const allocation of legAllocations) {
+          for (const attribution of allocation.attributions) {
+            if (attribution.sourceLedgerEventId) {
+              consumingLedgerEventIds.add(attribution.sourceLedgerEventId);
+            }
+          }
+        }
+        inferredActionRowsToInsert.push({
+          chainId: input.chainId,
+          walletAddress,
+          actionType: residualConsumptionAction.actionType,
+          occurredAt: event.occurredAt,
+          primaryPoolId: residualConsumptionAction.primaryPoolId,
+          depositId: null,
+          strategyId: null,
+          sourceLedgerEventId: event.ledgerEventId,
+          sourceResidualLotId: null,
+          consumingLedgerEventIdsJson: Array.from(consumingLedgerEventIds),
+          valueUsd: null,
+          confidence:
+            residualConsumptionAction.actionType === "cash_out_from_residual"
+              ? "medium"
+              : residualConsumptionAction.mixedFunding
+                ? "medium"
+                : "high",
+          latestRunId: input.runId,
+          metadataJson: {
+            txHash: event.txHash,
+            counterpartyAddress: event.counterpartyAddress,
+            classificationBasis: residualConsumptionAction.classificationBasis,
+            allocationBreakdown: residualConsumptionAction.allocationBreakdown.map((entry) => ({
+              source: entry.source,
+              amount: entry.amount.toString(),
+            })),
+            candidatePoolResidualConsumedRaw:
+              residualConsumptionAction.candidatePoolResidualConsumedRaw.toString(),
+            candidatePoolResidualShare: residualConsumptionAction.candidatePoolResidualShare,
+            mixedFunding: residualConsumptionAction.mixedFunding,
+            excessAllocationBuckets: residualConsumptionAction.excessAllocationBuckets.map((entry) => ({
+              source: entry.source,
+              amount: entry.amount.toString(),
+            })),
+            counterpartyPoolId: residualConsumptionAction.counterpartyPoolId,
+            sourcePoolBreakdown: residualConsumptionAction.sourcePoolBreakdown.map((entry) => ({
+              poolId: entry.poolId,
+              amount: entry.amount.toString(),
+            })),
+          },
+        });
+      }
+
       if (
         legAllocations.length > 0 &&
         (event.classification === "manual_deposit" || event.classification === "strategy_deposit")
@@ -520,6 +663,20 @@ export async function runCanonicalInference(input: RunInput): Promise<{
           metadataJson: {
             txHash: event.txHash,
             counterpartyAddress: event.counterpartyAddress,
+            classificationBasis: action.classificationBasis,
+            allocationBreakdown: action.allocationBreakdown.map((entry) => ({
+              source: entry.source,
+              amount: entry.amount.toString(),
+            })),
+            pairedSwapConsumedCandidateResidual: action.pairedSwapConsumedCandidateResidual,
+            candidatePoolResidualConsumedRaw: action.candidatePoolResidualConsumedRaw.toString(),
+            candidatePoolResidualShare: action.candidatePoolResidualShare,
+            mixedFunding: action.mixedFunding,
+            excessAllocationBuckets: action.excessAllocationBuckets.map((entry) => ({
+              source: entry.source,
+              amount: entry.amount.toString(),
+            })),
+            counterpartyPoolId: event.candidatePoolId,
             allocations: legAllocations.map((alloc) => ({
               tokenAddress: alloc.tokenAddress,
               totalRequested: alloc.totalRequested.toString(),

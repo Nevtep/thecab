@@ -364,11 +364,21 @@ export type InferredDepositActionInput = {
   pairedSwapConsumedCandidateResidual: boolean;
 };
 
-export type InferredDepositAction =
-  | { actionType: "rebalance_same_pool"; confidence: WaterfallConfidence }
-  | { actionType: "redeploy_same_pool"; confidence: WaterfallConfidence }
-  | { actionType: "new_capital_deposit"; confidence: WaterfallConfidence }
-  | { actionType: "unknown_source_deposit"; confidence: "low" };
+export type InferredDepositAction = {
+  actionType:
+    | "rebalance_same_pool"
+    | "redeploy_same_pool"
+    | "new_capital_deposit"
+    | "unknown_source_deposit";
+  confidence: WaterfallConfidence;
+  classificationBasis: "residual_flow";
+  allocationBreakdown: Array<{ source: WaterfallSourceKind; amount: bigint }>;
+  pairedSwapConsumedCandidateResidual: boolean;
+  candidatePoolResidualConsumedRaw: bigint;
+  candidatePoolResidualShare: number | null;
+  mixedFunding: boolean;
+  excessAllocationBuckets: Array<{ source: WaterfallSourceKind; amount: bigint }>;
+};
 
 /**
  * Classify a deposit's funding semantics from its waterfall allocations.
@@ -384,6 +394,13 @@ export type InferredDepositAction =
 export function classifyInferredDepositAction(
   input: InferredDepositActionInput,
 ): InferredDepositAction {
+  const sourceOrder: WaterfallSourceKind[] = [
+    "candidate_pool_residual",
+    "matching_cash_in",
+    "liquidation_or_reward",
+    "other_pool_residual",
+    "unknown",
+  ];
   const totals = new Map<WaterfallSourceKind, bigint>();
   let grandTotal = 0n;
   for (const alloc of input.legAllocations) {
@@ -396,8 +413,24 @@ export function classifyInferredDepositAction(
     }
   }
 
+  const allocationBreakdown = sourceOrder.flatMap((source) => {
+    const amount = totals.get(source) ?? 0n;
+    return amount > 0n ? [{ source, amount }] : [];
+  });
+  const candidatePoolResidualConsumedRaw = totals.get("candidate_pool_residual") ?? 0n;
+
   if (grandTotal === 0n) {
-    return { actionType: "unknown_source_deposit", confidence: "low" };
+    return {
+      actionType: "unknown_source_deposit",
+      confidence: "low",
+      classificationBasis: "residual_flow",
+      allocationBreakdown,
+      pairedSwapConsumedCandidateResidual: input.pairedSwapConsumedCandidateResidual,
+      candidatePoolResidualConsumedRaw,
+      candidatePoolResidualShare: null,
+      mixedFunding: false,
+      excessAllocationBuckets: [],
+    };
   }
 
   const share = (kind: WaterfallSourceKind): number => {
@@ -410,24 +443,47 @@ export function classifyInferredDepositAction(
   const candidatePoolShare = share("candidate_pool_residual");
   const cashInShare = share("matching_cash_in");
   const unknownShare = share("unknown");
+  const excessAllocationBuckets = allocationBreakdown.filter(
+    (entry) => entry.source !== "candidate_pool_residual",
+  );
+  const mixedFunding = candidatePoolResidualConsumedRaw > 0n && excessAllocationBuckets.length > 0;
 
-  // Rebalance: candidate-pool residual via paired swap is the dominant funding.
-  if (input.pairedSwapConsumedCandidateResidual && candidatePoolShare >= 0.5) {
-    return { actionType: "rebalance_same_pool", confidence: "high" };
+  const buildAction = (
+    actionType: InferredDepositAction["actionType"],
+    confidence: WaterfallConfidence,
+  ): InferredDepositAction => ({
+    actionType,
+    confidence,
+    classificationBasis: "residual_flow",
+    allocationBreakdown,
+    pairedSwapConsumedCandidateResidual: input.pairedSwapConsumedCandidateResidual,
+    candidatePoolResidualConsumedRaw,
+    candidatePoolResidualShare: candidatePoolShare,
+    mixedFunding,
+    excessAllocationBuckets,
+  });
+
+  if (input.pairedSwapConsumedCandidateResidual && candidatePoolResidualConsumedRaw > 0n) {
+    return buildAction(
+      "rebalance_same_pool",
+      !mixedFunding || candidatePoolShare >= 0.5 ? "high" : "medium",
+    );
   }
 
-  // Redeploy: direct same-pool residual without needing a paired swap.
-  if (!input.pairedSwapConsumedCandidateResidual && candidatePoolShare >= 0.5) {
-    return { actionType: "redeploy_same_pool", confidence: "high" };
+  if (!input.pairedSwapConsumedCandidateResidual && candidatePoolResidualConsumedRaw > 0n) {
+    return buildAction(
+      "redeploy_same_pool",
+      !mixedFunding || candidatePoolShare >= 0.5 ? "high" : "medium",
+    );
   }
 
   if (cashInShare >= 0.5) {
-    return { actionType: "new_capital_deposit", confidence: "high" };
+    return buildAction("new_capital_deposit", "high");
   }
 
   if (unknownShare >= 0.5) {
-    return { actionType: "unknown_source_deposit", confidence: "low" };
+    return buildAction("unknown_source_deposit", "low");
   }
 
-  return { actionType: "new_capital_deposit", confidence: "medium" };
+  return buildAction("new_capital_deposit", "medium");
 }

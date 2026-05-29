@@ -5,6 +5,7 @@ import { ASSET_TRUST_CLASSIFIER_VERSION } from "@/server/asset-trust/assetTrust.
 import {
   hydrateHistoricalPriceLookup,
   resolveHistoricalUsdBackfill,
+  summarizeRewardCoverageByDay,
   shouldIncludeHistoricalIdleToken,
 } from "@/server/analysis/computeSnapshots";
 
@@ -120,4 +121,25 @@ test("shouldIncludeHistoricalIdleToken keeps priced safe assets", () => {
       classifierVersion: ASSET_TRUST_CLASSIFIER_VERSION,
     },
   }), true);
+});
+
+test("summarizeRewardCoverageByDay degrades only days with unresolved reward ownership", () => {
+  const summary = summarizeRewardCoverageByDay({
+    dayRows: ["2026-05-01", "2026-05-02"],
+    unresolvedRows: [
+      {
+        occurredAt: new Date("2026-05-02T12:00:00.000Z"),
+        resolutionReasonCodes: ["missingTokenId", "missingStrategyExposure"],
+      },
+      {
+        occurredAt: new Date("2026-05-02T15:00:00.000Z"),
+        resolutionReasonCodes: ["missingTokenId"],
+      },
+    ],
+  });
+
+  assert.equal(summary.coverageStatusByDay.get("2026-05-01"), "full");
+  assert.equal(summary.coverageStatusByDay.get("2026-05-02"), "partial");
+  assert.deepEqual(summary.reasonCodesByDay.get("2026-05-02"), ["missingTokenId", "missingStrategyExposure"]);
+  assert.equal(summary.unresolvedCountByDay.get("2026-05-02"), 2);
 });

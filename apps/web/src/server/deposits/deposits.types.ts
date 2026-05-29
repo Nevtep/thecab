@@ -83,6 +83,8 @@ export type DepositSummaryView = {
   coveredStartDayUtc: string | null;
   coveredEndDayUtc: string | null;
   mellowStrategyCrossLinkId?: string | null;
+  mellowStrategyExternalPositionReference?: string | null;
+  mellowStrategyExternalPositionReferenceStatus?: "resolved" | "unresolved" | null;
 };
 
 export type DepositsListSummary = {
@@ -171,6 +173,8 @@ export type DepositDetailView = DepositSummaryView & {
   decomposition: DepositPerformanceDecompositionView;
   lifecycle: DepositLifecycleEventView[];
   mellowStrategyCrossLinkId: string | null;
+  mellowStrategyExternalPositionReference?: string | null;
+  mellowStrategyExternalPositionReferenceStatus?: "resolved" | "unresolved" | null;
 };
 
 export type DepositsCoveredRange = {

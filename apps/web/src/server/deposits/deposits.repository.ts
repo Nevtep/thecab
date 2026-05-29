@@ -155,6 +155,7 @@ export type DepositSummaryRowRecord = {
   coverageReasonCodes: string[] | null;
   coveredStartDayUtc: string | null;
   coveredEndDayUtc: string | null;
+  metadataJson?: Record<string, unknown> | null;
 };
 
 export type DepositLifecycleEventRowRecord = {
@@ -195,6 +196,23 @@ export type DepositDetailRowRecord = DepositSummaryRowRecord & {
   mellowStrategyCrossLinkId: string | null;
 };
 
+function readLinkedStrategyDebug(value: unknown) {
+  const metadata = asRecord(value);
+  const linkedStrategyDebug = asRecord(metadata.linkedStrategyDebug);
+  const externalStrategyPositionReference = asString(linkedStrategyDebug.externalStrategyPositionReference);
+  const externalStrategyPositionReferenceStatus = asString(linkedStrategyDebug.externalStrategyPositionReferenceStatus);
+  const normalizedStatus: "resolved" | "unresolved" | null =
+    externalStrategyPositionReferenceStatus === "resolved" || externalStrategyPositionReferenceStatus === "unresolved"
+      ? externalStrategyPositionReferenceStatus
+      : null;
+
+  return {
+    strategyId: asString(linkedStrategyDebug.strategyId),
+    externalStrategyPositionReference,
+    externalStrategyPositionReferenceStatus: normalizedStatus,
+  };
+}
+
 function parseSignedTokenDeltas(value: unknown): DepositLifecycleTokenDelta[] {
   if (!Array.isArray(value)) return [];
   return value.map((entry) => {
@@ -231,6 +249,8 @@ export function mapDepositLifecycleEventRow(eventRow: DepositLifecycleEventRowRe
 }
 
 export function mapDepositSummaryRow(row: DepositSummaryRowRecord): DepositSummaryView {
+  const linkedStrategyDebug = readLinkedStrategyDebug(row.metadataJson);
+
   return {
     depositId: row.depositId,
     poolId: row.poolId,
@@ -263,6 +283,8 @@ export function mapDepositSummaryRow(row: DepositSummaryRowRecord): DepositSumma
     coverageReasonCodes: row.coverageReasonCodes ?? [],
     coveredStartDayUtc: row.coveredStartDayUtc,
     coveredEndDayUtc: row.coveredEndDayUtc,
+    mellowStrategyExternalPositionReference: linkedStrategyDebug.externalStrategyPositionReference,
+    mellowStrategyExternalPositionReferenceStatus: linkedStrategyDebug.externalStrategyPositionReferenceStatus,
   };
 }
 
@@ -335,6 +357,7 @@ export async function findDepositSummaries(input: {
       coverageReasonCodes: depositWalletSummaries.coverageReasonCodes,
       coveredStartDayUtc: depositWalletSummaries.coveredStartDayUtc,
       coveredEndDayUtc: depositWalletSummaries.coveredEndDayUtc,
+      metadataJson: depositWalletSummaries.metadataJson,
     })
     .from(depositWalletSummaries)
     .innerJoin(pools, eq(pools.id, depositWalletSummaries.poolId))
@@ -392,6 +415,7 @@ export async function findDepositDetail(input: {
       coveredStartDayUtc: depositWalletSummaries.coveredStartDayUtc,
       coveredEndDayUtc: depositWalletSummaries.coveredEndDayUtc,
       mellowStrategyCrossLinkId: depositWalletSummaries.mellowStrategyCrossLinkId,
+      metadataJson: depositWalletSummaries.metadataJson,
     })
     .from(depositWalletSummaries)
     .innerJoin(pools, eq(pools.id, depositWalletSummaries.poolId))

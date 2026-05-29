@@ -264,9 +264,13 @@ export function extractUsdValue(value: unknown): number | null {
 }
 
 export function extractTokenSymbols(value: unknown) {
+  const isLikelyTokenSymbol = (candidate: string | null | undefined) => (
+    typeof candidate === "string" && /[A-Za-z]/.test(candidate)
+  );
+
   const explicitSymbols = collectValuesByKeyPattern(value, /^(token_symbol|symbol|token0_symbol|token1_symbol|base_symbol|quote_symbol)$/i)
     .map(asString)
-    .filter((candidate): candidate is string => Boolean(candidate));
+    .filter((candidate): candidate is string => isLikelyTokenSymbol(candidate));
 
   for (const signal of collectStringSignals(value)) {
     const mellowPairMatch = signal.match(/(?:MellowVelodromeStrategy:|MVS:)([A-Za-z0-9]+)-([A-Za-z0-9]+)-\d+/i);
@@ -278,7 +282,7 @@ export function extractTokenSymbols(value: unknown) {
     }
 
     const pairMatch = signal.match(/([A-Z0-9]{2,12})\s*\/\s*([A-Z0-9]{2,12})/);
-    if (pairMatch) {
+    if (pairMatch && isLikelyTokenSymbol(pairMatch[1]) && isLikelyTokenSymbol(pairMatch[2])) {
       return {
         primaryTokenSymbol: pairMatch[1] ?? null,
         secondaryTokenSymbol: pairMatch[2] ?? null,
@@ -286,7 +290,7 @@ export function extractTokenSymbols(value: unknown) {
     }
 
     const hyphenPairMatch = signal.match(/([A-Z0-9]{2,12})-([A-Z0-9]{2,12})(?:-\d+)?/);
-    if (hyphenPairMatch) {
+    if (hyphenPairMatch && isLikelyTokenSymbol(hyphenPairMatch[1]) && isLikelyTokenSymbol(hyphenPairMatch[2])) {
       return {
         primaryTokenSymbol: hyphenPairMatch[1] ?? null,
         secondaryTokenSymbol: hyphenPairMatch[2] ?? null,

@@ -144,6 +144,8 @@ export type PoolAutomatedStrategyPosition = {
   strategyLabel: string;
   coverageStatus: "full" | "share_level" | "partial" | "unknown";
   valueUsd: number | null;
+  externalStrategyPositionReference?: string | null;
+  externalStrategyPositionReferenceStatus?: "resolved" | "unresolved" | null;
   tokens: PoolPositionToken[];
   annualizedReturnPct: number | null;
 };

@@ -1,36 +1,21 @@
 import { task } from "@trigger.dev/sdk/v3";
 
+import { mapRewardResolutionReasonCodesToCoverageReasons } from "@/server/analysis/coverage";
+import {
+  resolveRewardOwnership,
+  type RewardCandidateInput,
+  type RewardDepositTarget,
+  type RewardStrategyTarget,
+} from "@/server/analysis/rewardResolution";
 import { getAnalysisRunById } from "@/server/analysis/analysis-run.repository";
 import { getAnalysisSlice } from "@/server/analysis/analysis-slice.repository";
 import { persistResolvedRewardEvents } from "@/server/analysis/enginePersistence";
+import { parseSurfaceKind } from "@/server/analysis/txClassification";
 import { getDb } from "@/server/db/client";
 import { deposits, ledgerEvents, rawProviderRecords, strategies, strategyExposures } from "@/server/db/schema";
 import { and, desc, eq, inArray } from "drizzle-orm";
 
-type RewardCandidate = {
-  txHash: string;
-  occurredAt: Date;
-  category: string | null;
-  summary: string | null;
-  protocol: string | null;
-  targetType: "deposit" | "strategy" | null;
-  targetTokenId: string | null;
-  targetWrapperAddress: string | null;
-};
-
-type RewardDepositTarget = {
-  id: string;
-  tokenId: string | null;
-  protocol: string;
-};
-
-type RewardStrategyTarget = {
-  id: string;
-  wrapperAddress: string;
-  protocol: string | null;
-};
-
-function asRewardCandidate(value: unknown): RewardCandidate | null {
+function asRewardCandidate(value: unknown): RewardCandidateInput | null {
   if (!value || typeof value !== "object") {
     return null;
   }
@@ -57,13 +42,21 @@ function asRewardCandidate(value: unknown): RewardCandidate | null {
       ? candidate.targetType
       : null,
     targetTokenId: typeof candidate.targetTokenId === "string" ? candidate.targetTokenId : null,
+    targetStakingRewardsAddress: typeof candidate.targetStakingRewardsAddress === "string"
+      ? candidate.targetStakingRewardsAddress.toLowerCase()
+      : null,
+    sameTxTokenId: typeof candidate.sameTxTokenId === "string" ? candidate.sameTxTokenId : null,
+    shareLifecycleWrapperAddress: typeof candidate.shareLifecycleWrapperAddress === "string"
+      ? candidate.shareLifecycleWrapperAddress.toLowerCase()
+      : null,
     targetWrapperAddress: typeof candidate.targetWrapperAddress === "string"
       ? candidate.targetWrapperAddress.toLowerCase()
       : null,
+    surfaceKind: parseSurfaceKind(candidate.surfaceKind),
   };
 }
 
-function inferRewardType(candidate: RewardCandidate) {
+function inferRewardType(candidate: RewardCandidateInput) {
   const text = [candidate.category, candidate.summary].filter(Boolean).join(" ").toLowerCase();
   return text.includes("reward") || text.includes("collect") ? "reward_claim" : "claim";
 }
@@ -92,20 +85,20 @@ export function isGovernanceRewardCandidate(input: {
 }
 
 export function resolveRewardClaimTarget(input: {
-  candidate: RewardCandidate;
+  candidate: RewardCandidateInput;
   depositTargets: RewardDepositTarget[];
   strategyTargets: RewardStrategyTarget[];
 }) {
-  const matchingDeposit = input.candidate.targetTokenId
-    ? input.depositTargets.find((target) => target.tokenId === input.candidate.targetTokenId)
-    : null;
-  const matchingStrategy = input.candidate.targetWrapperAddress
-    ? input.strategyTargets.find((target) => target.wrapperAddress === input.candidate.targetWrapperAddress)
-    : null;
-
+  const resolution = resolveRewardOwnership(input);
   return {
-    depositOrStrategyId: matchingDeposit?.id ?? matchingStrategy?.id ?? null,
-    targetType: matchingDeposit ? "deposit" : matchingStrategy ? "strategy" : input.candidate.targetType,
+    depositOrStrategyId: resolution.depositId ?? resolution.strategyId,
+    strategyExposureId: resolution.strategyExposureId,
+    resolvedPoolId: resolution.resolvedPoolId,
+    targetType: resolution.ownerType ?? input.candidate.targetType,
+    resolutionBasis: resolution.resolutionBasis,
+    resolutionReasonCodes: resolution.resolutionReasonCodes,
+    externalStrategyPositionReference: resolution.externalStrategyPositionReference,
+    externalStrategyPositionReferenceStatus: resolution.externalStrategyPositionReferenceStatus,
   };
 }
 
@@ -147,7 +140,8 @@ export const phaseRewardsTask = task({
       .limit(1),
       db
         .select({
-          id: deposits.id,
+          depositId: deposits.id,
+          poolId: deposits.poolId,
           tokenId: deposits.tokenId,
           protocol: deposits.metadataJson,
         })
@@ -160,9 +154,13 @@ export const phaseRewardsTask = task({
         ),
       db
         .select({
-          id: strategies.id,
+          strategyId: strategies.id,
+          strategyExposureId: strategyExposures.id,
           wrapperAddress: strategyExposures.wrapperAddress,
+          stakingRewardsAddress: strategies.stakingRewardsAddress,
           protocol: strategies.protocol,
+          primaryPoolId: strategies.primaryPoolId,
+          metadataJson: strategyExposures.metadataJson,
         })
         .from(strategyExposures)
         .innerJoin(strategies, eq(strategyExposures.strategyId, strategies.id))
@@ -175,9 +173,9 @@ export const phaseRewardsTask = task({
     ]);
 
     const latestRewardCandidates = Array.isArray(run.metadataJson.latestRewardCandidates)
-      ? run.metadataJson.latestRewardCandidates.map(asRewardCandidate).filter((candidate): candidate is RewardCandidate => Boolean(candidate))
+      ? run.metadataJson.latestRewardCandidates.map(asRewardCandidate).filter((candidate): candidate is RewardCandidateInput => Boolean(candidate))
       : Array.isArray(rows[0]?.responseJson.rewardCandidates)
-        ? rows[0]?.responseJson.rewardCandidates.map(asRewardCandidate).filter((candidate): candidate is RewardCandidate => Boolean(candidate))
+        ? rows[0]?.responseJson.rewardCandidates.map(asRewardCandidate).filter((candidate): candidate is RewardCandidateInput => Boolean(candidate))
         : [];
     const normalizedCandidateTxHashes = [...new Set(latestRewardCandidates.map((candidate) => candidate.txHash.toLowerCase()))];
     const ledgerRows = normalizedCandidateTxHashes.length === 0
@@ -211,14 +209,20 @@ export const phaseRewardsTask = task({
     );
 
     const depositTargets = depositRows.map((row) => ({
-      id: row.id,
+      depositId: row.depositId,
+      poolId: row.poolId,
       tokenId: row.tokenId,
       protocol: typeof row.protocol.protocol === "string" ? row.protocol.protocol : "aerodrome",
     }));
     const strategyTargets = strategyRows.map((row) => ({
-      id: row.id,
+      strategyId: row.strategyId,
+      strategyExposureId: row.strategyExposureId,
+      primaryPoolId: row.primaryPoolId,
       wrapperAddress: row.wrapperAddress.toLowerCase(),
+      stakingRewardsAddress: row.stakingRewardsAddress?.toLowerCase() ?? null,
       protocol: row.protocol,
+      externalStrategyPositionReference:
+        typeof row.metadataJson.externalDepositReference === "string" ? row.metadataJson.externalDepositReference : null,
     }));
 
     const resolvedClaims = filteredRewardCandidates.map((candidate, index) => {
@@ -233,31 +237,50 @@ export const phaseRewardsTask = task({
         logIndex: index,
         rewardType: inferRewardType(candidate),
         depositOrStrategyId: resolution.depositOrStrategyId,
+        strategyExposureId: resolution.strategyExposureId,
+        resolvedPoolId: resolution.resolvedPoolId,
         occurredAt: candidate.occurredAt,
+        resolutionBasis: resolution.resolutionBasis,
         category: candidate.category,
         summary: candidate.summary,
         protocol: candidate.protocol,
         targetType: resolution.targetType,
+        resolutionReasonCodes: resolution.resolutionReasonCodes,
         targetTokenId: candidate.targetTokenId,
         targetWrapperAddress: candidate.targetWrapperAddress,
+        externalStrategyPositionReference: resolution.externalStrategyPositionReference,
+        externalStrategyPositionReferenceStatus: resolution.externalStrategyPositionReferenceStatus,
       };
     });
 
-    const unresolvedCandidateCount = resolvedClaims.filter((claim) => !claim.depositOrStrategyId).length;
+    const unresolvedCoverageReasons = mapRewardResolutionReasonCodesToCoverageReasons(
+      resolvedClaims.flatMap((claim) => claim.resolutionReasonCodes ?? []),
+    );
     const accrualSnapshots = [
       ...depositTargets.map((target) => ({
-        depositOrStrategyId: target.id,
+        depositOrStrategyId: target.depositId,
+        resolvedPoolId: target.poolId,
         rewardType: "reward_accrual_snapshot",
         protocol: target.protocol,
         targetType: "deposit" as const,
+        resolutionBasis: target.tokenId ? "explicit_token_id" : "unresolved",
+        resolutionReasonCodes: target.tokenId ? [] : ["missingTokenId"],
         targetTokenId: target.tokenId,
       })),
       ...strategyTargets.map((target) => ({
-        depositOrStrategyId: target.id,
+        depositOrStrategyId: target.strategyId,
+        strategyExposureId: target.strategyExposureId,
+        resolvedPoolId: target.primaryPoolId,
         rewardType: "reward_accrual_snapshot",
         protocol: target.protocol,
         targetType: "strategy" as const,
+        resolutionBasis: "strategy_wrapper_pair",
+        resolutionReasonCodes: [] as string[],
         targetWrapperAddress: target.wrapperAddress,
+        externalStrategyPositionReference: target.externalStrategyPositionReference,
+        externalStrategyPositionReferenceStatus: target.externalStrategyPositionReference
+          ? ("resolved" as const)
+          : ("unresolved" as const),
       })),
     ];
 
@@ -276,7 +299,10 @@ export const phaseRewardsTask = task({
         alchemyRpc: 0,
         alchemyPrices: 0,
       },
-      coverageReasons: rows.length === 0 || unresolvedCandidateCount > 0 ? ["partialDecoded"] : [],
+      coverageReasons:
+        rows.length === 0
+          ? ["partialDecoded"]
+          : unresolvedCoverageReasons,
     };
   },
 });

@@ -40,7 +40,8 @@ type MellowWrapperArtifacts = {
   wrappers: Array<{
     wrapperAddress: string;
     strategyLabel: string;
-    tokenId: string | null;
+    externalDepositReference: string | null;
+    externalDepositReferenceStatus: "resolved" | "unresolved";
     feeTierLabel: string | null;
     shareBalanceRaw: string;
     token0Address: string;
@@ -139,6 +140,36 @@ export function serializeManualDepositLifecycle(input: {
     }));
 }
 
+export function resolvePersistedManualDepositStatus(input: {
+  hasManualPosition: boolean;
+  hasStakedPosition: boolean;
+  lifecycle?: ManualDepositLifecycleRecord[];
+}) {
+  const hasBurnLifecycle = (input.lifecycle ?? []).some((record) => {
+    if (record.category === "burn") {
+      return true;
+    }
+
+    return record.action === "decreaseLiquidity"
+      && typeof record.summary === "string"
+      && /burned\s+1\s+nft/i.test(record.summary);
+  });
+
+  if (hasBurnLifecycle) {
+    return "closed" as const;
+  }
+
+  if (input.hasStakedPosition) {
+    return "staked" as const;
+  }
+
+  if (input.hasManualPosition) {
+    return "open" as const;
+  }
+
+  return "closed" as const;
+}
+
 function asRecordArray(value: unknown) {
   return Array.isArray(value)
     ? value.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
@@ -221,12 +252,82 @@ function parseOptionalDate(value: string | null | undefined) {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+const PRESERVED_RANGE_METADATA_KEYS = [
+  "feeTierLabel",
+  "rangeLowerTick",
+  "rangeUpperTick",
+  "currentTick",
+  "isInRange",
+  "rangeLowerPrice",
+  "rangeUpperPrice",
+  "rangeQuoteTokenSymbol",
+  "rangeDisplayFractionDigits",
+] as const;
+
+export function mergePersistedPositionMetadataJson(input: {
+  existing: unknown;
+  next: Record<string, unknown>;
+}) {
+  const existingJson = asRecord(input.existing);
+  const nextJson = asRecord(input.next);
+  const existingMetadata = asRecord(existingJson.metadata);
+  const nextMetadata = asRecord(nextJson.metadata);
+  const mergedMetadata = {
+    ...existingMetadata,
+    ...nextMetadata,
+  } as Record<string, unknown>;
+
+  for (const key of PRESERVED_RANGE_METADATA_KEYS) {
+    const nextValue = nextMetadata[key];
+    if (nextValue === null || nextValue === undefined) {
+      const existingValue = existingMetadata[key];
+      if (existingValue !== null && existingValue !== undefined) {
+        mergedMetadata[key] = existingValue;
+      }
+    }
+  }
+
+  return {
+    ...existingJson,
+    ...nextJson,
+    metadata: mergedMetadata,
+  } satisfies Record<string, unknown>;
+}
+
 function normalizeTokenAddress(value: string | null | undefined) {
   return typeof value === "string" && /^0x[a-fA-F0-9]{40}$/.test(value) ? value.toLowerCase() : null;
 }
 
 function normalizeTokenSymbol(value: string | null | undefined) {
   return typeof value === "string" && value.trim().length > 0 ? value.trim().toLowerCase() : null;
+}
+
+function hasAlphabeticCharacter(value: string | null | undefined) {
+  return typeof value === "string" && /[A-Za-z]/.test(value);
+}
+
+function resolveKnownPoolTokenSymbol(input: {
+  chainId: number;
+  tokenAddress?: string | null;
+}) {
+  const normalizedAddress = normalizeTokenAddress(input.tokenAddress ?? null);
+  if (!normalizedAddress || input.chainId !== 8453) {
+    return null;
+  }
+
+  if (normalizedAddress === BASE_WETH_ADDRESS) return "WETH";
+  if (normalizedAddress === BASE_CBBTC_ADDRESS) return "cbBTC";
+  if (normalizedAddress === BASE_AERO_ADDRESS) return "AERO";
+  if (normalizedAddress === BASE_USDC_ADDRESS) return "USDC";
+  if (normalizedAddress === BASE_EURC_ADDRESS) return "EURC";
+
+  return null;
 }
 
 function resolveKnownPoolTokenAddress(input: {
@@ -349,6 +450,67 @@ function preferPoolLabel(existingLabel: string | null | undefined, incomingLabel
   }
 
   return existingLabel ?? incomingLabel ?? null;
+}
+
+function extractCanonicalPoolSymbols(label: string | null | undefined) {
+  if (typeof label !== "string") {
+    return {
+      primaryTokenSymbol: null,
+      secondaryTokenSymbol: null,
+    };
+  }
+
+  const match = label.trim().match(/^([A-Za-z0-9]+)\s*\/\s*([A-Za-z0-9]+)\s+.+$/);
+  return {
+    primaryTokenSymbol: match?.[1] ?? null,
+    secondaryTokenSymbol: match?.[2] ?? null,
+  };
+}
+
+export function resolveManualDepositDisplayMetadata(input: {
+  chainId: number;
+  family?: OverviewProtocolPosition["family"] | null;
+  canonicalPoolLabel?: string | null;
+  token0Address?: string | null;
+  token1Address?: string | null;
+  fallbackLabel?: string | null;
+  fallbackPoolLabel?: string | null;
+  fallbackPrimaryTokenSymbol?: string | null;
+  fallbackSecondaryTokenSymbol?: string | null;
+}) {
+  const canonicalPoolLabel = preferPoolLabel(input.canonicalPoolLabel, input.fallbackPoolLabel)
+    ?? input.canonicalPoolLabel
+    ?? input.fallbackPoolLabel
+    ?? null;
+  const canonicalPoolSymbols = extractCanonicalPoolSymbols(canonicalPoolLabel);
+  const primaryTokenSymbol = canonicalPoolSymbols.primaryTokenSymbol
+    ?? resolveKnownPoolTokenSymbol({ chainId: input.chainId, tokenAddress: input.token0Address })
+    ?? (hasAlphabeticCharacter(input.fallbackPrimaryTokenSymbol) ? input.fallbackPrimaryTokenSymbol ?? null : null);
+  const secondaryTokenSymbol = canonicalPoolSymbols.secondaryTokenSymbol
+    ?? resolveKnownPoolTokenSymbol({ chainId: input.chainId, tokenAddress: input.token1Address })
+    ?? (hasAlphabeticCharacter(input.fallbackSecondaryTokenSymbol) ? input.fallbackSecondaryTokenSymbol ?? null : null);
+  const canonicalPairLabel = primaryTokenSymbol && secondaryTokenSymbol
+    ? `${primaryTokenSymbol} / ${secondaryTokenSymbol}`
+    : null;
+  const fallbackLabelMatchesCanonicalPair = canonicalPairLabel && typeof input.fallbackLabel === "string"
+    ? input.fallbackLabel.toLowerCase().includes(canonicalPairLabel.toLowerCase())
+    : false;
+  const label = fallbackLabelMatchesCanonicalPair
+    ? input.fallbackLabel ?? null
+    : canonicalPairLabel
+      ? input.family === "staked_lp"
+        ? `${canonicalPairLabel} staked LP`
+        : input.family === "manual_deposit"
+          ? `${canonicalPairLabel} manual position`
+          : (input.fallbackLabel ?? canonicalPairLabel)
+      : (input.fallbackLabel ?? null);
+
+  return {
+    label,
+    poolLabel: canonicalPoolLabel,
+    primaryTokenSymbol,
+    secondaryTokenSymbol,
+  };
 }
 
 function mergePoolMetadata(
@@ -573,6 +735,7 @@ export async function persistProtocolPositions(input: {
   mellowArtifacts?: MellowWrapperArtifacts;
 }) {
   const db = getDb();
+  const normalizedWalletAddress = input.walletAddress.toLowerCase();
   const manualByTokenId = new Map((input.manualArtifacts?.positions ?? []).map((item) => [item.tokenId, item] as const));
   const mellowByWrapper = new Map(
     (input.mellowArtifacts?.wrappers ?? []).map((item) => [item.wrapperAddress.toLowerCase(), item] as const),
@@ -626,6 +789,60 @@ export async function persistProtocolPositions(input: {
     ...manualByTokenId.keys(),
     ...manualLifecycleByTokenId.keys(),
   ]));
+  const strategyWrapperAddresses = Array.from(new Set(
+    input.positions
+      .filter((position) => position.family === "strategy_exposure" && typeof position.metadata.wrapperAddress === "string")
+      .map((position) => position.metadata.wrapperAddress as string)
+      .map((wrapperAddress) => wrapperAddress.toLowerCase()),
+  ));
+
+  const [existingManualDeposits, existingStrategies, existingStrategyExposureRows] = await Promise.all([
+    manualTokenIds.length > 0
+      ? db
+        .select({ tokenId: deposits.tokenId, metadataJson: deposits.metadataJson })
+        .from(deposits)
+        .where(and(
+          eq(deposits.chainId, input.chainId),
+          eq(deposits.walletAddress, normalizedWalletAddress),
+          inArray(deposits.tokenId, manualTokenIds),
+        ))
+      : Promise.resolve([]),
+    strategyWrapperAddresses.length > 0
+      ? db
+        .select({ wrapperAddress: strategies.wrapperAddress, metadataJson: strategies.metadataJson })
+        .from(strategies)
+        .where(and(
+          eq(strategies.chainId, input.chainId),
+          inArray(strategies.wrapperAddress, strategyWrapperAddresses),
+        ))
+      : Promise.resolve([]),
+    strategyWrapperAddresses.length > 0
+      ? db
+        .select({ wrapperAddress: strategyExposures.wrapperAddress, metadataJson: strategyExposures.metadataJson })
+        .from(strategyExposures)
+        .where(and(
+          eq(strategyExposures.chainId, input.chainId),
+          eq(strategyExposures.walletAddress, normalizedWalletAddress),
+          inArray(strategyExposures.wrapperAddress, strategyWrapperAddresses),
+        ))
+      : Promise.resolve([]),
+  ]);
+
+  const existingManualMetadataByTokenId = new Map(
+    existingManualDeposits
+      .filter((row) => typeof row.tokenId === "string" && row.tokenId.length > 0)
+      .map((row) => [row.tokenId as string, asRecord(row.metadataJson)] as const),
+  );
+  const existingStrategyMetadataByWrapperAddress = new Map(
+    existingStrategies
+      .filter((row) => typeof row.wrapperAddress === "string" && row.wrapperAddress.length > 0)
+      .map((row) => [row.wrapperAddress as string, asRecord(row.metadataJson)] as const),
+  );
+  const existingStrategyExposureMetadataByWrapperAddress = new Map(
+    existingStrategyExposureRows
+      .filter((row) => typeof row.wrapperAddress === "string" && row.wrapperAddress.length > 0)
+      .map((row) => [row.wrapperAddress as string, asRecord(row.metadataJson)] as const),
+  );
 
   for (const tokenId of manualTokenIds) {
     const positionState = manualPositionByTokenId.get(tokenId) ?? null;
@@ -646,6 +863,9 @@ export async function persistProtocolPositions(input: {
       ?? null
     )?.toLowerCase() ?? null;
     let poolId: string | null = null;
+    let canonicalPoolLabel: string | null = null;
+    let canonicalToken0Address: string | null = null;
+    let canonicalToken1Address: string | null = null;
 
     if (poolAddress) {
       const token0Address = resolveKnownPoolTokenAddress({
@@ -679,6 +899,9 @@ export async function persistProtocolPositions(input: {
         },
       });
       poolId = pool.id;
+      canonicalPoolLabel = pool.label;
+      canonicalToken0Address = pool.token0Address;
+      canonicalToken1Address = pool.token1Address;
 
       if (position?.valueUsd !== null && position?.valueUsd !== undefined) {
         const currentTotal = poolTotals.get(pool.id)?.valueUsd ?? 0;
@@ -689,23 +912,37 @@ export async function persistProtocolPositions(input: {
       }
     }
 
+    const displayMetadata = resolveManualDepositDisplayMetadata({
+      chainId: input.chainId,
+      family: position?.family ?? null,
+      canonicalPoolLabel,
+      token0Address: canonicalToken0Address,
+      token1Address: canonicalToken1Address,
+      fallbackLabel: position?.label ?? null,
+      fallbackPoolLabel: position?.poolLabel ?? null,
+      fallbackPrimaryTokenSymbol: position?.primaryTokenSymbol ?? null,
+      fallbackSecondaryTokenSymbol: position?.secondaryTokenSymbol ?? null,
+    });
+
     if (!positionManagerAddress && !poolId) {
       continue;
     }
 
-    const status = positionState?.hasStakedPosition
-      ? "staked"
-      : positionState?.hasManualPosition
-        ? "open"
-        : "closed";
-    const metadataJson = {
-      label: position?.label ?? `Aerodrome CL position #${tokenId}`,
+    const status = resolvePersistedManualDepositStatus({
+      hasManualPosition: positionState?.hasManualPosition ?? false,
+      hasStakedPosition: positionState?.hasStakedPosition ?? false,
+      lifecycle,
+    });
+    const metadataJson = mergePersistedPositionMetadataJson({
+      existing: existingManualMetadataByTokenId.get(tokenId) ?? null,
+      next: {
+      label: displayMetadata.label ?? position?.label ?? `Aerodrome CL position #${tokenId}`,
       protocol: "aerodrome",
-      poolLabel: position?.poolLabel,
+      poolLabel: displayMetadata.poolLabel,
       valueUsd: position?.valueUsd ?? manual?.valueUsd ?? null,
       valueUpdatedAt: position?.valueUpdatedAt ?? null,
-      primaryTokenSymbol: position?.primaryTokenSymbol,
-      secondaryTokenSymbol: position?.secondaryTokenSymbol,
+      primaryTokenSymbol: displayMetadata.primaryTokenSymbol,
+      secondaryTokenSymbol: displayMetadata.secondaryTokenSymbol,
       primaryTokenAmount: position?.primaryTokenAmount,
       secondaryTokenAmount: position?.secondaryTokenAmount,
       metadata: {
@@ -714,13 +951,14 @@ export async function persistProtocolPositions(input: {
       },
       lifecycle: serializeManualDepositLifecycle({ tokenId, lifecycle }),
       historicalPersistenceSource: lifecycle.length > 0 ? "manual_lifecycle" : "current_position",
-    } satisfies Record<string, unknown>;
+      },
+    });
 
     const [deposit] = await db
       .insert(deposits)
       .values({
         chainId: input.chainId,
-        walletAddress: input.walletAddress.toLowerCase(),
+        walletAddress: normalizedWalletAddress,
         poolId,
         positionManagerAddress,
         tokenId,
@@ -745,6 +983,7 @@ export async function persistProtocolPositions(input: {
       })
       .returning();
 
+    existingManualMetadataByTokenId.set(tokenId, metadataJson);
     depositIds.push(deposit.id);
   }
 
@@ -792,6 +1031,17 @@ export async function persistProtocolPositions(input: {
         });
       }
 
+      const strategyMetadataJson = mergePersistedPositionMetadataJson({
+        existing: existingStrategyMetadataByWrapperAddress.get(wrapperAddress) ?? null,
+        next: {
+          label: position.label,
+          poolLabel: position.poolLabel,
+          valueUsd: position.valueUsd,
+          valueUpdatedAt: position.valueUpdatedAt,
+          metadata: position.metadata,
+        },
+      });
+
       const [strategy] = await db
         .insert(strategies)
         .values({
@@ -801,13 +1051,7 @@ export async function persistProtocolPositions(input: {
           wrapperAddress,
           primaryPoolId,
           coverageStatus: position.coverageStatus,
-          metadataJson: {
-            label: position.label,
-            poolLabel: position.poolLabel,
-            valueUsd: position.valueUsd,
-            valueUpdatedAt: position.valueUpdatedAt,
-            metadata: position.metadata,
-          },
+          metadataJson: strategyMetadataJson,
         })
         .onConflictDoUpdate({
           target: [strategies.chainId, strategies.wrapperAddress],
@@ -816,41 +1060,43 @@ export async function persistProtocolPositions(input: {
             label: position.strategyLabel ?? position.label,
             primaryPoolId,
             coverageStatus: position.coverageStatus,
-            metadataJson: {
-              label: position.label,
-              poolLabel: position.poolLabel,
-              valueUsd: position.valueUsd,
-              valueUpdatedAt: position.valueUpdatedAt,
-              metadata: position.metadata,
-            },
+            metadataJson: strategyMetadataJson,
             updatedAt: new Date(),
           },
         })
         .returning();
 
+      existingStrategyMetadataByWrapperAddress.set(wrapperAddress, strategyMetadataJson);
       strategyIds.push(strategy.id);
+
+      const strategyExposureMetadataJson = mergePersistedPositionMetadataJson({
+        existing: existingStrategyExposureMetadataByWrapperAddress.get(wrapperAddress) ?? null,
+        next: {
+          label: position.label,
+          strategyLabel: position.strategyLabel,
+          poolLabel: position.poolLabel,
+          valueUsd: position.valueUsd,
+          valueUpdatedAt: position.valueUpdatedAt,
+          token0Address: wrapper?.token0Address?.toLowerCase() ?? null,
+          token1Address: wrapper?.token1Address?.toLowerCase() ?? null,
+          externalDepositReference: wrapper?.externalDepositReference ?? null,
+          externalDepositReferenceStatus: wrapper?.externalDepositReferenceStatus ?? "unresolved",
+          metadata: position.metadata,
+        },
+      });
 
       await db
         .insert(strategyExposures)
         .values({
           chainId: input.chainId,
           strategyId: strategy.id,
-          walletAddress: input.walletAddress.toLowerCase(),
+          walletAddress: normalizedWalletAddress,
           wrapperAddress,
           sharesRaw: toNumericString(wrapper?.shareBalanceRaw) ?? "0",
           underlying0AmountRaw: toNumericString(wrapper?.token0AmountRaw),
           underlying1AmountRaw: toNumericString(wrapper?.token1AmountRaw),
           coverageStatus: position.coverageStatus,
-          metadataJson: {
-            label: position.label,
-            strategyLabel: position.strategyLabel,
-            poolLabel: position.poolLabel,
-            valueUsd: position.valueUsd,
-            valueUpdatedAt: position.valueUpdatedAt,
-            token0Address: wrapper?.token0Address?.toLowerCase() ?? null,
-            token1Address: wrapper?.token1Address?.toLowerCase() ?? null,
-            metadata: position.metadata,
-          },
+          metadataJson: strategyExposureMetadataJson,
         })
         .onConflictDoUpdate({
           target: [
@@ -864,19 +1110,12 @@ export async function persistProtocolPositions(input: {
             underlying0AmountRaw: toNumericString(wrapper?.token0AmountRaw),
             underlying1AmountRaw: toNumericString(wrapper?.token1AmountRaw),
             coverageStatus: position.coverageStatus,
-            metadataJson: {
-              label: position.label,
-              strategyLabel: position.strategyLabel,
-              poolLabel: position.poolLabel,
-              valueUsd: position.valueUsd,
-              valueUpdatedAt: position.valueUpdatedAt,
-              token0Address: wrapper?.token0Address?.toLowerCase() ?? null,
-              token1Address: wrapper?.token1Address?.toLowerCase() ?? null,
-              metadata: position.metadata,
-            },
+            metadataJson: strategyExposureMetadataJson,
             updatedAt: new Date(),
           },
         });
+
+      existingStrategyExposureMetadataByWrapperAddress.set(wrapperAddress, strategyExposureMetadataJson);
     }
   }
 
@@ -1390,6 +1629,16 @@ export async function classifyRunLedgerEvents(input: {
       delete nextMetadataJson.suspiciousReasonCodes;
     }
 
+    // Spec: spam/airdrop ledger events are excluded from the economic pipeline.
+    // The exclusion reason is stamped here as an audit trail so downstream
+    // consumers can filter without re-deriving spam signals.
+    // See docs/spec/the-cab-aerodrome-claim-surfaces-research.md §4.
+    if (classification === "airdrop") {
+      nextMetadataJson.economicExclusionReason = "airdrop_spam";
+    } else {
+      delete nextMetadataJson.economicExclusionReason;
+    }
+
     await db
       .update(ledgerEvents)
       .set({
@@ -1467,11 +1716,17 @@ export function buildAccrualRewardSnapshotRows(input: {
   accrualSnapshotDayUtc: string;
   accrualSnapshots: Array<{
     depositOrStrategyId: string;
+    strategyExposureId?: string | null;
+    resolvedPoolId?: string | null;
     rewardType: string;
     protocol: string | null;
     targetType: "deposit" | "strategy";
+    resolutionBasis?: string | null;
+    resolutionReasonCodes?: string[];
     targetTokenId?: string | null;
     targetWrapperAddress?: string | null;
+    externalStrategyPositionReference?: string | null;
+    externalStrategyPositionReferenceStatus?: "resolved" | "unresolved";
   }>;
 }) {
   const walletAddress = input.walletAddress.toLowerCase();
@@ -1490,15 +1745,23 @@ export function buildAccrualRewardSnapshotRows(input: {
     logIndex: 0,
     rewardType: snapshot.rewardType,
     depositOrStrategyId: snapshot.depositOrStrategyId,
+    strategyExposureId: snapshot.strategyExposureId ?? null,
+    resolvedPoolId: snapshot.resolvedPoolId ?? null,
     occurredAt: input.sliceEndUtc,
     accrualSnapshotDayUtc: input.accrualSnapshotDayUtc,
     isAccrualSnapshot: true,
+    resolutionBasis: snapshot.resolutionBasis ?? null,
+    resolutionReasonCodes: snapshot.resolutionReasonCodes ?? [],
     resolutionStatus: "resolved" as const,
     metadataJson: {
       protocol: snapshot.protocol,
       targetType: snapshot.targetType,
       targetTokenId: snapshot.targetTokenId ?? null,
       targetWrapperAddress: snapshot.targetWrapperAddress ?? null,
+      externalStrategyPositionReference: snapshot.externalStrategyPositionReference ?? null,
+      externalStrategyPositionReferenceStatus:
+        snapshot.externalStrategyPositionReferenceStatus ??
+        (snapshot.externalStrategyPositionReference ? "resolved" : "unresolved"),
       valuationMethod: "extrapolated",
     },
   }));
@@ -1513,21 +1776,33 @@ export async function persistResolvedRewardEvents(input: {
     logIndex: number;
     rewardType: string;
     depositOrStrategyId: string | null;
+    strategyExposureId?: string | null;
+    resolvedPoolId?: string | null;
     occurredAt: Date;
+    resolutionBasis?: string | null;
+    resolutionReasonCodes?: string[];
     category: string | null;
     summary: string | null;
     protocol: string | null;
     targetType: "deposit" | "strategy" | null;
     targetTokenId?: string | null;
     targetWrapperAddress?: string | null;
+    externalStrategyPositionReference?: string | null;
+    externalStrategyPositionReferenceStatus?: "resolved" | "unresolved";
   }>;
   accrualSnapshots: Array<{
     depositOrStrategyId: string;
+    strategyExposureId?: string | null;
+    resolvedPoolId?: string | null;
     rewardType: string;
     protocol: string | null;
     targetType: "deposit" | "strategy";
+    resolutionBasis?: string | null;
+    resolutionReasonCodes?: string[];
     targetTokenId?: string | null;
     targetWrapperAddress?: string | null;
+    externalStrategyPositionReference?: string | null;
+    externalStrategyPositionReferenceStatus?: "resolved" | "unresolved";
   }>;
 }) {
   const db = getDb();
@@ -1545,7 +1820,11 @@ export async function persistResolvedRewardEvents(input: {
           logIndex: claim.logIndex,
           rewardType: claim.rewardType,
           depositOrStrategyId: claim.depositOrStrategyId,
+          strategyExposureId: claim.strategyExposureId ?? null,
+          resolvedPoolId: claim.resolvedPoolId ?? null,
           occurredAt: claim.occurredAt,
+          resolutionBasis: claim.resolutionBasis ?? null,
+          resolutionReasonCodes: claim.resolutionReasonCodes ?? [],
           resolutionStatus: claim.depositOrStrategyId ? "resolved" : "unresolved",
           metadataJson: {
             category: claim.category,
@@ -1554,6 +1833,8 @@ export async function persistResolvedRewardEvents(input: {
             targetType: claim.targetType,
             targetTokenId: claim.targetTokenId ?? null,
             targetWrapperAddress: claim.targetWrapperAddress ?? null,
+            externalStrategyPositionReference: claim.externalStrategyPositionReference ?? null,
+            externalStrategyPositionReferenceStatus: claim.externalStrategyPositionReferenceStatus ?? (claim.externalStrategyPositionReference ? "resolved" : "unresolved"),
             valuationMethod: "event",
           },
         })),
@@ -1562,7 +1843,11 @@ export async function persistResolvedRewardEvents(input: {
         target: [rewardEvents.chainId, rewardEvents.txHash, rewardEvents.logIndex, rewardEvents.rewardType],
         set: {
           depositOrStrategyId: sql`excluded.deposit_or_strategy_id`,
+          strategyExposureId: sql`excluded.strategy_exposure_id`,
+          resolvedPoolId: sql`excluded.resolved_pool_id`,
           occurredAt: sql`excluded.occurred_at`,
+          resolutionBasis: sql`excluded.resolution_basis`,
+          resolutionReasonCodes: sql`excluded.resolution_reason_codes`,
           resolutionStatus: sql`excluded.resolution_status`,
           metadataJson: sql`COALESCE(${rewardEvents.metadataJson}, '{}'::jsonb) || COALESCE(excluded.metadata_json, '{}'::jsonb) || jsonb_build_object('valuationMethod', 'event')`,
         },

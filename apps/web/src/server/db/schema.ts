@@ -368,6 +368,10 @@ export const rewardEvents = pgTable(
     logIndex: integer("log_index").notNull().default(0),
     rewardType: varchar("reward_type", { length: 32 }).notNull(),
     depositOrStrategyId: uuid("deposit_or_strategy_id"),
+    strategyExposureId: uuid("strategy_exposure_id").references(() => strategyExposures.id),
+    resolvedPoolId: uuid("resolved_pool_id").references(() => pools.id),
+    resolutionBasis: varchar("resolution_basis", { length: 32 }),
+    resolutionReasonCodes: text("resolution_reason_codes").array().notNull().default(sql`'{}'::text[]`),
     tokenAddress: varchar("token_address", { length: 42 }),
     amountRaw: numeric("amount_raw", { precision: 78, scale: 0 }),
     amountUsd: numeric("amount_usd", { precision: 38, scale: 18 }),
@@ -379,6 +383,8 @@ export const rewardEvents = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).$defaultFn(now).notNull(),
   },
   (table) => [
+    index("reward_events_strategy_exposure_idx").on(table.strategyExposureId),
+    index("reward_events_resolved_pool_idx").on(table.resolvedPoolId),
     uniqueIndex("reward_events_identity_uidx").on(
       table.chainId,
       table.txHash,

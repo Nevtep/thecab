@@ -15,7 +15,7 @@ function createSettingsResponse(overrides?: Partial<SettingsResponse>): Settings
     chainId: 8453,
     preferences: {
       languagePreference: "en",
-      defaultOverviewRange: "7d",
+      defaultOverviewRange: "30d",
     },
     diagnostics: {
       analysis: {

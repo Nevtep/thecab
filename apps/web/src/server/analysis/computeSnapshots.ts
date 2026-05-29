@@ -19,7 +19,10 @@ import {
   strategies,
   strategyExposures,
 } from "@/server/db/schema";
-import { readOverviewRealizedRewardEvents } from "@/server/overview/overview.repository";
+import {
+  readOverviewRealizedRewardEvents,
+  readOverviewUnresolvedRewardCoverage,
+} from "@/server/overview/overview.repository";
 import { buildHistoricalComponentValueLookup } from "@/server/valuation/historicalValueLookup";
 
 export type WalletTokenSnapshot = {
@@ -230,6 +233,43 @@ function endOfDayUtc(dayUtc: string): Date {
   const d = new Date(`${dayUtc}T00:00:00.000Z`);
   d.setUTCDate(d.getUTCDate() + 1);
   return d;
+}
+
+export function summarizeRewardCoverageByDay(input: {
+  dayRows: string[];
+  unresolvedRows: Array<{
+    occurredAt: Date;
+    resolutionReasonCodes: string[];
+  }>;
+}) {
+  const daySet = new Set(input.dayRows);
+  const coverageStatusByDay = new Map<string, "full" | "partial">();
+  const reasonCodesByDay = new Map<string, string[]>();
+  const unresolvedCountByDay = new Map<string, number>();
+
+  for (const dayUtc of input.dayRows) {
+    coverageStatusByDay.set(dayUtc, "full");
+    reasonCodesByDay.set(dayUtc, []);
+    unresolvedCountByDay.set(dayUtc, 0);
+  }
+
+  for (const row of input.unresolvedRows) {
+    const dayUtc = dayUtcFromDate(row.occurredAt);
+    if (!daySet.has(dayUtc)) {
+      continue;
+    }
+
+    coverageStatusByDay.set(dayUtc, "partial");
+    unresolvedCountByDay.set(dayUtc, (unresolvedCountByDay.get(dayUtc) ?? 0) + 1);
+    const existingReasonCodes = reasonCodesByDay.get(dayUtc) ?? [];
+    reasonCodesByDay.set(dayUtc, Array.from(new Set([...existingReasonCodes, ...(row.resolutionReasonCodes ?? [])])));
+  }
+
+  return {
+    coverageStatusByDay,
+    reasonCodesByDay,
+    unresolvedCountByDay,
+  };
 }
 
 function dividePow10(rawAmount: string, decimals: number): number {
@@ -677,16 +717,29 @@ export async function computeSnapshots(input: {
   }
 
   const rewardValueByDay = new Map<string, number>();
-  const realizedRewardRows = await readOverviewRealizedRewardEvents({
-    walletAddress,
-    chainId: input.chainId,
-    startAt: new Date(`${input.startDayUtc}T00:00:00.000Z`),
-    endAt: input.capturedAt,
-  });
+  const rewardStartAt = new Date(`${input.startDayUtc}T00:00:00.000Z`);
+  const [realizedRewardRows, unresolvedRewardRows] = await Promise.all([
+    readOverviewRealizedRewardEvents({
+      walletAddress,
+      chainId: input.chainId,
+      startAt: rewardStartAt,
+      endAt: input.capturedAt,
+    }),
+    readOverviewUnresolvedRewardCoverage({
+      walletAddress,
+      chainId: input.chainId,
+      startAt: rewardStartAt,
+      endAt: input.capturedAt,
+    }),
+  ]);
   for (const row of realizedRewardRows) {
     const dayUtc = row.occurredAt.toISOString().slice(0, 10);
     rewardValueByDay.set(dayUtc, (rewardValueByDay.get(dayUtc) ?? 0) + (asNumber(row.amountUsd) ?? 0));
   }
+  const rewardCoverageByDay = summarizeRewardCoverageByDay({
+    dayRows,
+    unresolvedRows: unresolvedRewardRows,
+  });
   const historicalDeployedValues = buildHistoricalComponentValueLookup({
     bucketKeys: dayRows,
     seriesByToken: priceSeriesByToken,
@@ -870,6 +923,9 @@ export async function computeSnapshots(input: {
     const dayDeployedValueUsd = deployedValueByDay.get(dayUtc) ?? deployedValueUsd;
     const dayRewardValueUsd = rewardValueByDay.get(dayUtc) ?? 0;
     const totalValueUsd = dayDeployedValueUsd + metric.idleValueUsd;
+    const rewardCoverageStatus = rewardCoverageByDay.coverageStatusByDay.get(dayUtc) ?? "full";
+    const rewardCoverageReasonCodes = rewardCoverageByDay.reasonCodesByDay.get(dayUtc) ?? [];
+    const unresolvedRewardCount = rewardCoverageByDay.unresolvedCountByDay.get(dayUtc) ?? 0;
     const { pnlUsd, annualizedReturnPct } = computePnlAndAnnualized(dayUtc, totalValueUsd);
 
     return [
@@ -881,7 +937,11 @@ export async function computeSnapshots(input: {
         capturedAt: new Date(`${dayUtc}T00:00:00.000Z`),
         dayUtc,
         resolution: "daily",
-        coverageStatus: totalValueUsd > 0 ? "full" : "unknown",
+        coverageStatus: rewardCoverageStatus === "partial"
+          ? "partial"
+          : totalValueUsd > 0
+            ? "full"
+            : "unknown",
         valueUsd: String(totalValueUsd),
         pnlUsd: String(pnlUsd),
         annualizedReturnPct: annualizedReturnPct !== null ? String(annualizedReturnPct) : null,
@@ -899,6 +959,8 @@ export async function computeSnapshots(input: {
           cumulativeCashInUsd: metric.cumulativeCashInUsd,
           cumulativeCashOutUsd: metric.cumulativeCashOutUsd,
           netCapitalInUsd: metric.netCapitalInUsd,
+          rewardCoverageReasonCodes,
+          unresolvedRewardCount,
           snapshotKind: "analysis_engine_daily",
         },
       },
@@ -910,9 +972,11 @@ export async function computeSnapshots(input: {
         capturedAt: new Date(`${dayUtc}T00:00:00.000Z`),
         dayUtc,
         resolution: "daily",
-        coverageStatus: "full",
+        coverageStatus: rewardCoverageStatus,
         valueUsd: String(dayRewardValueUsd),
         metadataJson: {
+          rewardCoverageReasonCodes,
+          unresolvedRewardCount,
           snapshotKind: "analysis_engine_daily",
         },
       },
@@ -1005,6 +1069,8 @@ export async function computeSnapshots(input: {
     const metric = metricsByDay.get(dayUtc)!;
     const dayDeployedValueUsd = deployedValueByDay.get(dayUtc) ?? deployedValueUsd;
     const totalValueUsd = dayDeployedValueUsd + metric.idleValueUsd;
+    const rewardCoverageReasonCodes = rewardCoverageByDay.reasonCodesByDay.get(dayUtc) ?? [];
+    const unresolvedRewardCount = rewardCoverageByDay.unresolvedCountByDay.get(dayUtc) ?? 0;
 
     await db
       .insert(portfolioSnapshots)
@@ -1025,6 +1091,8 @@ export async function computeSnapshots(input: {
           cumulativeCashInUsd: metric.cumulativeCashInUsd,
           cumulativeCashOutUsd: metric.cumulativeCashOutUsd,
           netCapitalInUsd: metric.netCapitalInUsd,
+          rewardCoverageReasonCodes,
+          unresolvedRewardCount,
         },
       })
       .onConflictDoUpdate({
@@ -1043,6 +1111,8 @@ export async function computeSnapshots(input: {
             cumulativeCashInUsd: metric.cumulativeCashInUsd,
             cumulativeCashOutUsd: metric.cumulativeCashOutUsd,
             netCapitalInUsd: metric.netCapitalInUsd,
+            rewardCoverageReasonCodes,
+            unresolvedRewardCount,
           },
         },
       });

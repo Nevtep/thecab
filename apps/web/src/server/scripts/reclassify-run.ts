@@ -1,19 +1,12 @@
 import "dotenv/config";
-import { classifyRunLedgerEvents } from "@/server/analysis/enginePersistence";
+import { type WalletTokenSnapshot } from "@/server/analysis/computeSnapshots";
+import { reclassifyAnalysisRun } from "@/server/analysis/reclassify-run";
 import { getAnalysisRunById } from "@/server/analysis/analysis-run.repository";
 import { getDb } from "@/server/db/client";
-import { processedTxs, rawProviderRecords } from "@/server/db/schema";
+import { rawProviderRecords } from "@/server/db/schema";
 import { and, desc, eq } from "drizzle-orm";
 
-type WalletTokenSignal = {
-  tokenAddress: string;
-  possibleSpam: boolean;
-  verifiedContract: boolean;
-  usdPrice: number | null;
-  usdValue: number | null;
-};
-
-function parseWalletTokenSignals(value: unknown): WalletTokenSignal[] {
+function parseWalletTokenSnapshots(value: unknown): WalletTokenSnapshot[] {
   if (!Array.isArray(value)) {
     return [];
   }
@@ -22,6 +15,15 @@ function parseWalletTokenSignals(value: unknown): WalletTokenSignal[] {
     .filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
     .map((item) => ({
       tokenAddress: String(item.tokenAddress ?? item.token_address ?? "").toLowerCase(),
+      balanceRaw: String(item.balanceRaw ?? item.balance ?? "0"),
+      decimals: typeof item.decimals === "number"
+        ? item.decimals
+        : typeof item.decimals === "string"
+          ? Number(item.decimals)
+          : null,
+      symbol: typeof item.symbol === "string" ? item.symbol : null,
+      name: typeof item.name === "string" ? item.name : null,
+      nativeToken: item.nativeToken === true || item.native_token === true,
       possibleSpam: item.possibleSpam === true || item.possible_spam === true,
       verifiedContract: item.verifiedContract === true || item.verified_contract === true,
       usdPrice: typeof item.usdPrice === "number"
@@ -75,9 +77,9 @@ async function loadFallbackWalletTokenSignals(input: {
   ];
 
   for (const row of preferredRows) {
-    const signals = parseWalletTokenSignals((row.responseJson ?? {}).tokens);
-    if (signals.length > 0) {
-      return signals;
+    const tokens = parseWalletTokenSnapshots((row.responseJson ?? {}).tokens);
+    if (tokens.length > 0) {
+      return tokens;
     }
   }
 
@@ -96,35 +98,36 @@ async function main() {
     throw new Error(`run not found: ${runId}`);
   }
 
-  // For reclassification we want ALL processed tx for this wallet, not just those tied to this run.
-  const db = getDb();
-  const txRows = await db
-    .select({ txHash: processedTxs.txHash })
-    .from(processedTxs)
-    .where(and(eq(processedTxs.walletAddress, run.walletAddress), eq(processedTxs.chainId, run.chainId)));
-
-  let walletTokenSignals = parseWalletTokenSignals(run.metadataJson.latestWalletTokens);
-  if (walletTokenSignals.length === 0) {
-    walletTokenSignals = await loadFallbackWalletTokenSignals({
+  let walletTokens = parseWalletTokenSnapshots(run.metadataJson.latestWalletTokens);
+  if (walletTokens.length === 0) {
+    walletTokens = await loadFallbackWalletTokenSignals({
       walletAddress: run.walletAddress,
       chainId: run.chainId,
       runId,
     });
   }
-  const spamTokenAddresses = walletTokenSignals
-    .filter((item) => item.possibleSpam || item.verifiedContract === false)
-    .map((item) => item.tokenAddress);
 
-  const updated = await classifyRunLedgerEvents({
+  const result = await reclassifyAnalysisRun({
+    runId,
     walletAddress: run.walletAddress,
     chainId: run.chainId,
-    txHashes: txRows.map((row) => row.txHash),
-    runId,
-    spamTokenAddresses,
-    walletTokenSignals,
+    capturedAt: new Date(),
+    walletTokens,
   });
 
-  console.log(JSON.stringify({ runId, walletAddress: run.walletAddress, chainId: run.chainId, txCount: txRows.length, updated, spamTokens: spamTokenAddresses.length, walletTokens: walletTokenSignals.length }, null, 2));
+  console.log(JSON.stringify({
+    runId,
+    walletAddress: run.walletAddress,
+    chainId: run.chainId,
+    txCount: result.txCount,
+    walletTokens: result.walletTokenCount,
+    rewardResolution: result.rewardResolution,
+    classified: result.classified,
+    canonical: result.canonical,
+    totalValueUsd: result.snapshot.totalValueUsd,
+    poolReadModels: result.poolReadModels,
+    depositReadModels: result.depositReadModels,
+  }, null, 2));
   process.exit(0);
 }
 

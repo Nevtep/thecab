@@ -5,6 +5,7 @@ import {
   detectProtocolFromSignals,
   type KnownProtocolContract,
 } from "@/server/protocol-positions/protocolMetadata";
+import { isHistoryRecordEconomicallyExcluded, type SurfaceKind } from "@/server/analysis/txClassification";
 import { readMellowStrategyPositions } from "@/server/protocol-positions/readMellowStrategyPositions";
 import { reconstructRecentPositionState } from "@/server/protocol-positions/reconstructRecentPositionState";
 import type { OverviewProtocolPosition } from "@/server/protocol-positions/protocolPositions.types";
@@ -22,10 +23,51 @@ export type ComputeMellowShareLevelAccountingResult = {
     protocol: "mellow";
     targetType: "strategy";
     targetWrapperAddress: string | null;
+    /**
+     * On-chain surface this candidate originated from. See
+     * docs/spec/the-cab-aerodrome-claim-surfaces-research.md §3 + §6.
+     */
+    surfaceKind: SurfaceKind;
   }>;
   providerPartial: boolean;
   artifacts: Awaited<ReturnType<typeof readMellowStrategyPositions>>["artifacts"];
 };
+
+function asLowerString(value: unknown) {
+  return typeof value === "string" ? value.toLowerCase() : "";
+}
+
+export function resolveMellowRewardWrapperAddress(input: {
+  record: MoralisHistoryRecord;
+  currentWrappers: Set<string>;
+}) {
+  return collectAddressSignals(input.record).find((address) => input.currentWrappers.has(address)) ?? null;
+}
+
+export function isMellowRewardRecord(input: {
+  detectedProtocol: string | null;
+  category: string | null;
+  methodLabel: string | null;
+  summary: string | null;
+  wrapperAddress: string | null;
+}) {
+  const category = asLowerString(input.category);
+  const methodLabel = asLowerString(input.methodLabel);
+  const summary = asLowerString(input.summary);
+  const text = [category, methodLabel, summary].filter(Boolean).join(" ");
+  const hasExplicitRewardLanguage =
+    text.includes("reward") || text.includes("claim") || text.includes("collect");
+  const isWrapperGetRewardsReceive =
+    Boolean(input.wrapperAddress)
+    && category === "token receive"
+    && methodLabel.includes("getreward");
+
+  if (isWrapperGetRewardsReceive) {
+    return true;
+  }
+
+  return input.detectedProtocol === "mellow" && hasExplicitRewardLanguage;
+}
 
 function parseTimestamp(record: MoralisHistoryRecord) {
   const value = typeof record.block_timestamp === "string"
@@ -87,30 +129,49 @@ export async function computeMellowShareLevelAccounting(input: {
   );
 
   const rewardCandidates = input.history.flatMap((record) => {
+    // Spec: spam/airdrop records are excluded from the economic pipeline before
+    // any reward candidate is generated. See
+    // docs/spec/the-cab-aerodrome-claim-surfaces-research.md §4.
+    if (isHistoryRecordEconomicallyExcluded(record)) {
+      return [];
+    }
+
     const txHash = extractTxHash(record);
     const occurredAt = parseTimestamp(record);
     if (!txHash || !occurredAt) {
       return [];
     }
 
+    const category = typeof record.category === "string" ? record.category : null;
+    const methodLabel = typeof record.method_label === "string" ? record.method_label : null;
+    const summary = typeof record.summary === "string" ? record.summary : null;
     const protocol = detectProtocolFromSignals(metadata, collectStringSignals(record), collectAddressSignals(record));
-    const text = [record.category, record.method_label, record.summary]
-      .filter((value): value is string => typeof value === "string")
-      .join(" ")
-      .toLowerCase();
+    const wrapperAddress = resolveMellowRewardWrapperAddress({
+      record,
+      currentWrappers,
+    });
 
-    if (protocol !== "mellow" || (!text.includes("reward") && !text.includes("claim") && !text.includes("collect"))) {
+    if (!isMellowRewardRecord({
+      detectedProtocol: protocol,
+      category,
+      methodLabel,
+      summary,
+      wrapperAddress,
+    })) {
       return [];
     }
 
     return [{
       txHash,
       occurredAt,
-      category: typeof record.category === "string" ? record.category : null,
-      summary: typeof record.summary === "string" ? record.summary : null,
+      category,
+      summary,
       protocol: "mellow" as const,
       targetType: "strategy" as const,
-      targetWrapperAddress: collectAddressSignals(record).find((address) => currentWrappers.has(address)) ?? null,
+      targetWrapperAddress: wrapperAddress,
+      // Spec: Mellow wrapper reward inflows are always strategy-owned. See
+      // docs/spec/the-cab-aerodrome-claim-surfaces-research.md §3.
+      surfaceKind: "strategy_wrapper_reward_claim" as SurfaceKind,
     }];
   });
 

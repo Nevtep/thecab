@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import type { OverviewProtocolPosition } from "@/server/protocol-positions/protocolPositions.types";
+
 function ensureTestEnv() {
   process.env.MORALIS_API_KEY ??= "test-moralis-key";
   process.env.ALCHEMY_API_KEY ??= "test-alchemy-key";
@@ -155,4 +157,129 @@ test("normalizeAerodromeLifecycleForPersistence fills collect token ids from res
 
   assert.equal(normalized[0]?.tokenId, "69133516");
   assert.equal(normalized[1]?.tokenId, "69133516");
+});
+
+test("mergeProtocolRowsForPersistence keeps the richer protocol row when supplemental lifecycle data is degraded", async () => {
+  const { mergeProtocolRowsForPersistence } = await import("@/server/trigger/tasks/phase-deposits.task");
+
+  const baseRow: OverviewProtocolPosition = {
+    positionKey: "position-1",
+    chainId: 8453,
+    walletAddress: "0xwallet",
+    family: "staked_lp",
+    protocol: "aerodrome",
+    label: "WETH / USDC staked LP",
+    status: "staked",
+    coverageStatus: "partial",
+    coverageReasonCodes: ["positionMetadataIncomplete"],
+    valueUsd: 100,
+    valueStatus: "current",
+    valueUpdatedAt: "2026-05-29T00:00:00.000Z",
+    primaryTokenSymbol: "WETH",
+    secondaryTokenSymbol: "USDC",
+    primaryTokenAmount: 1,
+    secondaryTokenAmount: 1000,
+    poolLabel: "WETH / USDC 100",
+    strategyLabel: null,
+    governanceLabel: null,
+    tokenId: "71272831",
+    metadata: {
+      protocolSurface: "aerodrome_staking",
+      wrapperAddress: null,
+      positionContractAddress: "0xposition",
+      poolAddress: "0xpool",
+      lockEndAt: null,
+      feeTierLabel: "100",
+      rangeLowerTick: -200,
+      rangeUpperTick: 200,
+      currentTick: 0,
+      isInRange: true,
+      rangeLowerPrice: 1,
+      rangeUpperPrice: 2,
+      rangeQuoteTokenSymbol: "USDC",
+      rangeDisplayFractionDigits: 4,
+    },
+  };
+
+  const degradedSupplementalRow: OverviewProtocolPosition = {
+    ...baseRow,
+    valueUsd: null,
+    valueStatus: "unavailable",
+    primaryTokenAmount: null,
+    secondaryTokenAmount: null,
+    metadata: {
+      ...baseRow.metadata,
+      feeTierLabel: null,
+      rangeLowerTick: null,
+      rangeUpperTick: null,
+      currentTick: null,
+      isInRange: null,
+      rangeLowerPrice: null,
+      rangeUpperPrice: null,
+      rangeQuoteTokenSymbol: null,
+      rangeDisplayFractionDigits: null,
+    },
+  };
+
+  const merged = mergeProtocolRowsForPersistence({
+    baseRows: [baseRow],
+    supplementalRows: [[degradedSupplementalRow]],
+  });
+
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0]?.valueStatus, "current");
+  assert.equal(merged[0]?.metadata.rangeLowerTick, -200);
+  assert.equal(merged[0]?.metadata.feeTierLabel, "100");
+});
+
+test("mergeProtocolRowsForPersistence adds supplemental rows that are absent from protocol detection", async () => {
+  const { mergeProtocolRowsForPersistence } = await import("@/server/trigger/tasks/phase-deposits.task");
+
+  const supplementalRow: OverviewProtocolPosition = {
+    positionKey: "position-2",
+    chainId: 8453,
+    walletAddress: "0xwallet",
+    family: "manual_deposit",
+    protocol: "aerodrome",
+    label: "WETH / USDC deposit",
+    status: "active",
+    coverageStatus: "partial",
+    coverageReasonCodes: ["recentProtocolReconstruction"],
+    valueUsd: null,
+    valueStatus: "unavailable",
+    valueUpdatedAt: null,
+    primaryTokenSymbol: "WETH",
+    secondaryTokenSymbol: "USDC",
+    primaryTokenAmount: null,
+    secondaryTokenAmount: null,
+    poolLabel: "WETH / USDC",
+    strategyLabel: null,
+    governanceLabel: null,
+    tokenId: "71272831",
+    metadata: {
+      protocolSurface: "aerodrome_manual_deposit",
+      wrapperAddress: null,
+      positionContractAddress: "0xposition",
+      poolAddress: "0xpool",
+      lockEndAt: null,
+      feeTierLabel: "100",
+      rangeLowerTick: -200,
+      rangeUpperTick: 200,
+      currentTick: 0,
+      isInRange: true,
+      rangeLowerPrice: 1,
+      rangeUpperPrice: 2,
+      rangeQuoteTokenSymbol: "USDC",
+      rangeDisplayFractionDigits: 4,
+    },
+  };
+
+  const merged = mergeProtocolRowsForPersistence({
+    baseRows: [],
+    supplementalRows: [[supplementalRow]],
+  });
+
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0]?.positionKey, "position-2");
+  assert.equal(merged[0]?.metadata.rangeUpperTick, 200);
 });

@@ -16,6 +16,9 @@ import {
   resolveMintValuationUsd,
   resolveSyntheticGaugeClaimDepositId,
   resolveUsdValuation,
+  startOfUtcDay,
+  nextUtcDay,
+  shouldAttachCanonicalTimelineNarrative,
 } from "@/server/analysis/deposit-read-models";
 
 test("mapTimelineEventToLifecycleType excludes strategy lifecycle events from manual deposit timelines", () => {
@@ -31,6 +34,13 @@ test("mapTimelineEventToLifecycleType excludes strategy lifecycle events from ma
     mapTimelineEventToLifecycleType({ rawEventType: "strategy_claim", isOpeningEvent: false, openedByTransferIn: false }),
     null,
   );
+});
+
+test("shouldAttachCanonicalTimelineNarrative keeps rebalance and redeploy labels only when canonical inferred action identity exists", () => {
+  assert.equal(shouldAttachCanonicalTimelineNarrative({ rawEventType: "rebalance", inferredActionId: null }), false);
+  assert.equal(shouldAttachCanonicalTimelineNarrative({ rawEventType: "redeploy", inferredActionId: null }), false);
+  assert.equal(shouldAttachCanonicalTimelineNarrative({ rawEventType: "rebalance", inferredActionId: "action-1" }), true);
+  assert.equal(shouldAttachCanonicalTimelineNarrative({ rawEventType: "deposit", inferredActionId: null }), true);
 });
 
 test("buildStrategyIdByPoolId keeps the first strategy cross-link for each primary pool", () => {
@@ -70,14 +80,14 @@ test("timeline coverage reasons surface coverage gaps and degraded classificatio
       coverageStatus: "partial",
       confidence: "degraded",
     }),
-    ["priceUnavailable", "coverageGap", "lowConfidenceClassification"],
+    ["priceUnavailable", "coverageGap", "residualAmbiguousSource", "lowConfidenceClassification"],
   );
 });
 
 test("summary coverage reasons keep transfer-in and unattributed residual signals visible", () => {
   assert.deepEqual(
     deriveCoverageReasonCodes({ openedByTransferIn: true, coverageStatus: "partial" }),
-    ["transferInOrigin", "unattributedResidual"],
+    ["transferInOrigin", "unattributedResidual", "residualAmbiguousSource"],
   );
 });
 
@@ -140,6 +150,13 @@ test("resolveMintValuationUsd prices mint movements from ledger history", () => 
   });
 
   assert.equal(resolved, 12500);
+});
+
+test("mint historical price window includes the full UTC day of the earliest mint", () => {
+  const value = new Date("2026-03-05T17:45:39.000Z");
+
+  assert.equal(startOfUtcDay(value).toISOString(), "2026-03-05T00:00:00.000Z");
+  assert.equal(nextUtcDay(value).toISOString(), "2026-03-06T00:00:00.000Z");
 });
 
 test("resolveSyntheticGaugeClaimDepositId uses the explicit token id from tx metadata", () => {
@@ -433,6 +450,7 @@ test("buildDepositReadModelRows materializes summary lifecycle and decomposition
         amountRaw: "1000000000000000000",
         occurredAt: new Date("2026-05-22T00:00:00.000Z"),
         resolutionStatus: "resolved",
+        resolutionReasonCodes: [],
         metadataJson: { blockNumber: 2 },
         symbol: "AERO",
         resolvedAmountUsd: 20,
@@ -450,6 +468,7 @@ test("buildDepositReadModelRows materializes summary lifecycle and decomposition
         amountRaw: "750000000000000000",
         occurredAt: new Date("2026-05-23T00:00:00.000Z"),
         resolutionStatus: "resolved",
+        resolutionReasonCodes: [],
         metadataJson: { blockNumber: 3 },
         symbol: "AERO",
         resolvedAmountUsd: 15,
@@ -467,7 +486,26 @@ test("buildDepositReadModelRows materializes summary lifecycle and decomposition
         amountRaw: "600000000000000000",
         occurredAt: new Date("2026-05-24T00:00:00.000Z"),
         resolutionStatus: "unresolved",
+        resolutionReasonCodes: ["missingTokenId"],
         metadataJson: { blockNumber: 4, targetTokenId: "71093441" },
+        symbol: "AERO",
+        resolvedAmountUsd: 12,
+        priceSource: "event",
+        reasonCodes: [],
+        resolvedTokenDeltas: [],
+      },
+      {
+        id: "reward-4",
+        depositOrStrategyId: null,
+        txHash: "0xreward-token-id-resolved",
+        logIndex: 4,
+        rewardType: "reward_claim",
+        tokenAddress: "0x940181a94a35a4569e4529a3cdfb74e38fd98631",
+        amountRaw: "600000000000000000",
+        occurredAt: new Date("2026-05-25T00:00:00.000Z"),
+        resolutionStatus: "resolved",
+        resolutionReasonCodes: [],
+        metadataJson: { blockNumber: 5, targetTokenId: "71093441" },
         symbol: "AERO",
         resolvedAmountUsd: 12,
         priceSource: "event",
@@ -486,8 +524,10 @@ test("buildDepositReadModelRows materializes summary lifecycle and decomposition
   const openSummary = result.summaryRows.find((row) => row.depositId === "deposit-open");
   const closedSummary = result.summaryRows.find((row) => row.depositId === "deposit-closed");
   const openDecomposition = result.decompositionRowsToInsert.find((row) => row.depositId === "deposit-open");
-  assert.equal(openSummary?.totalRewardsUsd, "47");
-  assert.equal(openSummary?.totalReturnUsd, "547");
+  assert.equal(openSummary?.totalRewardsUsd, "32");
+  assert.equal(openSummary?.totalReturnUsd, "532");
+  assert.equal(openSummary?.coverageStatus, "partial");
+  assert.deepEqual(openSummary?.coverageReasonCodes, ["missingTokenId"]);
   assert.equal(openSummary?.mellowStrategyCrossLinkId, "strategy-1");
   assert.equal(openSummary?.positionLabel, "WETH / cbBTC · CL · 100 #71093441");
   assert.equal(openSummary?.rangeLowerPrice, "0.0269");
@@ -501,7 +541,7 @@ test("buildDepositReadModelRows materializes summary lifecycle and decomposition
   assert.equal(openDecomposition?.assetPriceEffectUsd, "500");
   assert.equal(openDecomposition?.rebalanceEffectUsd, "0");
   assert.equal(openDecomposition?.unattributedUsd, "0");
-  assert.equal(openDecomposition?.componentPercentages?.rewardsUsd ?? null, 47 / 547);
+  assert.equal(openDecomposition?.componentPercentages?.rewardsUsd ?? null, 32 / 532);
   assert.ok(openDecomposition);
   assert.ok(
     Math.abs(
@@ -1144,7 +1184,7 @@ test("buildDepositReadModelRows materializes deposit lifecycle from persisted de
   assert.deepEqual(lifecycleTypes, ["mint_position", "claim_reward", "close"]);
   assert.equal(summary?.capitalWithdrawnUsd, "2400");
   assert.equal(summary?.currentValueUsd, "2400");
-  assert.equal(summary?.totalRewardsUsd, "300");
+  assert.equal(summary?.totalRewardsUsd, "0");
 });
 
 test("buildDepositReadModelRows keeps post-withdrawal swaps in realized pnl only", () => {
@@ -1310,12 +1350,12 @@ test("buildDepositReadModelRows keeps post-withdrawal swaps in realized pnl only
 
   assert.equal(summary?.currentValueUsd, "2700");
   assert.equal(summary?.capitalWithdrawnUsd, "2700");
-  assert.equal(summary?.totalReturnUsd, "800");
+  assert.equal(summary?.totalReturnUsd, "700");
   assert.equal(decomposition?.assetPriceEffectUsd, "1000");
   assert.equal(decomposition?.rebalanceEffectUsd, "-300");
   assert.equal(decomposition?.realizedPnlUsd, "100");
   assert.equal(decomposition?.unrealizedPnlUsd, "0");
-  assert.equal(decomposition?.unattributedUsd, "0");
+  assert.equal(decomposition?.unattributedUsd, "-100");
   assert.equal((swapEvent?.metadataJson as Record<string, unknown>)?.realizedPnlUsd, 100);
   assert.equal((swapEvent?.metadataJson as Record<string, unknown>)?.realizedCostBasisUsd, 1350);
 });

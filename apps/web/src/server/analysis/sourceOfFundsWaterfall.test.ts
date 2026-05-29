@@ -213,6 +213,13 @@ test("classifyInferredDepositAction marks rebalance_same_pool when paired swap c
 
   assert.equal(result.actionType, "rebalance_same_pool");
   assert.equal(result.confidence, "high");
+  assert.equal(result.classificationBasis, "residual_flow");
+  assert.equal(result.candidatePoolResidualConsumedRaw, 800n);
+  assert.equal(result.candidatePoolResidualShare, 0.8);
+  assert.equal(result.mixedFunding, true);
+  assert.deepEqual(result.excessAllocationBuckets, [
+    { source: "matching_cash_in", amount: 200n },
+  ]);
 });
 
 test("classifyInferredDepositAction marks redeploy_same_pool when funded directly by same-pool residual", () => {
@@ -226,6 +233,54 @@ test("classifyInferredDepositAction marks redeploy_same_pool when funded directl
 
   assert.equal(result.actionType, "redeploy_same_pool");
   assert.equal(result.confidence, "high");
+  assert.equal(result.candidatePoolResidualConsumedRaw, 1_000n);
+  assert.equal(result.candidatePoolResidualShare, 1);
+  assert.equal(result.mixedFunding, false);
+  assert.deepEqual(result.excessAllocationBuckets, []);
+});
+
+test("classifyInferredDepositAction preserves same-pool rebalance when candidate residual is a minority share", () => {
+  const result = classifyInferredDepositAction({
+    targetPoolId: POOL_X,
+    legAllocations: [
+      buildAllocation("leg-1", [
+        { source: "candidate_pool_residual", amount: 400n },
+        { source: "matching_cash_in", amount: 600n },
+      ]),
+    ],
+    pairedSwapConsumedCandidateResidual: true,
+  });
+
+  assert.equal(result.actionType, "rebalance_same_pool");
+  assert.equal(result.confidence, "medium");
+  assert.equal(result.candidatePoolResidualConsumedRaw, 400n);
+  assert.equal(result.candidatePoolResidualShare, 0.4);
+  assert.equal(result.mixedFunding, true);
+  assert.deepEqual(result.excessAllocationBuckets, [
+    { source: "matching_cash_in", amount: 600n },
+  ]);
+});
+
+test("classifyInferredDepositAction preserves same-pool redeploy when candidate residual is only part of total funding", () => {
+  const result = classifyInferredDepositAction({
+    targetPoolId: POOL_X,
+    legAllocations: [
+      buildAllocation("leg-1", [
+        { source: "candidate_pool_residual", amount: 300n },
+        { source: "liquidation_or_reward", amount: 700n },
+      ]),
+    ],
+    pairedSwapConsumedCandidateResidual: false,
+  });
+
+  assert.equal(result.actionType, "redeploy_same_pool");
+  assert.equal(result.confidence, "medium");
+  assert.equal(result.candidatePoolResidualConsumedRaw, 300n);
+  assert.equal(result.candidatePoolResidualShare, 0.3);
+  assert.equal(result.mixedFunding, true);
+  assert.deepEqual(result.excessAllocationBuckets, [
+    { source: "liquidation_or_reward", amount: 700n },
+  ]);
 });
 
 test("classifyInferredDepositAction marks new_capital_deposit when cash-in dominates", () => {

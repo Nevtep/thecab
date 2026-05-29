@@ -2,25 +2,116 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  buildGroupedLifecycleEvent,
   buildSyntheticGaugeClaimCandidates,
   buildSyntheticGaugeClaimEventKey,
+  buildSyntheticGaugeClaimRewards,
+  collectCanonicalLifecycleRows,
+  mapInferredActionToPoolTimelineEventType,
   resolvePoolRewardTargetPoolId,
 } from "@/server/analysis/pool-read-models";
 
-test("resolvePoolRewardTargetPoolId only uses deposit or strategy ownership", () => {
+test("mapInferredActionToPoolTimelineEventType does not infer rebalance from swap-shaped lifecycle rows", () => {
+  assert.equal(mapInferredActionToPoolTimelineEventType("rebalance_same_pool"), "rebalance");
+  assert.equal(mapInferredActionToPoolTimelineEventType("redeploy_same_pool"), "redeploy");
+  assert.equal(mapInferredActionToPoolTimelineEventType(null), "deposit");
+});
+
+test("collectCanonicalLifecycleRows uses exact inferred-action ledger ids instead of time windows", () => {
+  const rows = collectCanonicalLifecycleRows({
+    lifecycleRows: [
+      {
+        id: "deposit-ledger",
+        txHash: "0xdeposit",
+        classification: "manual_deposit",
+        occurredAt: new Date("2026-05-01T00:00:00.000Z"),
+        confidence: "high",
+        metadataJson: {},
+      },
+      {
+        id: "withdraw-ledger",
+        txHash: "0xwithdraw",
+        classification: "manual_withdrawal",
+        occurredAt: new Date("2026-04-20T00:00:00.000Z"),
+        confidence: "high",
+        metadataJson: {},
+      },
+      {
+        id: "unrelated-ledger",
+        txHash: "0xunrelated",
+        classification: "swap",
+        occurredAt: new Date("2026-05-01T00:05:00.000Z"),
+        confidence: "high",
+        metadataJson: {},
+      },
+    ],
+    inferredAction: {
+      classificationBasis: "residual_flow",
+      consumingLedgerEventIdsJson: ["withdraw-ledger"],
+      sourceLedgerEventId: "deposit-ledger",
+    },
+  });
+
+  assert.deepEqual(rows.map((row) => row.id), ["withdraw-ledger", "deposit-ledger"]);
+});
+
+test("buildGroupedLifecycleEvent defaults to a degraded deposit row when no canonical inferred action exists", () => {
+  const event = buildGroupedLifecycleEvent({
+    deposit: {
+      depositId: "deposit-1",
+      poolId: "pool-1",
+      occurredAt: new Date("2026-05-01T00:00:00.000Z"),
+      txHash: "0xdeposit",
+      sourceLedgerEventId: "deposit-ledger",
+      coverageStatus: "partial",
+      attributedValueUsd: 123,
+      relatedDepositId: "deposit-1",
+      tokenId: "123",
+      status: "open",
+      metadataJson: {},
+    },
+    lifecycleRows: [
+      {
+        id: "swap-ledger",
+        txHash: "0xswap",
+        classification: "swap",
+        occurredAt: new Date("2026-05-01T00:01:00.000Z"),
+        confidence: "high",
+        metadataJson: {},
+      },
+    ],
+    inferredAction: null,
+  });
+
+  assert.equal(event.eventType, "deposit");
+  assert.equal(event.metadataJson.inferredActionType, null);
+  assert.deepEqual(event.metadataJson.groupedClassifications, ["swap"]);
+});
+
+test("resolvePoolRewardTargetPoolId prefers explicit resolved pool ownership and otherwise uses deposit or strategy ownership", () => {
   assert.equal(resolvePoolRewardTargetPoolId({
+    resolvedPoolId: "pool-explicit",
+    relatedId: "strategy-1",
+    depositToPoolId: new Map([["deposit-1", "pool-1"]]),
+    strategyToPoolId: new Map([["strategy-1", "pool-2"]]),
+  }), "pool-explicit");
+
+  assert.equal(resolvePoolRewardTargetPoolId({
+    resolvedPoolId: null,
     relatedId: "deposit-1",
     depositToPoolId: new Map([["deposit-1", "pool-1"]]),
     strategyToPoolId: new Map([["strategy-1", "pool-2"]]),
   }), "pool-1");
 
   assert.equal(resolvePoolRewardTargetPoolId({
+    resolvedPoolId: null,
     relatedId: "strategy-1",
     depositToPoolId: new Map([["deposit-1", "pool-1"]]),
     strategyToPoolId: new Map([["strategy-1", "pool-2"]]),
   }), "pool-2");
 
   assert.equal(resolvePoolRewardTargetPoolId({
+    resolvedPoolId: null,
     relatedId: "unresolved",
     depositToPoolId: new Map([["deposit-1", "pool-1"]]),
     strategyToPoolId: new Map([["strategy-1", "pool-2"]]),
@@ -172,4 +263,62 @@ test("buildSyntheticGaugeClaimEventKey stays within pool timeline event key limi
 
   assert.equal(eventKey, "reward:0x01c4d754abe2037b25b7d880a1f3a4000983b1064f83d86081c52fc9679a4a01:d5473da2-5bd8-47de-903b-c07d7338f7d2");
   assert.ok(eventKey.length <= 128);
+});
+
+test("buildSyntheticGaugeClaimRewards values unmatched gauge claims for pool totals", () => {
+  const rewards = buildSyntheticGaugeClaimRewards({
+    chainId: 8453,
+    candidates: [
+      {
+        ledgerEventId: "ledger-1",
+        txHash: "0xreward",
+        occurredAt: new Date("2026-05-28T00:00:00.000Z"),
+        poolId: "pool-1",
+        gaugeAddress: "0x1111111111111111111111111111111111111111",
+        methodLabel: "getreward",
+        metadataJson: {
+          toAddress: "0x1111111111111111111111111111111111111111",
+          methodLabel: "getReward",
+        },
+      },
+    ],
+    movementsByLedgerEventId: new Map([
+      ["ledger-1", [{
+        ledgerEventId: "ledger-1",
+        tokenAddress: "0x940181a94a35a4569e4529a3cdfb74e38fd98631",
+        amountRaw: "1000000000000000000",
+        directionIn: true,
+        amountUsd: null,
+        metadataJson: {
+          symbol: "AERO",
+        },
+      }]],
+    ]),
+    latestPriceByToken: new Map([
+      ["0x940181a94a35a4569e4529a3cdfb74e38fd98631", 2],
+    ]),
+    earliestPriceDayByToken: new Map([
+      ["0x940181a94a35a4569e4529a3cdfb74e38fd98631", "2026-05-28"],
+    ]),
+    priceByTokenAndDay: new Map([
+      ["0x940181a94a35a4569e4529a3cdfb74e38fd98631", new Map([["2026-05-28", 2]])],
+    ]),
+  });
+
+  assert.deepEqual(rewards, [{
+    eventKey: "reward:0xreward:ledger-1",
+    poolId: "pool-1",
+    txHash: "0xreward",
+    occurredAt: new Date("2026-05-28T00:00:00.000Z"),
+    amountUsd: 2,
+    tokenAddress: "0x940181a94a35a4569e4529a3cdfb74e38fd98631",
+    amountRaw: "1000000000000000000",
+    sourceLedgerEventId: "ledger-1",
+    gaugeAddress: "0x1111111111111111111111111111111111111111",
+    methodLabel: "getreward",
+    metadataJson: {
+      toAddress: "0x1111111111111111111111111111111111111111",
+      methodLabel: "getReward",
+    },
+  }]);
 });

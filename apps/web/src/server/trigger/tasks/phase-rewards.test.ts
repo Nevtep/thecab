@@ -48,14 +48,18 @@ test("resolveRewardClaimTarget leaves Aerodrome claims unresolved when token ide
       protocol: "aerodrome",
       targetType: "deposit",
       targetTokenId: null,
+      targetStakingRewardsAddress: null,
+      sameTxTokenId: null,
+      shareLifecycleWrapperAddress: null,
       targetWrapperAddress: null,
     },
-    depositTargets: [{ id: "deposit-1", tokenId: "123", protocol: "aerodrome" }],
+    depositTargets: [{ depositId: "deposit-1", poolId: "pool-1", tokenId: "123", protocol: "aerodrome" }],
     strategyTargets: [],
   });
 
   assert.equal(result.depositOrStrategyId, null);
   assert.equal(result.targetType, "deposit");
+  assert.deepEqual(result.resolutionReasonCodes, ["missingTokenId"]);
 });
 
 test("resolveRewardClaimTarget resolves Mellow claims only from explicit wrapper identity", async () => {
@@ -70,12 +74,26 @@ test("resolveRewardClaimTarget resolves Mellow claims only from explicit wrapper
       protocol: "mellow",
       targetType: "strategy",
       targetTokenId: null,
+      targetStakingRewardsAddress: null,
+      sameTxTokenId: null,
+      shareLifecycleWrapperAddress: null,
       targetWrapperAddress: "0xwrapper",
     },
     depositTargets: [],
-    strategyTargets: [{ id: "strategy-1", wrapperAddress: "0xwrapper", protocol: "mellow" }],
+    strategyTargets: [{
+      strategyId: "strategy-1",
+      strategyExposureId: "exposure-1",
+      primaryPoolId: "pool-1",
+      wrapperAddress: "0xwrapper",
+      stakingRewardsAddress: null,
+      protocol: "mellow",
+      externalStrategyPositionReference: null,
+    }],
   });
 
   assert.equal(result.depositOrStrategyId, "strategy-1");
   assert.equal(result.targetType, "strategy");
+  assert.equal(result.strategyExposureId, "exposure-1");
+  assert.equal(result.resolvedPoolId, "pool-1");
+  assert.equal(result.resolutionBasis, "strategy_wrapper_pair");
 });

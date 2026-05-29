@@ -31,7 +31,7 @@ As a connected user who has just analyzed my wallet for the first time, I need t
 
 1. **Given** a connected wallet on `chainId = 8453` with no prior `complete` `AnalysisRun`, **When** the user invokes `POST /api/analysis/start { walletAddress, chainId }`, **Then** the engine implicitly runs in `full_history` mode, partitions the window into at most five 90-day slices walking backward from `triggeredAtUtc`, and exposes per-slice progress through `GET /api/analysis/status`.
 2. **Given** the run is `running`, **When** any slice completes Phase A and Phase B, **Then** the next-older slice is unblocked for enqueue and per-slice status transitions are observable via the status endpoint without polling Trigger.dev directly.
-3. **Given** every slice has completed (`complete` or `failed`) and the global barrier is reached, **When** Phase D runs, **Then** rebalance detection (withdraw token T → swap T → redeposit into pool P within the configured window) classifies activity across slice boundaries, not just within a single slice.
+3. **Given** every slice has completed (`complete` or `failed`) and the global barrier is reached, **When** Phase D runs, **Then** canonical residual-flow inference classifies same-pool rebalances, same-pool redeploys, liquidations, and cash-outs across slice boundaries from deterministic source lots rather than bounded time windows.
 4. **Given** Phase D, E, and F all succeed, **When** the run finalizes, **Then** `AnalysisRun.status = complete`, `ProcessingCursor.lastProcessedDayUtc` advances to the latest fully-processed UTC day, and daily `PerformanceSnapshot` series for portfolio, per-pool, per-deposit, per-strategy, and rewards exist for every covered day.
 
 ---
@@ -150,7 +150,7 @@ As the Settings and Overview UI, I need `GET /api/analysis/status` to return the
 - Trigger.dev metadata is lost or stale: Postgres remains the source of truth; the run completes and the UI status polling continues to render correctly from persisted state (research.md §R12).
 - A user cancels a run, then immediately retriggers it: cancellation does not satisfy the once-per-day cap; a fresh run is enqueued and the cancelled run remains observable in the run history.
 - An `analysis.run` parent task crashes between Phase E and Phase F: re-execution with the same `idempotencyKey` resumes from the persisted slice/phase state and reaches `complete` without duplicate writes (research.md §R10).
-- A `decreaseLiquidity` → swap → `increaseLiquidity` sequence straddles two slices: Phase D runs after the global barrier and classifies the rebalance using the configured window (default 24h), so straddling slices does not produce a false negative (research.md §R6).
+- A `decreaseLiquidity` or manual withdrawal that creates residual source lots in one slice is later consumed by a same-pool swap or redeposit in another slice: Phase D runs after the global barrier and classifies the resulting canonical inferred action from deterministic residual/source-lot state, so slice boundaries do not produce a false negative (research.md §R6).
 - The wallet history provider (Moralis) returns an incomplete page set: the engine falls back to `alchemy_getAssetTransfers` for that slice and records the fallback in the slice's `RawProviderRecord` provenance (research.md §R8).
 
 ## Requirements *(mandatory)*
@@ -198,7 +198,7 @@ As the Settings and Overview UI, I need `GET /api/analysis/status` to return the
   4. **Phase D** (Activity classification) — global barrier after all slices' A+B complete.
   5. **Phase E** (Pool augmentation) — after Phase D.
   6. **Phase F** (Run finalization) — daily `PerformanceSnapshot` writes, `ProcessingCursor` advance, status flip to `complete`.
-- **FR-019**: Phase D MUST classify rebalances using the heuristic `decreaseLiquidity`/withdraw of token T from pool P → swap touching T → deposit into pool P within a bounded window (default 24h, configurable; not a magic number in code per research.md §R14.3).
+- **FR-019**: Phase D MUST classify higher-order wallet activity from deterministic source-of-funds and residual-flow state. Same-pool rebalances and same-pool redeploys MUST be emitted only when canonical attribution links the consuming action back to the originating pool's residual lots; time-window heuristics MUST NOT decide these labels.
 - **FR-020**: Phase A MUST honor the `mint()` vs `increaseLiquidity(existing tokenId)` ambiguity rule from the protocol research and MUST NOT double-count deposit lifecycles.
 - **FR-021**: Mellow exposure MUST be tracked by `(chainId, wrapperAddress)` and MUST NEVER be modeled as an NFT deposit (research.md §R7).
 - **FR-022**: Phase E MUST discover factory and gauge addresses dynamically (e.g. `router.defaultFactory()` per protocol research §4.3) and persist them to `ProtocolContract` with provenance; factory and gauge addresses MUST NOT be hardcoded in engine code.
@@ -327,7 +327,7 @@ As the Settings and Overview UI, I need `GET /api/analysis/status` to return the
 - Postgres (Drizzle) is the source of truth for all engine state; Trigger.dev metadata is observability only (research.md §R12).
 - Moralis and Alchemy plan limits and concurrency ceilings are tunable via environment variables; this spec assumes per-provider concurrency keys are sufficient to stay within budget.
 - Base mainnet reorg depth is empirically ≤ 2 blocks; the 32-block soft window is a comfortable safety margin (research.md §R5).
-- The rebalance detection window default of 24 hours is a starting value, configurable, and will be validated against real wallets during implementation (research.md §R14.3).
+- Phase D higher-order activity labels are determined by deterministic source-lot and residual-flow attribution, not by configurable time windows (research.md §R6).
 - Aerodrome factory and gauge addresses are discovered dynamically (`router.defaultFactory()` per protocol research §4.3) and cached in `ProtocolContract`; the engine does not ship with hardcoded protocol addresses beyond the router entry point.
 - Mellow exposure is tracked by `(chainId, wrapperAddress)` and not modeled as an NFT deposit; the exact event set per Mellow wrapper is verified during implementation (research.md §R14.1).
 - v1 stores `PricePoint` only at daily resolution; sub-daily granularity is a deliberate non-goal (research.md §R4, §R13).

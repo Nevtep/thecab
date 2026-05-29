@@ -10,6 +10,7 @@ import {
   analysisRuns,
   analysisSlices,
   deposits,
+  inferredActions,
   performanceSnapshots,
   portfolioSnapshots,
   processingCursors,
@@ -180,7 +181,7 @@ async function readLatestRunSummary(walletAddress: string) {
     throw new Error("ANALYSIS_RUN_NOT_FOUND");
   }
 
-  const [sliceRows, rawProviderCountRow, depositCountRow, strategyExposureCountRow, rewardCountRow, performanceCountRow, portfolioCountRow, protocolContractCountRow, cursorRows] = await Promise.all([
+  const [sliceRows, rawProviderCountRow, depositCountRow, strategyExposureCountRow, rewardCountRow, performanceCountRow, portfolioCountRow, protocolContractCountRow, cursorRows, rewardRows, inferredActionRows] = await Promise.all([
     db
       .select({ status: analysisSlices.status })
       .from(analysisSlices)
@@ -220,7 +221,78 @@ async function readLatestRunSummary(walletAddress: string) {
       })
       .from(processingCursors)
       .where(and(eq(processingCursors.walletAddress, walletAddress), eq(processingCursors.chainId, SUPPORTED_CHAIN_ID))),
+    db
+      .select({
+        resolutionStatus: rewardEvents.resolutionStatus,
+        metadataJson: rewardEvents.metadataJson,
+      })
+      .from(rewardEvents)
+      .where(and(eq(rewardEvents.walletAddress, walletAddress), eq(rewardEvents.chainId, SUPPORTED_CHAIN_ID))),
+    db
+      .select({
+        actionType: inferredActions.actionType,
+        confidence: inferredActions.confidence,
+        latestRunId: inferredActions.latestRunId,
+        metadataJson: inferredActions.metadataJson,
+      })
+      .from(inferredActions)
+      .where(and(eq(inferredActions.walletAddress, walletAddress), eq(inferredActions.chainId, SUPPORTED_CHAIN_ID))),
   ]);
+
+  const rewardResolutionSummary = {
+    total: rewardRows.length,
+    byResolutionStatus: Object.fromEntries(
+      Array.from(
+        rewardRows.reduce((map, row) => {
+          map.set(row.resolutionStatus, (map.get(row.resolutionStatus) ?? 0) + 1);
+          return map;
+        }, new Map<string, number>()),
+      ).sort(([left], [right]) => left.localeCompare(right)),
+    ),
+    byTargetType: Object.fromEntries(
+      Array.from(
+        rewardRows.reduce((map, row) => {
+          const targetType = typeof row.metadataJson.targetType === "string"
+            ? row.metadataJson.targetType
+            : "unknown";
+          map.set(targetType, (map.get(targetType) ?? 0) + 1);
+          return map;
+        }, new Map<string, number>()),
+      ).sort(([left], [right]) => left.localeCompare(right)),
+    ),
+  };
+
+  const inferredActionSummary = {
+    total: inferredActionRows.length,
+    currentRunCount: inferredActionRows.filter((row) => row.latestRunId === latestRun.id).length,
+    byActionType: Object.fromEntries(
+      Array.from(
+        inferredActionRows.reduce((map, row) => {
+          map.set(row.actionType, (map.get(row.actionType) ?? 0) + 1);
+          return map;
+        }, new Map<string, number>()),
+      ).sort(([left], [right]) => left.localeCompare(right)),
+    ),
+    byConfidence: Object.fromEntries(
+      Array.from(
+        inferredActionRows.reduce((map, row) => {
+          map.set(row.confidence, (map.get(row.confidence) ?? 0) + 1);
+          return map;
+        }, new Map<string, number>()),
+      ).sort(([left], [right]) => left.localeCompare(right)),
+    ),
+    byClassificationBasis: Object.fromEntries(
+      Array.from(
+        inferredActionRows.reduce((map, row) => {
+          const classificationBasis = typeof row.metadataJson.classificationBasis === "string"
+            ? row.metadataJson.classificationBasis
+            : "unknown";
+          map.set(classificationBasis, (map.get(classificationBasis) ?? 0) + 1);
+          return map;
+        }, new Map<string, number>()),
+      ).sort(([left], [right]) => left.localeCompare(right)),
+    ),
+  };
 
   return {
     latestRun,
@@ -237,6 +309,8 @@ async function readLatestRunSummary(walletAddress: string) {
     performanceSnapshotCount: performanceCountRow[0]?.value ?? 0,
     portfolioSnapshotCount: portfolioCountRow[0]?.value ?? 0,
     protocolContractCount: protocolContractCountRow[0]?.value ?? 0,
+    rewardResolutionSummary,
+    inferredActionSummary,
     cursor: cursorRows[0] ?? null,
   };
 }
@@ -355,6 +429,8 @@ async function main() {
         portfolioSnapshots: firstSummary.portfolioSnapshotCount,
         protocolContracts: firstSummary.protocolContractCount,
       },
+      rewardResolutionSummary: firstSummary.rewardResolutionSummary,
+      inferredActionSummary: firstSummary.inferredActionSummary,
       cursor: firstSummary.cursor,
       sameDayRetry,
     }, null, 2));

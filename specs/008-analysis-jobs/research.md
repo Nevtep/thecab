@@ -141,7 +141,7 @@ analysis.run
 **Rationale**:
 - Phase A (Deposits & Strategies) is the source of truth for which positions exist in the slice. Phase B (Rewards) needs A's output to know which deposits were staked when, so B is gated on A within the slice.
 - Phase C (slice handoff) is implicit: completing A+B for slice N unblocks slice N-1's enqueue; the parent task drives this with `batchTriggerAndWait`.
-- Phase D (Activity) requires the full set of deposit lifecycles across all slices to correctly classify rebalances (withdraw → swap → redeposit windows can span slice boundaries), so it runs after every slice's A+B completes.
+- Phase D (Activity) requires the full set of deposit lifecycles and residual/source-lot state across all slices to correctly classify same-pool rebalances, redeploys, liquidations, and cash-outs, so it runs after every slice's A+B completes.
 - Phase E (Pools) augments aggregated data with metadata reads; running after D ensures its inputs are complete.
 - Phase F (Finalize) writes `PerformanceSnapshot` daily points, advances `ProcessingCursor`, and flips `AnalysisRun.status = complete`.
 
@@ -151,7 +151,7 @@ analysis.run
 - Phase D processes the global remaining-tx list in batches of N (configurable) with bounded concurrency.
 
 **Alternatives considered**:
-- Run D per-slice and stitch later — rejected: rebalance windows would be cut at slice boundaries, producing false negatives.
+- Run D per-slice and stitch later — rejected: residual/source-lot ownership chains would be cut at slice boundaries, producing false negatives and forcing heuristics.
 - Merge D into B — rejected: violates separation of concerns and prevents independent retry of activity classification.
 
 ---
@@ -162,7 +162,7 @@ analysis.run
 |---|---|---|---|
 | A — Deposits & Strategies | Moralis wallet history, Moralis NFT transfers (position manager), Alchemy RPC logs (`IncreaseLiquidity`, `DecreaseLiquidity`, `Collect`, gauge `Deposit`/`Withdraw`, Mellow wrapper deposit/withdraw), contract reads for tickRange/factory | `RawProviderRecord`, `Deposit`, `Strategy`, `StrategyExposure`, `LedgerEvent` (lifecycle events), `AssetMovement` | Respects `mint` vs `increaseLiquidity(existing tokenId)` rule from protocol research §3.3. Mellow exposure never modeled as an NFT deposit. |
 | B — Rewards | Phase A output + Alchemy RPC logs (gauge `ClaimRewards`, voter fees/bribes, Mellow reward distributions), Collect events from A | `RewardEvent`, per-day reward snapshot rows keyed by `(chainId, depositOrStrategyId, day)` | Snapshots claimed and unclaimed accruals at slice boundaries so the daily rewards line is renderable. Uses contract reads for unclaimed amounts at the slice end block. |
-| D — Activity | All Phase A+B output + remaining wallet transactions not yet classified | `LedgerEvent` (enriched classification), `AttributionState`, `AttributionSourceLot` | Rebalance heuristic: `decreaseLiquidity`/withdraw of token T from pool P → swap touching T within a bounded window (default 24h) → deposit into P. Window bound documented in `data-model.md`. Residual attribution per product spec §6. |
+| D — Activity | All Phase A+B output + remaining wallet transactions not yet classified | `LedgerEvent` (enriched classification), `AttributionState`, `AttributionSourceLot` | Deterministic residual attribution and canonical inferred-action synthesis: source lots and residual consumption identify `rebalance_same_pool`, `redeploy_same_pool`, `liquidation_from_residual`, and `cash_out_from_residual` without bounded-window heuristics. |
 | E — Pools | All Phase A/B/D output + on-demand contract reads for missing pool metadata | `Pool`, `PoolMetricsSnapshot` (daily), `ProtocolContract` (factory/gauge if newly discovered) | Factory address discovered via `router.defaultFactory()` per protocol research §4.3; not hardcoded. |
 | F — Finalize | All prior output | `PerformanceSnapshot` (daily, portfolio/pool/deposit/strategy), advance `ProcessingCursor`, set `AnalysisRun.status = complete`, set `completedAtUtc` | Single transactional advance of cursor + status flip so the cache invariants are atomic. |
 
@@ -262,6 +262,6 @@ These do not block the spec but must be resolved during implementation:
 
 1. **Mellow event coverage** per wrapper/vault — confirm the exact event set emitted by each Mellow Aerodrome strategy and whether contract reads are needed for share valuation. Source: protocol research §1 "Needs further verification".
 2. **Gauge-to-pool discovery** for every Aerodrome pool type (CL vs stable vs volatile). Strategy: cache discovered `(gauge → pool)` mappings in `ProtocolContract` with provenance.
-3. **Rebalance window default** (currently 24h) — validate against a sample of real wallets before locking. Make the value a config constant, not a magic number in code.
+3. **Canonical inferred-action coverage** — validate deterministic residual-flow inference against a sample of real wallets, especially same-pool rebalance/redeploy paths and cross-slice residual consumption.
 4. **Trigger.dev plan sizing** — measure a worst-case full-history run (5 slices × Phase A+B + D + E + F + retries) against the cloud plan's run-minute budget. Self-hosted fallback path documented in deployment notes.
 5. **Unclaimed-reward valuation precision** — decide whether unclaimed amounts at slice end use the slice-end block's contract read or extrapolate from the most recent claim, when contract reads are not feasible.

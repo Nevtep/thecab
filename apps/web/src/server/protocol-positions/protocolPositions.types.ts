@@ -59,6 +59,8 @@ export type OverviewProtocolPosition = {
     wrapperAddress: string | null;
     positionContractAddress: string | null;
     poolAddress: string | null;
+    externalDepositReference?: string | null;
+    externalDepositReferenceStatus?: "resolved" | "unresolved" | null;
     lockEndAt: string | null;
     feeTierLabel: string | null;
     rangeLowerTick: number | null;

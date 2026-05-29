@@ -110,6 +110,41 @@ test("serializeManualDepositLifecycle keeps normalized records for one deposit t
   ]);
 });
 
+test("resolvePersistedManualDepositStatus closes burned deposits even if a stale staked row is present", async () => {
+  const { resolvePersistedManualDepositStatus } = await import("@/server/analysis/enginePersistence");
+
+  const status = resolvePersistedManualDepositStatus({
+    hasManualPosition: false,
+    hasStakedPosition: true,
+    lifecycle: [
+      {
+        txHash: "0xMint",
+        tokenId: "71272831",
+        action: "mint",
+        occurredAt: new Date("2026-05-23T21:32:37.000Z"),
+        positionManagerAddress: "0x827922686190790B37229Fd06084350E74485B72",
+        poolAddress: "0xb2cc224c1c9fee385f8ad6a55b4d94e92359dc59",
+        category: "mint",
+        methodLabel: null,
+        summary: "Minted 1 NFT",
+      },
+      {
+        txHash: "0xBurn",
+        tokenId: "71272831",
+        action: "decreaseLiquidity",
+        occurredAt: new Date("2026-05-28T04:58:45.000Z"),
+        positionManagerAddress: "0x827922686190790B37229Fd06084350E74485B72",
+        poolAddress: "0xb2cc224c1c9fee385f8ad6a55b4d94e92359dc59",
+        category: "burn",
+        methodLabel: "multicall",
+        summary: "Burned 1 NFT",
+      },
+    ],
+  });
+
+  assert.equal(status, "closed");
+});
+
 test("buildAccrualRewardSnapshotRows keeps synthetic snapshot identity stable across reruns", async () => {
   const { buildAccrualRewardSnapshotRows } = await import("@/server/analysis/enginePersistence");
 
@@ -166,4 +201,75 @@ test("buildAccrualRewardSnapshotRows keeps synthetic snapshot identity stable ac
   assert.equal(firstByDeposit.get("deposit-b")?.logIndex, 0);
   assert.equal(firstByDeposit.get("deposit-a")?.txHash, secondByDeposit.get("deposit-a")?.txHash);
   assert.equal(firstByDeposit.get("deposit-b")?.txHash, secondByDeposit.get("deposit-b")?.txHash);
+});
+
+test("resolveManualDepositDisplayMetadata prefers canonical pool metadata over numeric fallback symbols", async () => {
+  const { resolveManualDepositDisplayMetadata } = await import("@/server/analysis/enginePersistence");
+
+  const result = resolveManualDepositDisplayMetadata({
+    chainId: 8453,
+    family: "staked_lp",
+    canonicalPoolLabel: "WETH / USDC 100",
+    token0Address: "0x4200000000000000000000000000000000000006",
+    token1Address: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+    fallbackLabel: "AERO / CL staked LP",
+    fallbackPoolLabel: "2026 / 05",
+    fallbackPrimaryTokenSymbol: "2026",
+    fallbackSecondaryTokenSymbol: "05",
+  });
+
+  assert.deepEqual(result, {
+    label: "WETH / USDC staked LP",
+    poolLabel: "WETH / USDC 100",
+    primaryTokenSymbol: "WETH",
+    secondaryTokenSymbol: "USDC",
+  });
+});
+
+test("mergePersistedPositionMetadataJson preserves existing range metadata when the incoming row is degraded", async () => {
+  const { mergePersistedPositionMetadataJson } = await import("@/server/analysis/enginePersistence");
+
+  const merged = mergePersistedPositionMetadataJson({
+    existing: {
+      label: "Existing label",
+      metadata: {
+        feeTierLabel: "100",
+        rangeLowerTick: -200,
+        rangeUpperTick: 200,
+        currentTick: 0,
+        isInRange: true,
+        rangeLowerPrice: 1,
+        rangeUpperPrice: 2,
+        rangeQuoteTokenSymbol: "USDC",
+        rangeDisplayFractionDigits: 4,
+      },
+    },
+    next: {
+      label: "Fresh label",
+      metadata: {
+        feeTierLabel: null,
+        rangeLowerTick: null,
+        rangeUpperTick: null,
+        currentTick: null,
+        isInRange: null,
+        rangeLowerPrice: null,
+        rangeUpperPrice: null,
+        rangeQuoteTokenSymbol: null,
+        rangeDisplayFractionDigits: null,
+      },
+    },
+  }) as Record<string, unknown> & { metadata: Record<string, unknown> };
+
+  assert.equal(merged.label, "Fresh label");
+  assert.deepEqual(merged.metadata, {
+    feeTierLabel: "100",
+    rangeLowerTick: -200,
+    rangeUpperTick: 200,
+    currentTick: 0,
+    isInRange: true,
+    rangeLowerPrice: 1,
+    rangeUpperPrice: 2,
+    rangeQuoteTokenSymbol: "USDC",
+    rangeDisplayFractionDigits: 4,
+  });
 });

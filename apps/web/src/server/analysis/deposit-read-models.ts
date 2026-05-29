@@ -151,6 +151,14 @@ function dayUtcFromDate(value: Date) {
   return value.toISOString().slice(0, 10);
 }
 
+export function startOfUtcDay(value: Date) {
+  return new Date(`${dayUtcFromDate(value)}T00:00:00.000Z`);
+}
+
+export function nextUtcDay(value: Date) {
+  return new Date(startOfUtcDay(value).getTime() + MS_PER_DAY);
+}
+
 function pricePointKey(tokenAddress: string, dayUtc: string) {
   return `${tokenAddress}:${dayUtc}`;
 }
@@ -234,7 +242,7 @@ export function deriveCoverageReasonCodes(input: {
 }): string[] {
   const codes: string[] = [];
   if (input.openedByTransferIn) codes.push("transferInOrigin");
-  if (input.coverageStatus === "partial") codes.push("unattributedResidual");
+  if (input.coverageStatus === "partial") codes.push("unattributedResidual", "residualAmbiguousSource");
   return codes;
 }
 
@@ -268,6 +276,7 @@ type RewardLikeRow = {
   amountRaw: string;
   occurredAt: Date;
   resolutionStatus: string | null;
+  resolutionReasonCodes: string[];
   metadataJson: Record<string, unknown>;
   symbol: string | null;
   resolvedAmountUsd: number;
@@ -483,11 +492,11 @@ function mapPersistedLifecycleActionToEventType(input: {
 
 function rewardMatchesDeposit(input: {
   reward: Pick<RewardLikeRow, "depositOrStrategyId" | "metadataJson">;
-  relatedRewardOwnerIds: Set<string>;
   depositTokenId: string | null;
+  depositId: string;
 }) {
-  if (input.reward.depositOrStrategyId && input.relatedRewardOwnerIds.has(input.reward.depositOrStrategyId)) {
-    return true;
+  if (input.reward.depositOrStrategyId) {
+    return input.reward.depositOrStrategyId === input.depositId;
   }
 
   if (!input.depositTokenId) {
@@ -986,7 +995,7 @@ export function deriveTimelineCoverageReasonCodes(input: {
   return mergeReasonCodes(
     input.valuationReasonCodes,
     input.openedByTransferIn ? ["transferInOrigin"] : [],
-    input.coverageStatus === "partial" ? ["coverageGap"] : [],
+    input.coverageStatus === "partial" ? ["coverageGap", "residualAmbiguousSource"] : [],
     normalizeDepositConfidence(input.confidence) === "degraded" ? ["lowConfidenceClassification"] : [],
   );
 }
@@ -1101,6 +1110,11 @@ export function buildDepositReadModelRows(input: {
   pricedLifecycleMovements: Map<string, PricedMovement[]>;
   inferredActionIdByLedgerEventId: Map<string, string>;
   strategyIdByPoolId: Map<string, string>;
+  strategyDebugByPoolId?: Map<string, {
+    strategyId: string;
+    externalStrategyPositionReference: string | null;
+    externalStrategyPositionReferenceStatus: "resolved" | "unresolved" | null;
+  }>;
   resolvedRewardRows: RewardLikeRow[];
 }) {
   const lifecycleRowsToInsert: Array<typeof depositLifecycleEvents.$inferInsert> = [];
@@ -1142,6 +1156,7 @@ export function buildDepositReadModelRows(input: {
       poolKind,
       tokenId: deposit.tokenId,
     });
+    const linkedStrategyDebug = input.strategyDebugByPoolId?.get(deposit.poolId) ?? null;
     const persistedLifecycleRecords = extractPersistedDepositLifecycleRecords(deposit.metadataJson);
 
     const openingTimelineRow = input.timelineRows.find((row) => row.relatedDepositId === deposit.id && (
@@ -1241,6 +1256,15 @@ export function buildDepositReadModelRows(input: {
       const openingMovements = openingTimelineRow.sourceLedgerEventId
         ? (input.pricedLifecycleMovements.get(openingTimelineRow.sourceLedgerEventId) ?? [])
         : [];
+      const inferredActionId = openingTimelineRow.sourceLedgerEventId
+        ? (input.inferredActionIdByLedgerEventId.get(openingTimelineRow.sourceLedgerEventId) ?? null)
+        : null;
+      const timelineEventType = shouldAttachCanonicalTimelineNarrative({
+        rawEventType: openingTimelineRow.eventType,
+        inferredActionId,
+      })
+        ? openingTimelineRow.eventType
+        : null;
       const openingDeltas = buildSignedTokenDeltas({
         chainId: input.chainId,
         occurredAt: openingTimelineRow.occurredAt,
@@ -1257,7 +1281,7 @@ export function buildDepositReadModelRows(input: {
         signedTokenDeltas: openingDeltas.deltas,
         priceSource: openingDeltas.eventPriceSource,
         confidence: normalizeDepositConfidence(openingTimelineRow.confidence),
-        inferredActionId: openingTimelineRow.sourceLedgerEventId ? (input.inferredActionIdByLedgerEventId.get(openingTimelineRow.sourceLedgerEventId) ?? null) : null,
+        inferredActionId,
         coverageReasonCodes: deriveTimelineCoverageReasonCodes({
           valuationReasonCodes: openingDeltas.reasonCodes,
           coverageStatus: openingTimelineRow.coverageStatus,
@@ -1266,7 +1290,7 @@ export function buildDepositReadModelRows(input: {
         }),
         metadataJson: {
           source: "timeline_opening_event",
-          timelineEventType: openingTimelineRow.eventType,
+          ...(timelineEventType ? { timelineEventType } : {}),
         },
         principalFlowUsd: asNullableNumber(openingTimelineRow.attributedValueUsd),
       });
@@ -1286,6 +1310,15 @@ export function buildDepositReadModelRows(input: {
           openedByTransferIn: aggregate.openedByTransferIn,
         });
         if (!eventType) continue;
+        const inferredActionId = row.sourceLedgerEventId
+          ? (input.inferredActionIdByLedgerEventId.get(row.sourceLedgerEventId) ?? null)
+          : null;
+        const timelineEventType = shouldAttachCanonicalTimelineNarrative({
+          rawEventType: row.eventType,
+          inferredActionId,
+        })
+          ? row.eventType
+          : null;
 
         const rowLedgerEventIds = extractTimelineLedgerEventIds(row);
         const ledgerEvents = rowLedgerEventIds
@@ -1310,7 +1343,7 @@ export function buildDepositReadModelRows(input: {
           signedTokenDeltas: eventDeltas.deltas,
           priceSource: eventDeltas.eventPriceSource,
           confidence: normalizeDepositConfidence(row.confidence),
-          inferredActionId: row.sourceLedgerEventId ? (input.inferredActionIdByLedgerEventId.get(row.sourceLedgerEventId) ?? null) : null,
+          inferredActionId,
           coverageReasonCodes: deriveTimelineCoverageReasonCodes({
             valuationReasonCodes: eventDeltas.reasonCodes,
             coverageStatus: row.coverageStatus,
@@ -1318,19 +1351,13 @@ export function buildDepositReadModelRows(input: {
           }),
           metadataJson: {
             source: "pool_timeline_event",
-            timelineEventType: row.eventType,
+            ...(timelineEventType ? { timelineEventType } : {}),
             timelineEventId: row.id,
             ledgerEventIds: rowLedgerEventIds,
           },
           principalFlowUsd: asNullableNumber(row.attributedValueUsd),
         });
       }
-    }
-
-    const relatedRewardOwnerIds = new Set<string>([deposit.id]);
-    const linkedStrategyId = input.strategyIdByPoolId.get(deposit.poolId);
-    if (linkedStrategyId) {
-      relatedRewardOwnerIds.add(linkedStrategyId);
     }
 
     const persistedCollectTxHashes = new Set(
@@ -1346,11 +1373,15 @@ export function buildDepositReadModelRows(input: {
     const depositRewardRows = input.resolvedRewardRows.filter((row) => (
       rewardMatchesDeposit({
         reward: row,
-        relatedRewardOwnerIds,
         depositTokenId: deposit.tokenId,
+        depositId: deposit.id,
       })
     ));
     for (const row of depositRewardRows) {
+      const rewardCoverageReasonCodes = row.resolutionStatus === "resolved"
+        ? row.reasonCodes
+        : mergeReasonCodes(row.reasonCodes, row.resolutionReasonCodes);
+
       // Skip pushing a duplicate lifecycle candidate when the persisted
       // lifecycle already carries the same tx as "collect"; the persisted
       // record will render in the lifecycle UI. We still count the reward_event
@@ -1367,14 +1398,15 @@ export function buildDepositReadModelRows(input: {
         usdValue: row.resolvedAmountUsd,
         signedTokenDeltas: row.resolvedTokenDeltas,
         priceSource: row.priceSource,
-        confidence: normalizeDepositConfidence(row.reasonCodes.length > 0 ? "degraded" : "high"),
+        confidence: normalizeDepositConfidence(rewardCoverageReasonCodes.length > 0 ? "degraded" : "high"),
         inferredActionId: null,
-        coverageReasonCodes: row.reasonCodes,
+        coverageReasonCodes: rewardCoverageReasonCodes,
         metadataJson: {
           source: "reward_event",
           rewardEventId: row.id,
           rewardType: row.rewardType,
           resolutionStatus: row.resolutionStatus,
+          resolutionReasonCodes: row.resolutionReasonCodes,
         },
         principalFlowUsd: null,
       });
@@ -1389,7 +1421,10 @@ export function buildDepositReadModelRows(input: {
     // Total rewards = sum of every reward_event linked to this deposit.
     // This is independent of how the deposit lifecycle records the tx, so a
     // deposit's totalRewards is purely a join + sum over reward_events.
-    const rewards = depositRewardRows.reduce(
+    const countableRewardRows = depositRewardRows.filter((row) => (
+      row.resolutionStatus === "resolved"
+    ));
+    const rewards = countableRewardRows.reduce(
       (sum, row) => sum + Math.abs(row.resolvedAmountUsd ?? 0),
       0,
     );
@@ -1581,6 +1616,15 @@ export function buildDepositReadModelRows(input: {
       mellowStrategyCrossLinkId: input.strategyIdByPoolId.get(deposit.poolId) ?? null,
       metadataJson: {
         materializerVersion: "010-detail-1",
+        ...(linkedStrategyDebug
+          ? {
+              linkedStrategyDebug: {
+                strategyId: linkedStrategyDebug.strategyId,
+                externalStrategyPositionReference: linkedStrategyDebug.externalStrategyPositionReference,
+                externalStrategyPositionReferenceStatus: linkedStrategyDebug.externalStrategyPositionReferenceStatus,
+              },
+            }
+          : {}),
       } as Record<string, unknown>,
     };
   });
@@ -1616,6 +1660,16 @@ export function mapTimelineEventToLifecycleType(input: {
   }
 }
 
+export function shouldAttachCanonicalTimelineNarrative(input: {
+  rawEventType: string;
+  inferredActionId: string | null;
+}) {
+  return !(
+    (input.rawEventType === "rebalance" || input.rawEventType === "redeploy")
+    && !input.inferredActionId
+  );
+}
+
 export function buildStrategyIdByPoolId(rows: Array<{ strategyId: string; primaryPoolId: string | null }>) {
   const strategyIdByPoolId = new Map<string, string>();
   for (const row of rows) {
@@ -1624,6 +1678,31 @@ export function buildStrategyIdByPoolId(rows: Array<{ strategyId: string; primar
     }
   }
   return strategyIdByPoolId;
+}
+
+export function buildStrategyDebugByPoolId(rows: Array<{
+  strategyId: string;
+  primaryPoolId: string | null;
+  externalStrategyPositionReference: string | null;
+  externalStrategyPositionReferenceStatus: "resolved" | "unresolved" | null;
+}>) {
+  const strategyDebugByPoolId = new Map<string, {
+    strategyId: string;
+    externalStrategyPositionReference: string | null;
+    externalStrategyPositionReferenceStatus: "resolved" | "unresolved" | null;
+  }>();
+
+  for (const row of rows) {
+    if (row.primaryPoolId && !strategyDebugByPoolId.has(row.primaryPoolId)) {
+      strategyDebugByPoolId.set(row.primaryPoolId, {
+        strategyId: row.strategyId,
+        externalStrategyPositionReference: row.externalStrategyPositionReference,
+        externalStrategyPositionReferenceStatus: row.externalStrategyPositionReferenceStatus,
+      });
+    }
+  }
+
+  return strategyDebugByPoolId;
 }
 
 export async function materializeDepositReadModels(
@@ -1750,10 +1829,10 @@ export async function materializeDepositReadModels(
 
   const mintOccurredAtValues = Array.from(mintLedgerEventByTxHash.values()).map((row) => row.occurredAt);
   const earliestMintOccurredAt = mintOccurredAtValues.length > 0
-    ? new Date(Math.min(...mintOccurredAtValues.map((value) => value.getTime())))
+    ? startOfUtcDay(new Date(Math.min(...mintOccurredAtValues.map((value) => value.getTime()))))
     : null;
   const latestMintOccurredAtExclusive = mintOccurredAtValues.length > 0
-    ? new Date(Math.max(...mintOccurredAtValues.map((value) => value.getTime())) + MS_PER_DAY)
+    ? nextUtcDay(new Date(Math.max(...mintOccurredAtValues.map((value) => value.getTime()))))
     : null;
 
   const pricePointRows =
@@ -1850,6 +1929,10 @@ export async function materializeDepositReadModels(
     .select({
       strategyId: strategies.id,
       primaryPoolId: strategies.primaryPoolId,
+      externalStrategyPositionReference:
+        sql<string | null>`${strategyExposures.metadataJson} ->> 'externalDepositReference'`,
+      externalStrategyPositionReferenceStatus:
+        sql<"resolved" | "unresolved" | null>`${strategyExposures.metadataJson} ->> 'externalDepositReferenceStatus'`,
     })
     .from(strategyExposures)
     .innerJoin(strategies, eq(strategyExposures.strategyId, strategies.id))
@@ -1861,7 +1944,7 @@ export async function materializeDepositReadModels(
     );
 
   const strategyIdByPoolId = buildStrategyIdByPoolId(strategyCrossLinkRows);
-  const rewardOwnerIds = Array.from(new Set([...depositIds, ...strategyIdByPoolId.values()]));
+  const strategyDebugByPoolId = buildStrategyDebugByPoolId(strategyCrossLinkRows);
   // Wallet deposits' token IDs are used as a secondary attribution path so
   // orphan reward events (claims with `deposit_or_strategy_id = NULL`) still
   // reach the matching deposit when their `metadata.targetTokenId` lines up.
@@ -1885,6 +1968,7 @@ export async function materializeDepositReadModels(
       amountUsd: rewardEvents.amountUsd,
       occurredAt: rewardEvents.occurredAt,
       resolutionStatus: rewardEvents.resolutionStatus,
+      resolutionReasonCodes: rewardEvents.resolutionReasonCodes,
       metadataJson: rewardEvents.metadataJson,
     })
     .from(rewardEvents)
@@ -1894,7 +1978,7 @@ export async function materializeDepositReadModels(
         eq(rewardEvents.walletAddress, input.walletAddress),
         eq(rewardEvents.isAccrualSnapshot, false),
         or(
-          inArray(rewardEvents.depositOrStrategyId, rewardOwnerIds),
+          inArray(rewardEvents.depositOrStrategyId, depositIds),
           knownDepositTokenIds.length > 0
             ? and(
                 isNull(rewardEvents.depositOrStrategyId),
@@ -1939,7 +2023,6 @@ export async function materializeDepositReadModels(
 
   const syntheticRewardClassifications = ["claim", "unstake"] as const;
   const syntheticRewardMethodLabels = new Set(["getreward", "getrewards", "claim", "collect", "withdraw"]);
-  const depositById = new Map(eligibleDeposits.map((deposit) => [deposit.id, deposit]));
   const syntheticManualClaimCandidates = poolIdByGaugeAddress.size > 0
     ? (await db
       .select({
@@ -1983,7 +2066,6 @@ export async function materializeDepositReadModels(
           return [];
         }
 
-        const deposit = depositById.get(depositId);
         return [{
           ...row,
           depositId,
@@ -2335,7 +2417,10 @@ export async function materializeDepositReadModels(
       occurredAt,
       resolvedAmountUsd,
       priceSource,
-      reasonCodes,
+      reasonCodes: row.resolutionStatus === "resolved"
+        ? reasonCodes
+        : mergeReasonCodes(reasonCodes, row.resolutionReasonCodes),
+      resolutionReasonCodes: row.resolutionReasonCodes,
       resolvedTokenDeltas,
     };
   });
@@ -2367,6 +2452,7 @@ export async function materializeDepositReadModels(
       amountRaw: summary.amountRaw ?? "0",
       occurredAt: row.occurredAt,
       resolutionStatus: "resolved",
+      resolutionReasonCodes: [],
       metadataJson: {
         source: "claim_ledger_fallback",
         summary: row.summary,
@@ -2411,6 +2497,7 @@ export async function materializeDepositReadModels(
     pricedLifecycleMovements,
     inferredActionIdByLedgerEventId,
     strategyIdByPoolId,
+    strategyDebugByPoolId,
     resolvedRewardRows,
   });
 

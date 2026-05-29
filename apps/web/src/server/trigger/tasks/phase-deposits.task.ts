@@ -19,6 +19,7 @@ import { detectProtocolPositions } from "@/server/protocol-positions/detectProto
 import { readKnownProtocolContracts } from "@/server/overview/overview.repository";
 import { getWalletDefiPositions, getWalletHistory, getWalletTokens, getMoralisCoverageReason } from "@/server/providers/moralis";
 import { buildAnalysisProviderFailureError } from "@/server/providers/providerErrors";
+import { CANDIDATE_SCHEMA_VERSION } from "@/server/analysis/txClassification";
 
 export type PhaseDepositsTaskPayload = {
   runId: string;
@@ -35,6 +36,31 @@ type WalletHistoryPageResponse = {
 export type SliceHistoryLoadResult = {
   records: Array<Record<string, unknown>>;
   paginationTruncated: boolean;
+};
+
+type PersistedRewardCandidate = {
+  txHash: string;
+  occurredAt: Date;
+  category: string | null;
+  summary: string | null;
+  protocol?: string | null;
+  targetType?: "deposit" | "strategy" | null;
+  targetTokenId?: string | null;
+  targetWrapperAddress?: string | null;
+  targetStakingRewardsAddress?: string | null;
+  sameTxTokenId?: string | null;
+  shareLifecycleWrapperAddress?: string | null;
+  /**
+   * On-chain surface this candidate originated from. Drives ownership
+   * resolution branching in phase-rewards. See
+   * docs/spec/the-cab-aerodrome-claim-surfaces-research.md.
+   */
+  surfaceKind?: import("@/server/analysis/txClassification").SurfaceKind | null;
+  /**
+   * Stamped so reclassify can detect stale candidate shapes and regenerate
+   * them from history. See txClassification.CANDIDATE_SCHEMA_VERSION.
+   */
+  candidateSchemaVersion?: number;
 };
 
 function resolveHistoryWindowDurationMs(sliceStartUtc: Date, sliceEndUtc: Date) {
@@ -123,6 +149,63 @@ export function normalizeAerodromeLifecycleForPersistence(input: {
     const resolvedTokenId = input.rewardCandidatesByHash.get(record.txHash.toLowerCase())?.targetTokenId ?? null;
     return resolvedTokenId ? { ...record, tokenId: resolvedTokenId } : record;
   });
+}
+
+function scoreProtocolRowForPersistence(row: Awaited<ReturnType<typeof detectProtocolPositions>>["block"]["rows"][number]) {
+  const metadata = row.metadata ?? {};
+  let score = 0;
+
+  if (row.valueStatus === "current") score += 8;
+  if (row.valueUsd !== null) score += 4;
+  if (row.coverageStatus === "full") score += 3;
+  if (row.coverageStatus === "partial") score += 1;
+
+  for (const value of [
+    row.primaryTokenSymbol,
+    row.secondaryTokenSymbol,
+    row.poolLabel,
+    metadata.poolAddress,
+    metadata.feeTierLabel,
+    metadata.rangeLowerTick,
+    metadata.rangeUpperTick,
+    metadata.currentTick,
+    metadata.isInRange,
+    metadata.rangeLowerPrice,
+    metadata.rangeUpperPrice,
+    metadata.rangeQuoteTokenSymbol,
+    metadata.rangeDisplayFractionDigits,
+  ]) {
+    if (value !== null && value !== undefined) {
+      score += 1;
+    }
+  }
+
+  return score;
+}
+
+export function mergeProtocolRowsForPersistence(input: {
+  baseRows: Awaited<ReturnType<typeof detectProtocolPositions>>["block"]["rows"];
+  supplementalRows: Array<Awaited<ReturnType<typeof detectProtocolPositions>>["block"]["rows"]>;
+}) {
+  const rowsByKey = new Map(input.baseRows.map((row) => [row.positionKey, row] as const));
+
+  for (const supplementalGroup of input.supplementalRows) {
+    for (const row of supplementalGroup) {
+      const existing = rowsByKey.get(row.positionKey) ?? null;
+      if (!existing) {
+        rowsByKey.set(row.positionKey, row);
+        continue;
+      }
+
+      const existingScore = scoreProtocolRowForPersistence(existing);
+      const candidateScore = scoreProtocolRowForPersistence(row);
+      if (candidateScore > existingScore) {
+        rowsByKey.set(row.positionKey, row);
+      }
+    }
+  }
+
+  return Array.from(rowsByKey.values());
 }
 
 export async function collectSliceHistoryPages(input: {
@@ -242,9 +325,7 @@ async function loadSliceHistory(
   });
 }
 
-export const phaseDepositsTask = task({
-  id: "phase-deposits",
-  run: async (payload: PhaseDepositsTaskPayload) => {
+export async function runPhaseDepositsTask(payload: PhaseDepositsTaskPayload) {
     const [run, slice] = await Promise.all([
       getAnalysisRunById(payload.runId),
       getAnalysisSlice(payload.sliceId),
@@ -357,14 +438,10 @@ export const phaseDepositsTask = task({
       }),
     ]);
 
-    const mergedProtocolRows = [
-      ...protocolPositions.block.rows.filter((row) => !(
-        (row.protocol === "aerodrome" && (row.family === "manual_deposit" || row.family === "staked_lp")) ||
-        (row.protocol === "mellow" && row.family === "strategy_exposure")
-      )),
-      ...aerodromeLifecycle.rows,
-      ...mellowAccounting.rows,
-    ];
+    const mergedProtocolRows = mergeProtocolRowsForPersistence({
+      baseRows: protocolPositions.block.rows,
+      supplementalRows: [aerodromeLifecycle.rows, mellowAccounting.rows],
+    });
 
     if (protocolPositions.providerPartial || aerodromeLifecycle.providerPartial || mellowAccounting.providerPartial) {
       coverageReasons.add("providerError");
@@ -373,19 +450,13 @@ export const phaseDepositsTask = task({
       coverageReasons.add("pricingPartial");
     }
 
-    const rewardCandidatesByHash = new Map<string, {
-      txHash: string;
-      occurredAt: Date;
-      category: string | null;
-      summary: string | null;
-      protocol?: string | null;
-      targetType?: "deposit" | "strategy" | null;
-      targetTokenId?: string | null;
-      targetWrapperAddress?: string | null;
-    }>();
+    const rewardCandidatesByHash = new Map<string, PersistedRewardCandidate>();
 
     for (const candidate of [...aerodromeLifecycle.rewardCandidates, ...mellowAccounting.rewardCandidates]) {
-      rewardCandidatesByHash.set(candidate.txHash.toLowerCase(), candidate);
+      rewardCandidatesByHash.set(candidate.txHash.toLowerCase(), {
+        ...candidate,
+        candidateSchemaVersion: CANDIDATE_SCHEMA_VERSION,
+      });
     }
 
     const normalizedAerodromeLifecycle = normalizeAerodromeLifecycleForPersistence({
@@ -493,6 +564,11 @@ export const phaseDepositsTask = task({
         targetType: existing?.targetType ?? null,
         targetTokenId: existing?.targetTokenId ?? null,
         targetWrapperAddress: existing?.targetWrapperAddress ?? null,
+        targetStakingRewardsAddress: existing?.targetStakingRewardsAddress ?? null,
+        sameTxTokenId: existing?.sameTxTokenId ?? null,
+        shareLifecycleWrapperAddress: existing?.shareLifecycleWrapperAddress ?? null,
+        surfaceKind: existing?.surfaceKind ?? null,
+        candidateSchemaVersion: CANDIDATE_SCHEMA_VERSION,
       });
     }
 
@@ -522,5 +598,9 @@ export const phaseDepositsTask = task({
       },
       coverageReasons: Array.from(coverageReasons),
     };
-  },
+}
+
+export const phaseDepositsTask = task({
+  id: "phase-deposits",
+  run: async (payload: PhaseDepositsTaskPayload) => runPhaseDepositsTask(payload),
 });

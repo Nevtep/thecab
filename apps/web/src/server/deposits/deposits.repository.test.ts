@@ -45,6 +45,7 @@ function createSummaryRow(overrides: Partial<DepositDetailRowRecord> = {}): Depo
     coveredStartDayUtc: "2026-05-20",
     coveredEndDayUtc: "2026-05-28",
     mellowStrategyCrossLinkId: null,
+    metadataJson: null,
     ...overrides,
   };
 }
@@ -70,6 +71,7 @@ test("mapDepositSummaryRow normalizes persisted summary values", () => {
   assert.equal(mapped.rangeLowerPrice, null);
   assert.deepEqual(mapped.coverageReasonCodes, []);
   assert.equal(mapped.currentValueUsd, 1250.25);
+  assert.equal(mapped.mellowStrategyExternalPositionReference, null);
 });
 
 test("mapDepositDetailRows combines decomposition fallback and lifecycle normalization", () => {
@@ -78,6 +80,13 @@ test("mapDepositDetailRows combines decomposition fallback and lifecycle normali
       status: "closed",
       closedAt: new Date("2026-05-28T00:00:00.000Z"),
       mellowStrategyCrossLinkId: "strategy-1",
+      metadataJson: {
+        linkedStrategyDebug: {
+          strategyId: "strategy-1",
+          externalStrategyPositionReference: "71496797",
+          externalStrategyPositionReferenceStatus: "resolved",
+        },
+      },
     }),
     decompositionRow: {
       totalReturnUsd: "300",
@@ -125,4 +134,6 @@ test("mapDepositDetailRows combines decomposition fallback and lifecycle normali
   assert.equal(mapped.lifecycle[0]?.signedTokenDeltas[0]?.direction, "in");
   assert.equal(mapped.lifecycle[0]?.signedTokenDeltas[0]?.usdValue, 12.5);
   assert.equal(mapped.mellowStrategyCrossLinkId, "strategy-1");
+  assert.equal(mapped.mellowStrategyExternalPositionReference, "71496797");
+  assert.equal(mapped.mellowStrategyExternalPositionReferenceStatus, "resolved");
 });

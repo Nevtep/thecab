@@ -48,6 +48,12 @@ type PoolAccumulator = {
   hasStrategy: boolean;
   hasResidual: boolean;
   isInRange: boolean | null;
+  strategyDebugReferences: Array<{
+    strategyId: string;
+    exposureId: string;
+    externalStrategyPositionReference: string | null;
+    externalStrategyPositionReferenceStatus: "resolved" | "unresolved" | null;
+  }>;
   timeline: Array<{
     eventKey: string;
     eventType: string;
@@ -129,6 +135,20 @@ type SyntheticGaugeClaimCandidate = {
   metadataJson: Record<string, unknown>;
 };
 
+type SyntheticGaugeClaimReward = {
+  eventKey: string;
+  poolId: string;
+  txHash: string;
+  occurredAt: Date;
+  amountUsd: number;
+  tokenAddress: string | null;
+  amountRaw: string | null;
+  sourceLedgerEventId: string;
+  gaugeAddress: string;
+  methodLabel: string;
+  metadataJson: Record<string, unknown>;
+};
+
 type PoolTokenBalanceEvent = {
   occurredAt: Date;
   dayUtc: string;
@@ -142,9 +162,6 @@ type PoolTokenBalanceEvent = {
 };
 
 type MaterializedTimelineEvent = PoolAccumulator["timeline"][number];
-
-const REDEPLOY_LOOKBACK_WINDOW_MS = 30 * 60 * 1000;
-const REDEPLOY_FOLLOWUP_WINDOW_MS = 10 * 60 * 1000;
 
 const BASE_WETH_ADDRESS = "0x4200000000000000000000000000000000000006";
 const BASE_CBBTC_ADDRESS = "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf";
@@ -333,6 +350,17 @@ function pushUnique(target: string[], value: string | null) {
   target.push(value);
 }
 
+function pushUniqueStrategyDebugReference(
+  target: PoolAccumulator["strategyDebugReferences"],
+  value: PoolAccumulator["strategyDebugReferences"][number],
+) {
+  if (target.some((entry) => entry.exposureId === value.exposureId)) {
+    return;
+  }
+
+  target.push(value);
+}
+
 function pushUniqueCaseInsensitive(target: string[], value: string | null) {
   if (!value) {
     return;
@@ -420,6 +448,7 @@ function getOrCreatePoolAccumulator(input: {
     hasStrategy: false,
     hasResidual: false,
     isInRange: null,
+    strategyDebugReferences: [],
     timeline: [],
     rewardValueByDay: new Map(),
   };
@@ -712,11 +741,108 @@ export function buildSyntheticGaugeClaimEventKey(input: Pick<SyntheticGaugeClaim
   return `reward:${input.txHash}:${input.ledgerEventId}`;
 }
 
+function summarizeSyntheticGaugeClaimMovements(input: Array<{
+  tokenAddress: string;
+  amountRaw: string;
+  directionIn: boolean;
+}>) {
+  const incomingMovements = input.filter((movement) => movement.directionIn);
+  const tokenAddresses = Array.from(new Set(incomingMovements.map((movement) => movement.tokenAddress)));
+  if (tokenAddresses.length !== 1) {
+    return {
+      tokenAddress: null,
+      amountRaw: null,
+    };
+  }
+
+  const [tokenAddress] = tokenAddresses;
+  const amountRaw = incomingMovements
+    .filter((movement) => movement.tokenAddress === tokenAddress)
+    .reduce((total, movement) => total + BigInt(movement.amountRaw), 0n)
+    .toString();
+
+  return {
+    tokenAddress,
+    amountRaw,
+  };
+}
+
+export function buildSyntheticGaugeClaimRewards(input: {
+  chainId: number;
+  candidates: SyntheticGaugeClaimCandidate[];
+  movementsByLedgerEventId: Map<string, Array<{
+    ledgerEventId: string | null;
+    tokenAddress: string;
+    amountRaw: string;
+    directionIn: boolean;
+    amountUsd: string | null;
+    metadataJson: Record<string, unknown>;
+  }>>;
+  latestPriceByToken: Map<string, number>;
+  earliestPriceDayByToken: Map<string, string>;
+  priceByTokenAndDay: Map<string, Map<string, number>>;
+}) {
+  return input.candidates.flatMap((candidate): SyntheticGaugeClaimReward[] => {
+    const movements = input.movementsByLedgerEventId.get(candidate.ledgerEventId) ?? [];
+    if (movements.length === 0) {
+      return [];
+    }
+
+    const dayUtc = dayUtcFromDate(candidate.occurredAt);
+    let signedUsdTotal = 0;
+
+    for (const movement of movements) {
+      const tokenAddress = normalizeTokenAddress(movement.tokenAddress);
+      if (!tokenAddress) {
+        continue;
+      }
+
+      const amountUsd = resolveRewardValueUsd({
+        chainId: input.chainId,
+        rewardAmountUsd: movement.amountUsd,
+        rewardAmountRaw: movement.amountRaw,
+        rewardTokenAddress: tokenAddress,
+        rewardMetadata: movement.metadataJson,
+        dayUtc,
+        latestPriceByToken: input.latestPriceByToken,
+        earliestPriceDayByToken: input.earliestPriceDayByToken,
+        priceByTokenAndDay: input.priceByTokenAndDay,
+      });
+      signedUsdTotal += movement.directionIn ? amountUsd : -amountUsd;
+    }
+
+    if (signedUsdTotal <= 0) {
+      return [];
+    }
+
+    const summary = summarizeSyntheticGaugeClaimMovements(movements);
+
+    return [{
+      eventKey: buildSyntheticGaugeClaimEventKey(candidate),
+      poolId: candidate.poolId,
+      txHash: candidate.txHash,
+      occurredAt: candidate.occurredAt,
+      amountUsd: signedUsdTotal,
+      tokenAddress: summary.tokenAddress,
+      amountRaw: summary.amountRaw,
+      sourceLedgerEventId: candidate.ledgerEventId,
+      gaugeAddress: candidate.gaugeAddress,
+      methodLabel: candidate.methodLabel,
+      metadataJson: candidate.metadataJson,
+    }];
+  });
+}
+
 export function resolvePoolRewardTargetPoolId(input: {
+  resolvedPoolId?: string | null;
   relatedId: string | null;
   depositToPoolId: Map<string, string>;
   strategyToPoolId: Map<string, string>;
 }) {
+  if (input.resolvedPoolId) {
+    return input.resolvedPoolId;
+  }
+
   if (!input.relatedId) {
     return null;
   }
@@ -933,28 +1059,56 @@ function uniqueLifecycleRows(rows: LifecycleLedgerRow[]) {
   return uniqueRows;
 }
 
-function buildGroupedLifecycleEvent(input: {
+export function mapInferredActionToPoolTimelineEventType(actionType: string | null) {
+  return actionType === "rebalance_same_pool"
+    ? "rebalance"
+    : actionType === "redeploy_same_pool" || actionType === "redeploy_cross_pool"
+      ? "redeploy"
+      : "deposit";
+}
+
+export function collectCanonicalLifecycleRows(input: {
+  lifecycleRows: LifecycleLedgerRow[];
+  inferredAction:
+    | {
+        classificationBasis: string | null;
+        consumingLedgerEventIdsJson: string[];
+        sourceLedgerEventId: string | null;
+      }
+    | null;
+}) {
+  if (!input.inferredAction || input.inferredAction.classificationBasis !== "residual_flow") {
+    return [];
+  }
+
+  const relatedLedgerEventIds = new Set<string>(input.inferredAction.consumingLedgerEventIdsJson.filter(Boolean));
+  if (input.inferredAction.sourceLedgerEventId) {
+    relatedLedgerEventIds.add(input.inferredAction.sourceLedgerEventId);
+  }
+
+  return uniqueLifecycleRows(input.lifecycleRows.filter((row) => relatedLedgerEventIds.has(row.id)));
+}
+
+export function buildGroupedLifecycleEvent(input: {
   deposit: PoolDepositTimelineCandidate;
   lifecycleRows: LifecycleLedgerRow[];
-  inferredAction: { actionType: string; primaryPoolId: string | null } | null;
+  inferredAction:
+    | {
+        actionType: string;
+        primaryPoolId: string | null;
+        classificationBasis: string | null;
+        consumingLedgerEventIdsJson: string[];
+        sourceLedgerEventId: string | null;
+      }
+    | null;
 }): MaterializedTimelineEvent {
   const groupedRows = uniqueLifecycleRows(input.lifecycleRows);
   const groupedClassifications = groupedRows
     .map((row) => row.classification)
     .filter((value): value is string => Boolean(value));
 
-  // Canonical labeling: prefer the engine's inferred action for this deposit
-  // (rebalance_same_pool / redeploy_cross_pool / new_capital_deposit). Fall
-  // back to the legacy `hasSwap` shape only when no inferred action exists
-  // (e.g. backfill state before canonicalInference has run).
   const inferredActionType = input.inferredAction?.actionType ?? null;
-  const eventType = inferredActionType === "rebalance_same_pool"
-    ? "rebalance"
-    : inferredActionType === "redeploy_cross_pool"
-      ? "redeploy"
-      : inferredActionType === "new_capital_deposit"
-        ? "deposit"
-        : groupedClassifications.includes("swap") ? "rebalance" : "redeploy";
+  const eventType = mapInferredActionToPoolTimelineEventType(inferredActionType);
 
   return {
     eventKey: `group:${input.deposit.poolId}:${input.deposit.depositId}`,
@@ -1101,6 +1255,7 @@ export async function materializePoolReadModels(input: MaterializePoolReadModels
     db.select({
       id: rewardEvents.id,
       depositOrStrategyId: rewardEvents.depositOrStrategyId,
+      resolvedPoolId: rewardEvents.resolvedPoolId,
       tokenAddress: rewardEvents.tokenAddress,
       amountRaw: rewardEvents.amountRaw,
       amountUsd: rewardEvents.amountUsd,
@@ -1182,6 +1337,7 @@ export async function materializePoolReadModels(input: MaterializePoolReadModels
       sourceLedgerEventId: inferredActions.sourceLedgerEventId,
       consumingLedgerEventIdsJson: inferredActions.consumingLedgerEventIdsJson,
       occurredAt: inferredActions.occurredAt,
+      metadataJson: inferredActions.metadataJson,
     })
       .from(inferredActions)
       .where(
@@ -1199,17 +1355,35 @@ export async function materializePoolReadModels(input: MaterializePoolReadModels
   // of truth for whether a deposit is a fresh capital event, a same-pool
   // rebalance, or a redeploy from a sibling pool. The lifecycle grouping
   // below consults this map instead of the legacy `hasSwap` heuristic.
-  const inferredActionByDepositLedgerEventId = new Map<string, { actionType: string; primaryPoolId: string | null }>();
+  const inferredActionByDepositLedgerEventId = new Map<string, {
+    actionType: string;
+    primaryPoolId: string | null;
+    classificationBasis: string | null;
+    consumingLedgerEventIdsJson: string[];
+    sourceLedgerEventId: string | null;
+  }>();
   for (const action of inferredActionRows) {
     if (!action.sourceLedgerEventId) continue;
     inferredActionByDepositLedgerEventId.set(action.sourceLedgerEventId, {
       actionType: action.actionType,
       primaryPoolId: action.primaryPoolId,
+      classificationBasis:
+        typeof action.metadataJson.classificationBasis === "string"
+          ? action.metadataJson.classificationBasis
+          : null,
+      consumingLedgerEventIdsJson: action.consumingLedgerEventIdsJson,
+      sourceLedgerEventId: action.sourceLedgerEventId,
     });
   }
 
   const poolsById = new Map(poolRows.map((row) => [row.id, row]));
   const poolIdByAddress = new Map(poolRows.map((row) => [row.poolAddress.toLowerCase(), row.id] as const));
+  const poolIdByGaugeAddress = new Map(
+    poolRows.flatMap((row) => {
+      const gaugeAddress = normalizeTokenAddress((row.metadataJson ?? {}).gaugeAddress);
+      return gaugeAddress ? [[gaugeAddress, row.id] as const] : [];
+    }),
+  );
   const depositToPoolId = new Map<string, string>();
   const strategyToPoolId = new Map<string, string>();
   const accumulators = new Map<string, PoolAccumulator>();
@@ -1416,6 +1590,16 @@ export async function materializePoolReadModels(input: MaterializePoolReadModels
     accumulator.firstParticipatedAt = mergeDateBounds(accumulator.firstParticipatedAt, strategy.createdAt, "min");
     accumulator.lastParticipatedAt = mergeDateBounds(accumulator.lastParticipatedAt, strategy.updatedAt, "max");
     pushUnique(accumulator.strategyLabels, strategy.strategyLabel);
+    pushUniqueStrategyDebugReference(accumulator.strategyDebugReferences, {
+      strategyId: strategy.strategyId,
+      exposureId: strategy.exposureId,
+      externalStrategyPositionReference:
+        typeof metadata.externalDepositReference === "string" ? metadata.externalDepositReference : null,
+      externalStrategyPositionReferenceStatus:
+        metadata.externalDepositReferenceStatus === "resolved" || metadata.externalDepositReferenceStatus === "unresolved"
+          ? metadata.externalDepositReferenceStatus
+          : null,
+    });
     strategyToPoolId.set(strategy.strategyId, strategy.primaryPoolId);
 
     const token0Address = resolveKnownTokenAddress({
@@ -1465,6 +1649,36 @@ export async function materializePoolReadModels(input: MaterializePoolReadModels
       .filter((row): row is typeof row & { primaryPoolId: string; wrapperAddress: string } => Boolean(row.primaryPoolId && row.wrapperAddress))
       .map((row) => [row.wrapperAddress.toLowerCase(), row.primaryPoolId] as const),
   );
+
+  const coveredRewardTxHashSet = new Set(
+    rewardRows.flatMap((row) => {
+      const poolId = resolvePoolRewardTargetPoolId({
+        resolvedPoolId: row.resolvedPoolId,
+        relatedId: row.depositOrStrategyId,
+        depositToPoolId,
+        strategyToPoolId,
+      });
+
+      return poolId ? [row.txHash.toLowerCase()] : [];
+    }),
+  );
+
+  const syntheticGaugeClaimCandidates = poolIdByGaugeAddress.size > 0
+    ? buildSyntheticGaugeClaimCandidates({
+      lifecycleRows: normalizedLifecycleRows,
+      rewardTxHashSet: coveredRewardTxHashSet,
+      protocolContractPoolIdByAddress: poolIdByGaugeAddress,
+    })
+    : [];
+
+  for (const candidate of syntheticGaugeClaimCandidates) {
+    for (const movement of lifecycleMovementsByLedgerEventId.get(candidate.ledgerEventId) ?? []) {
+      const tokenAddress = normalizeTokenAddress(movement.tokenAddress);
+      if (tokenAddress) {
+        relevantTokenAddresses.add(tokenAddress);
+      }
+    }
+  }
 
   for (const lifecycleRow of lifecycleLedgerRows) {
     if (!lifecycleRow.id || !lifecycleRow.classification) {
@@ -1666,6 +1880,15 @@ export async function materializePoolReadModels(input: MaterializePoolReadModels
       capturedAt: input.capturedAt,
     });
 
+    const syntheticGaugeClaimRewards = buildSyntheticGaugeClaimRewards({
+      chainId: input.chainId,
+      candidates: syntheticGaugeClaimCandidates,
+      movementsByLedgerEventId: lifecycleMovementsByLedgerEventId,
+      latestPriceByToken,
+      earliestPriceDayByToken,
+      priceByTokenAndDay,
+    });
+
     const tokenDeltaEventsByPoolId = new Map<string, PoolTokenDeltaEvent[]>();
     for (const tokenDeltaEvent of tokenDeltaEvents) {
       const bucket = tokenDeltaEventsByPoolId.get(tokenDeltaEvent.poolId) ?? [];
@@ -1794,6 +2017,7 @@ export async function materializePoolReadModels(input: MaterializePoolReadModels
       const rewardMetadata = reward.metadataJson ?? {};
       const rewardTokenAddress = normalizeTokenAddress(reward.tokenAddress);
       const poolId = resolvePoolRewardTargetPoolId({
+        resolvedPoolId: reward.resolvedPoolId,
         relatedId,
         depositToPoolId,
         strategyToPoolId,
@@ -1851,37 +2075,66 @@ export async function materializePoolReadModels(input: MaterializePoolReadModels
       });
     }
 
+    for (const reward of syntheticGaugeClaimRewards) {
+      const pool = poolsById.get(reward.poolId);
+      if (!pool) {
+        continue;
+      }
+
+      const accumulator = getOrCreatePoolAccumulator({
+        map: accumulators,
+        poolId: reward.poolId,
+        poolAddress: pool.poolAddress,
+        label: pool.label,
+        tokenSymbols: [],
+        feeTierLabel: asString((pool.metadataJson ?? {}).feeTierLabel),
+      });
+      const dayUtc = dayUtcFromDate(reward.occurredAt);
+
+      accumulator.totalRewardsUsd += reward.amountUsd;
+      accumulator.rewardValueByDay.set(dayUtc, (accumulator.rewardValueByDay.get(dayUtc) ?? 0) + reward.amountUsd);
+      accumulator.lastParticipatedAt = mergeDateBounds(accumulator.lastParticipatedAt, reward.occurredAt, "max");
+      accumulator.timeline.push({
+        eventKey: reward.eventKey,
+        eventType: "claim",
+        occurredAt: reward.occurredAt,
+        confidence: "medium",
+        coverageStatus: accumulator.coverageStatus,
+        attributedValueUsd: reward.amountUsd,
+        sourceLedgerEventId: reward.sourceLedgerEventId,
+        relatedDepositId: null,
+        relatedStrategyId: null,
+        metadataJson: {
+          source: "claim_ledger_fallback",
+          txHash: reward.txHash,
+          gaugeAddress: reward.gaugeAddress,
+          methodLabel: reward.methodLabel,
+          tokenAddress: reward.tokenAddress,
+          amountRaw: reward.amountRaw,
+          ...reward.metadataJson,
+        },
+      });
+    }
+
     for (const depositCandidate of depositTimelineCandidates.sort((left, right) => left.occurredAt.getTime() - right.occurredAt.getTime())) {
       const accumulator = accumulators.get(depositCandidate.poolId);
       if (!accumulator) {
         continue;
       }
 
-      const relatedLifecycleRows = depositCandidate.txHash
-        ? uniqueLifecycleRows(
-          normalizedLifecycleRows.filter((row) => {
-            const deltaMs = row.occurredAt.getTime() - depositCandidate.occurredAt.getTime();
-            const isRelevantClassification = row.classification === "manual_deposit"
-              || row.classification === "manual_withdrawal"
-              || row.classification === "unstake"
-              || row.classification === "stake"
-              || row.classification === "swap";
-
-            return isRelevantClassification
-              && deltaMs >= -REDEPLOY_LOOKBACK_WINDOW_MS
-              && deltaMs <= REDEPLOY_FOLLOWUP_WINDOW_MS;
-          }),
-        )
-        : [];
-
-      const shouldGroupLifecycle = relatedLifecycleRows.some((row) => (
-        row.txHash !== depositCandidate.txHash
-        && (row.classification === "manual_withdrawal" || row.classification === "unstake" || row.classification === "stake" || row.classification === "swap")
-      ));
-
       const inferredActionForDeposit = depositCandidate.sourceLedgerEventId
         ? inferredActionByDepositLedgerEventId.get(depositCandidate.sourceLedgerEventId) ?? null
         : null;
+      const relatedLifecycleRows = collectCanonicalLifecycleRows({
+        lifecycleRows: normalizedLifecycleRows,
+        inferredAction: inferredActionForDeposit,
+      });
+      const shouldGroupLifecycle = Boolean(
+        inferredActionForDeposit
+        && inferredActionForDeposit.classificationBasis === "residual_flow"
+        && inferredActionForDeposit.actionType !== "new_capital_deposit"
+        && relatedLifecycleRows.length > 0,
+      );
 
       accumulator.timeline.push(
         shouldGroupLifecycle
@@ -2203,6 +2456,7 @@ export async function materializePoolReadModels(input: MaterializePoolReadModels
           tokenSymbols: accumulator.tokenSymbols,
           feeTierLabel: accumulator.feeTierLabel,
           strategyLabels: accumulator.strategyLabels,
+          strategyDebugReferences: accumulator.strategyDebugReferences,
           isInRange: accumulator.isInRange,
           metricsEstimated: true,
           coverageReasonCodes: accumulator.coverageStatus === "full" ? [] : ["positionMetadataIncomplete"],

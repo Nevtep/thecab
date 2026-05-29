@@ -7,10 +7,8 @@ import {
   mergeAnalysisRunMetadata,
   readRunSliceCoverage,
 } from "@/server/analysis/analysis-run.repository";
-import { listRunSlices, resolveRunSliceDayWindow } from "@/server/analysis/analysis-slice.repository";
-import { computeSnapshots, type WalletTokenSnapshot } from "@/server/analysis/computeSnapshots";
-import { materializePoolReadModels } from "@/server/analysis/pool-read-models";
-import { materializeDepositReadModels } from "@/server/analysis/deposit-read-models";
+import { type WalletTokenSnapshot } from "@/server/analysis/computeSnapshots";
+import { reclassifyAnalysisRun } from "@/server/analysis/reclassify-run";
 import { getDb } from "@/server/db/client";
 import { rawProviderRecords } from "@/server/db/schema";
 import { upsertProcessingCursor } from "@/server/analysis/processing-cursor.repository";
@@ -119,8 +117,6 @@ export const phaseFinalizeTask = task({
     }
 
     const capturedAt = new Date();
-    const slices = await listRunSlices(payload.runId);
-    const sliceDayWindow = resolveRunSliceDayWindow(slices, run.utcDayBucket);
     let walletTokens = parseWalletTokenSnapshots(run.metadataJson.latestWalletTokens);
 
     if (walletTokens.length === 0) {
@@ -140,37 +136,12 @@ export const phaseFinalizeTask = task({
       }
     }
 
-    const snapshot = await computeSnapshots({
+    const reclassification = await reclassifyAnalysisRun({
+      runId: payload.runId,
       walletAddress: payload.walletAddress,
       chainId: payload.chainId,
-      startDayUtc: sliceDayWindow.startDayUtc,
-      endDayUtc: sliceDayWindow.endDayUtc,
       capturedAt,
-      poolTotals: Array.isArray(run.metadataJson.latestPoolTotals)
-        ? run.metadataJson.latestPoolTotals
-          .filter((item): item is { poolId: string; valueUsd: number } => typeof item === "object" && item !== null)
-          .map((item) => ({
-            poolId: String(item.poolId),
-            valueUsd: Number(item.valueUsd ?? 0),
-          }))
-        : [],
       walletTokens,
-    });
-    const poolReadModels = await materializePoolReadModels({
-      runId: payload.runId,
-      walletAddress: payload.walletAddress,
-      chainId: payload.chainId,
-      startDayUtc: sliceDayWindow.startDayUtc,
-      endDayUtc: sliceDayWindow.endDayUtc,
-      capturedAt,
-    });
-    await materializeDepositReadModels({
-      runId: payload.runId,
-      walletAddress: payload.walletAddress,
-      chainId: payload.chainId,
-      startDayUtc: sliceDayWindow.startDayUtc,
-      endDayUtc: sliceDayWindow.endDayUtc,
-      capturedAt,
     });
     const sliceCoverage = await readRunSliceCoverage(payload.runId);
 
@@ -181,7 +152,7 @@ export const phaseFinalizeTask = task({
       lastSuccessfulRunId: payload.runId,
       lastAdvancedAt: capturedAt,
       metadataJson: {
-        totalValueUsd: snapshot.totalValueUsd,
+        totalValueUsd: reclassification.snapshot.totalValueUsd,
       },
     });
 
@@ -193,7 +164,7 @@ export const phaseFinalizeTask = task({
       metadataJson: {
         coverage: sliceCoverage.coverage,
         coverageReasons: sliceCoverage.coverageReasons,
-        totalValueUsd: snapshot.totalValueUsd,
+        totalValueUsd: reclassification.snapshot.totalValueUsd,
       },
     });
 
@@ -208,8 +179,8 @@ export const phaseFinalizeTask = task({
       status: finalizedRun.status,
       coverage: finalizedRun.coverage,
       coverageReasons: finalizedRun.coverageReasonsJson,
-      totalValueUsd: snapshot.totalValueUsd,
-      poolReadModels,
+      totalValueUsd: reclassification.snapshot.totalValueUsd,
+      poolReadModels: reclassification.poolReadModels,
     };
   },
 });

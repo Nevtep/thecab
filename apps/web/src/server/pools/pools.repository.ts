@@ -538,6 +538,12 @@ export async function readPoolPositions(input: {
         strategyLabel: row.strategyLabel,
         coverageStatus: normalizeCoverageStatus(row.coverageStatus),
         valueUsd: asNumber(metadata.valueUsd),
+        externalStrategyPositionReference:
+          typeof metadata.externalDepositReference === "string" ? metadata.externalDepositReference : null,
+        externalStrategyPositionReferenceStatus:
+          metadata.externalDepositReferenceStatus === "resolved" || metadata.externalDepositReferenceStatus === "unresolved"
+            ? metadata.externalDepositReferenceStatus
+            : null,
         tokens: buildPositionTokens({
           primaryTokenSymbol: metadata.primaryTokenSymbol ?? nestedMetadata.primaryTokenSymbol,
           secondaryTokenSymbol: metadata.secondaryTokenSymbol ?? nestedMetadata.secondaryTokenSymbol,

@@ -1,0 +1,74 @@
+[
+  {
+    "slug": "airdrop-spam-telegram-pool",
+    "hash": "0xca23a1618b416be4f082ae26e59dd9bfcea5e028f00a2cd9f1b8dd95fbff77ea",
+    "category": "token receive",
+    "methodLabel": "airdrop",
+    "summary": "Received 500 t.me/s/us_pool - Visit to claim from 0x83...2913",
+    "possibleSpam": true,
+    "to": "0x88db0cd7c4273a3c0a2c3d60a1d6e637b28e2fe6"
+  },
+  {
+    "slug": "mellow-wrapper-withdraw",
+    "hash": "0x08507e237c24b49b4e6d348c03a9d06e85584812157e9e1c061e27387b6b4ddc",
+    "category": "withdraw",
+    "methodLabel": "withdraw",
+    "summary": "Withdrew 1.27 AERO",
+    "possibleSpam": false,
+    "to": "0xb9db6804e84d960e139a2bdc33bfc30f8fb689fe"
+  },
+  {
+    "slug": "aerodrome-v2-gauge-getreward-a",
+    "hash": "0xbf1129574cc93a84c213991aada4dacf7672e9b08cfe1fbfc51d9cf7fc7b9a3a",
+    "category": "token receive",
+    "methodLabel": "getReward",
+    "summary": "Received 0.00557 AERO from 0x51...c025",
+    "possibleSpam": false,
+    "to": "0x519bbd1dd8c6a94c46080e24f316c14ee758c025"
+  },
+  {
+    "slug": "aerodrome-pool-claimfees",
+    "hash": "0xd1e9dd394439266e57449cf8dbc22325000523f910ec6b61b24f645bf3799792",
+    "category": "token receive",
+    "methodLabel": "claimFees",
+    "summary": "Received 2 ERC20 tokens",
+    "possibleSpam": false,
+    "to": "0xcdac0d6c6c59727a65f871236188350531885c43"
+  },
+  {
+    "slug": "aerodrome-v2-gauge-getreward-b",
+    "hash": "0x5668e82188a25c0cc7866431a648db31a871f39c1ccb770fb87af002c6418e8e",
+    "category": "token receive",
+    "methodLabel": "getReward",
+    "summary": "Received 0.4043 AERO from 0x51...c025",
+    "possibleSpam": false,
+    "to": "0x519bbd1dd8c6a94c46080e24f316c14ee758c025"
+  },
+  {
+    "slug": "mellow-wrapper-getrewards-a",
+    "hash": "0x2c95ecec3d4f3b6a45547860437280674e519dc7a39fdfda715d7c3b9c4754db",
+    "category": "token receive",
+    "methodLabel": "getRewards",
+    "summary": "Received 434.06 AERO from 0xb9...89fe",
+    "possibleSpam": false,
+    "to": "0xb9db6804e84d960e139a2bdc33bfc30f8fb689fe"
+  },
+  {
+    "slug": "airdrop-spam-usdc-lookalike",
+    "hash": "0x59fe9cdbb0430a41a6e7f1b154f1a7e5e9a7a0b230716991ce895b25c2a2108c",
+    "category": "token receive",
+    "methodLabel": "airdrop",
+    "summary": "Received 2,300 UЅDС | t.me/s/us_circle | claim until 03.11.25 from 0x83...2913",
+    "possibleSpam": true,
+    "to": "0xa340faae387bddf282f43fc5663c75f7b5f5fc24"
+  },
+  {
+    "slug": "mellow-wrapper-getrewards-b",
+    "hash": "0xda11fa189a60475b08a23df709284aec6711c47373237948cfa04f0be13e69f3",
+    "category": "token receive",
+    "methodLabel": "getRewards",
+    "summary": "Received 188.28 AERO from 0xb9...89fe",
+    "possibleSpam": false,
+    "to": "0xb9db6804e84d960e139a2bdc33bfc30f8fb689fe"
+  }
+]
