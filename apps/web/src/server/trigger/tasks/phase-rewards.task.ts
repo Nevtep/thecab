@@ -12,7 +12,7 @@ import { getAnalysisSlice } from "@/server/analysis/analysis-slice.repository";
 import { persistResolvedRewardEvents } from "@/server/analysis/enginePersistence";
 import { parseSurfaceKind } from "@/server/analysis/txClassification";
 import { getDb } from "@/server/db/client";
-import { deposits, ledgerEvents, rawProviderRecords, strategies, strategyExposures } from "@/server/db/schema";
+import { deposits, ledgerEvents, pools, rawProviderRecords, strategies, strategyExposures } from "@/server/db/schema";
 import { and, desc, eq, inArray } from "drizzle-orm";
 
 function asRewardCandidate(value: unknown): RewardCandidateInput | null {
@@ -45,6 +45,9 @@ function asRewardCandidate(value: unknown): RewardCandidateInput | null {
     targetStakingRewardsAddress: typeof candidate.targetStakingRewardsAddress === "string"
       ? candidate.targetStakingRewardsAddress.toLowerCase()
       : null,
+    targetPoolAddress: typeof candidate.targetPoolAddress === "string"
+      ? candidate.targetPoolAddress.toLowerCase()
+      : null,
     sameTxTokenId: typeof candidate.sameTxTokenId === "string" ? candidate.sameTxTokenId : null,
     shareLifecycleWrapperAddress: typeof candidate.shareLifecycleWrapperAddress === "string"
       ? candidate.shareLifecycleWrapperAddress.toLowerCase()
@@ -53,10 +56,20 @@ function asRewardCandidate(value: unknown): RewardCandidateInput | null {
       ? candidate.targetWrapperAddress.toLowerCase()
       : null,
     surfaceKind: parseSurfaceKind(candidate.surfaceKind),
+    componentKey: typeof candidate.componentKey === "string" ? candidate.componentKey : null,
+    economicComponentKind: typeof candidate.economicComponentKind === "string"
+      ? candidate.economicComponentKind
+      : null,
+    movementLogIndexes: Array.isArray(candidate.movementLogIndexes)
+      ? candidate.movementLogIndexes.filter((value): value is number => typeof value === "number")
+      : [],
   };
 }
 
 function inferRewardType(candidate: RewardCandidateInput) {
+  if (candidate.economicComponentKind === "fee_claim" || candidate.surfaceKind?.startsWith("pool_fee_claim")) {
+    return "fee_claim";
+  }
   const text = [candidate.category, candidate.summary].filter(Boolean).join(" ").toLowerCase();
   return text.includes("reward") || text.includes("collect") ? "reward_claim" : "claim";
 }
@@ -97,6 +110,7 @@ export function resolveRewardClaimTarget(input: {
     targetType: resolution.ownerType ?? input.candidate.targetType,
     resolutionBasis: resolution.resolutionBasis,
     resolutionReasonCodes: resolution.resolutionReasonCodes,
+    feeAttributionBasis: resolution.feeAttributionBasis ?? null,
     externalStrategyPositionReference: resolution.externalStrategyPositionReference,
     externalStrategyPositionReferenceStatus: resolution.externalStrategyPositionReferenceStatus,
   };
@@ -124,7 +138,7 @@ export const phaseRewardsTask = task({
     }
 
     const db = getDb();
-    const [rows, depositRows, strategyRows] = await Promise.all([
+    const [rows, depositRows, strategyRows, poolRows] = await Promise.all([
       db
       .select({ responseJson: rawProviderRecords.responseJson })
       .from(rawProviderRecords)
@@ -143,6 +157,7 @@ export const phaseRewardsTask = task({
           depositId: deposits.id,
           poolId: deposits.poolId,
           tokenId: deposits.tokenId,
+          createdAt: deposits.createdAt,
           protocol: deposits.metadataJson,
         })
         .from(deposits)
@@ -160,6 +175,7 @@ export const phaseRewardsTask = task({
           stakingRewardsAddress: strategies.stakingRewardsAddress,
           protocol: strategies.protocol,
           primaryPoolId: strategies.primaryPoolId,
+          createdAt: strategyExposures.createdAt,
           metadataJson: strategyExposures.metadataJson,
         })
         .from(strategyExposures)
@@ -170,6 +186,13 @@ export const phaseRewardsTask = task({
             eq(strategyExposures.chainId, payload.chainId),
           ),
         ),
+      db
+        .select({
+          poolId: pools.id,
+          poolAddress: pools.poolAddress,
+        })
+        .from(pools)
+        .where(eq(pools.chainId, payload.chainId)),
     ]);
 
     const latestRewardCandidates = Array.isArray(run.metadataJson.latestRewardCandidates)
@@ -213,7 +236,9 @@ export const phaseRewardsTask = task({
       poolId: row.poolId,
       tokenId: row.tokenId,
       protocol: typeof row.protocol.protocol === "string" ? row.protocol.protocol : "aerodrome",
+      createdAt: row.createdAt,
     }));
+    const poolIdByAddress = new Map(poolRows.map((row) => [row.poolAddress.toLowerCase(), row.poolId] as const));
     const strategyTargets = strategyRows.map((row) => ({
       strategyId: row.strategyId,
       strategyExposureId: row.strategyExposureId,
@@ -223,31 +248,40 @@ export const phaseRewardsTask = task({
       protocol: row.protocol,
       externalStrategyPositionReference:
         typeof row.metadataJson.externalDepositReference === "string" ? row.metadataJson.externalDepositReference : null,
+      createdAt: row.createdAt,
     }));
 
     const resolvedClaims = filteredRewardCandidates.map((candidate, index) => {
+      const candidateWithPool = candidate.targetPoolAddress && !candidate.targetPoolId
+        ? { ...candidate, targetPoolId: poolIdByAddress.get(candidate.targetPoolAddress) ?? null }
+        : candidate;
       const resolution = resolveRewardClaimTarget({
-        candidate,
+        candidate: candidateWithPool,
         depositTargets,
         strategyTargets,
       });
 
       return {
-        txHash: candidate.txHash,
+        txHash: candidateWithPool.txHash,
         logIndex: index,
-        rewardType: inferRewardType(candidate),
+        rewardType: inferRewardType(candidateWithPool),
         depositOrStrategyId: resolution.depositOrStrategyId,
         strategyExposureId: resolution.strategyExposureId,
         resolvedPoolId: resolution.resolvedPoolId,
-        occurredAt: candidate.occurredAt,
+        occurredAt: candidateWithPool.occurredAt,
         resolutionBasis: resolution.resolutionBasis,
-        category: candidate.category,
-        summary: candidate.summary,
-        protocol: candidate.protocol,
+        category: candidateWithPool.category,
+        summary: candidateWithPool.summary,
+        protocol: candidateWithPool.protocol,
         targetType: resolution.targetType,
         resolutionReasonCodes: resolution.resolutionReasonCodes,
-        targetTokenId: candidate.targetTokenId,
-        targetWrapperAddress: candidate.targetWrapperAddress,
+        targetTokenId: candidateWithPool.targetTokenId,
+        targetWrapperAddress: candidateWithPool.targetWrapperAddress,
+        surfaceKind: candidateWithPool.surfaceKind,
+        componentKey: candidateWithPool.componentKey,
+        economicComponentKind: candidateWithPool.economicComponentKind,
+        movementLogIndexes: candidateWithPool.movementLogIndexes,
+        feeAttributionBasis: resolution.feeAttributionBasis,
         externalStrategyPositionReference: resolution.externalStrategyPositionReference,
         externalStrategyPositionReferenceStatus: resolution.externalStrategyPositionReferenceStatus,
       };

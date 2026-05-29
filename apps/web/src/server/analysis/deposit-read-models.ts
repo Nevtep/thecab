@@ -1392,7 +1392,7 @@ export function buildDepositReadModelRows(input: {
       lifecycleCandidates.push({
         occurredAt: row.occurredAt,
         logIndex: row.logIndex,
-        eventType: "claim_reward",
+        eventType: row.rewardType === "fee_claim" ? "collect_fees" : "claim_reward",
         txHash: row.txHash,
         blockNumber: asInteger(asRecord(row.metadataJson).blockNumber) ?? 0,
         usdValue: row.resolvedAmountUsd,
@@ -1422,9 +1422,16 @@ export function buildDepositReadModelRows(input: {
     // This is independent of how the deposit lifecycle records the tx, so a
     // deposit's totalRewards is purely a join + sum over reward_events.
     const countableRewardRows = depositRewardRows.filter((row) => (
-      row.resolutionStatus === "resolved"
+      row.resolutionStatus === "resolved" && row.rewardType !== "fee_claim"
+    ));
+    const countableFeeRows = depositRewardRows.filter((row) => (
+      row.resolutionStatus === "resolved" && row.rewardType === "fee_claim"
     ));
     const rewards = countableRewardRows.reduce(
+      (sum, row) => sum + Math.abs(row.resolvedAmountUsd ?? 0),
+      0,
+    );
+    const fees = countableFeeRows.reduce(
       (sum, row) => sum + Math.abs(row.resolvedAmountUsd ?? 0),
       0,
     );
@@ -1474,7 +1481,7 @@ export function buildDepositReadModelRows(input: {
     // received at the burn tx; for open ones it is the live position valuation.
     const realizedPnlUsd = status === "closed" ? realizedExitValueUsd - capitalEntered : 0;
     const unrealizedPnlUsd = status === "closed" ? 0 : currentValueUsd - netInvested;
-    const totalReturnUsd = currentValueUsd - capitalEntered + rewards;
+    const totalReturnUsd = currentValueUsd - capitalEntered + rewards + fees;
     const totalReturnPct = capitalEntered > 0 ? totalReturnUsd / capitalEntered : null;
 
     let estimatedAnnualizedReturnPct: number | null = null;
@@ -1591,6 +1598,7 @@ export function buildDepositReadModelRows(input: {
       capitalEnteredUsd: capitalEntered.toString(),
       capitalWithdrawnUsd: capitalWithdrawn.toString(),
       totalRewardsUsd: rewards.toString(),
+      totalFeesUsd: fees.toString(),
       realizedPnlUsd: realizedPnlUsd.toString(),
       unrealizedPnlUsd: unrealizedPnlUsd.toString(),
       totalReturnUsd: totalReturnUsd.toString(),

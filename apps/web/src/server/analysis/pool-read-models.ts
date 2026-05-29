@@ -40,6 +40,7 @@ type PoolAccumulator = {
   strategyValueUsd: number;
   residualValueUsd: number;
   totalRewardsUsd: number;
+  totalFeesUsd: number;
   coverageStatus: "full" | "share_level" | "partial" | "unknown";
   strategyLabels: string[];
   firstParticipatedAt: Date | null;
@@ -440,6 +441,7 @@ function getOrCreatePoolAccumulator(input: {
     strategyValueUsd: 0,
     residualValueUsd: 0,
     totalRewardsUsd: 0,
+    totalFeesUsd: 0,
     coverageStatus: "unknown",
     strategyLabels: [],
     firstParticipatedAt: null,
@@ -2052,14 +2054,20 @@ export async function materializePoolReadModels(input: MaterializePoolReadModels
         priceByTokenAndDay,
       });
 
-      accumulator.totalRewardsUsd += amountUsd;
-      accumulator.rewardValueByDay.set(dayUtc, (accumulator.rewardValueByDay.get(dayUtc) ?? 0) + amountUsd);
+      if (reward.rewardType === "fee_claim") {
+        accumulator.totalFeesUsd += amountUsd;
+      } else {
+        accumulator.totalRewardsUsd += amountUsd;
+        accumulator.rewardValueByDay.set(dayUtc, (accumulator.rewardValueByDay.get(dayUtc) ?? 0) + amountUsd);
+      }
       accumulator.lastParticipatedAt = mergeDateBounds(accumulator.lastParticipatedAt, reward.occurredAt, "max");
       const relatedStrategyId = relatedId && strategyToPoolId.get(relatedId) ? relatedId : null;
       const relatedDepositId = relatedId && depositToPoolId.get(relatedId) ? relatedId : null;
       accumulator.timeline.push({
         eventKey: `reward:${reward.txHash}:${reward.logIndex}:${reward.rewardType}`,
-        eventType: relatedStrategyId || rewardMetadata.targetType === "strategy" ? "strategy_claim" : "claim",
+        eventType: reward.rewardType === "fee_claim"
+          ? "collect_fees"
+          : relatedStrategyId || rewardMetadata.targetType === "strategy" ? "strategy_claim" : "claim",
         occurredAt: reward.occurredAt,
         confidence: "high",
         coverageStatus: accumulator.coverageStatus,
@@ -2449,6 +2457,7 @@ export async function materializePoolReadModels(input: MaterializePoolReadModels
         realizedPnlUsd: null,
         unrealizedPnlUsd: null,
         totalRewardsUsd: String(accumulator.totalRewardsUsd),
+        totalFeesUsd: String(accumulator.totalFeesUsd),
         annualizedReturnPct: annualizedReturnPct === null ? null : String(annualizedReturnPct),
         metadataJson: {
           label: accumulator.label,

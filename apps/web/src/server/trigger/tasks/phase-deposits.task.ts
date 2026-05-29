@@ -20,6 +20,7 @@ import { readKnownProtocolContracts } from "@/server/overview/overview.repositor
 import { getWalletDefiPositions, getWalletHistory, getWalletTokens, getMoralisCoverageReason } from "@/server/providers/moralis";
 import { buildAnalysisProviderFailureError } from "@/server/providers/providerErrors";
 import { CANDIDATE_SCHEMA_VERSION } from "@/server/analysis/txClassification";
+import type { EconomicComponentKind } from "@/server/analysis/txClassification";
 
 export type PhaseDepositsTaskPayload = {
   runId: string;
@@ -47,9 +48,13 @@ type PersistedRewardCandidate = {
   targetType?: "deposit" | "strategy" | null;
   targetTokenId?: string | null;
   targetWrapperAddress?: string | null;
+  targetPoolAddress?: string | null;
   targetStakingRewardsAddress?: string | null;
   sameTxTokenId?: string | null;
   shareLifecycleWrapperAddress?: string | null;
+  componentKey?: string;
+  economicComponentKind?: EconomicComponentKind;
+  movementLogIndexes?: number[];
   /**
    * On-chain surface this candidate originated from. Drives ownership
    * resolution branching in phase-rewards. See
@@ -450,13 +455,19 @@ export async function runPhaseDepositsTask(payload: PhaseDepositsTaskPayload) {
       coverageReasons.add("pricingPartial");
     }
 
+    const rewardCandidatesByKey = new Map<string, PersistedRewardCandidate>();
     const rewardCandidatesByHash = new Map<string, PersistedRewardCandidate>();
 
     for (const candidate of [...aerodromeLifecycle.rewardCandidates, ...mellowAccounting.rewardCandidates]) {
-      rewardCandidatesByHash.set(candidate.txHash.toLowerCase(), {
+      const persistedCandidate = {
         ...candidate,
+        componentKey: candidate.componentKey ?? `${candidate.txHash.toLowerCase()}:${candidate.economicComponentKind ?? "reward_claim"}`,
         candidateSchemaVersion: CANDIDATE_SCHEMA_VERSION,
-      });
+      };
+      rewardCandidatesByKey.set(persistedCandidate.componentKey, persistedCandidate);
+      if (!rewardCandidatesByHash.has(candidate.txHash.toLowerCase())) {
+        rewardCandidatesByHash.set(candidate.txHash.toLowerCase(), persistedCandidate);
+      }
     }
 
     const normalizedAerodromeLifecycle = normalizeAerodromeLifecycleForPersistence({
@@ -528,7 +539,7 @@ export async function runPhaseDepositsTask(payload: PhaseDepositsTaskPayload) {
           endpoint: "/protocols/reward-candidates",
           requestJson: { walletAddress: payload.walletAddress, chainId: payload.chainId },
           responseJson: {
-            rewardCandidates: Array.from(rewardCandidatesByHash.values()).map((candidate) => ({
+            rewardCandidates: Array.from(rewardCandidatesByKey.values()).map((candidate) => ({
               ...candidate,
               occurredAt: candidate.occurredAt.toISOString(),
             })),
@@ -558,23 +569,30 @@ export async function runPhaseDepositsTask(payload: PhaseDepositsTaskPayload) {
 
     for (const candidate of persistedHistory.rewardCandidates) {
       const existing = rewardCandidatesByHash.get(candidate.txHash.toLowerCase());
-      rewardCandidatesByHash.set(candidate.txHash.toLowerCase(), {
+      const mergedCandidate: PersistedRewardCandidate = {
         ...candidate,
         protocol: existing?.protocol ?? null,
         targetType: existing?.targetType ?? null,
         targetTokenId: existing?.targetTokenId ?? null,
+        targetPoolAddress: existing?.targetPoolAddress ?? null,
         targetWrapperAddress: existing?.targetWrapperAddress ?? null,
         targetStakingRewardsAddress: existing?.targetStakingRewardsAddress ?? null,
         sameTxTokenId: existing?.sameTxTokenId ?? null,
         shareLifecycleWrapperAddress: existing?.shareLifecycleWrapperAddress ?? null,
         surfaceKind: existing?.surfaceKind ?? null,
+        componentKey: existing?.componentKey ?? `${candidate.txHash.toLowerCase()}:reward_claim`,
+        economicComponentKind: existing?.economicComponentKind ?? "reward_claim",
+        movementLogIndexes: existing?.movementLogIndexes ?? [],
         candidateSchemaVersion: CANDIDATE_SCHEMA_VERSION,
-      });
+      };
+      rewardCandidatesByKey.set(mergedCandidate.componentKey ?? `${candidate.txHash.toLowerCase()}:reward_claim`, mergedCandidate);
+      rewardCandidatesByHash.set(candidate.txHash.toLowerCase(), mergedCandidate);
     }
 
     const metadataPatch: Record<string, unknown> = {
       latestPoolTotals: persistedPositions.poolTotals,
-      latestRewardCandidates: Array.from(rewardCandidatesByHash.values()),
+      latestRewardCandidates: Array.from(rewardCandidatesByKey.values()),
+      latestRewardCandidateSchemaVersion: CANDIDATE_SCHEMA_VERSION,
     };
 
     if (tokensResult.ok) {
@@ -589,7 +607,7 @@ export async function runPhaseDepositsTask(payload: PhaseDepositsTaskPayload) {
       txCountProcessed: persistedHistory.txCountProcessed,
       assetMovementCount: persistedHistory.assetMovementCount,
       softReorgTxCount: softReorgTxHashes.length,
-      rewardCandidateCount: rewardCandidatesByHash.size,
+      rewardCandidateCount: rewardCandidatesByKey.size,
       positionCount: mergedProtocolRows.length,
       providerAttempts: {
         moralis: 3,

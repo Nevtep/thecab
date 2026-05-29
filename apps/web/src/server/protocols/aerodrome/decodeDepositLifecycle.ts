@@ -7,7 +7,12 @@ import {
 } from "viem";
 
 import { alchemyRpc } from "@/server/providers/alchemy";
-import { isHistoryRecordEconomicallyExcluded, type SurfaceKind } from "@/server/analysis/txClassification";
+import {
+  decomposeTxEconomics,
+  isHistoryRecordEconomicallyExcluded,
+  type EconomicComponentKind,
+  type SurfaceKind,
+} from "@/server/analysis/txClassification";
 import {
   AERODROME_CL_POSITION_MANAGER_ADDRESS,
   asRecordArray,
@@ -173,6 +178,10 @@ export type DecodeAerodromeDepositLifecycleResult = {
     protocol: "aerodrome";
     targetType: "deposit";
     targetTokenId: string | null;
+    targetPoolAddress?: string | null;
+    componentKey?: string;
+    economicComponentKind?: EconomicComponentKind;
+    movementLogIndexes?: number[];
     /**
      * On-chain surface this candidate originated from. Drives ownership
      * resolution branching downstream. See
@@ -954,6 +963,60 @@ function buildGaugeRewardCandidates(input: {
   return candidates;
 }
 
+function extractPoolFeeClaimCandidates(input: {
+  walletAddress: string;
+  history: MoralisHistoryRecord[];
+}): DecodeAerodromeDepositLifecycleResult["rewardCandidates"] {
+  const walletAddress = input.walletAddress.toLowerCase();
+  return input.history.flatMap((record) => {
+    if (isHistoryRecordEconomicallyExcluded(record)) return [];
+
+    const txHash = extractTxHash(record);
+    const occurredAt = parseTimestamp(record);
+    const methodLabel = asString(record.method_label)?.toLowerCase() ?? "";
+    if (!txHash || !occurredAt || methodLabel !== "claimfees") {
+      return [];
+    }
+
+    const inboundTransfers = asRecordArray(record.erc20_transfers).filter((transfer) =>
+      asString(transfer.to_address)?.toLowerCase() === walletAddress &&
+      asString(transfer.from_address)?.toLowerCase()
+    );
+    const sourceAddresses = new Set(
+      inboundTransfers
+        .map((transfer) => asString(transfer.from_address)?.toLowerCase() ?? null)
+        .filter((address): address is string => Boolean(address)),
+    );
+    if (inboundTransfers.length === 0 || sourceAddresses.size !== 1) {
+      return [];
+    }
+
+    const poolAddress = [...sourceAddresses][0] ?? null;
+    const components = decomposeTxEconomics({
+      txHash,
+      record,
+      surfaceKind: "pool_fee_claim",
+    });
+
+    return components
+      .filter((component) => component.kind === "fee_claim")
+      .map((component) => ({
+        txHash,
+        occurredAt,
+        category: asString(record.category),
+        summary: asString(record.summary),
+        protocol: "aerodrome" as const,
+        targetType: "deposit" as const,
+        targetTokenId: null,
+        targetPoolAddress: poolAddress,
+        surfaceKind: "pool_fee_claim" as SurfaceKind,
+        componentKey: component.componentKey,
+        economicComponentKind: component.kind,
+        movementLogIndexes: component.movementLogIndexes,
+      }));
+  });
+}
+
 export async function decodeAerodromeDepositLifecycle(input: {
   walletAddress: string;
   chainId: number;
@@ -1032,6 +1095,10 @@ export async function decodeAerodromeDepositLifecycle(input: {
   const dedupedGaugeCandidates = gaugeRewardCandidates.filter(
     (candidate) => !lifecycleCollectTxHashes.has(candidate.txHash),
   );
+  const feeClaimCandidates = extractPoolFeeClaimCandidates({
+    walletAddress: input.walletAddress,
+    history: input.history,
+  });
 
   return {
     rows: [...currentState.rows, ...reconstructedRows, ...historicalRangeBackfilledRows],
@@ -1053,6 +1120,8 @@ export async function decodeAerodromeDepositLifecycle(input: {
           // Spec: a lifecycle `collect` is a per-NFT manual deposit claim by
           // construction (the NPM/CL contracts only collect against a tokenId).
           surfaceKind: "manual_deposit_gauge_claim" as SurfaceKind,
+          componentKey: `${record.txHash}:reward_claim`,
+          economicComponentKind: "reward_claim" as const,
         })),
       ...dedupedGaugeCandidates.map((candidate) => {
         const resolvedTokenId = resolveAerodromeRewardCandidateTokenId({
@@ -1081,8 +1150,11 @@ export async function decodeAerodromeDepositLifecycle(input: {
           targetType: "deposit" as const,
           targetTokenId: resolvedTokenId,
           surfaceKind,
+          componentKey: `${candidate.txHash}:reward_claim`,
+          economicComponentKind: "reward_claim" as const,
         };
       }),
+      ...feeClaimCandidates,
     ],
     providerPartial: currentState.providerPartial,
     failedTokenIds: currentState.failedTokenIds,

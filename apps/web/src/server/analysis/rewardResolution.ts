@@ -1,4 +1,4 @@
-import type { SurfaceKind } from "@/server/analysis/txClassification";
+import type { EconomicComponentKind, SurfaceKind } from "@/server/analysis/txClassification";
 
 export type RewardCandidateInput = {
   txHash: string;
@@ -8,6 +8,8 @@ export type RewardCandidateInput = {
   protocol: string | null;
   targetType: "deposit" | "strategy" | null;
   targetTokenId: string | null;
+  targetPoolAddress?: string | null;
+  targetPoolId?: string | null;
   targetWrapperAddress: string | null;
   targetStakingRewardsAddress?: string | null;
   sameTxTokenId?: string | null;
@@ -18,6 +20,9 @@ export type RewardCandidateInput = {
    * docs/spec/the-cab-aerodrome-claim-surfaces-research.md.
    */
   surfaceKind?: SurfaceKind | null;
+  componentKey?: string | null;
+  economicComponentKind?: EconomicComponentKind | string | null;
+  movementLogIndexes?: number[];
 };
 
 export type RewardDepositTarget = {
@@ -25,6 +30,7 @@ export type RewardDepositTarget = {
   poolId: string | null;
   tokenId: string | null;
   protocol: string | null;
+  createdAt?: Date;
 };
 
 export type RewardStrategyTarget = {
@@ -35,6 +41,7 @@ export type RewardStrategyTarget = {
   stakingRewardsAddress?: string | null;
   protocol: string | null;
   externalStrategyPositionReference: string | null;
+  createdAt?: Date;
 };
 
 export type RewardResolutionBasis =
@@ -43,6 +50,8 @@ export type RewardResolutionBasis =
   | "strategy_wrapper_pair"
   | "staking_rewards_pair"
   | "share_lifecycle_context"
+  | "wallet_pool_single_holder"
+  | "wallet_pool_aggregate"
   | "unresolved";
 
 export type RewardOwnershipResolution = {
@@ -56,6 +65,7 @@ export type RewardOwnershipResolution = {
   resolutionReasonCodes: string[];
   externalStrategyPositionReference: string | null;
   externalStrategyPositionReferenceStatus: "resolved" | "unresolved";
+  feeAttributionBasis?: "wallet_pool_single_holder" | "wallet_pool_aggregate" | null;
 };
 
 function normalizeAddress(value: string | null | undefined) {
@@ -97,6 +107,87 @@ export function resolveRewardOwnership(input: {
       resolutionReasonCodes: ["excludedAirdrop"],
       externalStrategyPositionReference: null,
       externalStrategyPositionReferenceStatus: "unresolved",
+    };
+  }
+  if (
+    input.candidate.economicComponentKind === "fee_claim" ||
+    surfaceKind === "pool_fee_claim" ||
+    surfaceKind === "pool_fee_claim_v2" ||
+    surfaceKind === "pool_fee_claim_slipstream"
+  ) {
+    const targetPoolId = input.candidate.targetPoolId ?? null;
+    if (!targetPoolId) {
+      return {
+        resolutionStatus: "unresolved",
+        ownerType: input.candidate.targetType,
+        depositId: null,
+        strategyId: null,
+        strategyExposureId: null,
+        resolvedPoolId: null,
+        resolutionBasis: "unresolved",
+        resolutionReasonCodes: ["feeClaimNoActivePosition"],
+        externalStrategyPositionReference: null,
+        externalStrategyPositionReferenceStatus: "unresolved",
+        feeAttributionBasis: null,
+      };
+    }
+
+    const matchingDeposits = input.depositTargets.filter((target) => target.poolId === targetPoolId);
+    const matchingStrategies = input.strategyTargets.filter((target) => target.primaryPoolId === targetPoolId);
+    const owners = [
+      ...matchingDeposits.map((target) => ({ type: "deposit" as const, target, createdAt: target.createdAt })),
+      ...matchingStrategies.map((target) => ({ type: "strategy" as const, target, createdAt: target.createdAt })),
+    ].sort((a, b) => (a.createdAt?.getTime() ?? 0) - (b.createdAt?.getTime() ?? 0));
+
+    const owner = owners[0] ?? null;
+    if (!owner) {
+      return {
+        resolutionStatus: "unresolved",
+        ownerType: input.candidate.targetType,
+        depositId: null,
+        strategyId: null,
+        strategyExposureId: null,
+        resolvedPoolId: targetPoolId,
+        resolutionBasis: "unresolved",
+        resolutionReasonCodes: ["feeClaimNoActivePosition"],
+        externalStrategyPositionReference: null,
+        externalStrategyPositionReferenceStatus: "unresolved",
+        feeAttributionBasis: null,
+      };
+    }
+
+    const feeAttributionBasis = owners.length === 1
+      ? "wallet_pool_single_holder"
+      : "wallet_pool_aggregate";
+    if (owner.type === "deposit") {
+      return {
+        resolutionStatus: "resolved",
+        ownerType: "deposit",
+        depositId: owner.target.depositId,
+        strategyId: null,
+        strategyExposureId: null,
+        resolvedPoolId: targetPoolId,
+        resolutionBasis: feeAttributionBasis,
+        resolutionReasonCodes: [],
+        externalStrategyPositionReference: null,
+        externalStrategyPositionReferenceStatus: "unresolved",
+        feeAttributionBasis,
+      };
+    }
+    return {
+      resolutionStatus: "resolved",
+      ownerType: "strategy",
+      depositId: null,
+      strategyId: owner.target.strategyId,
+      strategyExposureId: owner.target.strategyExposureId,
+      resolvedPoolId: targetPoolId,
+      resolutionBasis: feeAttributionBasis,
+      resolutionReasonCodes: [],
+      externalStrategyPositionReference: owner.target.externalStrategyPositionReference,
+      externalStrategyPositionReferenceStatus: owner.target.externalStrategyPositionReference
+        ? "resolved"
+        : "unresolved",
+      feeAttributionBasis,
     };
   }
 

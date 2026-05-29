@@ -5,6 +5,7 @@ import test from "node:test";
 
 import {
   CANDIDATE_SCHEMA_VERSION,
+  decomposeTxEconomics,
   detectEconomicExclusionReason,
   isHistoryRecordEconomicallyExcluded,
   parseSurfaceKind,
@@ -115,6 +116,26 @@ test("mellow wrapper withdraw fixture carries mixed reward + principal flows (Ph
   assert.equal(transfers.length, 4);
   const symbols = transfers.map((t) => t.token_symbol);
   assert.ok(symbols.includes("AERO"), `expected AERO inflow, got ${JSON.stringify(symbols)}`);
+
+  const components = decomposeTxEconomics({
+    txHash: String(record.hash),
+    record,
+    surfaceKind: "strategy_wrapper_withdraw",
+    wrapperAddress: "0xb9db6804e84d960e139a2bdc33bfc30f8fb689fe",
+  });
+  assert.equal(components.length, 2);
+  assert.equal(
+    components.find((component) => component.kind === "reward_claim")?.tokenAddresses[0],
+    "0x940181a94a35a4569e4529a3cdfb74e38fd98631",
+  );
+  assert.deepEqual(
+    components.find((component) => component.kind === "reward_claim")?.movementLogIndexes,
+    [846],
+  );
+  assert.deepEqual(
+    components.find((component) => component.kind === "strategy_close")?.movementLogIndexes,
+    [833, 834],
+  );
 });
 
 test("resolveRewardOwnership short-circuits gauge_reward_unknown_surface to unresolved + unknownRewardSurface", () => {

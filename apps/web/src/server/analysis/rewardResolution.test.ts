@@ -175,3 +175,40 @@ test("resolveRewardOwnership rejects manual-strategy conflicts instead of guessi
   assert.equal(result.strategyId, null);
   assert.deepEqual(result.resolutionReasonCodes, ["manualStrategyConflict"]);
 });
+
+test("resolveRewardOwnership attributes pool fee claims by wallet-pool holder", () => {
+  const result = resolveRewardOwnership({
+    candidate: buildCandidate({
+      economicComponentKind: "fee_claim",
+      surfaceKind: "pool_fee_claim",
+      targetPoolId: "pool-1",
+      targetType: "deposit",
+    }),
+    depositTargets: [buildDepositTarget()],
+    strategyTargets: [],
+  });
+
+  assert.equal(result.resolutionStatus, "resolved");
+  assert.equal(result.ownerType, "deposit");
+  assert.equal(result.depositId, "deposit-1");
+  assert.equal(result.resolvedPoolId, "pool-1");
+  assert.equal(result.resolutionBasis, "wallet_pool_single_holder");
+  assert.equal(result.feeAttributionBasis, "wallet_pool_single_holder");
+});
+
+test("resolveRewardOwnership leaves pool fee claims unresolved without a pool holder", () => {
+  const result = resolveRewardOwnership({
+    candidate: buildCandidate({
+      economicComponentKind: "fee_claim",
+      surfaceKind: "pool_fee_claim",
+      targetPoolId: "pool-1",
+      targetType: "deposit",
+    }),
+    depositTargets: [],
+    strategyTargets: [],
+  });
+
+  assert.equal(result.resolutionStatus, "unresolved");
+  assert.equal(result.resolvedPoolId, "pool-1");
+  assert.deepEqual(result.resolutionReasonCodes, ["feeClaimNoActivePosition"]);
+});

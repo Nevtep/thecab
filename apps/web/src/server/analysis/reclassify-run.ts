@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 
 import { getAnalysisRunById } from "@/server/analysis/analysis-run.repository";
+import { mergeAnalysisRunMetadata } from "@/server/analysis/analysis-run.repository";
 import { listRunSlices, resolveRunSliceDayWindow } from "@/server/analysis/analysis-slice.repository";
 import { runCanonicalInference } from "@/server/analysis/canonicalInference";
 import { computeSnapshots, type WalletTokenSnapshot } from "@/server/analysis/computeSnapshots";
@@ -16,8 +17,12 @@ import {
 } from "@/server/analysis/rewardResolution";
 import { materializeDepositReadModels } from "@/server/analysis/deposit-read-models";
 import { materializePoolReadModels } from "@/server/analysis/pool-read-models";
-import { parseSurfaceKind } from "@/server/analysis/txClassification";
+import { CANDIDATE_SCHEMA_VERSION, parseSurfaceKind } from "@/server/analysis/txClassification";
 import { getDb } from "@/server/db/client";
+import { getWalletHistory } from "@/server/providers/moralis";
+import { readKnownProtocolContracts } from "@/server/overview/overview.repository";
+import { decodeAerodromeDepositLifecycle } from "@/server/protocols/aerodrome/decodeDepositLifecycle";
+import { computeMellowShareLevelAccounting } from "@/server/protocols/mellow/computeShareLevelAccounting";
 import {
   deposits,
   ledgerEvents,
@@ -58,6 +63,9 @@ function asRewardCandidate(value: unknown): RewardCandidateInput | null {
     targetStakingRewardsAddress: typeof candidate.targetStakingRewardsAddress === "string"
       ? candidate.targetStakingRewardsAddress.toLowerCase()
       : null,
+    targetPoolAddress: typeof candidate.targetPoolAddress === "string"
+      ? candidate.targetPoolAddress.toLowerCase()
+      : null,
     sameTxTokenId: typeof candidate.sameTxTokenId === "string" ? candidate.sameTxTokenId : null,
     shareLifecycleWrapperAddress: typeof candidate.shareLifecycleWrapperAddress === "string"
       ? candidate.shareLifecycleWrapperAddress.toLowerCase()
@@ -67,10 +75,20 @@ function asRewardCandidate(value: unknown): RewardCandidateInput | null {
         ? candidate.targetWrapperAddress.toLowerCase()
         : null,
     surfaceKind: parseSurfaceKind(candidate.surfaceKind),
+    componentKey: typeof candidate.componentKey === "string" ? candidate.componentKey : null,
+    economicComponentKind: typeof candidate.economicComponentKind === "string"
+      ? candidate.economicComponentKind
+      : null,
+    movementLogIndexes: Array.isArray(candidate.movementLogIndexes)
+      ? candidate.movementLogIndexes.filter((value): value is number => typeof value === "number")
+      : [],
   };
 }
 
 function inferRewardType(candidate: RewardCandidateInput) {
+  if (candidate.economicComponentKind === "fee_claim" || candidate.surfaceKind?.startsWith("pool_fee_claim")) {
+    return "fee_claim";
+  }
   const text = [candidate.category, candidate.summary].filter(Boolean).join(" ").toLowerCase();
   return text.includes("reward") || text.includes("collect") ? "reward_claim" : "claim";
 }
@@ -307,12 +325,87 @@ async function rerunRewardResolution(input: {
   };
 }
 
+function candidatesNeedRegeneration(value: unknown) {
+  if (!Array.isArray(value)) {
+    return true;
+  }
+  return value.some((candidate) =>
+    !candidate ||
+    typeof candidate !== "object" ||
+    (candidate as Record<string, unknown>).candidateSchemaVersion !== CANDIDATE_SCHEMA_VERSION
+  );
+}
+
+async function regenerateRewardCandidates(input: {
+  runId: string;
+  walletAddress: string;
+  chainId: number;
+  slices: Awaited<ReturnType<typeof listRunSlices>>;
+  walletTokens: WalletTokenSnapshot[];
+}) {
+  const protocolContracts = await readKnownProtocolContracts({ chainId: input.chainId });
+  const rewardCandidates = [];
+  for (const slice of input.slices) {
+    const history: Array<Record<string, unknown>> = [];
+    let cursor: string | undefined;
+    for (let pageIndex = 0; pageIndex < 20; pageIndex += 1) {
+      const historyPage = await getWalletHistory(input.walletAddress, input.chainId, {
+        fromDate: slice.sliceStartUtc.toISOString(),
+        toDate: slice.sliceEndUtc.toISOString(),
+        limit: 100,
+        cursor,
+      });
+      const pageRecords = Array.isArray(historyPage.result)
+        ? historyPage.result.filter((record): record is Record<string, unknown> => typeof record === "object" && record !== null)
+        : [];
+      history.push(...pageRecords);
+      if (pageRecords.length < 100 || typeof historyPage.cursor !== "string" || historyPage.cursor.length === 0) {
+        break;
+      }
+      cursor = historyPage.cursor;
+    }
+    const [aerodromeLifecycle, mellowAccounting] = await Promise.all([
+      decodeAerodromeDepositLifecycle({
+        walletAddress: input.walletAddress,
+        chainId: input.chainId,
+        history,
+        protocolContracts,
+        now: new Date(),
+      }),
+      computeMellowShareLevelAccounting({
+        walletAddress: input.walletAddress,
+        chainId: input.chainId,
+        walletTokens: input.walletTokens,
+        history,
+        protocolContracts,
+        now: new Date(),
+      }),
+    ]);
+    rewardCandidates.push(
+      ...[...aerodromeLifecycle.rewardCandidates, ...mellowAccounting.rewardCandidates].map((candidate) => ({
+        ...candidate,
+        componentKey: candidate.componentKey ?? `${candidate.txHash.toLowerCase()}:${candidate.economicComponentKind ?? "reward_claim"}`,
+        occurredAt: candidate.occurredAt.toISOString(),
+        candidateSchemaVersion: CANDIDATE_SCHEMA_VERSION,
+      })),
+    );
+  }
+
+  await mergeAnalysisRunMetadata(input.runId, {
+    latestRewardCandidates: rewardCandidates,
+    latestRewardCandidateSchemaVersion: CANDIDATE_SCHEMA_VERSION,
+  });
+
+  return rewardCandidates.length;
+}
+
 export async function reclassifyAnalysisRun(input: {
   runId: string;
   walletAddress: string;
   chainId: number;
   capturedAt: Date;
   walletTokens: WalletTokenSnapshot[];
+  regenerateCandidates?: boolean;
 }) {
   const run = await getAnalysisRunById(input.runId);
   if (!run) {
@@ -333,6 +426,21 @@ export async function reclassifyAnalysisRun(input: {
   const spamTokenAddresses = input.walletTokens
     .filter((item) => item.possibleSpam || item.verifiedContract === false)
     .map((item) => item.tokenAddress.toLowerCase());
+
+  let regeneratedRewardCandidateCount = 0;
+  if (
+    input.regenerateCandidates ||
+    run.metadataJson.latestRewardCandidateSchemaVersion !== CANDIDATE_SCHEMA_VERSION ||
+    candidatesNeedRegeneration(run.metadataJson.latestRewardCandidates)
+  ) {
+    regeneratedRewardCandidateCount = await regenerateRewardCandidates({
+      runId: input.runId,
+      walletAddress: input.walletAddress,
+      chainId: input.chainId,
+      slices,
+      walletTokens: input.walletTokens,
+    });
+  }
 
   const rewardResolution = await rerunRewardResolution({
     runId: input.runId,
@@ -390,6 +498,7 @@ export async function reclassifyAnalysisRun(input: {
     txCount: txRows.length,
     walletTokenCount: input.walletTokens.length,
     rewardResolution,
+    regeneratedRewardCandidateCount,
     classified,
     canonical,
     snapshot,

@@ -17,6 +17,7 @@
  */
 export type SurfaceKind =
   | "manual_deposit_gauge_claim"
+  | "pool_fee_claim"
   | "pool_fee_claim_v2"
   | "pool_fee_claim_slipstream"
   | "strategy_wrapper_reward_claim"
@@ -39,6 +40,14 @@ export type EconomicComponentKind =
   | "deposit_close"
   | "principal_return"
   | "excluded_airdrop";
+
+export type EconomicComponent = {
+  componentKey: string;
+  kind: EconomicComponentKind;
+  surfaceKind: SurfaceKind;
+  movementLogIndexes: number[];
+  tokenAddresses: string[];
+};
 
 /**
  * Reason a ledger event / history record is excluded from the economic
@@ -85,6 +94,7 @@ export function isHistoryRecordEconomicallyExcluded(record: Record<string, unkno
 
 const SURFACE_KIND_VALUES = new Set<SurfaceKind>([
   "manual_deposit_gauge_claim",
+  "pool_fee_claim",
   "pool_fee_claim_v2",
   "pool_fee_claim_slipstream",
   "strategy_wrapper_reward_claim",
@@ -103,4 +113,115 @@ export function parseSurfaceKind(value: unknown): SurfaceKind | null {
   return typeof value === "string" && SURFACE_KIND_VALUES.has(value as SurfaceKind)
     ? (value as SurfaceKind)
     : null;
+}
+
+function asRecordArray(value: unknown): Array<Record<string, unknown>> {
+  return Array.isArray(value)
+    ? value.filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
+    : [];
+}
+
+function asLowerString(value: unknown) {
+  return typeof value === "string" ? value.toLowerCase() : null;
+}
+
+function transferLogIndex(transfer: Record<string, unknown>, fallback: number) {
+  const value = transfer.log_index ?? transfer.logIndex;
+  if (typeof value === "number" && Number.isInteger(value)) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    if (Number.isInteger(parsed)) {
+      return parsed;
+    }
+  }
+  return fallback;
+}
+
+function uniqueSorted(values: number[]) {
+  return [...new Set(values)].sort((a, b) => a - b);
+}
+
+function uniqueStrings(values: Array<string | null>) {
+  return [...new Set(values.filter((value): value is string => Boolean(value)))].sort();
+}
+
+/**
+ * Split a Moralis-shaped transaction record into economic components when the
+ * protocol surface has deterministic movement boundaries. Unknown or ambiguous
+ * splits deliberately return no reward component, avoiding reward inflation.
+ */
+export function decomposeTxEconomics(input: {
+  txHash: string;
+  record: Record<string, unknown>;
+  surfaceKind: SurfaceKind;
+  wrapperAddress?: string | null;
+}): EconomicComponent[] {
+  const txHash = input.txHash.toLowerCase();
+  const walletTransfers = [
+    ...asRecordArray(input.record.erc20_transfers),
+    ...asRecordArray(input.record.native_transfers),
+  ];
+  const wrapperAddress = asLowerString(input.wrapperAddress);
+
+  if (input.surfaceKind === "strategy_wrapper_withdraw") {
+    const inbound = walletTransfers
+      .map((transfer, index) => ({ transfer, logIndex: transferLogIndex(transfer, index) }))
+      .filter(({ transfer }) => asLowerString(transfer.direction) === "receive");
+    const rewardTransfers = inbound.filter(({ transfer }) =>
+      wrapperAddress !== null && asLowerString(transfer.from_address) === wrapperAddress
+    );
+    const principalTransfers = inbound.filter(({ transfer }) =>
+      wrapperAddress === null || asLowerString(transfer.from_address) !== wrapperAddress
+    );
+
+    const components: EconomicComponent[] = [];
+    if (principalTransfers.length > 0) {
+      components.push({
+        componentKey: `${txHash}:strategy_close:${uniqueSorted(principalTransfers.map((item) => item.logIndex)).join("-")}`,
+        kind: "strategy_close",
+        surfaceKind: input.surfaceKind,
+        movementLogIndexes: uniqueSorted(principalTransfers.map((item) => item.logIndex)),
+        tokenAddresses: uniqueStrings(principalTransfers.map(({ transfer }) => asLowerString(transfer.address))),
+      });
+    }
+    if (rewardTransfers.length > 0) {
+      components.push({
+        componentKey: `${txHash}:reward_claim:${uniqueSorted(rewardTransfers.map((item) => item.logIndex)).join("-")}`,
+        kind: "reward_claim",
+        surfaceKind: input.surfaceKind,
+        movementLogIndexes: uniqueSorted(rewardTransfers.map((item) => item.logIndex)),
+        tokenAddresses: uniqueStrings(rewardTransfers.map(({ transfer }) => asLowerString(transfer.address))),
+      });
+    }
+    return components;
+  }
+
+  if (
+    input.surfaceKind === "pool_fee_claim" ||
+    input.surfaceKind === "pool_fee_claim_v2" ||
+    input.surfaceKind === "pool_fee_claim_slipstream"
+  ) {
+    const inbound = walletTransfers
+      .map((transfer, index) => ({ transfer, logIndex: transferLogIndex(transfer, index) }))
+      .filter(({ transfer }) => asLowerString(transfer.direction) === "receive");
+    return inbound.length === 0
+      ? []
+      : [{
+          componentKey: `${txHash}:fee_claim:${uniqueSorted(inbound.map((item) => item.logIndex)).join("-")}`,
+          kind: "fee_claim",
+          surfaceKind: input.surfaceKind,
+          movementLogIndexes: uniqueSorted(inbound.map((item) => item.logIndex)),
+          tokenAddresses: uniqueStrings(inbound.map(({ transfer }) => asLowerString(transfer.address))),
+        }];
+  }
+
+  return [{
+    componentKey: `${txHash}:reward_claim`,
+    kind: "reward_claim",
+    surfaceKind: input.surfaceKind,
+    movementLogIndexes: [],
+    tokenAddresses: [],
+  }];
 }

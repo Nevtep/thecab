@@ -1,0 +1,2 @@
+ALTER TABLE "deposit_wallet_summaries" ADD COLUMN "total_fees_usd" numeric(38, 18) DEFAULT '0' NOT NULL;--> statement-breakpoint
+ALTER TABLE "pool_wallet_summaries" ADD COLUMN "total_fees_usd" numeric(38, 18) DEFAULT '0' NOT NULL;

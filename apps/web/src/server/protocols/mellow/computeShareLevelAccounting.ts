@@ -5,7 +5,12 @@ import {
   detectProtocolFromSignals,
   type KnownProtocolContract,
 } from "@/server/protocol-positions/protocolMetadata";
-import { isHistoryRecordEconomicallyExcluded, type SurfaceKind } from "@/server/analysis/txClassification";
+import {
+  decomposeTxEconomics,
+  isHistoryRecordEconomicallyExcluded,
+  type EconomicComponentKind,
+  type SurfaceKind,
+} from "@/server/analysis/txClassification";
 import { readMellowStrategyPositions } from "@/server/protocol-positions/readMellowStrategyPositions";
 import { reconstructRecentPositionState } from "@/server/protocol-positions/reconstructRecentPositionState";
 import type { OverviewProtocolPosition } from "@/server/protocol-positions/protocolPositions.types";
@@ -23,6 +28,9 @@ export type ComputeMellowShareLevelAccountingResult = {
     protocol: "mellow";
     targetType: "strategy";
     targetWrapperAddress: string | null;
+    componentKey?: string;
+    economicComponentKind?: EconomicComponentKind;
+    movementLogIndexes?: number[];
     /**
      * On-chain surface this candidate originated from. See
      * docs/spec/the-cab-aerodrome-claim-surfaces-research.md §3 + §6.
@@ -42,6 +50,41 @@ export function resolveMellowRewardWrapperAddress(input: {
   currentWrappers: Set<string>;
 }) {
   return collectAddressSignals(input.record).find((address) => input.currentWrappers.has(address)) ?? null;
+}
+
+function asRecordArray(value: unknown): Array<Record<string, unknown>> {
+  return Array.isArray(value)
+    ? value.filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
+    : [];
+}
+
+function collectHistoricalMellowWrappers(input: {
+  history: MoralisHistoryRecord[];
+  currentWrappers: Set<string>;
+}) {
+  const wrappers = new Set(input.currentWrappers);
+  for (const record of input.history) {
+    for (const transfer of asRecordArray(record.erc20_transfers)) {
+      const symbol = asLowerString(transfer.token_symbol);
+      const name = asLowerString(transfer.token_name);
+      const tokenAddress = asLowerString(transfer.address);
+      if (!tokenAddress) continue;
+      if (symbol.startsWith("mvs:") || name.includes("mellowvelodromestrategy")) {
+        wrappers.add(tokenAddress);
+      }
+    }
+
+    const methodLabel = asLowerString(record.method_label);
+    if (methodLabel.includes("getreward")) {
+      for (const transfer of asRecordArray(record.erc20_transfers)) {
+        const fromAddress = asLowerString(transfer.from_address);
+        if (fromAddress && asLowerString(transfer.direction) === "receive") {
+          wrappers.add(fromAddress);
+        }
+      }
+    }
+  }
+  return wrappers;
 }
 
 export function isMellowRewardRecord(input: {
@@ -124,22 +167,27 @@ export async function computeMellowShareLevelAccounting(input: {
       .map((row) => row.metadata.wrapperAddress?.toLowerCase() ?? null)
       .filter((value): value is string => Boolean(value)),
   );
+  const historicalWrappers = collectHistoricalMellowWrappers({
+    history: input.history,
+    currentWrappers,
+  });
   const reconstructedRows = reconstructed.rows.filter((row) =>
     row.protocol === "mellow" && row.family === "strategy_exposure" && !currentKeys.has(row.positionKey)
   );
 
-  const rewardCandidates = input.history.flatMap((record) => {
+  const rewardCandidates: ComputeMellowShareLevelAccountingResult["rewardCandidates"] = [];
+  for (const record of input.history) {
     // Spec: spam/airdrop records are excluded from the economic pipeline before
     // any reward candidate is generated. See
     // docs/spec/the-cab-aerodrome-claim-surfaces-research.md §4.
     if (isHistoryRecordEconomicallyExcluded(record)) {
-      return [];
+      continue;
     }
 
     const txHash = extractTxHash(record);
     const occurredAt = parseTimestamp(record);
     if (!txHash || !occurredAt) {
-      return [];
+      continue;
     }
 
     const category = typeof record.category === "string" ? record.category : null;
@@ -148,8 +196,34 @@ export async function computeMellowShareLevelAccounting(input: {
     const protocol = detectProtocolFromSignals(metadata, collectStringSignals(record), collectAddressSignals(record));
     const wrapperAddress = resolveMellowRewardWrapperAddress({
       record,
-      currentWrappers,
+      currentWrappers: historicalWrappers,
     });
+    const methodLabelLower = asLowerString(methodLabel);
+
+    if (wrapperAddress && methodLabelLower === "withdraw") {
+      const components = decomposeTxEconomics({
+        txHash,
+        record,
+        surfaceKind: "strategy_wrapper_withdraw",
+        wrapperAddress,
+      });
+      rewardCandidates.push(...components
+        .filter((component) => component.kind === "reward_claim")
+        .map((component) => ({
+          txHash,
+          occurredAt,
+          category,
+          summary,
+          protocol: "mellow" as const,
+          targetType: "strategy" as const,
+          targetWrapperAddress: wrapperAddress,
+          surfaceKind: "strategy_wrapper_withdraw" as SurfaceKind,
+          componentKey: component.componentKey,
+          economicComponentKind: component.kind,
+          movementLogIndexes: component.movementLogIndexes,
+        })));
+      continue;
+    }
 
     if (!isMellowRewardRecord({
       detectedProtocol: protocol,
@@ -158,10 +232,10 @@ export async function computeMellowShareLevelAccounting(input: {
       summary,
       wrapperAddress,
     })) {
-      return [];
+      continue;
     }
 
-    return [{
+    rewardCandidates.push({
       txHash,
       occurredAt,
       category,
@@ -172,8 +246,11 @@ export async function computeMellowShareLevelAccounting(input: {
       // Spec: Mellow wrapper reward inflows are always strategy-owned. See
       // docs/spec/the-cab-aerodrome-claim-surfaces-research.md §3.
       surfaceKind: "strategy_wrapper_reward_claim" as SurfaceKind,
-    }];
-  });
+      componentKey: `${txHash}:reward_claim`,
+      economicComponentKind: "reward_claim" as const,
+      movementLogIndexes: [],
+    });
+  }
 
   return {
     rows: [...currentState.rows, ...reconstructedRows],

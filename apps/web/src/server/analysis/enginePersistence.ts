@@ -597,6 +597,7 @@ function buildAssetMovementRows(input: {
       amountUsd: extractHistoryTransferAmountUsd(record)?.toString() ?? null,
       metadataJson: {
         source,
+        logIndex: asNumber(record.log_index) ?? asNumber(record.logIndex) ?? index,
         symbol: asString(record.token_symbol) ?? asString(record.symbol),
         name: asString(record.token_name) ?? asString(record.name),
         fromAddress,
@@ -1725,6 +1726,11 @@ export function buildAccrualRewardSnapshotRows(input: {
     resolutionReasonCodes?: string[];
     targetTokenId?: string | null;
     targetWrapperAddress?: string | null;
+    surfaceKind?: string | null;
+    componentKey?: string | null;
+    economicComponentKind?: string | null;
+    movementLogIndexes?: number[];
+    feeAttributionBasis?: string | null;
     externalStrategyPositionReference?: string | null;
     externalStrategyPositionReferenceStatus?: "resolved" | "unresolved";
   }>;
@@ -1787,6 +1793,11 @@ export async function persistResolvedRewardEvents(input: {
     targetType: "deposit" | "strategy" | null;
     targetTokenId?: string | null;
     targetWrapperAddress?: string | null;
+    surfaceKind?: string | null;
+    componentKey?: string | null;
+    economicComponentKind?: string | null;
+    movementLogIndexes?: number[];
+    feeAttributionBasis?: string | null;
     externalStrategyPositionReference?: string | null;
     externalStrategyPositionReferenceStatus?: "resolved" | "unresolved";
   }>;
@@ -1833,6 +1844,11 @@ export async function persistResolvedRewardEvents(input: {
             targetType: claim.targetType,
             targetTokenId: claim.targetTokenId ?? null,
             targetWrapperAddress: claim.targetWrapperAddress ?? null,
+            surfaceKind: claim.surfaceKind ?? null,
+            componentKey: claim.componentKey ?? null,
+            economicComponentKind: claim.economicComponentKind ?? null,
+            movementLogIndexes: claim.movementLogIndexes ?? [],
+            feeAttributionBasis: claim.feeAttributionBasis ?? null,
             externalStrategyPositionReference: claim.externalStrategyPositionReference ?? null,
             externalStrategyPositionReferenceStatus: claim.externalStrategyPositionReferenceStatus ?? (claim.externalStrategyPositionReference ? "resolved" : "unresolved"),
             valuationMethod: "event",
@@ -1910,7 +1926,7 @@ async function enrichRewardEventsFromMovements(input: {
   await db.execute(sql`
     WITH movement_rollup AS (
       SELECT
-        le.tx_hash,
+        re.id AS reward_event_id,
         CASE WHEN count(DISTINCT am.token_address) = 1 THEN min(am.token_address) ELSE null END AS token_address,
         CASE
           WHEN count(DISTINCT am.token_address) = 1 AND bool_and(am.amount_raw IS NOT NULL)
@@ -1937,6 +1953,11 @@ async function enrichRewardEventsFromMovements(input: {
           )
         ) AS amount_usd
       FROM ${ledgerEvents} le
+      JOIN ${rewardEvents} re
+        ON re.tx_hash = le.tx_hash
+        AND re.chain_id = ${input.chainId}
+        AND re.wallet_address = ${input.walletAddress}
+        AND re.is_accrual_snapshot = false
       JOIN ${assetMovements} am ON am.ledger_event_id = le.id
       LEFT JOIN LATERAL (
         SELECT pp.price_usd
@@ -1951,7 +1972,13 @@ async function enrichRewardEventsFromMovements(input: {
         AND am.chain_id = ${input.chainId}
         AND am.direction_in = true
         AND le.tx_hash = ANY(${txHashesArray})
-      GROUP BY le.tx_hash
+        AND (
+          jsonb_array_length(COALESCE(re.metadata_json -> 'movementLogIndexes', '[]'::jsonb)) = 0
+          OR (am.metadata_json ->> 'logIndex') IN (
+            SELECT jsonb_array_elements_text(COALESCE(re.metadata_json -> 'movementLogIndexes', '[]'::jsonb))
+          )
+        )
+      GROUP BY re.id
     )
     UPDATE ${rewardEvents} re
     SET
@@ -1960,7 +1987,7 @@ async function enrichRewardEventsFromMovements(input: {
       amount_usd = mr.amount_usd,
       metadata_json = COALESCE(re.metadata_json, '{}'::jsonb) || jsonb_build_object('enrichedFromMovement', true)
     FROM movement_rollup mr
-    WHERE re.tx_hash = mr.tx_hash
+    WHERE re.id = mr.reward_event_id
       AND re.chain_id = ${input.chainId}
       AND re.wallet_address = ${input.walletAddress}
       AND re.is_accrual_snapshot = false

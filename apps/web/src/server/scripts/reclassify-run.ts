@@ -87,9 +87,11 @@ async function loadFallbackWalletTokenSignals(input: {
 }
 
 async function main() {
-  const runId = process.env.RUN_ID ?? process.argv[2];
+  const args = process.argv.slice(2);
+  const regenerate = args.includes("--regenerate");
+  const runId = process.env.RUN_ID ?? args.find((arg) => !arg.startsWith("--"));
   if (!runId) {
-    console.error("usage: RUN_ID=<runId> tsx reclassify-run.ts");
+    console.error("usage: RUN_ID=<runId> tsx reclassify-run.ts [--regenerate]");
     process.exit(1);
   }
 
@@ -113,6 +115,7 @@ async function main() {
     chainId: run.chainId,
     capturedAt: new Date(),
     walletTokens,
+    regenerateCandidates: regenerate,
   });
 
   console.log(JSON.stringify({
@@ -121,6 +124,7 @@ async function main() {
     chainId: run.chainId,
     txCount: result.txCount,
     walletTokens: result.walletTokenCount,
+    regeneratedRewardCandidateCount: result.regeneratedRewardCandidateCount,
     rewardResolution: result.rewardResolution,
     classified: result.classified,
     canonical: result.canonical,
