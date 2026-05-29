@@ -404,6 +404,7 @@ export function OverviewComponent({
   const navigationItems = getOverviewNavigationItems(activeAnalysis.status);
   const analysisAction = getOverviewAnalysisAction(activeAnalysis.status);
   const isHistoricalAnalysisReady = activeAnalysis.status === "ready" || activeAnalysis.status === "stale";
+  const showHistoricalAnalysisCards = isHistoricalAnalysisReady;
   const exclusionMessage = buildExclusionMessage(overviewViewModel?.metrics.exclusions ?? null, t, locale);
   const visibleRenderableRows = visibleAssetRows.filter((row) => {
     if (!showUnpricedAssets && row.priceUsd === null) {
@@ -625,14 +626,16 @@ export function OverviewComponent({
                   accentColor={portfolioEvolutionSeriesMeta.idle.color}
                   series={portfolioEvolutionModel?.data.map((point) => point.idleValueUsd) ?? []}
                 />
-                <CabImpactMetricCard
-                  label={t("metrics.estimatedRealizedRewards")}
-                  value={formatCurrencyValue(estimatedRealizedRewardsMetricValueUsd, locale, t("states.unavailableValue"))}
-                  iconName="rewards"
-                  accentColor={portfolioEvolutionSeriesMeta.rewards.color}
-                  series={portfolioEvolutionModel?.data.map((point) => point.cumulativeRewardValueUsd) ?? []}
-                  meta={portfolioEvolutionModel ? t("portfolioEvolution.tooltip.eventCount", { count: portfolioEvolutionModel.footer.markerCount }) : null}
-                />
+                {showHistoricalAnalysisCards ? (
+                  <CabImpactMetricCard
+                    label={t("metrics.estimatedRealizedRewards")}
+                    value={formatCurrencyValue(estimatedRealizedRewardsMetricValueUsd, locale, t("states.unavailableValue"))}
+                    iconName="rewards"
+                    accentColor={portfolioEvolutionSeriesMeta.rewards.color}
+                    series={portfolioEvolutionModel?.data.map((point) => point.cumulativeRewardValueUsd) ?? []}
+                    meta={portfolioEvolutionModel ? t("portfolioEvolution.tooltip.eventCount", { count: portfolioEvolutionModel.footer.markerCount }) : null}
+                  />
+                ) : null}
               </>
             )}
           </CabDashboardGrid>
@@ -644,43 +647,30 @@ export function OverviewComponent({
 
           <div className={styles.primaryGrid}>
             <div className={styles.primaryPanel}>
-              {isInitialChartLoading ? (
-                <CabLoadingPanel label={t("states.loadingChart")} />
-              ) : !resolvedChartViewModel && chartErrorCode ? (
+              {isInitialProtocolPositionsLoading ? (
+                <CabLoadingPanel label={t("states.loadingProtocolPositions")} />
+              ) : !resolvedProtocolPositionsViewModel && protocolPositionsErrorCode ? (
                 <CabErrorPanel
                   title={t("states.providerFailureTitle")}
-                  description={t(`states.errors.${chartErrorCode}`, { defaultValue: t("states.providerFailureDescription") })}
+                  description={t(`states.errors.${protocolPositionsErrorCode}`, { defaultValue: t("states.providerFailureDescription") })}
                   retryLabel={t("actions.refresh")}
                   onRetry={onRefresh}
                 />
-              ) : !resolvedChartViewModel ? (
+              ) : !resolvedProtocolPositionsViewModel ? (
                 <CabEmptyState
                   title={t("states.emptyTitle")}
                   description={t("states.emptyDescription")}
                 />
-              ) : !isHistoricalAnalysisReady ? (
-                <CabCard density="spacious">
-                  <CabEmptyState
-                    title={t("portfolioEvolution.awaitingAnalysisTitle")}
-                    description={t("portfolioEvolution.awaitingAnalysisDescription")}
-                    actionLabel={analysisAction.visible && analysisAction.labelKey ? t(analysisAction.labelKey) : undefined}
-                    onAction={analysisAction.visible && analysisAction.mode ? () => onStartAnalysis(analysisAction.mode) : undefined}
-                  />
-                </CabCard>
               ) : (
-                <PortfolioEvolutionSection
-                  viewModel={resolvedChartViewModel}
-                  model={portfolioEvolutionModel}
-                  activity={activityViewModel}
-                  range={range}
-                  locale={locale}
-                  isRefreshing={isChartRefreshing}
-                  onRangeChange={onRangeChange}
+                <ProtocolPositionsSection
+                  protocolPositions={resolvedProtocolPositionsViewModel.protocolPositions}
+                  sourceSubtitle={t(`overview:sources.${resolvedProtocolPositionsViewModel.protocolPositions.source}`)}
+                  coverageMessage={protocolPositionsCoverageMessage}
                 />
               )}
             </div>
 
-            <div className={`${styles.primaryPanel} ${styles.distributionPanel}`}>
+            <div className={styles.primaryPanel}>
               {isInitialChartLoading ? (
                 <CabLoadingPanel label={t("states.loadingDistribution")} />
               ) : !resolvedChartViewModel && chartErrorCode ? (
@@ -706,27 +696,35 @@ export function OverviewComponent({
             </div>
           </div>
 
-          {isInitialProtocolPositionsLoading ? (
-            <CabLoadingPanel label={t("states.loadingProtocolPositions")} />
-          ) : !resolvedProtocolPositionsViewModel && protocolPositionsErrorCode ? (
-            <CabErrorPanel
-              title={t("states.providerFailureTitle")}
-              description={t(`states.errors.${protocolPositionsErrorCode}`, { defaultValue: t("states.providerFailureDescription") })}
-              retryLabel={t("actions.refresh")}
-              onRetry={onRefresh}
-            />
-          ) : !resolvedProtocolPositionsViewModel ? (
-            <CabEmptyState
-              title={t("states.emptyTitle")}
-              description={t("states.emptyDescription")}
-            />
-          ) : (
-            <ProtocolPositionsSection
-              protocolPositions={resolvedProtocolPositionsViewModel.protocolPositions}
-              sourceSubtitle={t(`overview:sources.${resolvedProtocolPositionsViewModel.protocolPositions.source}`)}
-              coverageMessage={protocolPositionsCoverageMessage}
-            />
-          )}
+          {showHistoricalAnalysisCards ? (
+            <div className={styles.primaryPanel}>
+              {isInitialChartLoading ? (
+                <CabLoadingPanel label={t("states.loadingChart")} />
+              ) : !resolvedChartViewModel && chartErrorCode ? (
+                <CabErrorPanel
+                  title={t("states.providerFailureTitle")}
+                  description={t(`states.errors.${chartErrorCode}`, { defaultValue: t("states.providerFailureDescription") })}
+                  retryLabel={t("actions.refresh")}
+                  onRetry={onRefresh}
+                />
+              ) : !resolvedChartViewModel ? (
+                <CabEmptyState
+                  title={t("states.emptyTitle")}
+                  description={t("states.emptyDescription")}
+                />
+              ) : (
+                <PortfolioEvolutionSection
+                  viewModel={resolvedChartViewModel}
+                  model={portfolioEvolutionModel}
+                  activity={activityViewModel}
+                  range={range}
+                  locale={locale}
+                  isRefreshing={isChartRefreshing}
+                  onRangeChange={onRangeChange}
+                />
+              )}
+            </div>
+          ) : null}
 
           <div
             style={{

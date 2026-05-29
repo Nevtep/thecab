@@ -1,6 +1,8 @@
 .root {
   display: grid;
   gap: 20px;
+  min-width: 0;
+  container-type: inline-size;
 }
 
 .headerBlock {
@@ -267,7 +269,49 @@
   }
 }
 
+@container (max-width: 1280px) {
+  .summaryZone {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rowGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 860px) {
+  .summaryMetricsGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .groupHeaderTop {
+    flex-direction: column;
+  }
+
+  .groupValue {
+    justify-items: start;
+    text-align: left;
+  }
+
+  .groupSplitLabels {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .groupSplitLabelEnd {
+    text-align: left;
+  }
+
+  .rowGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .footerRefresh {
+    margin-left: 0;
+    width: 100%;
+  }
+}
+
+@container (max-width: 860px) {
   .summaryMetricsGrid {
     grid-template-columns: minmax(0, 1fr);
   }

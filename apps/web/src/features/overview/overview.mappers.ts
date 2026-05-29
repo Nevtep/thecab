@@ -47,16 +47,16 @@ export function createInitialOverviewScreenState(
   return {
     walletAddress,
     chainId,
-    range: "7d",
+    range: "30d",
   };
 }
 
 export function normalizeOverviewRange(range?: string | null): OverviewRange {
-  if (range === "24h" || range === "30d") {
+  if (range === "24h" || range === "7d" || range === "30d") {
     return range;
   }
 
-  return "7d";
+  return "30d";
 }
 
 export function mapOverviewResponseToViewModel(response: OverviewViewModel): OverviewViewModel {

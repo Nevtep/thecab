@@ -190,12 +190,12 @@ export function OverviewContainer() {
       !isConnected ||
       !isSupportedChain ||
       !chartViewModel ||
-      screenState.range !== "7d"
+      screenState.range !== "30d"
     ) {
       return;
     }
 
-    for (const range of ["24h", "30d"] as const) {
+    for (const range of ["24h", "7d"] as const) {
       const warmupKey = `${walletAddress}:${resolvedChainId}:${range}`;
       if (warmedSnapshotKeysRef.current.has(warmupKey)) {
         continue;

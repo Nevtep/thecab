@@ -14,6 +14,7 @@ import {
   protocolContracts,
   pools,
   rawProviderRecords,
+  rewardEvents,
   walletContexts,
 } from "@/server/db/schema";
 import type { OverviewRequest } from "@/server/overview/overview.types";
@@ -630,6 +631,7 @@ export async function readOverviewRealizedRewardEvents(input: ScopedWalletInput 
     where re.wallet_address = ${input.walletAddress.toLowerCase()}
       and re.chain_id = ${input.chainId}
       and re.is_accrual_snapshot = false
+      and re.resolution_status = 'resolved'
       and re.occurred_at >= ${input.startAt}
       and re.occurred_at <= ${input.endAt}
       and not exists (
@@ -654,6 +656,53 @@ export async function readOverviewRealizedRewardEvents(input: ScopedWalletInput 
   return result.rows.map((row) => ({
     ...row,
     occurredAt: row.occurredAt instanceof Date ? row.occurredAt : new Date(row.occurredAt),
+  }));
+}
+
+export async function readOverviewUnresolvedRewardCoverage(input: ScopedWalletInput & {
+  startAt: Date;
+  endAt: Date;
+}) {
+  const db = getDb();
+
+  const rows = await db
+    .select({
+      occurredAt: rewardEvents.occurredAt,
+      resolutionReasonCodes: rewardEvents.resolutionReasonCodes,
+      txHash: rewardEvents.txHash,
+    })
+    .from(rewardEvents)
+    .where(
+      and(
+        eq(rewardEvents.walletAddress, input.walletAddress.toLowerCase()),
+        eq(rewardEvents.chainId, input.chainId),
+        eq(rewardEvents.isAccrualSnapshot, false),
+        gte(rewardEvents.occurredAt, input.startAt),
+        lte(rewardEvents.occurredAt, input.endAt),
+        sql`${rewardEvents.resolutionStatus} <> 'resolved'`,
+        sql`not exists (
+          select 1
+          from ${ledgerEvents} le_filtered
+          where le_filtered.chain_id = ${rewardEvents.chainId}
+            and le_filtered.wallet_address = ${rewardEvents.walletAddress}
+            and le_filtered.tx_hash = ${rewardEvents.txHash}
+            and (
+              le_filtered.classification = 'governance'
+              or lower(coalesce(le_filtered.metadata_json->>'summary', '')) like '%voting escrow%'
+              or lower(coalesce(le_filtered.metadata_json->>'summary', '')) like '%veaero%'
+              or (
+                lower(coalesce(le_filtered.metadata_json->>'summary', '')) like '%aerodrome%'
+                and lower(coalesce(le_filtered.metadata_json->>'summary', '')) like '%escrow%'
+              )
+            )
+        )`,
+      ),
+    )
+    .orderBy(rewardEvents.occurredAt);
+
+  return rows.map((row) => ({
+    occurredAt: row.occurredAt,
+    resolutionReasonCodes: row.resolutionReasonCodes ?? [],
   }));
 }
 

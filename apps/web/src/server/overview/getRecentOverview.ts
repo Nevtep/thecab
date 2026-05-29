@@ -41,7 +41,7 @@ import type {
   OverviewResponse,
 } from "@/server/overview/overview.types";
 
-export const DEFAULT_OVERVIEW_RANGE: OverviewRange = "7d";
+export const DEFAULT_OVERVIEW_RANGE: OverviewRange = "30d";
 
 const OVERVIEW_BUCKET_CONFIG: Record<OverviewRange, { granularity: "hour" | "day"; bucketCount: number }> = {
   "24h": { granularity: "hour", bucketCount: 24 },
