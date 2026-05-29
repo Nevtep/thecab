@@ -1,4 +1,4 @@
-# The Cab — Aerodrome & Mellow Protocol Mechanics Research v1.1
+# The Cab — Aerodrome & Mellow Protocol Mechanics Research v1.2
 
 ## Document role
 
@@ -31,6 +31,11 @@ The following findings are treated as accepted design inputs for The Cab:
 - Manual Aerodrome concentrated-liquidity deposits should be identified primarily by NFT / `tokenId` where available.
 - `mint()` creates a new manual deposit lifecycle.
 - `increaseLiquidity(tokenId, ...)` adds capital to an existing deposit lifecycle.
+- Aerodrome reward ownership for manual deposits must resolve from deposit identity, meaning explicit `tokenId` evidence first and same-tx lifecycle/NFT context second.
+- Aerodrome rewards must not be attributed by pool-plus-time-window heuristics, unique-active-position heuristics, or current-position fallbacks.
+- Pool rewards are an aggregate of already linked deposit rewards and strategy rewards; pools do not own reward attribution directly.
+- Gauge reward realization can happen on explicit claim transactions and on unstake transactions that return rewards in the same transaction.
+- Gauge-origin reward receipts may appear in provider history as generic ERC20 `token receive` rows rather than explicit `claim` rows.
 - `IncreaseLiquidity` events alone are not sufficient to distinguish a new deposit from an increase to an existing deposit.
 - Mellow exposure should not be modeled as a user-owned manual Aerodrome NFT deposit unless the wallet actually owns the relevant NFT.
 - Mellow should be modeled as an automated strategy layer.
@@ -158,6 +163,68 @@ Analytics implication:
 - The deposit may be economically closed before burn if liquidity has been fully removed and assets withdrawn.
 - Burn is not how normal deposit continuity should be tracked.
 
+### 2.7 Stake / unstake semantics
+
+Aerodrome manual deposits can be staked into a gauge without changing deposit identity.
+
+Product interpretation:
+
+```txt
+stake / unstake do not create a new Deposit and do not change Deposit identity
+```
+
+Analytics implication:
+
+- The same `tokenId` remains the same Deposit before stake, while staked, and after unstake.
+- A stake is typically observed through a known gauge surface plus wallet-to-gauge NFT movement or a gauge deposit-like interaction.
+- An unstake is typically observed through the reverse gauge-to-wallet NFT movement or a gauge `withdraw(...)` surface.
+- Gauge unstake must not be confused with manual LP withdrawal from the position manager.
+- Deposit status may change between unstaked and staked operational states while remaining the same Deposit lifecycle.
+
+### 2.8 Exit / withdrawal semantics
+
+Manual concentrated-liquidity withdrawal or close often appears as a position-manager `multicall(...)` rather than a single clearly named `withdraw(...)` function.
+
+Product interpretation:
+
+```txt
+manual LP withdrawal / close = economic effect of the multicall inner steps,
+not the top-level selector name
+```
+
+Analytics implication:
+
+- A close path may include `decreaseLiquidity(...)`, `collect(...)`, token returns, and `burn(...)` in one transaction.
+- Economic withdrawal should be recognized from the inner operations and resulting token movements.
+- The deposit may be economically closed once liquidity is removed and assets are returned, even if `burn(...)` is only a trailing cleanup signal.
+- Any returned tokens may remain pool-attributed residuals until later movement resolves them.
+
+### 2.9 Deposit lifecycle data that The Cab must preserve
+
+For each manual deposit lifecycle event, the engine should preserve enough data to explain both ownership and economic effect.
+
+Minimum useful lifecycle fields:
+
+- `tokenId`
+- `txHash`
+- `occurredAt`
+- `positionManagerAddress`
+- `poolAddress`
+- interpreted action (`mint`, `increaseLiquidity`, `stake`, `claim_reward`, `unstake`, `decreaseLiquidity`, `collect`, `withdraw`, `burn`, `close`)
+- decoded method label when available
+- provider category / summary when available
+- token deltas from `AssetMovement`
+- event-time USD valuation / price source where available
+- confidence / coverage notes when classification or valuation is partial
+
+The point of the lifecycle is not just chronology. It is to preserve:
+
+- identity continuity by `tokenId`;
+- economic state transitions;
+- reward realization;
+- capital-in vs capital-out separation;
+- the distinction between manual deposit behavior and later residual-wallet behavior.
+
 ---
 
 ## 3. Aerodrome event semantics and classification risks
@@ -207,6 +274,48 @@ For manual Aerodrome concentrated-liquidity deposits:
 
 ### 3.4 Implementation warning
 
+Function names can be misleading for Aerodrome lifecycle classification.
+
+Observed implementation caveat:
+
+```txt
+gauge unstake may call a function named withdraw(...)
+manual CL withdrawal may appear as position-manager multicall(...)
+```
+
+This means The Cab must not equate:
+
+- top-level function name `withdraw(...)` with manual deposit withdrawal;
+- top-level function name `multicall(...)` with a generic or unclassifiable action.
+
+Instead, classification must inspect:
+
+- the target contract surface, especially gauge vs position manager;
+- decoded inner calls / call trace where available;
+- same-tx token movements;
+- NFT burn / transfer behavior;
+- the presence of `decreaseLiquidity`, `collect`, and burn steps inside the transaction.
+
+Concrete examples observed during implementation review:
+
+- Unstake example: `0xa49ceac9eef9af25d363b82651871f58d159ad15197897e735e8bc43064ae132`
+  - Product interpretation: gauge unstake
+  - Contract-function surface: target function named `withdraw`
+  - Warning: this is not the same thing as a manual LP position withdrawal from the position manager.
+- Withdrawal example: `0x88fb14fb47d93e40d0cc9c84da13c618808c6b5e4c2ff3a811646566a7bbecbc`
+  - Product interpretation: manual deposit withdrawal / close path
+  - Contract-function surface: top-level call appears as `multicall`
+  - Warning: the economic withdrawal is happening inside the multicall sequence, including burn and withdrawal-related steps.
+
+Implementation rule:
+
+```txt
+unstake / withdraw naming must follow economic interpretation and contract surface,
+not raw selector name alone
+```
+
+### 3.5 Implementation warning
+
 Do not classify an Aerodrome deposit lifecycle using event names alone.
 
 Incorrect:
@@ -220,6 +329,91 @@ Correct:
 ```txt
 mint() + IncreaseLiquidity event => new Deposit
 increaseLiquidity(tokenId) + IncreaseLiquidity event => existing Deposit continues
+```
+
+### 3.6 Reward realization and attribution rule
+
+For manual Aerodrome deposits, reward ownership follows deposit identity, not pool continuity.
+
+Canonical rule:
+
+```txt
+RewardEvent -> Deposit -> Pool
+```
+
+This means:
+
+- first resolve the reward to a Deposit;
+- only after that derive the Pool from the Deposit;
+- never attribute a reward directly to a Pool and then try to guess the Deposit afterward.
+
+Resolution priority for Aerodrome manual-deposit rewards:
+
+1. Explicit `tokenId` from decoded input / provider metadata.
+2. Same-tx lifecycle or NFT context that proves the `tokenId`.
+3. Otherwise unresolved.
+
+Accepted explicit identity fields include shapes such as:
+
+- `tokenId`
+- `token_id`
+- `tokenIds`
+- `token_ids`
+- `positionId`
+- `position_id`
+- array/nested variants of those fields in decoded input or metadata
+
+Rejected attribution shortcuts:
+
+- unique currently open deposit in the same pool
+- deposit whose time window covers the claim
+- current manual position in the same pool
+- direct pool attribution without deposit identity
+
+Implementation rule:
+
+```txt
+unresolved reward > falsely attributed reward
+```
+
+### 3.7 Gauge reward and provider-decoding caveats
+
+Gauge reward realizations do not always look like explicit `claim` lifecycle rows in provider history.
+
+Observed caveats:
+
+- provider history can label gauge reward receipts as generic ERC20 `token receive` rows;
+- reward realization can happen on explicit claim transactions such as `getReward(...)` / `getRewards(...)`;
+- reward realization can also happen on unstake transactions such as gauge `withdraw(...)` when the same tx returns reward tokens to the wallet.
+
+Implementation implication:
+
+- known-gauge ERC20 inbound transfers should be treated as reward candidates;
+- those reward candidates must not be inserted into the manual deposit lifecycle as if they were deposit-opening or deposit-closing actions;
+- gauge touches must not create synthetic deposits under the gauge address;
+- duplicate reward emission must be avoided when the same tx already contains a lifecycle-linked `collect(...)` signal.
+
+### 3.8 Common Aerodrome function / surface watchlist
+
+The exact ABI varies by surface, but the following function families are the important ones observed so far.
+
+| Surface | Common function / signal | The Cab interpretation |
+|---|---|---|
+| Position manager | `mint(...)` | Open new manual Deposit |
+| Position manager | `increaseLiquidity(tokenId, ...)` | Add capital to existing Deposit |
+| Position manager | `decreaseLiquidity(tokenId, ...)` | Reduce capital in existing Deposit |
+| Position manager | `collect(tokenId, ...)` | Realize deposit-linked fees/rewards |
+| Position manager | `burn(tokenId)` | Cleanup / closure confirmation |
+| Position manager | `multicall(...)` | Wrapper surface around close / withdrawal flows; inspect inner calls |
+| Gauge | NFT transfer to known gauge / deposit-like call | Stake existing Deposit |
+| Gauge | `withdraw(...)` | Unstake existing Deposit, not manual LP withdrawal |
+| Gauge | `getReward(...)`, `getRewards(...)`, claim-like call | Explicit reward claim candidate |
+| Gauge | `withdraw(...)` with inbound reward transfer | Unstake plus reward realization in one tx |
+
+Implementation warning:
+
+```txt
+top-level selector name is not the product meaning
 ```
 
 ---
@@ -245,9 +439,9 @@ However, several important actions happen through other protocol surfaces.
 |---|---|---|
 | Swaps | Router, pool events, token transfers | Usually router-mediated, but must be confirmed with token movement. |
 | Add liquidity / deposit LP | Router, pool events, position manager, LP/NFT events | May pass through Router, but must be tied to Deposit identity. |
-| Remove liquidity / withdraw LP | Router, pool events, position manager, token transfers | May open residual attribution. |
+| Remove liquidity / withdraw LP | Router, pool events, position manager, token transfers | May open residual attribution; often appears as position-manager `multicall(...)`, so inspect inner steps rather than the top-level selector only. |
 | Stake LP | Gauge contracts, LP token transfers | Do not assume Router involvement. |
-| Unstake LP | Gauge contracts, LP token transfers | Do not assume Router involvement. |
+| Unstake LP | Gauge contracts, LP token transfers | Do not assume Router involvement; gauge unstake may call a function literally named `withdraw(...)`, which must not be confused with manual LP withdrawal. |
 | Claim LP/gauge rewards | Gauge/reward contracts, token transfers | Link to RewardEvent. |
 | veAERO lock/relock/increase | Voting escrow / veAERO contracts, AERO transfers | Governance surface, not Router surface. |
 | Vote/reset/relay | Voter/governance contracts | Governance surface. |
@@ -346,6 +540,60 @@ Pool
 ```
 
 The pool view should aggregate value while preserving source breakdown.
+
+### 5.4 Ownership hierarchy for rewards and pools
+
+The ownership hierarchy must remain explicit.
+
+Manual path:
+
+```txt
+RewardEvent -> Deposit -> Pool
+```
+
+Strategy path:
+
+```txt
+RewardEvent -> StrategyExposure / Strategy -> Pool
+```
+
+Never:
+
+```txt
+RewardEvent -> Pool -> guessed Deposit
+```
+
+This hierarchy exists because:
+
+- reward ownership is a position-level or strategy-level fact;
+- pools are aggregate containers, not the primary owner of reward claims;
+- multiple deposits and strategies can coexist in the same pool at the same time;
+- direct pool attribution creates ambiguity and spaghetti as soon as a pool has overlapping positions.
+
+### 5.5 Pool reward aggregation rule
+
+Pool rewards must be computed from already linked reward ownership.
+
+Canonical rule:
+
+```txt
+pool total rewards = sum(rewards linked to pool deposits) + sum(rewards linked to pool strategies)
+```
+
+This means:
+
+- resolve deposit rewards first;
+- resolve strategy rewards first;
+- derive the pool from the resolved deposit / strategy owner;
+- aggregate those resolved rewards at pool level.
+
+Do not:
+
+- infer pool rewards directly from gauge transfers alone;
+- force unresolved rewards into a pool because the gauge is known;
+- use time-window overlap between pool activity and reward timing as ownership proof.
+
+If ownership cannot be resolved to a Deposit or Strategy, the reward should remain unresolved until better identity evidence exists.
 
 ---
 
@@ -753,6 +1001,145 @@ Implementation rule:
 - A wallet interaction with `StakingRewards` should be considered candidate Strategy reward/staking activity.
 - Both surfaces must map to the same `Strategy` record when they are paired in official Mellow metadata.
 
+#### Aerodrome dashboard strategy-position lens (`LpSugar`)
+
+Additional protocol research against the live Aerodrome dashboard and Base onchain reads established that Aerodrome uses a separate read-only lens contract for wallet position lists:
+
+```txt
+LpSugar = wallet-position lens / dashboard aggregation contract
+```
+
+Verified Base contract:
+
+- `LpSugar`: `0x69dD9db6d8f8E7d83887A704f447b1a584b599A1`
+
+Observed related dashboard surfaces:
+
+- `Multicall3`: `0xca11bde05977b3631167028862be2a173976ca11`
+- `OffchainOracle`: `0xfBC91Fc9C6E70Afbea84b69FB0bF5EBa7F90aaFd`
+
+Critical finding from the captured Aerodrome app bundle:
+
+```txt
+dashboard label = "Deposit #" + String(position.id)
+```
+
+This means the Aerodrome-visible automated `Deposit #...` number is rendered from the `id` field of the dashboard position object, not from the wrapper address itself and not from the wrapper's small `positionId()` value.
+
+Observed verified `LpSugar` methods used by the dashboard:
+
+- `count()`
+- `tokens(uint256,uint256,address,address[])`
+- `positions(uint256,uint256,address)`
+- `positionsUnstakedConcentrated(uint256,uint256,address)`
+
+Observed selectors:
+
+- `0x06661abd` => `count()`
+- `0x295212be` => `tokens(uint256,uint256,address,address[])`
+- `0xedbd33bf` => `positions(uint256,uint256,address)`
+- `0xe2bd5514` => `positionsUnstakedConcentrated(uint256,uint256,address)`
+
+The important returned `positions(...)` fields for The Cab are:
+
+- `id`
+- `lp`
+- `alm`
+- `locker`
+- `unlocks_at`
+- liquidity and amount fields
+- tick/range fields
+
+Working interpretation:
+
+- `alm` identifies the ALM / wrapper contract for automated positions.
+- `id` is the Aerodrome dashboard-facing strategy-position reference currently shown to users as `Deposit #...`.
+- This `id` is deterministic and wallet-scoped in the dashboard response path.
+- This `id` is not the same thing as the wrapper's own `positionId()`.
+
+Concrete evidence from live dashboard decoding:
+
+- `0x55F54B1f63125Fce3c90F30856CE9d928FF47C26` is a verified `LpWrapper` for the EURC/USDC strategy.
+- That wrapper's own `positionId()` is `16`.
+- The Aerodrome dashboard response from `LpSugar.positions(...)` returned a row with:
+  - `alm = 0x55F54B1f63125Fce3c90F30856CE9d928FF47C26`
+  - `id = 71140295`
+- A different wrapper, `0xcd975e6a5F55137755487F0918b8ca74aCCe7925`, returned:
+  - `id = 71496797`
+
+Therefore:
+
+```txt
+LpWrapper.positionId() != Aerodrome dashboard Deposit # / position.id
+```
+
+and:
+
+```txt
+Aerodrome dashboard Deposit # comes from LpSugar.positions(...).id
+```
+
+Implementation path for The Cab:
+
+1. Use official Mellow strategy metadata to map `lpWrapper` + `StakingRewards` to a single `Strategy`.
+2. Use a Base RPC provider and call `LpSugar.positions(limit, offset, walletAddress)`.
+3. Filter returned rows where `alm == Strategy.wrapperAddress`.
+4. If exactly one deterministic wallet-scoped row matches, persist `row.id` as the Aerodrome dashboard strategy-position reference.
+5. Store that value as external metadata on `StrategyExposure`, not as a replacement for canonical ownership identity.
+
+Recommended tooling and provider path:
+
+- Library: `viem`
+- RPC provider: Base JSON-RPC such as Alchemy Base mainnet
+- ABI/source reference: verified `LpSugar` ABI/source from BaseScan
+- Dashboard verification method: HAR capture plus bundle string inspection when necessary
+
+Recommended query path:
+
+```ts
+const rows = await publicClient.readContract({
+  address: LPSUGAR_ADDRESS,
+  abi: lpSugarAbi,
+  functionName: 'positions',
+  args: [limit, offset, walletAddress],
+});
+
+const match = rows.filter((row) =>
+  isAddressEqual(row.alm, strategy.wrapperAddress),
+);
+```
+
+Recommended persistence rule:
+
+```txt
+canonical ownership key = StrategyExposure identity by wallet + strategy + wrapper/share lifecycle
+external deterministic reference = LpSugar position.id
+```
+
+Recommended field naming:
+
+- `metadata_json.externalDepositReference`, or
+- a dedicated field such as `strategyPositionId` / `aerodromePositionReference`
+
+Do not:
+
+- rename this value to manual Aerodrome NFT `tokenId` in domain logic;
+- replace `StrategyExposure` identity with this value without stronger protocol proof;
+- substitute `LpWrapper.positionId()` for the dashboard-facing `Deposit #...`;
+- use the public `points.mellow.finance` API as the source of this identifier.
+
+Safe usage rule for v1:
+
+```txt
+use LpSugar.positions(...).id as a deterministic external strategy-position reference,
+not as proven canonical manual-NFT token identity
+```
+
+Ambiguity rule:
+
+- If multiple `LpSugar.positions(...)` rows match the same wrapper and wallet at the same time, keep the external reference unresolved until a stronger distinguishing signal exists.
+- If no row matches the wrapper, do not guess from pool/time-window overlap.
+
 ### 8.8 Mellow event and function watchlist
 
 The exact ABI should be verified per deployed contract, but The Cab should look for these categories:
@@ -940,6 +1327,8 @@ The Cab should follow these rules:
 8. Mellow strategy value may contribute to Pool aggregates when the underlying pool is known.
 9. Mellow should not create manual Deposit entities unless the wallet owns the manual Aerodrome NFT.
 10. If accounting relies only on share balances, UI must show `share_level` coverage.
+11. If `LpSugar.positions(...)` yields a deterministic wallet-scoped row for the wrapper, persist `row.id` as an external strategy-position reference on `StrategyExposure`.
+12. Do not substitute `LpWrapper.positionId()` for Aerodrome dashboard `Deposit #...` because live evidence shows those identifiers differ.
 
 ### 8.11 Mellow-specific open questions
 
@@ -957,6 +1346,8 @@ Implementation should verify:
 10. How to map each `lpWrapper` back to the exact Aerodrome pool when relying only on onchain reads.
 11. Whether management/protocol/performance fee share minting can be reliably separated from user share minting.
 12. Whether strategy internal rebalance events should be shown in Activity or only summarized in Strategy detail.
+13. Whether `LpSugar.positions(...).id` is documented in source as a pool position id, strategy position id, or another lens-specific identity, even though the dashboard already uses it as `Deposit #...`.
+14. Whether any wrapper can surface multiple simultaneous `LpSugar` rows per wallet, which would require a stronger matching rule than `alm == wrapperAddress` alone.
 
 
 ## 9. Protocol finding to domain mapping
@@ -972,7 +1363,7 @@ Implementation should verify:
 | User participation in Mellow | `StrategyExposure` | User-level strategy lifecycle. |
 | Onchain classified action | `LedgerEvent` | Canonical event timeline. |
 | Token movement | `AssetMovement` | Accounting primitive. |
-| Claimed fees/rewards | `RewardEvent` | Query-friendly reward surface. |
+| Claimed fees/rewards | `RewardEvent` | Query-friendly reward surface; owned by Deposit or Strategy before any Pool aggregation. |
 | veAERO/vote/relay actions | `GovernanceEvent` | Governance-specific surface. |
 | Leftover pool token after withdraw | `AttributionState` | Residual pool attribution. |
 | Cash-in or reward-conversion inventory | `AttributionSourceLot` | Waterfall source. |
@@ -983,7 +1374,7 @@ Implementation should verify:
 
 ## 10. Implementation warnings
 
-### 9.1 Do not collapse Pools, Deposits, and Strategies
+### 10.1 Do not collapse Pools, Deposits, and Strategies
 
 Incorrect:
 
@@ -1000,7 +1391,7 @@ Pool
   └── Residual Attribution
 ```
 
-### 9.2 Do not model Mellow as manual deposit by default
+### 10.2 Do not model Mellow as manual deposit by default
 
 Incorrect:
 
@@ -1014,7 +1405,7 @@ Correct:
 Mellow deposit => StrategyExposure
 ```
 
-### 9.3 Do not classify by event names only
+### 10.3 Do not classify by event names only
 
 Incorrect:
 
@@ -1029,7 +1420,57 @@ mint() + IncreaseLiquidity => new Deposit
 increaseLiquidity(tokenId) + IncreaseLiquidity => same Deposit continues
 ```
 
-### 9.4 Do not assume Router covers all actions
+### 10.4 Do not attribute rewards by pool / time heuristics
+
+Incorrect:
+
+```txt
+reward happened in pool X around time T => assign it to the deposit that looks active there
+```
+
+Correct:
+
+```txt
+reward must resolve from explicit owner identity first (tokenId or strategy surface);
+otherwise leave it unresolved
+```
+
+### 10.5a Do not conflate dashboard strategy-position id with wrapper `positionId()`
+
+Incorrect:
+
+```txt
+LpWrapper.positionId() == Aerodrome dashboard Deposit #
+```
+
+Correct:
+
+```txt
+Aerodrome dashboard Deposit # comes from LpSugar.positions(...).id;
+LpWrapper.positionId() is a different wrapper-level value
+```
+
+Implementation consequence:
+
+```txt
+persist dashboard-facing strategy position references separately from wrapper positionId()
+```
+
+### 10.5 Do not inject gauge reward receipts into deposit lifecycle rows
+
+Incorrect:
+
+```txt
+gauge reward transfer => deposit lifecycle event that opens/closes/mutates the Deposit directly
+```
+
+Correct:
+
+```txt
+gauge reward transfer => RewardEvent candidate to be linked to the Deposit or Strategy
+```
+
+### 10.6 Do not assume Router covers all actions
 
 Incorrect:
 
@@ -1043,7 +1484,7 @@ Correct:
 Aerodrome activity may occur through Router, pools, gauges, rewards, bribes, veAERO, voter, and Mellow contracts.
 ```
 
-### 9.5 Do not let residual balances disappear
+### 10.7 Do not let residual balances disappear
 
 Incorrect:
 
@@ -1055,6 +1496,36 @@ Correct:
 
 ```txt
 withdraw => active deposit may close, but residual tokens remain attributed until resolved by movement
+```
+
+### 10.8 Do not let a top-level function name override the economic interpretation
+
+Incorrect:
+
+```txt
+withdraw(...) always means manual LP withdrawal
+multicall(...) is too generic to classify
+```
+
+Correct:
+
+```txt
+gauge withdraw(...) can mean unstake
+position-manager multicall(...) can be the real manual withdrawal / close path
+```
+
+### 10.9 Prefer unresolved over confidently wrong
+
+Incorrect:
+
+```txt
+if identity is missing, guess the nearest pool/deposit so the UI is non-zero
+```
+
+Correct:
+
+```txt
+if identity is missing, keep the reward unresolved and surface the coverage limitation
 ```
 
 ---
@@ -1073,6 +1544,8 @@ The following research should be completed during implementation:
 8. Which transactions require call traces rather than event logs only?
 9. How should partial history be handled when a deposit or strategy began before the one-year analysis window?
 10. Which provider returns enough decoded transaction context to distinguish `mint()` from `increaseLiquidity()` reliably?
+11. Which claim / unstake tx shapes still fail to expose a reliable `tokenId` even after checking nested decoded input and same-tx lifecycle context?
+12. Which gauge implementations on relevant Aerodrome surfaces realize rewards on `withdraw(...)` versus explicit claim-only functions?
 
 ---
 
@@ -1134,9 +1607,16 @@ The research supports these implementation rules:
 2. `mint()` creates a new Deposit.
 3. `increaseLiquidity(tokenId)` extends an existing Deposit.
 4. `IncreaseLiquidity` events are ambiguous without transaction context.
-5. Mellow user exposure should be modeled as StrategyExposure, not as manual Deposit.
-6. Mellow strategies may contribute to Pool aggregates while retaining separate accounting.
-7. Router is a discovery anchor, not the entire protocol surface.
-8. Pool-level analytics must aggregate Deposits, Strategies, and Residual Attribution.
-9. Residual assets must remain visible and attributed until actual movement resolves them.
-10. All analytics should remain explainable through LedgerEvents, AssetMovements, PricePoints, and CoverageReports.
+5. Stake / unstake do not change deposit identity; they mutate the same Deposit lifecycle.
+6. Gauge `withdraw(...)` can mean unstake, while manual LP withdrawal can appear as position-manager `multicall(...)`.
+7. Aerodrome reward ownership must resolve by explicit `tokenId` or same-tx lifecycle / NFT context, otherwise remain unresolved.
+8. Gauge reward realization may appear as generic ERC20 receive rows and may occur on explicit claim txs or unstake txs.
+9. Pool rewards must aggregate already linked Deposit and Strategy rewards rather than inferring ownership directly at pool level.
+10. Mellow user exposure should be modeled as StrategyExposure, not as manual Deposit.
+11. Mellow strategies may contribute to Pool aggregates while retaining separate accounting.
+12. Router is a discovery anchor, not the entire protocol surface.
+13. Pool-level analytics must aggregate Deposits, Strategies, and Residual Attribution.
+14. Residual assets must remain visible and attributed until actual movement resolves them.
+15. All analytics should remain explainable through LedgerEvents, AssetMovements, PricePoints, and CoverageReports.
+16. Aerodrome dashboard automated `Deposit #...` values come from `LpSugar.positions(...).id`, which can be persisted as an external deterministic strategy-position reference on `StrategyExposure`.
+17. `LpWrapper.positionId()` must not be substituted for the dashboard-facing strategy-position reference because live evidence shows the values differ.
