@@ -34,6 +34,7 @@ export type CabDonutChartProps = {
   height?: number;
   valueFormatter?: (value: number) => string;
   centerContent?: ReactNode;
+  footerContent?: ReactNode;
 };
 
 export function CabDonutChart({
@@ -44,6 +45,7 @@ export function CabDonutChart({
   height,
   valueFormatter,
   centerContent,
+  footerContent,
 }: CabDonutChartProps) {
   const normalizedLevels = levels && levels.length > 0
     ? levels.map((level, levelIndex) => ({
@@ -64,7 +66,7 @@ export function CabDonutChart({
       }];
 
   return (
-    <CabChartFrame title={title} subtitle={subtitle} height={height}>
+    <CabChartFrame title={title} subtitle={subtitle} height={height} footer={footerContent}>
       <div
         style={{ width: "100%", height: "100%", position: "relative" }}
         onMouseDownCapture={(event) => {

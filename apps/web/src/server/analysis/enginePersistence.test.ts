@@ -218,6 +218,41 @@ test("resolvePersistedRewardResolutionStatus treats strategy exposure ownership 
     depositOrStrategyId: null,
     strategyExposureId: null,
   }), "unresolved");
+  assert.equal(resolvePersistedRewardResolutionStatus({
+    depositOrStrategyId: null,
+    strategyExposureId: null,
+    resolutionStatus: "excluded",
+  }), "excluded");
+});
+
+test("buildAccrualRewardSnapshotRows preserves reward source metadata used by Rewards display", async () => {
+  const { buildAccrualRewardSnapshotRows } = await import("@/server/analysis/enginePersistence");
+
+  const [snapshot] = buildAccrualRewardSnapshotRows({
+    walletAddress: "0x0ecd939b7fca4dc4a0675d8d28bad12cefae0954",
+    chainId: 8453,
+    sliceEndUtc: new Date("2026-05-29T00:00:00.000Z"),
+    accrualSnapshotDayUtc: "2026-05-28",
+    accrualSnapshots: [
+      {
+        depositOrStrategyId: "deposit-a",
+        rewardType: "reward_accrual_snapshot",
+        protocol: "aerodrome",
+        targetType: "deposit",
+        targetTokenId: "1",
+        surfaceKind: "manual_deposit_gauge_claim",
+        componentKey: "reward-0",
+        economicComponentKind: "reward_claim",
+        movementLogIndexes: [7],
+        feeAttributionBasis: "wallet_pool_single_holder",
+      },
+    ],
+  });
+
+  assert.equal(snapshot?.metadataJson.sourceSurface, "manual_deposit_gauge_claim");
+  assert.equal(snapshot?.metadataJson.surfaceKind, "manual_deposit_gauge_claim");
+  assert.equal(snapshot?.metadataJson.componentKey, "reward-0");
+  assert.deepEqual(snapshot?.metadataJson.movementLogIndexes, [7]);
 });
 
 test("resolveManualDepositDisplayMetadata prefers canonical pool metadata over numeric fallback symbols", async () => {

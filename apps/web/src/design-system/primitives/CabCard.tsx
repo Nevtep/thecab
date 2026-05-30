@@ -1,6 +1,6 @@
 "use client";
 
-import type { PropsWithChildren } from "react";
+import type { ComponentProps, PropsWithChildren } from "react";
 import { YStack } from "tamagui";
 
 import { cabColors } from "@/design-system/tokens";
@@ -16,9 +16,9 @@ export type CabCardProps = PropsWithChildren<{
   padding?: number | string;
   gap?: number | string;
   density?: CabDensity;
-}>;
+}> & Omit<ComponentProps<typeof YStack>, "padding" | "gap">;
 
-export function CabCard({ padding, gap, density = "default", children }: CabCardProps) {
+export function CabCard({ padding, gap, density = "default", children, ...props }: CabCardProps) {
   const densityStyle = cardDensityStyles[density];
 
   return (
@@ -29,6 +29,7 @@ export function CabCard({ padding, gap, density = "default", children }: CabCard
       borderRadius="$3"
       padding={padding ?? densityStyle.padding}
       gap={gap ?? densityStyle.gap}
+      {...props}
     >
       {children}
     </YStack>

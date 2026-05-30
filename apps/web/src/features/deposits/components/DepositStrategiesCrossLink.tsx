@@ -5,11 +5,14 @@ import { useRouter } from "next/navigation";
 import { CabButton, CabCard, CabStack, CabText } from "@/design-system";
 import { CabTooltip } from "@/design-system/primitives/CabTooltip";
 import { getStrategyDetailHref } from "@/features/deposits/deposits.navigation";
+import { buildDepositRewardsHref } from "@/features/rewards/rewards.navigation";
 
 type DepositStrategiesCrossLinkProps = {
   title: string;
   description: string;
   actionLabel: string;
+  rewardsActionLabel?: string;
+  depositId?: string;
   strategyId: string;
 };
 
@@ -35,6 +38,11 @@ export function DepositStrategiesCrossLink(input: DepositStrategiesCrossLinkProp
             </span>
           </CabTooltip>
         )}
+        {input.depositId && input.rewardsActionLabel ? (
+          <CabButton tone="technical" controlSize="sm" onPress={() => router.push(buildDepositRewardsHref(input.depositId!))}>
+            {input.rewardsActionLabel}
+          </CabButton>
+        ) : null}
         <CabText variant="caption">{input.strategyId}</CabText>
       </CabStack>
     </CabCard>

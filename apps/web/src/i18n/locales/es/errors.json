@@ -18,5 +18,12 @@
     "invalid_request": "La solicitud de estrategias no es válida.",
     "strategy_not_found": "No pudimos encontrar esa estrategia para esta billetera.",
     "internal_error": "Ocurrió un problema al cargar estrategias."
+  },
+  "rewards": {
+    "UNAUTHENTICATED_WALLET": "Conecte su billetera para ver rewards.",
+    "UNSUPPORTED_CHAIN": "Esta red todavía no es compatible con rewards.",
+    "INVALID_REWARDS_FILTERS": "Los filtros de rewards no son válidos.",
+    "ANALYSIS_NOT_FOUND": "Ejecute un análisis antes de ver rewards.",
+    "REWARDS_READ_FAILED": "Ocurrió un problema al cargar rewards."
   }
 }

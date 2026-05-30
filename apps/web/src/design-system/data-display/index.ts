@@ -5,6 +5,7 @@ export * from "@/design-system/data-display/CabCompositionRail";
 export * from "@/design-system/data-display/CabCoverageBadge";
 export * from "@/design-system/data-display/CabDataPanel";
 export * from "@/design-system/data-display/CabImpactMetricCard";
+export * from "@/design-system/data-display/CabKeyValueList";
 export * from "@/design-system/data-display/CabKpiStrip";
 export * from "@/design-system/data-display/CabMetricCard";
 export * from "@/design-system/data-display/CabRangeIndicator";

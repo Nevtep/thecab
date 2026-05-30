@@ -21,6 +21,7 @@ import { DepositPerformanceDecomposition } from "@/features/deposits/components/
 import { DepositRangeIndicator } from "@/features/deposits/components/DepositRangeIndicator";
 import { DepositStrategiesCrossLink } from "@/features/deposits/components/DepositStrategiesCrossLink";
 import { DepositValueChart } from "@/features/deposits/components/DepositValueChart";
+import { buildDepositRewardsHref } from "@/features/rewards/rewards.navigation";
 import type { DepositDetailResponse } from "@/features/deposits/deposits.types";
 import { mapDepositDetailResponseToViewModel } from "@/features/deposits/deposits.mappers";
 
@@ -82,6 +83,8 @@ export function DepositDetailComponent(input: DepositDetailComponentProps) {
         tokenIdLabel={viewModel.header.tokenIdLabel}
         explorerUrl={explorerUrl(deposit.tokenId)}
         viewInExplorerLabel={viewModel.actions.viewInExplorerLabel}
+        rewardsHref={buildDepositRewardsHref(deposit.depositId)}
+        viewRewardsLabel={t("navigation:items.rewards")}
         closeLabel={viewModel.actions.closeLabel}
         onClose={input.onClose}
       />
@@ -158,6 +161,8 @@ export function DepositDetailComponent(input: DepositDetailComponentProps) {
           title={viewModel.strategyCrossLink.title}
           description={viewModel.strategyCrossLink.description}
           actionLabel={viewModel.strategyCrossLink.actionLabel}
+          rewardsActionLabel={t("navigation:items.rewards")}
+          depositId={deposit.depositId}
           strategyId={viewModel.strategyCrossLink.strategyId}
         />
       ) : null}

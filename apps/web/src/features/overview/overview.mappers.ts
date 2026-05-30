@@ -268,8 +268,9 @@ export function getOverviewNavigationItems(
       key: "rewards",
       iconName: "rewards",
       labelKey: "navigation:items.rewards",
-      stateKey: analysisReady ? "comingSoon" : "requiresAnalysis",
-      disabled: true,
+      href: analysisReady ? "/rewards" : undefined,
+      stateKey: analysisReady ? "active" : "requiresAnalysis",
+      disabled: !analysisReady,
     },
     {
       key: "governance",

@@ -14,6 +14,7 @@ export type CabChartFrameProps = PropsWithChildren<{
   height?: number;
   actions?: ReactNode;
   notice?: string;
+  footer?: ReactNode;
   loadingLabel?: string;
   /** Accessible name for the chart graphic */
   ariaLabel?: string;
@@ -29,6 +30,7 @@ export function CabChartFrame({
   height = 280,
   actions, 
   notice,
+  footer,
   loadingLabel,
   ariaLabel,
   summary,
@@ -114,6 +116,7 @@ export function CabChartFrame({
             {dataTable}
           </div>
         ) : null}
+        {footer ? footer : null}
       </CabStack>
     </CabCard>
   );

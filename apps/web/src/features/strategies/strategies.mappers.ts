@@ -7,6 +7,7 @@ import type {
   StrategySummaryView,
 } from "@/features/strategies/strategies.types";
 import { getExplorerBaseUrl } from "@/chains/chains";
+import { formatCompactNumber, formatSignedPercent, formatUsd } from "@/i18n/formatters";
 
 export type StrategyRowViewModel = StrategySummaryView & {
   formattedCurrentValue: string;
@@ -50,26 +51,14 @@ export type StrategyDetailViewModel = StrategyDetailResponse & {
   }>;
 };
 
-function formatUsd(value: number | null) {
+function formatNullableUsd(value: number | null, locale: string) {
   if (value === null) return "—";
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 2,
-  }).format(value);
+  return formatUsd(value, locale);
 }
 
-function formatPercent(value: number | null) {
+function formatNullablePercent(value: number | null, locale: string) {
   if (value === null) return "—";
-  return new Intl.NumberFormat("en-US", {
-    style: "percent",
-    maximumFractionDigits: 2,
-    signDisplay: "exceptZero",
-  }).format(value);
-}
-
-function formatCount(value: number) {
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(value);
+  return formatSignedPercent(value, locale);
 }
 
 function totalReturnSign(value: number | null): StrategyRowViewModel["totalReturnSign"] {
@@ -101,30 +90,36 @@ export function getStrategyTxExplorerUrl(chainId: number, txHash: string | null)
   return txHash ? `${getExplorerBaseUrl(chainId)}/tx/${txHash}` : null;
 }
 
-export function mapStrategiesListResponseToViewModel(response: StrategiesListResponse): StrategiesListViewModel {
+export function mapStrategiesListResponseToViewModel(
+  response: StrategiesListResponse,
+  locale = "en-US",
+): StrategiesListViewModel {
   const selectedExposureId = response.selectedStrategy?.strategyExposureId ?? null;
   return {
     ...response,
     formattedKpis: {
-      currentStrategyValueUsd: formatUsd(response.kpis.currentStrategyValueUsd),
-      activeStrategyCount: formatCount(response.kpis.activeStrategyCount),
-      totalClaimedRewardsUsd: formatUsd(response.kpis.totalClaimedRewardsUsd),
-      totalReturnUsd: formatUsd(response.kpis.totalReturnUsd),
-      protocolCoveragePct: formatPercent(response.kpis.protocolCoveragePct),
+      currentStrategyValueUsd: formatNullableUsd(response.kpis.currentStrategyValueUsd, locale),
+      activeStrategyCount: formatCompactNumber(response.kpis.activeStrategyCount, locale),
+      totalClaimedRewardsUsd: formatNullableUsd(response.kpis.totalClaimedRewardsUsd, locale),
+      totalReturnUsd: formatNullableUsd(response.kpis.totalReturnUsd, locale),
+      protocolCoveragePct: formatNullablePercent(response.kpis.protocolCoveragePct, locale),
     },
     items: response.strategies.map((item) => ({
       ...item,
-      formattedCurrentValue: formatUsd(item.currentEstimatedValueUsd),
-      formattedRewards: formatUsd(item.totalRewardsUsd),
-      formattedTotalReturn: formatUsd(item.totalReturnUsd),
-      formattedApr: formatPercent(item.estimatedAnnualizedReturnPct),
+      formattedCurrentValue: formatNullableUsd(item.currentEstimatedValueUsd, locale),
+      formattedRewards: formatNullableUsd(item.totalRewardsUsd, locale),
+      formattedTotalReturn: formatNullableUsd(item.totalReturnUsd, locale),
+      formattedApr: formatNullablePercent(item.estimatedAnnualizedReturnPct, locale),
       totalReturnSign: totalReturnSign(item.totalReturnUsd),
       isSelected: item.strategyExposureId === selectedExposureId,
     })),
   };
 }
 
-export function mapStrategyDetailResponseToViewModel(response: StrategyDetailResponse): StrategyDetailViewModel {
+export function mapStrategyDetailResponseToViewModel(
+  response: StrategyDetailResponse,
+  locale = "en-US",
+): StrategyDetailViewModel {
   const coverageNoteView = {
     ...response.strategy.coverageNote,
     tone: getStrategyCoverageTone(response.strategy.coverageNote.status),
@@ -135,20 +130,20 @@ export function mapStrategyDetailResponseToViewModel(response: StrategyDetailRes
   return {
     ...response,
     formattedHeader: {
-      currentValue: formatUsd(response.strategy.currentEstimatedValueUsd),
-      totalReturn: formatUsd(response.strategy.totalReturnUsd),
-      rewards: formatUsd(response.strategy.totalRewardsUsd),
+      currentValue: formatNullableUsd(response.strategy.currentEstimatedValueUsd, locale),
+      totalReturn: formatNullableUsd(response.strategy.totalReturnUsd, locale),
+      rewards: formatNullableUsd(response.strategy.totalRewardsUsd, locale),
     },
     coverageNoteView,
     rewardsRows: response.strategy.rewards.map((reward) => ({
       ...reward,
-      formattedAmountUsd: formatUsd(reward.amountUsd),
+      formattedAmountUsd: formatNullableUsd(reward.amountUsd, locale),
       explorerUrl: getStrategyTxExplorerUrl(response.chainId, reward.txHash),
     })),
     lifecycleRows: response.strategy.lifecycle.map((event) => ({
       ...event,
       labelKey: getStrategyLifecycleLabelKey(event.eventType),
-      formattedUsdValue: formatUsd(event.usdValue),
+      formattedUsdValue: formatNullableUsd(event.usdValue, locale),
       explorerUrl: getStrategyTxExplorerUrl(response.chainId, event.txHash),
     })),
   };

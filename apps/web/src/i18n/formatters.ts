@@ -12,6 +12,15 @@ export function formatUsd(value: number, locale: string): string {
   }).format(value);
 }
 
+export function formatCompactUsd(value: number, locale: string): string {
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: "USD",
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(value);
+}
+
 export function formatSignedUsd(value: number, locale: string): string {
   return new Intl.NumberFormat(locale, {
     style: "currency",
@@ -38,6 +47,12 @@ export function formatPercent(value: number, locale: string): string {
     style: "percent",
     maximumFractionDigits: 2,
   }).format(value);
+}
+
+export function formatPercentPoints(value: number, locale: string): string {
+  return `${new Intl.NumberFormat(locale, {
+    maximumFractionDigits: 2,
+  }).format(value)}%`;
 }
 
 export function formatSignedPercent(value: number, locale: string): string {

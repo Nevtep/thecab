@@ -4,7 +4,11 @@
     "full": "Full coverage",
     "share_level": "Share-level coverage",
     "partial": "Partial coverage",
-    "unknown": "Coverage unknown"
+    "unknown": "Coverage unknown",
+    "unresolved": "Unresolved",
+    "excluded": "Excluded",
+    "unavailable": "Unavailable",
+    "estimated": "Estimated"
   },
   "status": {
     "recent": "Recent coverage",
@@ -68,7 +72,18 @@
     "baselineTransferIn": "The first visible strategy event was an inbound share transfer",
     "incompleteInternalActivity": "Internal strategy activity is incomplete",
     "externalStrategyReferenceUnresolved": "External strategy position reference is unresolved",
-    "mixedCoverageAggregate": "This aggregate combines strategies with different coverage levels"
+    "mixedCoverageAggregate": "This aggregate combines strategies with different coverage levels",
+    "missingOwnerEvidence": "Owner evidence is missing",
+    "unknownRewardSurface": "Reward surface is unknown",
+    "excludedAirdrop": "Airdrop-like activity was excluded",
+    "ambiguousWrapperWithdraw": "Wrapper withdrawal is ambiguous",
+    "missingClaimTimePrice": "Claim-time price is missing",
+    "missingPoolMapping": "Pool mapping is missing",
+    "mixedValuationCoverage": "Valuation coverage is mixed",
+    "historicalCapitalPartial": "Historical capital coverage is partial",
+    "governancePoolMappingUnavailable": "Governance pool mapping is unavailable",
+    "walletPoolAggregateAttribution": "Wallet-pool aggregate attribution was used",
+    "analysisNotReady": "Historical analysis is not ready"
   },
   "confidence": {
     "high": "High confidence",

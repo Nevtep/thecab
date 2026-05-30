@@ -232,3 +232,91 @@ test("resolveRewardOwnership leaves pool fee claims unresolved without a pool ho
   assert.equal(result.resolvedPoolId, "pool-1");
   assert.deepEqual(result.resolutionReasonCodes, ["feeClaimNoActivePosition"]);
 });
+
+test("resolveRewardOwnership keeps unknown reward surfaces unresolved with display reason evidence", () => {
+  const result = resolveRewardOwnership({
+    candidate: buildCandidate({
+      surfaceKind: "gauge_reward_unknown_surface",
+      targetType: null,
+    }),
+    depositTargets: [buildDepositTarget()],
+    strategyTargets: [buildStrategyTarget()],
+  });
+
+  assert.equal(result.resolutionStatus, "unresolved");
+  assert.equal(result.ownerType, null);
+  assert.equal(result.resolutionBasis, "unresolved");
+  assert.deepEqual(result.resolutionReasonCodes, ["unknownRewardSurface"]);
+});
+
+test("resolveRewardOwnership preserves governance claims separately from LP owner attribution", () => {
+  const result = resolveRewardOwnership({
+    candidate: buildCandidate({
+      surfaceKind: "governance_voter_claim",
+      targetType: null,
+    }),
+    depositTargets: [buildDepositTarget()],
+    strategyTargets: [buildStrategyTarget()],
+  });
+
+  assert.equal(result.resolutionStatus, "resolved");
+  assert.equal(result.ownerType, null);
+  assert.equal(result.resolvedPoolId, null);
+  assert.equal(result.resolutionBasis, "governance_claim");
+  assert.deepEqual(result.resolutionReasonCodes, ["governanceReward"]);
+});
+
+test("resolveRewardOwnership marks spam-like airdrops as excluded instead of unresolved rewards", () => {
+  const result = resolveRewardOwnership({
+    candidate: buildCandidate({
+      surfaceKind: "airdrop_spam",
+      economicComponentKind: "excluded_airdrop",
+      targetType: null,
+    }),
+    depositTargets: [],
+    strategyTargets: [],
+  });
+
+  assert.equal(result.resolutionStatus, "excluded");
+  assert.equal(result.ownerType, null);
+  assert.deepEqual(result.resolutionReasonCodes, ["excludedAirdrop"]);
+});
+
+test("resolveRewardOwnership leaves ambiguous wrapper withdrawals unresolved without exposure proof", () => {
+  const result = resolveRewardOwnership({
+    candidate: buildCandidate({
+      surfaceKind: "strategy_wrapper_withdraw",
+      targetType: "strategy",
+      targetWrapperAddress: "0xunknownwrapper",
+    }),
+    depositTargets: [],
+    strategyTargets: [buildStrategyTarget({ wrapperAddress: "0xwrapper" })],
+  });
+
+  assert.equal(result.resolutionStatus, "unresolved");
+  assert.equal(result.ownerType, "strategy");
+  assert.equal(result.strategyExposureId, null);
+  assert.deepEqual(result.resolutionReasonCodes, ["missingStrategyExposure"]);
+});
+
+test("resolveRewardOwnership resolves v2 fee aggregate without guessing deposit ownership from pool alone", () => {
+  const result = resolveRewardOwnership({
+    candidate: buildCandidate({
+      economicComponentKind: "fee_claim",
+      surfaceKind: "pool_fee_claim_v2",
+      targetPoolId: "pool-1",
+      targetType: "deposit",
+    }),
+    depositTargets: [
+      buildDepositTarget({ depositId: "deposit-1", poolId: "pool-1", createdAt: new Date("2026-05-01T00:00:00.000Z") }),
+      buildDepositTarget({ depositId: "deposit-2", poolId: "pool-1", createdAt: new Date("2026-05-02T00:00:00.000Z") }),
+    ],
+    strategyTargets: [],
+  });
+
+  assert.equal(result.resolutionStatus, "resolved");
+  assert.equal(result.ownerType, "deposit");
+  assert.equal(result.depositId, "deposit-1");
+  assert.equal(result.resolutionBasis, "wallet_pool_aggregate");
+  assert.equal(result.feeAttributionBasis, "wallet_pool_aggregate");
+});

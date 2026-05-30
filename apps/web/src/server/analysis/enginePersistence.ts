@@ -1717,7 +1717,12 @@ function buildSyntheticRewardSnapshotTxHash(input: {
 export function resolvePersistedRewardResolutionStatus(input: {
   depositOrStrategyId?: string | null;
   strategyExposureId?: string | null;
+  resolutionStatus?: "resolved" | "unresolved" | "excluded" | "unavailable" | null;
 }) {
+  if (input.resolutionStatus) {
+    return input.resolutionStatus;
+  }
+
   return input.depositOrStrategyId || input.strategyExposureId ? "resolved" as const : "unresolved" as const;
 }
 
@@ -1744,6 +1749,7 @@ export function buildAccrualRewardSnapshotRows(input: {
     feeAttributionBasis?: string | null;
     externalStrategyPositionReference?: string | null;
     externalStrategyPositionReferenceStatus?: "resolved" | "unresolved";
+    resolutionStatus?: "resolved" | "unresolved" | "excluded" | "unavailable" | null;
   }>;
 }) {
   const walletAddress = input.walletAddress.toLowerCase();
@@ -1775,6 +1781,12 @@ export function buildAccrualRewardSnapshotRows(input: {
       targetType: snapshot.targetType,
       targetTokenId: snapshot.targetTokenId ?? null,
       targetWrapperAddress: snapshot.targetWrapperAddress ?? null,
+      sourceSurface: snapshot.surfaceKind ?? null,
+      surfaceKind: snapshot.surfaceKind ?? null,
+      componentKey: snapshot.componentKey ?? null,
+      economicComponentKind: snapshot.economicComponentKind ?? null,
+      movementLogIndexes: snapshot.movementLogIndexes ?? [],
+      feeAttributionBasis: snapshot.feeAttributionBasis ?? null,
       externalStrategyPositionReference: snapshot.externalStrategyPositionReference ?? null,
       externalStrategyPositionReferenceStatus:
         snapshot.externalStrategyPositionReferenceStatus ??
@@ -1811,6 +1823,7 @@ export async function persistResolvedRewardEvents(input: {
     feeAttributionBasis?: string | null;
     externalStrategyPositionReference?: string | null;
     externalStrategyPositionReferenceStatus?: "resolved" | "unresolved";
+    resolutionStatus?: "resolved" | "unresolved" | "excluded" | "unavailable" | null;
   }>;
   accrualSnapshots: Array<{
     depositOrStrategyId: string;
@@ -1823,6 +1836,11 @@ export async function persistResolvedRewardEvents(input: {
     resolutionReasonCodes?: string[];
     targetTokenId?: string | null;
     targetWrapperAddress?: string | null;
+    surfaceKind?: string | null;
+    componentKey?: string | null;
+    economicComponentKind?: string | null;
+    movementLogIndexes?: number[];
+    feeAttributionBasis?: string | null;
     externalStrategyPositionReference?: string | null;
     externalStrategyPositionReferenceStatus?: "resolved" | "unresolved";
   }>;
@@ -1855,6 +1873,7 @@ export async function persistResolvedRewardEvents(input: {
             targetType: claim.targetType,
             targetTokenId: claim.targetTokenId ?? null,
             targetWrapperAddress: claim.targetWrapperAddress ?? null,
+            sourceSurface: claim.surfaceKind ?? null,
             surfaceKind: claim.surfaceKind ?? null,
             componentKey: claim.componentKey ?? null,
             economicComponentKind: claim.economicComponentKind ?? null,

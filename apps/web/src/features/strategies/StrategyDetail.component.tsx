@@ -57,7 +57,7 @@ export function StrategyDetailComponent(input: StrategyDetailComponentProps) {
     );
   }
 
-  const viewModel = mapStrategyDetailResponseToViewModel(input.response);
+  const viewModel = mapStrategyDetailResponseToViewModel(input.response, input.locale);
   const { strategy } = viewModel;
 
   return (
@@ -117,6 +117,7 @@ export function StrategyDetailComponent(input: StrategyDetailComponentProps) {
           status: t("strategies:detail.status"),
           resolved: t("strategies:detail.resolution.resolved"),
           unresolved: t("strategies:detail.resolution.unresolved"),
+          openRewards: t("navigation:items.rewards"),
         }}
       />
       <StrategyLifecycleTimeline

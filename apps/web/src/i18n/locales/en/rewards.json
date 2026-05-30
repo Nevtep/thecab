@@ -1,3 +1,155 @@
 {
-  "title": "TODO"
+  "title": "Rewards",
+  "subtitle": "Inspect claimed value across deposits, strategies, governance, pools, and tokens.",
+  "states": {
+    "loadingTitle": "Loading rewards",
+    "errorTitle": "Rewards unavailable"
+  },
+  "kpis": {
+    "totalClaimedRewards": "Total claimed rewards",
+    "rewardEvents": "Reward events",
+    "estimatedRewardReturn": "Est. reward return",
+    "resolvedRewardsValue": "Resolved rewards value",
+    "unresolvedExcludedValue": "Unresolved / excluded value",
+    "coverage": "coverage",
+    "visibleRows": "visible rows",
+    "estimated": "estimated",
+    "unavailable": "unavailable",
+    "ofTotal": "of total"
+  },
+  "filters": {
+    "search": "Search",
+    "searchPlaceholder": "Search rewards, tx, pools, tokens...",
+    "source": "Source",
+    "token": "Token",
+    "pool": "Pool",
+    "deposit": "Deposit",
+    "strategy": "Strategy",
+    "rewardType": "Reward type",
+    "coverage": "Coverage",
+    "resolutionStatus": "Resolution"
+  },
+  "datePresets": {
+    "7d": "7d",
+    "30d": "30d",
+    "90d": "90d",
+    "1y": "1y",
+    "all": "All",
+    "custom": "Custom"
+  },
+  "sources": {
+    "all": "All",
+    "manualDeposit": "Manual Deposit",
+    "manual_deposit": "Manual Deposit",
+    "deposits": "Deposits",
+    "strategy": "Strategy",
+    "strategies": "Strategies",
+    "governance": "Governance",
+    "unresolved": "Unresolved",
+    "excluded": "Excluded",
+    "unavailable": "Unavailable"
+  },
+  "rewardTypes": {
+    "fee_claim": "LP Fees",
+    "reward_claim": "Gauge Emissions",
+    "mellow_reward": "Strategy Reward",
+    "governance_reward": "Governance",
+    "unknown_reward": "Unknown",
+    "reward_accrual_snapshot": "Accrual Snapshot"
+  },
+  "confidence": {
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low",
+    "none": "None"
+  },
+  "panels": {
+    "rewardsOverTime": "A) Rewards over time",
+    "sourceBreakdown": "B1) Source breakdown",
+    "poolContributionBreakdown": "B2) Pool contribution breakdown",
+    "tokenBreakdown": "B3) Token breakdown",
+    "rewardEvents": "C) Reward events",
+    "selectedReward": "Selected reward",
+    "ownershipTrace": "Ownership trace",
+    "poolContribution": "Pool contribution",
+    "claimDetails": "Claim details",
+    "coverageNotes": "Coverage notes",
+    "unresolvedExcludedActivity": "Unresolved & excluded activity"
+  },
+  "table": {
+    "columns": {
+      "dateTime": "Date / Time",
+      "token": "Token",
+      "amount": "Amount",
+      "valueAtClaim": "Value at claim",
+      "ownerSource": "Owner / Source",
+      "linkedEntity": "Linked entity",
+      "pool": "Pool",
+      "rewardType": "Reward type",
+      "poolContribution": "Pool contrib.",
+      "coverage": "Coverage",
+      "confidence": "Confidence",
+      "tx": "Tx"
+    }
+  },
+  "selected": {
+    "amount": "Amount",
+    "value": "Value",
+    "owner": "Owner",
+    "coverage": "Coverage",
+    "confidence": "Confidence",
+    "status": "Status",
+    "pool": "Pool",
+    "countingRule": "Counting rule",
+    "empty": "Select a reward row to inspect its evidence."
+  },
+  "ownershipTrace": {
+    "linkedEntity": "Linked Entity",
+    "sourceSurface": "Source Surface",
+    "evidence": "Evidence"
+  },
+  "claimDetails": {
+    "txHash": "Tx Hash",
+    "claimTime": "Claim Time",
+    "rewardType": "Reward Type",
+    "openTx": "Open transaction in Basescan"
+  },
+  "coverageNotes": {
+    "reason": "Reason"
+  },
+  "evidence": {
+    "resolvedOwner": "Reward evidence resolves to this owner.",
+    "unresolved": "Owner evidence is incomplete."
+  },
+  "countingRules": {
+    "owner_resolved_pool": "Counted once at pool level.",
+    "wallet_pool_aggregate": "Counted once by wallet-pool aggregate.",
+    "no_pool_contribution": "No pool contribution.",
+    "unresolved_owner": "Not counted until owner resolves.",
+    "excluded_activity": "Excluded from economic totals."
+  },
+  "notes": {
+    "noDoubleCount": "Attribution avoids double counting across layers."
+  },
+  "empty": {
+    "noRewardsTitle": "No rewards found",
+    "noRewardsDescription": "No supported reward events were found for this wallet and chain.",
+    "filteredTitle": "No rewards match these filters",
+    "filteredDescription": "The historical rewards view is still available; adjust or clear filters to see matching reward events."
+  },
+  "locked": {
+    "title": "Rewards locked",
+    "description": "Run historical analysis before inspecting reward flows."
+  },
+  "actions": {
+    "refresh": "Refresh",
+    "chartEmphasis": "Chart",
+    "tableEmphasis": "Table"
+  },
+  "labels": {
+    "valueUsd": "Value (USD)"
+  },
+  "a11y": {
+    "rowsPerPage": "Rows per page"
+  }
 }

@@ -1,3 +1,155 @@
 {
-  "title": "PENDIENTE"
+  "title": "Rewards",
+  "subtitle": "Inspecciona valor reclamado en depósitos, estrategias, gobernanza, pools y tokens.",
+  "states": {
+    "loadingTitle": "Cargando rewards",
+    "errorTitle": "Rewards no disponibles"
+  },
+  "kpis": {
+    "totalClaimedRewards": "Rewards reclamados totales",
+    "rewardEvents": "Eventos de reward",
+    "estimatedRewardReturn": "Retorno est. de reward",
+    "resolvedRewardsValue": "Valor de rewards resueltos",
+    "unresolvedExcludedValue": "Valor no resuelto / excluido",
+    "coverage": "cobertura",
+    "visibleRows": "filas visibles",
+    "estimated": "estimado",
+    "unavailable": "no disponible",
+    "ofTotal": "del total"
+  },
+  "filters": {
+    "search": "Buscar",
+    "searchPlaceholder": "Buscar rewards, tx, pools, tokens...",
+    "source": "Fuente",
+    "token": "Token",
+    "pool": "Pool",
+    "deposit": "Depósito",
+    "strategy": "Estrategia",
+    "rewardType": "Tipo de reward",
+    "coverage": "Cobertura",
+    "resolutionStatus": "Resolución"
+  },
+  "datePresets": {
+    "7d": "7d",
+    "30d": "30d",
+    "90d": "90d",
+    "1y": "1a",
+    "all": "Todo",
+    "custom": "Personalizado"
+  },
+  "sources": {
+    "all": "Todo",
+    "manualDeposit": "Depósito manual",
+    "manual_deposit": "Depósito manual",
+    "deposits": "Depósitos",
+    "strategy": "Estrategia",
+    "strategies": "Estrategias",
+    "governance": "Gobernanza",
+    "unresolved": "No resuelto",
+    "excluded": "Excluido",
+    "unavailable": "No disponible"
+  },
+  "rewardTypes": {
+    "fee_claim": "Fees LP",
+    "reward_claim": "Emisiones gauge",
+    "mellow_reward": "Reward de estrategia",
+    "governance_reward": "Gobernanza",
+    "unknown_reward": "Desconocido",
+    "reward_accrual_snapshot": "Snapshot de acumulación"
+  },
+  "confidence": {
+    "high": "Alta",
+    "medium": "Media",
+    "low": "Baja",
+    "none": "Ninguna"
+  },
+  "panels": {
+    "rewardsOverTime": "A) Rewards en el tiempo",
+    "sourceBreakdown": "B1) Desglose por fuente",
+    "poolContributionBreakdown": "B2) Desglose por pool",
+    "tokenBreakdown": "B3) Desglose por token",
+    "rewardEvents": "C) Eventos de reward",
+    "selectedReward": "Reward seleccionado",
+    "ownershipTrace": "Trazabilidad de dueño",
+    "poolContribution": "Contribución al pool",
+    "claimDetails": "Detalles del claim",
+    "coverageNotes": "Notas de cobertura",
+    "unresolvedExcludedActivity": "Actividad no resuelta y excluida"
+  },
+  "table": {
+    "columns": {
+      "dateTime": "Fecha / Hora",
+      "token": "Token",
+      "amount": "Cantidad",
+      "valueAtClaim": "Valor al claim",
+      "ownerSource": "Dueño / Fuente",
+      "linkedEntity": "Entidad vinculada",
+      "pool": "Pool",
+      "rewardType": "Tipo de reward",
+      "poolContribution": "Contrib. pool",
+      "coverage": "Cobertura",
+      "confidence": "Confianza",
+      "tx": "Tx"
+    }
+  },
+  "selected": {
+    "amount": "Cantidad",
+    "value": "Valor",
+    "owner": "Dueño",
+    "coverage": "Cobertura",
+    "confidence": "Confianza",
+    "status": "Estado",
+    "pool": "Pool",
+    "countingRule": "Regla de conteo",
+    "empty": "Selecciona una fila de reward para inspeccionar su evidencia."
+  },
+  "ownershipTrace": {
+    "linkedEntity": "Entidad vinculada",
+    "sourceSurface": "Superficie fuente",
+    "evidence": "Evidencia"
+  },
+  "claimDetails": {
+    "txHash": "Hash de tx",
+    "claimTime": "Hora del claim",
+    "rewardType": "Tipo de reward",
+    "openTx": "Abrir transacción en Basescan"
+  },
+  "coverageNotes": {
+    "reason": "Razón"
+  },
+  "evidence": {
+    "resolvedOwner": "La evidencia del reward resuelve este dueño.",
+    "unresolved": "La evidencia del dueño está incompleta."
+  },
+  "countingRules": {
+    "owner_resolved_pool": "Contado una vez a nivel pool.",
+    "wallet_pool_aggregate": "Contado una vez por agregado wallet-pool.",
+    "no_pool_contribution": "Sin contribución al pool.",
+    "unresolved_owner": "No se cuenta hasta resolver dueño.",
+    "excluded_activity": "Excluido de totales económicos."
+  },
+  "notes": {
+    "noDoubleCount": "La atribución evita doble conteo entre capas."
+  },
+  "empty": {
+    "noRewardsTitle": "No se encontraron rewards",
+    "noRewardsDescription": "No se encontraron eventos de reward soportados para esta wallet y chain.",
+    "filteredTitle": "Ningún reward coincide con estos filtros",
+    "filteredDescription": "La vista histórica sigue disponible; ajusta o limpia filtros para ver eventos de reward coincidentes."
+  },
+  "locked": {
+    "title": "Rewards bloqueados",
+    "description": "Ejecuta análisis histórico antes de inspeccionar flujos de rewards."
+  },
+  "actions": {
+    "refresh": "Actualizar",
+    "chartEmphasis": "Gráfico",
+    "tableEmphasis": "Tabla"
+  },
+  "labels": {
+    "valueUsd": "Valor (USD)"
+  },
+  "a11y": {
+    "rowsPerPage": "Filas por página"
+  }
 }

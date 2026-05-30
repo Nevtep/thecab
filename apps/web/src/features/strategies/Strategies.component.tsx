@@ -3,11 +3,9 @@
 import { useTranslation } from "react-i18next";
 
 import {
-  CabDataPanel,
   CabErrorPanel,
   CabLoadingPanel,
   CabSectionHeader,
-  CabStack,
 } from "@/design-system";
 import { StrategiesEmptyState } from "@/features/strategies/components/StrategiesEmptyState";
 import { StrategiesFiltersBar } from "@/features/strategies/components/StrategiesFiltersBar";
@@ -128,26 +126,22 @@ export function StrategiesComponent(input: StrategiesComponentProps) {
         onClearFilters={() => input.onClearFilters()}
       />
       <div className={styles.dataView}>
-        <CabDataPanel>
-          <CabStack gap="$3">
-            <StrategiesTable
-              items={input.viewModel.items}
-              labels={{
-                strategy: t("strategies:table.columns.strategy"),
-                status: t("strategies:table.columns.status"),
-                currentValue: t("strategies:table.columns.currentValue"),
-                shares: t("strategies:table.columns.shares"),
-                rewards: t("strategies:table.columns.claimedRewards"),
-                result: t("strategies:table.columns.result"),
-                apr: t("strategies:table.columns.estimatedApr"),
-                coverage: t("strategies:table.columns.coverage"),
-                select: t("strategies:actions.openStrategy"),
-              }}
-              getCoverageLabel={(coverage) => t(getStrategyCoverageLabelKey(coverage))}
-              onSelect={input.onSelectStrategy}
-            />
-          </CabStack>
-        </CabDataPanel>
+        <StrategiesTable
+          items={input.viewModel.items}
+          labels={{
+            strategy: t("strategies:table.columns.strategy"),
+            status: t("strategies:table.columns.status"),
+            currentValue: t("strategies:table.columns.currentValue"),
+            shares: t("strategies:table.columns.shares"),
+            rewards: t("strategies:table.columns.claimedRewards"),
+            result: t("strategies:table.columns.result"),
+            apr: t("strategies:table.columns.estimatedApr"),
+            coverage: t("strategies:table.columns.coverage"),
+            select: t("strategies:actions.openStrategy"),
+          }}
+          getCoverageLabel={(coverage) => t(getStrategyCoverageLabelKey(coverage))}
+          onSelect={input.onSelectStrategy}
+        />
         <StrategySelectedPanel
           chainId={input.viewModel.chainId}
           locale={i18n.language}
@@ -175,6 +169,7 @@ export function StrategiesComponent(input: StrategiesComponentProps) {
             unresolved: t("strategies:detail.resolution.unresolved"),
             lifecycleEmpty: t("strategies:detail.lifecycleEmpty"),
             openPool: t("strategies:actions.openPool"),
+            openRewards: t("navigation:items.rewards"),
           }}
           onOpenPool={input.onOpenPool}
           translate={(key, options) => t(key, options)}

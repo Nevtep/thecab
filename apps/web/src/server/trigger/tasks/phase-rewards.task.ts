@@ -110,6 +110,7 @@ export function resolveRewardClaimTarget(input: {
     targetType: resolution.ownerType ?? input.candidate.targetType,
     resolutionBasis: resolution.resolutionBasis,
     resolutionReasonCodes: resolution.resolutionReasonCodes,
+    resolutionStatus: resolution.resolutionStatus,
     feeAttributionBasis: resolution.feeAttributionBasis ?? null,
     externalStrategyPositionReference: resolution.externalStrategyPositionReference,
     externalStrategyPositionReferenceStatus: resolution.externalStrategyPositionReferenceStatus,
@@ -227,10 +228,6 @@ export const phaseRewardsTask = task({
         }))
         .map((row) => row.txHash.toLowerCase()),
     );
-    const filteredRewardCandidates = latestRewardCandidates.filter((candidate) =>
-      !governanceCandidateTxHashes.has(candidate.txHash.toLowerCase()),
-    );
-
     const depositTargets = depositRows.map((row) => ({
       depositId: row.depositId,
       poolId: row.poolId,
@@ -251,10 +248,14 @@ export const phaseRewardsTask = task({
       createdAt: row.createdAt,
     }));
 
-    const resolvedClaims = filteredRewardCandidates.map((candidate, index) => {
-      const candidateWithPool = candidate.targetPoolAddress && !candidate.targetPoolId
-        ? { ...candidate, targetPoolId: poolIdByAddress.get(candidate.targetPoolAddress) ?? null }
+    const resolvedClaims = latestRewardCandidates.map((candidate, index) => {
+      const governanceCandidate = governanceCandidateTxHashes.has(candidate.txHash.toLowerCase());
+      const candidateWithGovernanceSurface = governanceCandidate
+        ? { ...candidate, surfaceKind: "governance_voter_claim" as const, economicComponentKind: candidate.economicComponentKind ?? "reward_claim" }
         : candidate;
+      const candidateWithPool = candidate.targetPoolAddress && !candidate.targetPoolId
+        ? { ...candidateWithGovernanceSurface, targetPoolId: poolIdByAddress.get(candidate.targetPoolAddress) ?? null }
+        : candidateWithGovernanceSurface;
       const resolution = resolveRewardClaimTarget({
         candidate: candidateWithPool,
         depositTargets,
@@ -264,7 +265,7 @@ export const phaseRewardsTask = task({
       return {
         txHash: candidateWithPool.txHash,
         logIndex: index,
-        rewardType: inferRewardType(candidateWithPool),
+        rewardType: governanceCandidate ? "governance_reward" : inferRewardType(candidateWithPool),
         depositOrStrategyId: resolution.depositOrStrategyId,
         strategyExposureId: resolution.strategyExposureId,
         resolvedPoolId: resolution.resolvedPoolId,
@@ -275,6 +276,7 @@ export const phaseRewardsTask = task({
         protocol: candidateWithPool.protocol,
         targetType: resolution.targetType,
         resolutionReasonCodes: resolution.resolutionReasonCodes,
+        resolutionStatus: resolution.resolutionStatus,
         targetTokenId: candidateWithPool.targetTokenId,
         targetWrapperAddress: candidateWithPool.targetWrapperAddress,
         surfaceKind: candidateWithPool.surfaceKind,

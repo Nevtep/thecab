@@ -11,6 +11,8 @@ import {
   getStrategiesListQueryOptions,
   getStrategyDetailQueryOptions,
 } from "@/features/strategies/strategies.queries";
+import { getRewardsQueryOptions } from "@/features/rewards/rewards.queries";
+import type { RewardsResponse, RewardsUrlState } from "@/features/rewards/rewards.types";
 import type { StrategiesListResponse, StrategyDetailResponse } from "@/features/strategies/strategies.types";
 import type { StrategiesListUrlState } from "@/features/strategies/strategies.urlState";
 import type { SettingsResponse, SettingsUpdateRequest } from "@/features/settings/settings.types";
@@ -226,11 +228,13 @@ export function useStrategyDetailQuery(
   });
 }
 
-export function useRewardsQuery(input: WalletScopedInput) {
-  return useQuery({
-    queryKey: queryKeys.rewards(input),
-    queryFn: () => apiClient(`/api/rewards?chainId=${input.chainId}`),
-    enabled: false,
+export function useRewardsQuery(
+  input: WalletScopedInput & { state: RewardsUrlState },
+  options?: { enabled?: boolean },
+) {
+  return useQuery<RewardsResponse>({
+    ...getRewardsQueryOptions(input),
+    enabled: (options?.enabled ?? true) && Boolean(input.walletAddress),
   });
 }
 

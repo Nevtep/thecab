@@ -9,7 +9,9 @@ export function PoolRelatedLinks(input: {
   labels: {
     deposit: string;
     strategy: string;
+    rewards?: string;
   };
+  rewardsHref?: string | null;
   deposits: Array<{ id: string; label: string; href?: string | null }>;
   strategies: Array<{ id: string; label: string; href?: string | null }>;
 }) {
@@ -19,6 +21,11 @@ export function PoolRelatedLinks(input: {
     <CabDataPanel>
       <CabStack gap="$2">
         <CabText variant="heading">{input.title}</CabText>
+        {input.rewardsHref && input.labels.rewards ? (
+          <CabButton tone="technical" onPress={() => router.push(input.rewardsHref!)}>
+            {input.labels.rewards}
+          </CabButton>
+        ) : null}
         {input.deposits.map((deposit) => (
           <CabButton
             key={`deposit-${deposit.id}`}

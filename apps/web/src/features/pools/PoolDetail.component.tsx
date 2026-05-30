@@ -21,6 +21,7 @@ import { PoolHistoryChart } from "@/features/pools/components/PoolHistoryChart";
 import { PoolRelatedLinks } from "@/features/pools/components/PoolRelatedLinks";
 import { PoolMetadataFooter } from "@/features/pools/components/PoolMetadataFooter";
 import { PoolTimeline } from "@/features/pools/components/PoolTimeline";
+import { buildPoolRewardsHref } from "@/features/rewards/rewards.navigation";
 import { buildStrategiesListHref } from "@/features/strategies/strategies.navigation";
 import { getPoolsCoverageLabelKey } from "@/features/pools/pools.mappers";
 import type { PoolDetailRange, PoolDetailViewModel } from "@/features/pools/pools.types";
@@ -241,7 +242,9 @@ export function PoolDetailComponent(input: PoolDetailComponentProps) {
           labels={{
             deposit: t("pools:values.deposit"),
             strategy: t("pools:values.strategy"),
+            rewards: t("navigation:items.rewards"),
           }}
+          rewardsHref={buildPoolRewardsHref(viewModel.header.poolId)}
           deposits={viewModel.related.deposits}
           strategies={viewModel.related.strategies.map((strategy) => ({
             ...strategy,

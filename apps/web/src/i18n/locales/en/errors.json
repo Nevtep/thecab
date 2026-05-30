@@ -18,5 +18,12 @@
     "invalid_request": "The strategy request was invalid.",
     "strategy_not_found": "We couldn't find that strategy for this wallet.",
     "internal_error": "Something went wrong while loading strategies."
+  },
+  "rewards": {
+    "UNAUTHENTICATED_WALLET": "Please connect your wallet to view rewards.",
+    "UNSUPPORTED_CHAIN": "This chain is not supported for rewards yet.",
+    "INVALID_REWARDS_FILTERS": "The rewards filters are invalid.",
+    "ANALYSIS_NOT_FOUND": "Run analysis before viewing rewards.",
+    "REWARDS_READ_FAILED": "Something went wrong while loading rewards."
   }
 }

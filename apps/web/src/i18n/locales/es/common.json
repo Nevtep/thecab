@@ -7,5 +7,19 @@
     "connected": "Wallet conectada",
     "disconnected": "Wallet desconectada",
     "unsupported": "Red no soportada"
-  }
+  },
+  "search": "Buscar",
+  "clearAll": "Limpiar todo",
+  "rowsPerPage": "Filas por página",
+  "showingRange": "Mostrando {{from}}-{{to}} de {{total}}",
+  "viewDetails": "Ver detalles",
+  "viewAll": "Ver todo",
+  "copy": "Copiar",
+  "openExternalLink": "Abrir enlace externo",
+  "all": "Todo",
+  "other": "Otro",
+  "yes": "Sí",
+  "no": "No",
+  "previous": "Anterior",
+  "next": "Siguiente"
 }

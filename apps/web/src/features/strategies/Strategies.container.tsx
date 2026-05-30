@@ -31,7 +31,7 @@ export function StrategiesContainer() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const { t } = useTranslation(["strategies", "navigation"]);
+  const { i18n, t } = useTranslation(["strategies", "navigation"]);
   const previousAnalysisStatusRef = useRef<string | null>(null);
   const { address, chainId, isConnected, isAuthenticated, isSupportedChain, isAuthReady } = useCabWallet();
 
@@ -78,8 +78,8 @@ export function StrategiesContainer() {
     [analysisStatusQuery.data?.status],
   );
   const viewModel = useMemo(
-    () => (strategiesQuery.data ? mapStrategiesListResponseToViewModel(strategiesQuery.data) : null),
-    [strategiesQuery.data],
+    () => (strategiesQuery.data ? mapStrategiesListResponseToViewModel(strategiesQuery.data, i18n.language) : null),
+    [i18n.language, strategiesQuery.data],
   );
   const screenState = useMemo(() => {
     if (!isWalletReady || analysisStatusQuery.isLoading || strategiesQuery.isLoading) {

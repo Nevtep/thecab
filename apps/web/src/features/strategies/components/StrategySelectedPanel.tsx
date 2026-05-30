@@ -1,11 +1,15 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+
 import { CabBadge, CabButton, CabCard, CabStack, CabText } from "@/design-system";
+import { buildStrategyRewardsHref } from "@/features/rewards/rewards.navigation";
 import { StrategyCoverageNote } from "@/features/strategies/components/StrategyCoverageNote";
 import { StrategyExposureSummary } from "@/features/strategies/components/StrategyExposureSummary";
 import { StrategyLifecycleTimeline } from "@/features/strategies/components/StrategyLifecycleTimeline";
 import { StrategyRewardsTable } from "@/features/strategies/components/StrategyRewardsTable";
 import type { StrategyDetailView } from "@/features/strategies/strategies.types";
+import { formatUsd } from "@/i18n/formatters";
 
 import styles from "@/features/strategies/StrategiesWorkspace.module.css";
 
@@ -36,21 +40,19 @@ type StrategySelectedPanelProps = {
     unresolved: string;
     lifecycleEmpty: string;
     openPool: string;
+    openRewards?: string;
   };
   onOpenPool?: (poolId: string) => void;
   translate: (key: string, options?: { defaultValue?: string }) => string;
 };
 
-function formatUsd(value: number | null, locale: string) {
+function formatNullableUsd(value: number | null, locale: string) {
   if (value === null) return "—";
-  return new Intl.NumberFormat(locale, {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 2,
-  }).format(value);
+  return formatUsd(value, locale);
 }
 
 export function StrategySelectedPanel({ chainId, locale, onOpenPool, strategy, labels, translate }: StrategySelectedPanelProps) {
+  const router = useRouter();
   if (!strategy) {
     return (
       <CabCard density="compact">
@@ -68,7 +70,7 @@ export function StrategySelectedPanel({ chainId, locale, onOpenPool, strategy, l
           <div className={styles.panelMetrics}>
             <div>
               <CabText variant="caption">{labels.currentValue}</CabText>
-              <CabText variant="label">{formatUsd(strategy.currentEstimatedValueUsd, locale)}</CabText>
+              <CabText variant="label">{formatNullableUsd(strategy.currentEstimatedValueUsd, locale)}</CabText>
             </div>
             <div>
               <CabText variant="caption">{labels.shares}</CabText>
@@ -76,7 +78,7 @@ export function StrategySelectedPanel({ chainId, locale, onOpenPool, strategy, l
             </div>
             <div>
               <CabText variant="caption">{labels.totalReturn}</CabText>
-              <CabText variant="label">{formatUsd(strategy.totalReturnUsd, locale)}</CabText>
+              <CabText variant="label">{formatNullableUsd(strategy.totalReturnUsd, locale)}</CabText>
             </div>
             <CabBadge size="sm" tone={strategy.coverageStatus === "full" ? "success" : "warning"}>
               {translate(`coverage:level.${strategy.coverageStatus}`)}
@@ -88,6 +90,11 @@ export function StrategySelectedPanel({ chainId, locale, onOpenPool, strategy, l
           {strategy.primaryPoolId && onOpenPool ? (
             <CabButton tone="secondary" controlSize="sm" onPress={() => onOpenPool(strategy.primaryPoolId!)}>
               {labels.openPool}
+            </CabButton>
+          ) : null}
+          {labels.openRewards ? (
+            <CabButton tone="technical" controlSize="sm" onPress={() => router.push(buildStrategyRewardsHref(strategy.strategyExposureId))}>
+              {labels.openRewards}
             </CabButton>
           ) : null}
         </CabStack>

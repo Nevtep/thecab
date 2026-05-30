@@ -3,6 +3,7 @@
 import { CabBadge, CabCard, CabStack, CabText, CabTxHash } from "@/design-system";
 import { getStrategyTxExplorerUrl } from "@/features/strategies/strategies.mappers";
 import type { StrategyLifecycleEventView } from "@/features/strategies/strategies.types";
+import { formatDateTime, formatUsd } from "@/i18n/formatters";
 
 import styles from "@/features/strategies/StrategiesWorkspace.module.css";
 
@@ -20,20 +21,9 @@ type StrategyLifecycleTimelineProps = {
   translate: (key: string, options?: { defaultValue?: string }) => string;
 };
 
-function formatUsd(value: number | null, locale: string) {
+function formatNullableUsd(value: number | null, locale: string) {
   if (value === null) return "—";
-  return new Intl.NumberFormat(locale, {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
-function formatDate(value: string, locale: string) {
-  return new Intl.DateTimeFormat(locale, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return formatUsd(value, locale);
 }
 
 function badgeTone(coverageStatus: StrategyLifecycleEventView["coverageStatus"]) {
@@ -80,9 +70,9 @@ export function StrategyLifecycleTimeline({ chainId, events, labels, locale, tra
                         {translate(`coverage:confidence.${event.confidence}`)}
                       </CabBadge>
                     </CabStack>
-                    <CabText variant="caption">{formatDate(event.occurredAt, locale)}</CabText>
+                    <CabText variant="caption">{formatDateTime(event.occurredAt, locale)}</CabText>
                     <div className={styles.timelineMeta}>
-                      <span>{labels.value}: {showAmounts ? formatUsd(event.usdValue, locale) : "—"}</span>
+                      <span>{labels.value}: {showAmounts ? formatNullableUsd(event.usdValue, locale) : "—"}</span>
                       <span>{labels.shares}: {showAmounts ? event.shareDeltaRaw ?? "—" : "—"}</span>
                       <span>
                         {labels.transaction}:{" "}

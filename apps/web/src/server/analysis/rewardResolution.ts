@@ -52,10 +52,11 @@ export type RewardResolutionBasis =
   | "share_lifecycle_context"
   | "wallet_pool_single_holder"
   | "wallet_pool_aggregate"
+  | "governance_claim"
   | "unresolved";
 
 export type RewardOwnershipResolution = {
-  resolutionStatus: "resolved" | "unresolved";
+  resolutionStatus: "resolved" | "unresolved" | "excluded" | "unavailable";
   ownerType: "deposit" | "strategy" | null;
   depositId: string | null;
   strategyId: string | null;
@@ -97,7 +98,7 @@ export function resolveRewardOwnership(input: {
   }
   if (surfaceKind === "airdrop_spam") {
     return {
-      resolutionStatus: "unresolved",
+      resolutionStatus: "excluded",
       ownerType: null,
       depositId: null,
       strategyId: null,
@@ -105,6 +106,20 @@ export function resolveRewardOwnership(input: {
       resolvedPoolId: null,
       resolutionBasis: "unresolved",
       resolutionReasonCodes: ["excludedAirdrop"],
+      externalStrategyPositionReference: null,
+      externalStrategyPositionReferenceStatus: "unresolved",
+    };
+  }
+  if (surfaceKind === "governance_voter_claim") {
+    return {
+      resolutionStatus: "resolved",
+      ownerType: null,
+      depositId: null,
+      strategyId: null,
+      strategyExposureId: null,
+      resolvedPoolId: null,
+      resolutionBasis: "governance_claim",
+      resolutionReasonCodes: ["governanceReward"],
       externalStrategyPositionReference: null,
       externalStrategyPositionReferenceStatus: "unresolved",
     };

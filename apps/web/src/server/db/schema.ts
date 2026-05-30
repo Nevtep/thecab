@@ -491,6 +491,11 @@ export const rewardEvents = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).$defaultFn(now).notNull(),
   },
   (table) => [
+    index("reward_events_wallet_occurred_idx").on(table.chainId, table.walletAddress, table.occurredAt),
+    index("reward_events_wallet_resolution_idx").on(table.chainId, table.walletAddress, table.resolutionStatus),
+    index("reward_events_wallet_token_idx").on(table.chainId, table.walletAddress, table.tokenAddress),
+    index("reward_events_wallet_reward_type_idx").on(table.chainId, table.walletAddress, table.rewardType),
+    index("reward_events_wallet_deposit_idx").on(table.chainId, table.walletAddress, table.depositOrStrategyId),
     index("reward_events_strategy_exposure_idx").on(table.strategyExposureId),
     index("reward_events_resolved_pool_idx").on(table.resolvedPoolId),
     uniqueIndex("reward_events_identity_uidx").on(

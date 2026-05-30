@@ -2,6 +2,7 @@
 
 import { CabCard, CabStack, CabText } from "@/design-system";
 import type { StrategyDetailView } from "@/features/strategies/strategies.types";
+import { formatUsd } from "@/i18n/formatters";
 
 import styles from "@/features/strategies/StrategiesWorkspace.module.css";
 
@@ -19,13 +20,9 @@ type StrategyExposureSummaryProps = {
   };
 };
 
-function formatUsd(value: number | null, locale: string) {
+function formatNullableUsd(value: number | null, locale: string) {
   if (value === null) return "—";
-  return new Intl.NumberFormat(locale, {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 2,
-  }).format(value);
+  return formatUsd(value, locale);
 }
 
 function formatShares(value: string, symbol: string | null) {
@@ -34,12 +31,12 @@ function formatShares(value: string, symbol: string | null) {
 
 export function StrategyExposureSummary({ labels, locale, strategy }: StrategyExposureSummaryProps) {
   const metrics = [
-    { label: labels.deposited, value: formatUsd(strategy.depositedValueUsd, locale) },
-    { label: labels.withdrawn, value: formatUsd(strategy.withdrawnValueUsd, locale) },
+    { label: labels.deposited, value: formatNullableUsd(strategy.depositedValueUsd, locale) },
+    { label: labels.withdrawn, value: formatNullableUsd(strategy.withdrawnValueUsd, locale) },
     { label: labels.sharesReceived, value: formatShares(strategy.sharesReceivedRaw, strategy.shareSymbol) },
     { label: labels.sharesRedeemed, value: formatShares(strategy.sharesRedeemedRaw, strategy.shareSymbol) },
     { label: labels.currentShares, value: formatShares(strategy.currentSharesRaw, strategy.shareSymbol) },
-    { label: labels.currentValue, value: formatUsd(strategy.currentEstimatedValueUsd, locale) },
+    { label: labels.currentValue, value: formatNullableUsd(strategy.currentEstimatedValueUsd, locale) },
   ];
 
   return (

@@ -6,5 +6,12 @@
     "rewardsHour": "Hourly rewards",
     "rewardsDay": "Daily rewards",
     "rewardsAccumulated": "Accumulated rewards"
-  }
+  },
+  "claimedValue": "Claimed value",
+  "estimatedRewardReturn": "Est. reward return",
+  "rewardCount": "Reward count",
+  "claimEventMarker": "Claim event",
+  "dailyGrouping": "Daily",
+  "coveragePercent": "Coverage",
+  "partialValuesNote": "Some values are partial due to coverage gaps."
 }

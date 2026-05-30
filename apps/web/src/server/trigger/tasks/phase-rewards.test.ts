@@ -14,7 +14,7 @@ function ensureTestEnv() {
 
 ensureTestEnv();
 
-test("isGovernanceRewardCandidate excludes Aerodrome Voting Escrow relock claims from reward processing", async () => {
+test("isGovernanceRewardCandidate detects Aerodrome Voting Escrow relock claims for governance persistence", async () => {
   const { isGovernanceRewardCandidate } = await import("@/server/trigger/tasks/phase-rewards.task");
 
   assert.equal(isGovernanceRewardCandidate({
@@ -58,6 +58,7 @@ test("resolveRewardClaimTarget leaves Aerodrome claims unresolved when token ide
   });
 
   assert.equal(result.depositOrStrategyId, null);
+  assert.equal(result.resolutionStatus, "unresolved");
   assert.equal(result.targetType, "deposit");
   assert.deepEqual(result.resolutionReasonCodes, ["missingTokenId"]);
 });
@@ -96,4 +97,33 @@ test("resolveRewardClaimTarget resolves Mellow claims only from explicit wrapper
   assert.equal(result.strategyExposureId, "exposure-1");
   assert.equal(result.resolvedPoolId, "pool-1");
   assert.equal(result.resolutionBasis, "strategy_wrapper_pair");
+  assert.equal(result.resolutionStatus, "resolved");
+});
+
+test("resolveRewardClaimTarget carries excluded airdrop status into persistence input", async () => {
+  const { resolveRewardClaimTarget } = await import("@/server/trigger/tasks/phase-rewards.task");
+
+  const result = resolveRewardClaimTarget({
+    candidate: {
+      txHash: "0xairdrop",
+      occurredAt: new Date("2026-05-24T12:00:00.000Z"),
+      category: "airdrop",
+      summary: "Suspicious airdrop",
+      protocol: "unknown",
+      targetType: null,
+      targetTokenId: null,
+      targetStakingRewardsAddress: null,
+      sameTxTokenId: null,
+      shareLifecycleWrapperAddress: null,
+      targetWrapperAddress: null,
+      surfaceKind: "airdrop_spam",
+      economicComponentKind: "excluded_airdrop",
+    },
+    depositTargets: [],
+    strategyTargets: [],
+  });
+
+  assert.equal(result.resolutionStatus, "excluded");
+  assert.equal(result.depositOrStrategyId, null);
+  assert.deepEqual(result.resolutionReasonCodes, ["excludedAirdrop"]);
 });

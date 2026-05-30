@@ -1,10 +1,20 @@
 "use client";
 
-import { CabBadge, CabButton } from "@/design-system";
+import { createColumnHelper, type ColumnDef } from "@tanstack/react-table";
+import { useMemo } from "react";
+
+import {
+  CabBadge,
+  DataTable,
+  DataTablePercentCell,
+  DataTableRowActionCell,
+  DataTableStatusCell,
+  DataTableValueCell,
+} from "@/design-system";
 import { StrategyIdentityCell } from "@/features/strategies/components/StrategyIdentityCell";
 import type { StrategyRowViewModel } from "@/features/strategies/strategies.mappers";
 
-import styles from "@/features/strategies/StrategiesWorkspace.module.css";
+const columnHelper = createColumnHelper<StrategyRowViewModel>();
 
 type StrategiesTableProps = {
   items: StrategyRowViewModel[];
@@ -23,44 +33,110 @@ type StrategiesTableProps = {
   onSelect: (strategyExposureId: string) => void;
 };
 
-export function StrategiesTable({ items, labels, getCoverageLabel, onSelect }: StrategiesTableProps) {
-  return (
-    <div className={styles.tableWrap}>
-      <table className={styles.table}>
-        <thead>
-          <tr>
-            <th>{labels.strategy}</th>
-            <th>{labels.status}</th>
-            <th>{labels.currentValue}</th>
-            <th>{labels.shares}</th>
-            <th>{labels.rewards}</th>
-            <th>{labels.result}</th>
-            <th>{labels.apr}</th>
-            <th>{labels.coverage}</th>
-            <th><span className={styles.srOnly}>{labels.select}</span></th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item) => (
-            <tr key={item.strategyExposureId} className={item.isSelected ? styles.selectedRow : undefined}>
-              <td><StrategyIdentityCell item={item} /></td>
-              <td><CabBadge size="sm" tone={item.status === "active" ? "success" : "neutral"}>{item.status}</CabBadge></td>
-              <td>{item.formattedCurrentValue}</td>
-              <td>{item.currentSharesRaw} {item.shareSymbol ?? ""}</td>
-              <td>{item.formattedRewards}</td>
-              <td className={styles[item.totalReturnSign]}>{item.formattedTotalReturn}</td>
-              <td>{item.formattedApr}</td>
-              <td><CabBadge size="sm" tone={item.coverageStatus === "full" ? "success" : "warning"}>{getCoverageLabel(item.coverageStatus)}</CabBadge></td>
-              <td>
-                <CabButton density="compact" tone="secondary" onPress={() => onSelect(item.strategyExposureId)}>
-                  {labels.select}
-                </CabButton>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+function returnTone(sign: StrategyRowViewModel["totalReturnSign"]) {
+  if (sign === "positive") return "positive" as const;
+  if (sign === "negative") return "negative" as const;
+  return "neutral" as const;
 }
 
+export function StrategiesTable({ items, labels, getCoverageLabel, onSelect }: StrategiesTableProps) {
+  const selectedRowId = items.find((item) => item.isSelected)?.strategyExposureId ?? null;
+  const columns = useMemo<Array<ColumnDef<StrategyRowViewModel, unknown>>>(() => {
+    const all = [
+      columnHelper.display({
+        id: "strategy",
+        header: () => labels.strategy,
+        cell: ({ row }) => <StrategyIdentityCell item={row.original} />,
+      }),
+      columnHelper.display({
+        id: "status",
+        header: () => labels.status,
+        cell: ({ row }) => (
+          <DataTableStatusCell
+            tone={row.original.status === "active" ? "success" : "neutral"}
+            label={row.original.status}
+          />
+        ),
+      }),
+      columnHelper.accessor("currentEstimatedValueUsd", {
+        id: "currentValue",
+        header: () => labels.currentValue,
+        meta: { numeric: true },
+        cell: ({ row }) => <DataTableValueCell primary={row.original.formattedCurrentValue} />,
+      }),
+      columnHelper.display({
+        id: "shares",
+        header: () => labels.shares,
+        meta: { numeric: true },
+        cell: ({ row }) => (
+          <DataTableValueCell
+            primary={`${row.original.currentSharesRaw} ${row.original.shareSymbol ?? ""}`.trim()}
+          />
+        ),
+      }),
+      columnHelper.accessor("totalRewardsUsd", {
+        id: "rewards",
+        header: () => labels.rewards,
+        meta: { numeric: true },
+        cell: ({ row }) => <DataTableValueCell primary={row.original.formattedRewards} />,
+      }),
+      columnHelper.accessor("totalReturnUsd", {
+        id: "result",
+        header: () => labels.result,
+        meta: { numeric: true },
+        cell: ({ row }) => (
+          <DataTablePercentCell
+            value={row.original.formattedTotalReturn}
+            tone={returnTone(row.original.totalReturnSign)}
+          />
+        ),
+      }),
+      columnHelper.accessor("estimatedAnnualizedReturnPct", {
+        id: "apr",
+        header: () => labels.apr,
+        meta: { numeric: true },
+        cell: ({ row }) => (
+          <DataTablePercentCell
+            value={row.original.formattedApr}
+            tone={returnTone(row.original.totalReturnSign)}
+          />
+        ),
+      }),
+      columnHelper.display({
+        id: "coverage",
+        header: () => labels.coverage,
+        cell: ({ row }) => (
+          <CabBadge size="sm" tone={row.original.coverageStatus === "full" ? "success" : "warning"}>
+            {getCoverageLabel(row.original.coverageStatus)}
+          </CabBadge>
+        ),
+      }),
+      columnHelper.display({
+        id: "select",
+        header: () => labels.select,
+        enableSorting: false,
+        meta: { align: "center" },
+        cell: ({ row }) => (
+          <DataTableRowActionCell
+            label={labels.select}
+            tone="secondary"
+            onPress={() => onSelect(row.original.strategyExposureId)}
+          />
+        ),
+      }),
+    ];
+
+    return all as Array<ColumnDef<StrategyRowViewModel, unknown>>;
+  }, [getCoverageLabel, labels, onSelect]);
+
+  return (
+    <DataTable
+      columns={columns}
+      data={items}
+      rowKey={(row) => row.strategyExposureId}
+      selectedRowId={selectedRowId}
+      onRowSelect={onSelect}
+      stickyHeader
+    />
+  );
+}

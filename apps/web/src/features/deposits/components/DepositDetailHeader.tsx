@@ -1,5 +1,7 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+
 import { CabBadge, CabButton, CabSectionHeader, CabStack, CabText } from "@/design-system";
 
 type DepositDetailHeaderProps = {
@@ -9,11 +11,14 @@ type DepositDetailHeaderProps = {
   tokenIdLabel: string | null;
   explorerUrl: string | null;
   viewInExplorerLabel: string;
+  rewardsHref?: string | null;
+  viewRewardsLabel?: string;
   closeLabel: string;
   onClose?: () => void;
 };
 
 export function DepositDetailHeader(input: DepositDetailHeaderProps) {
+  const router = useRouter();
   return (
     <CabStack gap="$2">
       <CabSectionHeader
@@ -37,6 +42,11 @@ export function DepositDetailHeader(input: DepositDetailHeaderProps) {
             }}
           >
             {input.viewInExplorerLabel}
+          </CabButton>
+        ) : null}
+        {input.rewardsHref && input.viewRewardsLabel ? (
+          <CabButton tone="technical" controlSize="sm" onPress={() => router.push(input.rewardsHref!)}>
+            {input.viewRewardsLabel}
           </CabButton>
         ) : null}
       </CabStack>

@@ -4,7 +4,11 @@
     "full": "Cobertura completa",
     "share_level": "Cobertura a nivel de participación",
     "partial": "Cobertura parcial",
-    "unknown": "Cobertura desconocida"
+    "unknown": "Cobertura desconocida",
+    "unresolved": "No resuelto",
+    "excluded": "Excluido",
+    "unavailable": "No disponible",
+    "estimated": "Estimado"
   },
   "status": {
     "recent": "Cobertura reciente",
@@ -68,7 +72,18 @@
     "baselineTransferIn": "El primer evento visible de estrategia fue una transferencia entrante de shares",
     "incompleteInternalActivity": "La actividad interna de la estrategia está incompleta",
     "externalStrategyReferenceUnresolved": "La referencia externa de posición de estrategia no está resuelta",
-    "mixedCoverageAggregate": "Este agregado combina estrategias con distintos niveles de cobertura"
+    "mixedCoverageAggregate": "Este agregado combina estrategias con distintos niveles de cobertura",
+    "missingOwnerEvidence": "Falta evidencia de dueño",
+    "unknownRewardSurface": "La superficie de reward es desconocida",
+    "excludedAirdrop": "Actividad similar a airdrop fue excluida",
+    "ambiguousWrapperWithdraw": "El retiro del wrapper es ambiguo",
+    "missingClaimTimePrice": "Falta precio al momento del claim",
+    "missingPoolMapping": "Falta mapeo de pool",
+    "mixedValuationCoverage": "La cobertura de valuación es mixta",
+    "historicalCapitalPartial": "La cobertura de capital histórico es parcial",
+    "governancePoolMappingUnavailable": "El mapeo de pool de gobernanza no está disponible",
+    "walletPoolAggregateAttribution": "Se usó atribución agregada wallet-pool",
+    "analysisNotReady": "El análisis histórico no está listo"
   },
   "confidence": {
     "high": "Confianza alta",
