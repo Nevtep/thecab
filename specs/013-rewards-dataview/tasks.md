@@ -89,7 +89,7 @@
 - [ ] T045 [P] [US1] Implement token breakdown panel in `apps/web/src/features/rewards/components/RewardsTokenBreakdown.tsx`
 - [ ] T046 [US1] Implement reward events table with selectable row shell in `apps/web/src/features/rewards/components/RewardsEventsTable.tsx`
 - [ ] T047 [US1] Implement locked, no-rewards, and filtered-empty states in `apps/web/src/features/rewards/components/RewardsEmptyState.tsx`
-- [ ] T048 [US1] Implement mockup-aligned desktop workspace grid and responsive base layout in `apps/web/src/features/rewards/RewardsWorkspace.module.css`
+- [ ] T048 [US1] Implement mockup-aligned desktop workspace grid, responsive base layout, and tabular numeric alignment for financial values, token amounts, percentages, timestamps, and hashes in `apps/web/src/features/rewards/RewardsWorkspace.module.css`
 - [ ] T049 [US1] Wire `/rewards` page to Rewards container in `apps/web/src/app/rewards/page.tsx`
 
 **Checkpoint**: MVP Rewards DataView is independently functional.
@@ -172,7 +172,7 @@
 - [ ] T080 [US4] Implement estimated reward return and coverage classification in `apps/web/src/server/rewards/rewards.service.ts`
 - [ ] T081 [US4] Implement date preset and custom date filter application in `apps/web/src/server/rewards/rewards.route.ts`
 - [ ] T082 [US4] Update filter bar date controls for 7d, 30d, 90d, 1y, all, and custom date in `apps/web/src/features/rewards/components/RewardsFiltersBar.tsx`
-- [ ] T083 [US4] Update Rewards Over Time panel with return series, reward count axis, claim markers, grouping control, and partial coverage note in `apps/web/src/features/rewards/components/RewardsOverTimePanel.tsx`
+- [ ] T083 [US4] Update Rewards Over Time panel with return series, reward count axis, claim markers, grouping control, chart/table emphasis control where supported by available data, and partial coverage note in `apps/web/src/features/rewards/components/RewardsOverTimePanel.tsx`
 - [ ] T084 [US4] Add reward return and chart localization keys in `apps/web/src/i18n/locales/en/rewards.json`, `apps/web/src/i18n/locales/es/rewards.json`, `apps/web/src/i18n/locales/en/charts.json`, and `apps/web/src/i18n/locales/es/charts.json`
 
 **Checkpoint**: Reward performance over time is independently testable.
@@ -241,7 +241,7 @@
 
 - [ ] T109 [P] Add deterministic rewards regression script in `apps/web/src/server/scripts/analysis-rewards-regression.ts`
 - [ ] T110 Add reward regression command documentation to `specs/013-rewards-dataview/quickstart.md`
-- [ ] T111 [P] Add or update database indexes for profiled Rewards filters in `apps/web/src/server/db/schema.ts` and generate migration in `apps/web/src/server/db/migrations/`
+- [ ] T111 [P] Profile `GET /api/rewards` against 2,000-row target and 10,000-row stress fixtures, then add or update database indexes for profiled Rewards filters in `apps/web/src/server/db/schema.ts` and generate migration in `apps/web/src/server/db/migrations/` only if existing indexes miss the plan performance goals
 - [ ] T112 Update unit test script entries for Rewards tests in `apps/web/package.json`
 - [ ] T113 Run focused Rewards test command from `specs/013-rewards-dataview/quickstart.md`
 - [ ] T114 Run full unit suite command from `apps/web/package.json`
@@ -249,7 +249,7 @@
 - [ ] T116 Run i18n parity command from `apps/web/package.json`
 - [ ] T117 Run design-system checks command from `apps/web/package.json`
 - [ ] T118 Run deterministic reward regression script from `apps/web/src/server/scripts/analysis-rewards-regression.ts`
-- [ ] T119 Record manual auth-gated UI signoff results in `specs/013-rewards-dataview/quickstart.md`
+- [ ] T119 Record manual auth-gated UI signoff results for mockup hierarchy, responsive behavior, tabular numeric alignment, and selected-rail reachability in `specs/013-rewards-dataview/quickstart.md`
 - [ ] T120 Review Rewards implementation for provider-boundary, chain-aware identity, no hardcoded copy, no owner guessing, and no browser automation against `AGENTS.md`
 
 ---

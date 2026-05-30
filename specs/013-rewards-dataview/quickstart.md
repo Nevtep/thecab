@@ -108,6 +108,7 @@ Record product/developer signoff for:
 - incoming Pool, Deposit, or Strategy links produce visible removable filter chips;
 - unresolved/excluded values are not presented as confident earned rewards;
 - narrow viewport keeps selected reward evidence reachable in no more than two interactions;
+- Rewards numeric columns, KPI values, token amounts, percentages, timestamps, and hashes use tabular alignment and remain scannable in dense table and rail states;
 - copy is localized and no hardcoded English text appears in the UI;
 - visual tone matches the dark, disciplined, control-tower mockup.
 
