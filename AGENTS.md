@@ -1,7 +1,7 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read
-`specs/012-strategies-lifecycle/plan.md`.
+`specs/013-rewards-dataview/plan.md`.
 <!-- SPECKIT END -->
 
 # The Cab Codex Agent Rules
