@@ -9,6 +9,9 @@
     "activity": "Actividad",
     "settings": "Configuración"
   },
+  "descriptions": {
+    "strategies": "Análisis de exposiciones automatizadas"
+  },
   "a11y": {
     "openMenu": "Abrir menú de navegación",
     "closeMenu": "Cerrar menú de navegación",

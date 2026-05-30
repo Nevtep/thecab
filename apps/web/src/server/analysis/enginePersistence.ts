@@ -18,6 +18,10 @@ import {
   strategyExposures,
 } from "@/server/db/schema";
 import { insertProcessedTxs, listProcessedTxs } from "@/server/analysis/processed-tx.repository";
+import {
+  materializeStrategyReadModels as materializeStrategyReadModelsProjection,
+  type MaterializeStrategyReadModelsInput,
+} from "@/server/analysis/strategy-read-models";
 import { insertRawProviderRecord } from "@/server/providers/raw-provider-records.repository";
 import type { OverviewProtocolPosition } from "@/server/protocol-positions/protocolPositions.types";
 
@@ -2140,4 +2144,8 @@ export async function persistPoolSnapshots(input: {
   }
 
   return input.poolTotals.length;
+}
+
+export async function materializeStrategyReadModels(input: MaterializeStrategyReadModelsInput) {
+  return materializeStrategyReadModelsProjection(input);
 }

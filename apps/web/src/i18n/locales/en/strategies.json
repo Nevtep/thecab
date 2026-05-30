@@ -1,3 +1,104 @@
 {
-  "title": "TODO"
+  "title": "Strategies",
+  "subtitle": "Automated Mellow exposures separated from manual deposits.",
+  "actions": {
+    "refresh": "Refresh",
+    "openPool": "Open pool",
+    "openStrategy": "Open strategy",
+    "clearFilters": "Clear filters"
+  },
+  "kpis": {
+    "currentValue": "Current strategy value",
+    "activeCount": "Active strategies",
+    "claimedRewards": "Claimed rewards",
+    "totalReturn": "Total return",
+    "protocolCoverage": "Protocol coverage",
+    "unavailable": "Unavailable"
+  },
+  "filters": {
+    "searchPlaceholder": "Search strategies",
+    "status": "Status",
+    "protocol": "Protocol",
+    "pool": "Pool",
+    "coverage": "Coverage",
+    "returnSign": "Return",
+    "shareLevel": "Share-level",
+    "partial": "Partial"
+  },
+  "filterValues": {
+    "active": "Active",
+    "closed": "Closed",
+    "all": "All",
+    "mellow": "Mellow",
+    "positive": "Positive",
+    "negative": "Negative",
+    "any": "Any"
+  },
+  "table": {
+    "title": "Detected exposures",
+    "columns": {
+      "strategy": "Strategy / Pool",
+      "protocol": "Protocol",
+      "status": "Status",
+      "currentValue": "Current value",
+      "shares": "Shares",
+      "claimedRewards": "Claimed rewards",
+      "result": "Result",
+      "estimatedApr": "Estimated APR",
+      "coverage": "Coverage",
+      "confidence": "Confidence"
+    }
+  },
+  "detail": {
+    "exposureSummary": "Exposure summary",
+    "rewards": "Claimed rewards",
+    "lifecycle": "Lifecycle",
+    "coverageNote": "Coverage note",
+    "deposited": "Deposited",
+    "withdrawn": "Withdrawn",
+    "sharesReceived": "Shares received",
+    "sharesRedeemed": "Shares redeemed",
+    "currentShares": "Current shares",
+    "currentValue": "Current estimated value"
+  },
+  "events": {
+    "strategy_deposit": "Strategy deposit",
+    "strategy_share_receive": "Shares received",
+    "strategy_stake": "Stake",
+    "strategy_claim": "Reward claim",
+    "strategy_unstake": "Unstake",
+    "strategy_withdraw": "Withdraw",
+    "strategy_share_redeem": "Shares redeemed",
+    "strategy_close": "Close",
+    "strategy_internal_rebalance": "Internal rebalance",
+    "strategy_fee_dilution": "Fee dilution",
+    "strategy_baseline_transfer_in": "Baseline transfer-in",
+    "unresolved_strategy_reward": "Unresolved strategy reward"
+  },
+  "coverageNote": {
+    "full": {
+      "title": "Full strategy coverage",
+      "body": "Deposits, withdrawals, shares, rewards, and internal activity are reconstructed for this strategy."
+    },
+    "share_level": {
+      "title": "Share-level strategy coverage",
+      "body": "User shares, deposits, withdrawals, and resolved rewards are counted. Internal strategy activity may be incomplete."
+    },
+    "partial": {
+      "title": "Partial strategy coverage",
+      "body": "Some prices, share valuation, pool mapping, reward ownership, or lifecycle events are missing or degraded."
+    },
+    "unknown": {
+      "title": "Strategy coverage unknown",
+      "body": "Exposure was detected, but there is not enough evidence for reliable strategy accounting."
+    }
+  },
+  "states": {
+    "emptyTitle": "No automated strategies detected",
+    "emptyDescription": "Manual deposits remain under Deposits. Strategies appears when automated Mellow exposure is found.",
+    "emptyFilteredTitle": "No strategies match these filters",
+    "selectedMissingTitle": "Selected strategy is no longer visible",
+    "lockedTitle": "Analysis required",
+    "loadingTitle": "Loading strategies"
+  }
 }

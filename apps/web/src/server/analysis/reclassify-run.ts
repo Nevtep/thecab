@@ -7,6 +7,7 @@ import { runCanonicalInference } from "@/server/analysis/canonicalInference";
 import { computeSnapshots, type WalletTokenSnapshot } from "@/server/analysis/computeSnapshots";
 import {
   classifyRunLedgerEvents,
+  materializeStrategyReadModels,
   persistResolvedRewardEvents,
 } from "@/server/analysis/enginePersistence";
 import {
@@ -477,6 +478,14 @@ export async function reclassifyAnalysisRun(input: {
     poolTotals: parsePoolTotals(run.metadataJson.latestPoolTotals),
     walletTokens: input.walletTokens,
   });
+  const strategyReadModels = await materializeStrategyReadModels({
+    runId: input.runId,
+    walletAddress: input.walletAddress,
+    chainId: input.chainId,
+    startDayUtc: sliceDayWindow.startDayUtc,
+    endDayUtc: sliceDayWindow.endDayUtc,
+    capturedAt: input.capturedAt,
+  });
   const poolReadModels = await materializePoolReadModels({
     runId: input.runId,
     walletAddress: input.walletAddress,
@@ -502,6 +511,7 @@ export async function reclassifyAnalysisRun(input: {
     classified,
     canonical,
     snapshot,
+    strategyReadModels,
     poolReadModels,
     depositReadModels,
     sliceDayWindow,

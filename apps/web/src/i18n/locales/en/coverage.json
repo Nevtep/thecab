@@ -58,7 +58,17 @@
     "rangeUnavailable": "Range metadata is unavailable for this position",
     "priceFallbackDca": "A nearest historical price fallback was used",
     "coverageGap": "There is a gap in covered history",
-    "lowConfidenceClassification": "Some event classification is lower confidence"
+    "lowConfidenceClassification": "Some event classification is lower confidence",
+    "shareLevelAccounting": "Accounting is reliable at the share level, but internal strategy activity is incomplete",
+    "missingShareValuation": "Share valuation is unavailable for this strategy",
+    "missingHistoricalPrice": "A historical price is missing for one or more strategy events",
+    "poolMappingInferred": "The underlying pool mapping was inferred",
+    "poolMappingUnknown": "The underlying pool mapping is unknown",
+    "unresolvedStrategyReward": "A strategy-shaped reward could not be resolved to this exposure",
+    "baselineTransferIn": "The first visible strategy event was an inbound share transfer",
+    "incompleteInternalActivity": "Internal strategy activity is incomplete",
+    "externalStrategyReferenceUnresolved": "External strategy position reference is unresolved",
+    "mixedCoverageAggregate": "This aggregate combines strategies with different coverage levels"
   },
   "confidence": {
     "high": "High confidence",

@@ -180,6 +180,7 @@ export const phaseFinalizeTask = task({
       coverage: finalizedRun.coverage,
       coverageReasons: finalizedRun.coverageReasonsJson,
       totalValueUsd: reclassification.snapshot.totalValueUsd,
+      strategyReadModels: reclassification.strategyReadModels,
       poolReadModels: reclassification.poolReadModels,
     };
   },

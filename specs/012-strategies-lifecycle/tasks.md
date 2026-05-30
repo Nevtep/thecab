@@ -11,13 +11,13 @@
 
 **Purpose**: Reserve the implementation surfaces for the Strategies DataView, server read layer, analysis read models, and regression scripts.
 
-- [ ] T001 Create Strategies route directories in apps/web/src/app/strategies/ and apps/web/src/app/strategies/[strategyId]/
-- [ ] T002 Create Strategies API route directories in apps/web/src/app/api/strategies/ and apps/web/src/app/api/strategies/[strategyId]/
-- [ ] T003 Create Strategies feature module directories in apps/web/src/features/strategies/ and apps/web/src/features/strategies/components/
-- [ ] T004 Create Strategies server module directory in apps/web/src/server/strategies/
-- [ ] T005 [P] Create placeholder strategy read-model module in apps/web/src/server/analysis/strategy-read-models.ts
-- [ ] T006 [P] Create placeholder regression script in apps/web/src/server/scripts/analysis-strategy-regression.ts
-- [ ] T007 [P] Create placeholder rebuild script in apps/web/src/server/scripts/rebuild-strategy-read-models.ts
+- [X] T001 Create Strategies route directories in apps/web/src/app/strategies/ and apps/web/src/app/strategies/[strategyId]/
+- [X] T002 Create Strategies API route directories in apps/web/src/app/api/strategies/ and apps/web/src/app/api/strategies/[strategyId]/
+- [X] T003 Create Strategies feature module directories in apps/web/src/features/strategies/ and apps/web/src/features/strategies/components/
+- [X] T004 Create Strategies server module directory in apps/web/src/server/strategies/
+- [X] T005 [P] Create placeholder strategy read-model module in apps/web/src/server/analysis/strategy-read-models.ts
+- [X] T006 [P] Create placeholder regression script in apps/web/src/server/scripts/analysis-strategy-regression.ts
+- [X] T007 [P] Create placeholder rebuild script in apps/web/src/server/scripts/rebuild-strategy-read-models.ts
 
 ---
 
@@ -27,20 +27,20 @@
 
 **Critical**: No user story work can begin until this phase is complete.
 
-- [ ] T008 Add strategy_wallet_summaries, strategy_history_snapshots, and strategy_lifecycle_events schema definitions with indexes in apps/web/src/server/db/schema.ts
-- [ ] T009 Generate and review Drizzle migration for strategy read-model tables in apps/web/src/server/db/migrations/
-- [ ] T010 Update FK-safe purge order for strategy read-model tables in apps/web/src/server/scripts/db-purge.ts
-- [ ] T011 [P] Define shared Strategies API/view model types in apps/web/src/server/strategies/strategies.types.ts
-- [ ] T012 [P] Define Strategies route validation contract in apps/web/src/server/strategies/strategies.contract.ts
-- [ ] T013 [P] Define client Strategies types in apps/web/src/features/strategies/strategies.types.ts
-- [ ] T014 [P] Add Strategies URL-state parser and serializer skeleton in apps/web/src/features/strategies/strategies.urlState.ts
-- [ ] T015 [P] Add Strategies navigation helper skeleton in apps/web/src/features/strategies/strategies.navigation.ts
-- [ ] T016 [P] Replace placeholder Strategies i18n resources with full key skeletons in apps/web/src/i18n/locales/en/strategies.json and apps/web/src/i18n/locales/es/strategies.json
-- [ ] T017 [P] Add strategy coverage reason keys in apps/web/src/i18n/locales/en/coverage.json and apps/web/src/i18n/locales/es/coverage.json
-- [ ] T018 [P] Add strategy navigation and error keys in apps/web/src/i18n/locales/en/navigation.json, apps/web/src/i18n/locales/es/navigation.json, apps/web/src/i18n/locales/en/errors.json, and apps/web/src/i18n/locales/es/errors.json
-- [ ] T019 Update strategy query keys to include normalized filters in apps/web/src/queries/keys.ts
-- [ ] T020 Update strategy query hook signatures without enabling data fetches yet in apps/web/src/queries/hooks.ts
-- [ ] T021 Wire materializeStrategyReadModels into finalize/rebuild order behind a no-op implementation in apps/web/src/server/trigger/tasks/phase-finalize.task.ts and apps/web/src/server/analysis/enginePersistence.ts
+- [X] T008 Add strategy_wallet_summaries, strategy_history_snapshots, and strategy_lifecycle_events schema definitions with indexes in apps/web/src/server/db/schema.ts
+- [X] T009 Generate and review Drizzle migration for strategy read-model tables in apps/web/src/server/db/migrations/
+- [X] T010 Update FK-safe purge order for strategy read-model tables in apps/web/src/server/scripts/db-purge.ts
+- [X] T011 [P] Define shared Strategies API/view model types in apps/web/src/server/strategies/strategies.types.ts
+- [X] T012 [P] Define Strategies route validation contract in apps/web/src/server/strategies/strategies.contract.ts
+- [X] T013 [P] Define client Strategies types in apps/web/src/features/strategies/strategies.types.ts
+- [X] T014 [P] Add Strategies URL-state parser and serializer skeleton in apps/web/src/features/strategies/strategies.urlState.ts
+- [X] T015 [P] Add Strategies navigation helper skeleton in apps/web/src/features/strategies/strategies.navigation.ts
+- [X] T016 [P] Replace placeholder Strategies i18n resources with full key skeletons in apps/web/src/i18n/locales/en/strategies.json and apps/web/src/i18n/locales/es/strategies.json
+- [X] T017 [P] Add strategy coverage reason keys in apps/web/src/i18n/locales/en/coverage.json and apps/web/src/i18n/locales/es/coverage.json
+- [X] T018 [P] Add strategy navigation and error keys in apps/web/src/i18n/locales/en/navigation.json, apps/web/src/i18n/locales/es/navigation.json, apps/web/src/i18n/locales/en/errors.json, and apps/web/src/i18n/locales/es/errors.json
+- [X] T019 Update strategy query keys to include normalized filters in apps/web/src/queries/keys.ts
+- [X] T020 Update strategy query hook signatures without enabling data fetches yet in apps/web/src/queries/hooks.ts
+- [X] T021 Wire materializeStrategyReadModels into finalize/rebuild order behind a no-op implementation in apps/web/src/server/trigger/tasks/phase-finalize.task.ts and apps/web/src/server/analysis/enginePersistence.ts
 
 **Checkpoint**: Foundation ready. User story implementation can begin.
 

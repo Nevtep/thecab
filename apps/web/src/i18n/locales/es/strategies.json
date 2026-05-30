@@ -1,3 +1,104 @@
 {
-  "title": "PENDIENTE"
+  "title": "Estrategias",
+  "subtitle": "Exposiciones automatizadas de Mellow separadas de los depósitos manuales.",
+  "actions": {
+    "refresh": "Actualizar",
+    "openPool": "Abrir pool",
+    "openStrategy": "Abrir estrategia",
+    "clearFilters": "Limpiar filtros"
+  },
+  "kpis": {
+    "currentValue": "Valor actual de estrategias",
+    "activeCount": "Estrategias activas",
+    "claimedRewards": "Recompensas reclamadas",
+    "totalReturn": "Retorno total",
+    "protocolCoverage": "Cobertura del protocolo",
+    "unavailable": "No disponible"
+  },
+  "filters": {
+    "searchPlaceholder": "Buscar estrategias",
+    "status": "Estado",
+    "protocol": "Protocolo",
+    "pool": "Pool",
+    "coverage": "Cobertura",
+    "returnSign": "Retorno",
+    "shareLevel": "Nivel de shares",
+    "partial": "Parcial"
+  },
+  "filterValues": {
+    "active": "Activas",
+    "closed": "Cerradas",
+    "all": "Todas",
+    "mellow": "Mellow",
+    "positive": "Positivo",
+    "negative": "Negativo",
+    "any": "Cualquiera"
+  },
+  "table": {
+    "title": "Exposiciones detectadas",
+    "columns": {
+      "strategy": "Estrategia / Pool",
+      "protocol": "Protocolo",
+      "status": "Estado",
+      "currentValue": "Valor actual",
+      "shares": "Shares",
+      "claimedRewards": "Recompensas reclamadas",
+      "result": "Resultado",
+      "estimatedApr": "APR estimado",
+      "coverage": "Cobertura",
+      "confidence": "Confianza"
+    }
+  },
+  "detail": {
+    "exposureSummary": "Resumen de exposición",
+    "rewards": "Recompensas reclamadas",
+    "lifecycle": "Línea de vida",
+    "coverageNote": "Nota de cobertura",
+    "deposited": "Depositado",
+    "withdrawn": "Retirado",
+    "sharesReceived": "Shares recibidas",
+    "sharesRedeemed": "Shares redimidas",
+    "currentShares": "Shares actuales",
+    "currentValue": "Valor estimado actual"
+  },
+  "events": {
+    "strategy_deposit": "Depósito en estrategia",
+    "strategy_share_receive": "Shares recibidas",
+    "strategy_stake": "Stake",
+    "strategy_claim": "Reclamo de rewards",
+    "strategy_unstake": "Unstake",
+    "strategy_withdraw": "Retiro",
+    "strategy_share_redeem": "Shares redimidas",
+    "strategy_close": "Cierre",
+    "strategy_internal_rebalance": "Rebalanceo interno",
+    "strategy_fee_dilution": "Dilución por fees",
+    "strategy_baseline_transfer_in": "Transferencia inicial",
+    "unresolved_strategy_reward": "Reward de estrategia sin resolver"
+  },
+  "coverageNote": {
+    "full": {
+      "title": "Cobertura completa de estrategia",
+      "body": "Depósitos, retiros, shares, recompensas y actividad interna están reconstruidos para esta estrategia."
+    },
+    "share_level": {
+      "title": "Cobertura de estrategia a nivel de share",
+      "body": "Se contabilizan shares, depósitos, retiros y recompensas resueltas del usuario. La actividad interna de la estrategia puede estar incompleta."
+    },
+    "partial": {
+      "title": "Cobertura parcial de estrategia",
+      "body": "Faltan o están degradados algunos precios, valuación de shares, mapeo de pool, propiedad de recompensas o eventos de ciclo de vida."
+    },
+    "unknown": {
+      "title": "Cobertura de estrategia desconocida",
+      "body": "Se detectó exposición, pero no hay suficiente evidencia para una contabilidad confiable de estrategia."
+    }
+  },
+  "states": {
+    "emptyTitle": "No se detectaron estrategias automatizadas",
+    "emptyDescription": "Los depósitos manuales siguen en Depósitos. Estrategias aparece cuando se encuentra exposición automatizada de Mellow.",
+    "emptyFilteredTitle": "Ninguna estrategia coincide con estos filtros",
+    "selectedMissingTitle": "La estrategia seleccionada ya no está visible",
+    "lockedTitle": "Se requiere análisis",
+    "loadingTitle": "Cargando estrategias"
+  }
 }

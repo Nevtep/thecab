@@ -9,6 +9,9 @@
     "activity": "Activity",
     "settings": "Settings"
   },
+  "descriptions": {
+    "strategies": "Automated exposure analysis"
+  },
   "a11y": {
     "openMenu": "Open navigation menu",
     "closeMenu": "Close navigation menu",

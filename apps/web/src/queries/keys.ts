@@ -11,6 +11,10 @@ type PoolsParams = BaseParams & {
   filters?: Record<string, unknown>;
 };
 
+type StrategiesParams = BaseParams & {
+  filters?: Record<string, unknown>;
+};
+
 export const queryKeys = {
   overview: ({ chainId, walletAddress, range }: OverviewParams) =>
     ["overview", chainId, walletAddress ?? "", range] as const,
@@ -32,8 +36,8 @@ export const queryKeys = {
     ["deposits", chainId, walletAddress ?? "", JSON.stringify(filters ?? {})] as const,
   depositDetail: (chainId: number, depositId: string) =>
     ["deposit", chainId, depositId] as const,
-  strategies: ({ chainId, walletAddress }: BaseParams) =>
-    ["strategies", chainId, walletAddress ?? ""] as const,
+  strategies: ({ chainId, walletAddress, filters }: StrategiesParams) =>
+    ["strategies", chainId, walletAddress ?? "", JSON.stringify(filters ?? {})] as const,
   strategyDetail: (chainId: number, strategyId: string) =>
     ["strategy", chainId, strategyId] as const,
   rewards: ({ chainId, walletAddress }: BaseParams) =>

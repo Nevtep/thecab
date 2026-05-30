@@ -58,7 +58,17 @@
     "rangeUnavailable": "Los metadatos de rango no están disponibles para esta posición",
     "priceFallbackDca": "Se usó un fallback al precio histórico más cercano",
     "coverageGap": "Existe un hueco en la historia cubierta",
-    "lowConfidenceClassification": "Algunos eventos tienen una clasificación de menor confianza"
+    "lowConfidenceClassification": "Algunos eventos tienen una clasificación de menor confianza",
+    "shareLevelAccounting": "La contabilidad es confiable a nivel de share, pero la actividad interna de la estrategia está incompleta",
+    "missingShareValuation": "La valuación de shares no está disponible para esta estrategia",
+    "missingHistoricalPrice": "Falta un precio histórico para uno o más eventos de estrategia",
+    "poolMappingInferred": "El mapeo del pool subyacente fue inferido",
+    "poolMappingUnknown": "El mapeo del pool subyacente es desconocido",
+    "unresolvedStrategyReward": "Una recompensa con forma de estrategia no pudo resolverse a esta exposición",
+    "baselineTransferIn": "El primer evento visible de estrategia fue una transferencia entrante de shares",
+    "incompleteInternalActivity": "La actividad interna de la estrategia está incompleta",
+    "externalStrategyReferenceUnresolved": "La referencia externa de posición de estrategia no está resuelta",
+    "mixedCoverageAggregate": "Este agregado combina estrategias con distintos niveles de cobertura"
   },
   "confidence": {
     "high": "Confianza alta",

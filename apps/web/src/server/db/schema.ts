@@ -266,6 +266,114 @@ export const strategyExposures = pgTable(
   ],
 );
 
+export const strategyWalletSummaries = pgTable(
+  "strategy_wallet_summaries",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    chainId: integer("chain_id").notNull(),
+    walletAddress: varchar("wallet_address", { length: 42 }).notNull(),
+    strategyId: uuid("strategy_id")
+      .notNull()
+      .references(() => strategies.id, { onDelete: "cascade" }),
+    strategyExposureId: uuid("strategy_exposure_id")
+      .notNull()
+      .references(() => strategyExposures.id, { onDelete: "cascade" }),
+    primaryPoolId: uuid("primary_pool_id").references(() => pools.id, { onDelete: "set null" }),
+    latestRunId: uuid("latest_run_id")
+      .notNull()
+      .references(() => analysisRuns.id, { onDelete: "cascade" }),
+    strategyLabel: text("strategy_label").notNull(),
+    protocol: varchar("protocol", { length: 32 }).notNull().default("mellow"),
+    wrapperAddress: varchar("wrapper_address", { length: 42 }),
+    stakingRewardsAddress: varchar("staking_rewards_address", { length: 42 }),
+    externalStrategyPositionReference: text("external_strategy_position_reference"),
+    externalStrategyPositionReferenceStatus: varchar("external_strategy_position_reference_status", { length: 24 })
+      .notNull()
+      .default("unresolved"),
+    poolMappingStatus: varchar("pool_mapping_status", { length: 24 }).notNull().default("unknown"),
+    status: varchar("status", { length: 24 }).notNull().default("unknown"),
+    openedAt: timestamp("opened_at", { withTimezone: true }),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    coveredStartDayUtc: varchar("covered_start_day_utc", { length: 10 }),
+    coveredEndDayUtc: varchar("covered_end_day_utc", { length: 10 }),
+    depositedValueUsd: numeric("deposited_value_usd", { precision: 38, scale: 18 }).notNull().default("0"),
+    withdrawnValueUsd: numeric("withdrawn_value_usd", { precision: 38, scale: 18 }).notNull().default("0"),
+    currentEstimatedValueUsd: numeric("current_estimated_value_usd", { precision: 38, scale: 18 }),
+    sharesReceivedRaw: numeric("shares_received_raw", { precision: 78, scale: 0 }).notNull().default("0"),
+    sharesRedeemedRaw: numeric("shares_redeemed_raw", { precision: 78, scale: 0 }).notNull().default("0"),
+    currentSharesRaw: numeric("current_shares_raw", { precision: 78, scale: 0 }).notNull().default("0"),
+    shareSymbol: varchar("share_symbol", { length: 48 }),
+    totalRewardsUsd: numeric("total_rewards_usd", { precision: 38, scale: 18 }).notNull().default("0"),
+    resolvedRewardCount: integer("resolved_reward_count").notNull().default(0),
+    unresolvedRewardCount: integer("unresolved_reward_count").notNull().default(0),
+    realizedPnlUsd: numeric("realized_pnl_usd", { precision: 38, scale: 18 }),
+    unrealizedPnlUsd: numeric("unrealized_pnl_usd", { precision: 38, scale: 18 }),
+    totalReturnUsd: numeric("total_return_usd", { precision: 38, scale: 18 }),
+    totalReturnPct: numeric("total_return_pct", { precision: 12, scale: 6 }),
+    estimatedAnnualizedReturnPct: numeric("estimated_annualized_return_pct", { precision: 12, scale: 6 }),
+    coverageStatus: varchar("coverage_status", { length: 24 }).notNull().default("share_level"),
+    confidence: varchar("confidence", { length: 16 }).notNull().default("unknown"),
+    coverageReasonCodes: text("coverage_reason_codes").array().notNull().default(sql`'{}'::text[]`),
+    metadataJson: jsonb("metadata_json").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).$defaultFn(now).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).$defaultFn(now).notNull(),
+  },
+  (table) => [
+    uniqueIndex("strategy_wallet_summaries_identity_uidx").on(table.chainId, table.walletAddress, table.strategyExposureId),
+    index("strategy_wallet_summaries_status_idx").on(table.chainId, table.walletAddress, table.status),
+    index("strategy_wallet_summaries_pool_idx").on(table.chainId, table.walletAddress, table.primaryPoolId),
+    index("strategy_wallet_summaries_coverage_idx").on(table.chainId, table.walletAddress, table.coverageStatus),
+    index("strategy_wallet_summaries_value_idx").on(table.chainId, table.walletAddress, table.currentEstimatedValueUsd),
+    index("strategy_wallet_summaries_opened_idx").on(table.chainId, table.walletAddress, table.openedAt),
+  ],
+);
+
+export const strategyHistorySnapshots = pgTable(
+  "strategy_history_snapshots",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    chainId: integer("chain_id").notNull(),
+    walletAddress: varchar("wallet_address", { length: 42 }).notNull(),
+    strategyId: uuid("strategy_id")
+      .notNull()
+      .references(() => strategies.id, { onDelete: "cascade" }),
+    strategyExposureId: uuid("strategy_exposure_id")
+      .notNull()
+      .references(() => strategyExposures.id, { onDelete: "cascade" }),
+    primaryPoolId: uuid("primary_pool_id").references(() => pools.id, { onDelete: "set null" }),
+    dayUtc: varchar("day_utc", { length: 10 }).notNull(),
+    latestRunId: uuid("latest_run_id")
+      .notNull()
+      .references(() => analysisRuns.id, { onDelete: "cascade" }),
+    coverageStatus: varchar("coverage_status", { length: 24 }).notNull().default("share_level"),
+    shareBalanceRaw: numeric("share_balance_raw", { precision: 78, scale: 0 }).notNull().default("0"),
+    estimatedValueUsd: numeric("estimated_value_usd", { precision: 38, scale: 18 }),
+    depositedValueUsd: numeric("deposited_value_usd", { precision: 38, scale: 18 }).notNull().default("0"),
+    withdrawnValueUsd: numeric("withdrawn_value_usd", { precision: 38, scale: 18 }).notNull().default("0"),
+    rewardValueUsd: numeric("reward_value_usd", { precision: 38, scale: 18 }).notNull().default("0"),
+    cumulativeRewardsUsd: numeric("cumulative_rewards_usd", { precision: 38, scale: 18 }).notNull().default("0"),
+    totalReturnUsd: numeric("total_return_usd", { precision: 38, scale: 18 }),
+    metadataJson: jsonb("metadata_json").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).$defaultFn(now).notNull(),
+  },
+  (table) => [
+    uniqueIndex("strategy_history_snapshots_identity_uidx").on(
+      table.chainId,
+      table.walletAddress,
+      table.strategyExposureId,
+      table.dayUtc,
+    ),
+    index("strategy_history_snapshots_day_idx").on(table.chainId, table.walletAddress, table.dayUtc),
+    index("strategy_history_snapshots_exposure_day_idx").on(
+      table.chainId,
+      table.walletAddress,
+      table.strategyExposureId,
+      table.dayUtc,
+    ),
+    index("strategy_history_snapshots_pool_day_idx").on(table.chainId, table.walletAddress, table.primaryPoolId, table.dayUtc),
+  ],
+);
+
 export const pricePoints = pgTable(
   "price_points",
   {
@@ -394,6 +502,59 @@ export const rewardEvents = pgTable(
     uniqueIndex("reward_events_accrual_uidx")
       .on(table.chainId, table.depositOrStrategyId, table.accrualSnapshotDayUtc)
       .where(sql`${table.isAccrualSnapshot} = true`),
+  ],
+);
+
+export const strategyLifecycleEvents = pgTable(
+  "strategy_lifecycle_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    chainId: integer("chain_id").notNull(),
+    walletAddress: varchar("wallet_address", { length: 42 }).notNull(),
+    strategyId: uuid("strategy_id")
+      .notNull()
+      .references(() => strategies.id, { onDelete: "cascade" }),
+    strategyExposureId: uuid("strategy_exposure_id")
+      .notNull()
+      .references(() => strategyExposures.id, { onDelete: "cascade" }),
+    primaryPoolId: uuid("primary_pool_id").references(() => pools.id, { onDelete: "set null" }),
+    sequenceIndex: integer("sequence_index").notNull(),
+    latestRunId: uuid("latest_run_id")
+      .notNull()
+      .references(() => analysisRuns.id, { onDelete: "cascade" }),
+    eventType: varchar("event_type", { length: 40 }).notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+    txHash: varchar("tx_hash", { length: 66 }),
+    logIndex: integer("log_index"),
+    blockNumber: numeric("block_number", { precision: 38, scale: 0 }),
+    sourceLedgerEventId: uuid("source_ledger_event_id").references(() => ledgerEvents.id, { onDelete: "set null" }),
+    sourceRewardEventId: uuid("source_reward_event_id").references(() => rewardEvents.id, { onDelete: "set null" }),
+    usdValue: numeric("usd_value", { precision: 38, scale: 18 }),
+    shareDeltaRaw: numeric("share_delta_raw", { precision: 78, scale: 0 }),
+    tokenDeltasJson: jsonb("token_deltas_json").$type<unknown[]>().notNull().default([]),
+    priceSource: varchar("price_source", { length: 32 }),
+    confidence: varchar("confidence", { length: 16 }).notNull().default("unknown"),
+    coverageStatus: varchar("coverage_status", { length: 24 }).notNull().default("share_level"),
+    coverageReasonCodes: text("coverage_reason_codes").array().notNull().default(sql`'{}'::text[]`),
+    metadataJson: jsonb("metadata_json").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).$defaultFn(now).notNull(),
+  },
+  (table) => [
+    uniqueIndex("strategy_lifecycle_events_identity_uidx").on(
+      table.chainId,
+      table.walletAddress,
+      table.strategyExposureId,
+      table.sequenceIndex,
+    ),
+    index("strategy_lifecycle_events_occurred_idx").on(
+      table.chainId,
+      table.walletAddress,
+      table.strategyExposureId,
+      table.occurredAt,
+    ),
+    index("strategy_lifecycle_events_type_idx").on(table.chainId, table.walletAddress, table.strategyExposureId, table.eventType),
+    index("strategy_lifecycle_events_tx_idx").on(table.chainId, table.walletAddress, table.txHash),
+    index("strategy_lifecycle_events_reward_idx").on(table.chainId, table.walletAddress, table.sourceRewardEventId),
   ],
 );
 

@@ -7,6 +7,12 @@ import type {
 } from "@/features/deposits/deposits.urlState";
 import { buildDepositsApiQueryString, normalizeFiltersForQueryKey } from "@/features/deposits/deposits.urlState";
 import type { PoolDetailRange, PoolDetailResponse, PoolsListFilters, PoolsListResponse } from "@/features/pools/pools.types";
+import {
+  getStrategiesListQueryOptions,
+  getStrategyDetailQueryOptions,
+} from "@/features/strategies/strategies.queries";
+import type { StrategiesListResponse, StrategyDetailResponse } from "@/features/strategies/strategies.types";
+import type { StrategiesListUrlState } from "@/features/strategies/strategies.urlState";
 import type { SettingsResponse, SettingsUpdateRequest } from "@/features/settings/settings.types";
 import {
   getOverviewActivityQueryOptions,
@@ -196,19 +202,27 @@ export function useDepositDetailViewQuery(
   });
 }
 
-export function useStrategiesQuery(input: WalletScopedInput) {
-  return useQuery({
-    queryKey: queryKeys.strategies(input),
-    queryFn: () => apiClient(`/api/strategies?chainId=${input.chainId}`),
-    enabled: false,
+export function useStrategiesQuery(
+  input: WalletScopedInput & { state: StrategiesListUrlState },
+  options?: { enabled?: boolean },
+) {
+  return useQuery<StrategiesListResponse>({
+    ...getStrategiesListQueryOptions(input),
+    enabled: (options?.enabled ?? false) && Boolean(input.walletAddress),
   });
 }
 
-export function useStrategyDetailQuery(chainId: number, strategyId: string) {
-  return useQuery({
-    queryKey: queryKeys.strategyDetail(chainId, strategyId),
-    queryFn: () => apiClient(`/api/strategies/${strategyId}?chainId=${chainId}`),
-    enabled: false,
+export function useStrategyDetailQuery(
+  input: WalletScopedInput & { strategyId: string | null },
+  options?: { enabled?: boolean },
+) {
+  return useQuery<StrategyDetailResponse>({
+    ...getStrategyDetailQueryOptions({
+      chainId: input.chainId,
+      strategyId: input.strategyId ?? "",
+    }),
+    enabled:
+      (options?.enabled ?? false) && Boolean(input.walletAddress) && Boolean(input.strategyId),
   });
 }
 

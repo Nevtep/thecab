@@ -10,5 +10,13 @@
     "run_not_found": "We couldn't find that analysis run.",
     "not_cancellable": "That run can't be cancelled.",
     "internal_error": "Something went wrong. Please try again."
+  },
+  "strategies": {
+    "wallet_not_authenticated": "Please connect your wallet to view strategies.",
+    "chain_unsupported": "This chain is not supported for strategies yet.",
+    "analysis_not_ready": "Run analysis before viewing strategy lifecycle data.",
+    "invalid_request": "The strategy request was invalid.",
+    "strategy_not_found": "We couldn't find that strategy for this wallet.",
+    "internal_error": "Something went wrong while loading strategies."
   }
 }
