@@ -203,6 +203,23 @@ test("buildAccrualRewardSnapshotRows keeps synthetic snapshot identity stable ac
   assert.equal(firstByDeposit.get("deposit-b")?.txHash, secondByDeposit.get("deposit-b")?.txHash);
 });
 
+test("resolvePersistedRewardResolutionStatus treats strategy exposure ownership as resolved", async () => {
+  const { resolvePersistedRewardResolutionStatus } = await import("@/server/analysis/enginePersistence");
+
+  assert.equal(resolvePersistedRewardResolutionStatus({
+    depositOrStrategyId: "deposit-1",
+    strategyExposureId: null,
+  }), "resolved");
+  assert.equal(resolvePersistedRewardResolutionStatus({
+    depositOrStrategyId: null,
+    strategyExposureId: "exposure-1",
+  }), "resolved");
+  assert.equal(resolvePersistedRewardResolutionStatus({
+    depositOrStrategyId: null,
+    strategyExposureId: null,
+  }), "unresolved");
+});
+
 test("resolveManualDepositDisplayMetadata prefers canonical pool metadata over numeric fallback symbols", async () => {
   const { resolveManualDepositDisplayMetadata } = await import("@/server/analysis/enginePersistence");
 

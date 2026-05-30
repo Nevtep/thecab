@@ -91,6 +91,7 @@ WITH deposit_rewards AS (
     JOIN deposits d ON d.id = re.deposit_or_strategy_id
    WHERE re.chain_id = 8453
      AND re.wallet_address = lower('<WALLET_ADDRESS>')
+     AND re.is_accrual_snapshot = false
      AND re.resolution_status = 'resolved'
      AND re.strategy_exposure_id IS NULL
    GROUP BY d.pool_id
@@ -103,6 +104,7 @@ strategy_rewards AS (
     JOIN strategies s ON s.id = se.strategy_id
    WHERE re.chain_id = 8453
      AND re.wallet_address = lower('<WALLET_ADDRESS>')
+     AND re.is_accrual_snapshot = false
      AND re.resolution_status = 'resolved'
      AND re.strategy_exposure_id IS NOT NULL
    GROUP BY s.primary_pool_id
@@ -193,6 +195,26 @@ Expected checkpoints:
 - non-full coverage strategies show a visible coverage note.
 
 ## 8. Final Regression Acceptance
+
+### Implementation Regression Notes
+
+2026-05-30 UTC validation run:
+
+- Rebuilt read models for run `121584d7-4cae-4c70-be95-76afda940575` and wallet `0x0ecd939b7fca4dc4a0675d8d28bad12cefae0954`.
+- `rebuild-pool-read-models.ts`: 5 pool summaries, 1,830 history rows, 73 timeline rows.
+- `rebuild-deposit-read-models.ts`: 26 deposit summaries, 85 lifecycle rows, 26 decomposition rows.
+- `rebuild-strategy-read-models.ts`: 4 strategy summaries, 4 history rows, 11 lifecycle rows.
+- `analysis-strategy-regression.ts` passed after rebuild:
+  - strategy lifecycle rows have source transaction hashes;
+  - strategy reward lifecycle rows match `reward_events.strategy_exposure_id`;
+  - deposit reward rows do not carry `strategy_exposure_id`;
+  - pool totals equal resolved deposit plus strategy rewards within rounding tolerance;
+  - surface totals are available for Deposits, Strategies, and Pools.
+- Pool rewards now count canonical resolved `reward_events` only. Synthetic accrual snapshots and claim-ledger fallback diagnostics are excluded from user-facing reward totals so Pools, Deposits, and Strategies reconcile to the same ownership source.
+- Representative strategy claim hashes emitted for explorer review:
+  - `0x46f63be7e6bda313c3559bc9bee295d7d85de99a3903a8ac266152dd7a051dd6`
+  - `0xe1755f34427255d7b615b25b11e2f7d6ff8cb8430e1fbcdc64c685c61994b39c`
+  - `0x66e3c84386b10a3cdb2d452c29c0770c43708d23fb115b3916d8ced126a289fb`
 
 Before marking feature complete:
 

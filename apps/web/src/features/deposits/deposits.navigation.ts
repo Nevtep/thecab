@@ -1,11 +1,11 @@
-const ENABLE_STRATEGIES_ROUTE = false;
+import { SUPPORTED_CHAIN_ID } from "@/wallet/supportedChains";
 
-export function getStrategiesListHref(): string | null {
-  return ENABLE_STRATEGIES_ROUTE ? "/strategies" : null;
+export function getStrategiesListHref(chainId = SUPPORTED_CHAIN_ID): string {
+  return `/strategies?chainId=${chainId}`;
 }
 
-export function getStrategyDetailHref(strategyId: string): string | null {
-  return ENABLE_STRATEGIES_ROUTE ? `/strategies/${strategyId}` : null;
+export function getStrategyDetailHref(strategyId: string, chainId = SUPPORTED_CHAIN_ID): string {
+  return `/strategies/${strategyId}?chainId=${chainId}`;
 }
 
 export function buildDepositsPoolHref(input: { chainId: number; poolId: string }) {

@@ -5,6 +5,8 @@
     "refresh": "Actualizar",
     "openPool": "Abrir pool",
     "openStrategy": "Abrir estrategia",
+    "backToStrategies": "Volver a estrategias",
+    "clearPool": "Limpiar pool",
     "clearFilters": "Limpiar filtros"
   },
   "kpis": {
@@ -22,6 +24,7 @@
     "pool": "Pool",
     "coverage": "Cobertura",
     "returnSign": "Retorno",
+    "sort": "Orden",
     "shareLevel": "Nivel de shares",
     "partial": "Parcial"
   },
@@ -32,7 +35,13 @@
     "mellow": "Mellow",
     "positive": "Positivo",
     "negative": "Negativo",
-    "any": "Cualquiera"
+    "any": "Cualquiera",
+    "currentValueDesc": "Valor alto",
+    "currentValueAsc": "Valor bajo",
+    "returnDesc": "Retorno alto",
+    "returnAsc": "Retorno bajo",
+    "coverageDesc": "Cobertura alta",
+    "coverageAsc": "Cobertura baja"
   },
   "table": {
     "title": "Exposiciones detectadas",
@@ -59,7 +68,42 @@
     "sharesReceived": "Shares recibidas",
     "sharesRedeemed": "Shares redimidas",
     "currentShares": "Shares actuales",
-    "currentValue": "Valor estimado actual"
+    "currentValue": "Valor estimado actual",
+    "totalReturn": "Retorno total",
+    "transaction": "Transacción",
+    "status": "Estado",
+    "poolUnavailable": "Pool subyacente no disponible",
+    "rewardsEmpty": "No se encontraron recompensas de estrategia resueltas.",
+    "lifecycleEmpty": "No hay eventos de ciclo de vida disponibles para esta estrategia.",
+    "errorTitle": "No pudimos cargar esta estrategia",
+    "emptyTitle": "Estrategia no encontrada",
+    "emptyDescription": "Esta estrategia ya no está disponible en el conjunto analizado.",
+    "rewardColumns": {
+      "token": "Token",
+      "amount": "Cantidad",
+      "value": "Valor",
+      "claimedAt": "Reclamado"
+    },
+    "resolution": {
+      "resolved": "Resuelto",
+      "unresolved": "Sin resolver"
+    }
+  },
+  "lifecycle": {
+    "eventTypes": {
+      "strategy_deposit": "Depósito en estrategia",
+      "strategy_share_receive": "Shares recibidas",
+      "strategy_stake": "Stake",
+      "strategy_claim": "Reclamo de rewards",
+      "strategy_unstake": "Unstake",
+      "strategy_withdraw": "Retiro",
+      "strategy_share_redeem": "Shares redimidas",
+      "strategy_close": "Cierre",
+      "strategy_internal_rebalance": "Rebalanceo interno",
+      "strategy_fee_dilution": "Dilución por fees",
+      "strategy_baseline_transfer_in": "Transferencia inicial",
+      "unresolved_strategy_reward": "Reward de estrategia sin resolver"
+    }
   },
   "events": {
     "strategy_deposit": "Depósito en estrategia",

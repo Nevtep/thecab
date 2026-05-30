@@ -19,17 +19,26 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
   min-width: 0;
 }
 
 .searchInput {
-  flex: 1;
+  flex: 1 1 220px;
   min-width: 180px;
+}
+
+.filterGroup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 
 .segmented {
   display: flex;
   gap: 6px;
+  flex-wrap: wrap;
 }
 
 .dataView {
@@ -82,9 +91,20 @@
 
 .panelMetrics {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   align-items: center;
+}
+
+.detailHeroMetrics,
+.detailMetricGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.detailMetric {
+  min-width: 0;
 }
 
 .summaryGrid {
@@ -92,6 +112,100 @@
   grid-template-columns: 1fr auto;
   gap: 8px 12px;
   font-size: 12px;
+}
+
+.compactTableWrap {
+  overflow-x: auto;
+}
+
+.compactTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.compactTable th,
+.compactTable td {
+  padding: 8px;
+  border-bottom: 1px solid rgba(184, 199, 230, 0.12);
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.compactTable th {
+  color: rgba(234, 241, 255, 0.66);
+  font-weight: 600;
+}
+
+.timeline {
+  display: grid;
+  gap: 10px;
+}
+
+.timelineItem {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  gap: 10px;
+  position: relative;
+}
+
+.timelineItem::before {
+  background: rgba(184, 199, 230, 0.18);
+  bottom: -10px;
+  content: "";
+  left: 6px;
+  position: absolute;
+  top: 14px;
+  width: 1px;
+}
+
+.timelineItem:last-child::before {
+  display: none;
+}
+
+.timelineMarker {
+  width: 12px;
+  height: 12px;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: rgb(0, 224, 225);
+  box-shadow: 0 0 10px rgba(0, 224, 225, 0.45);
+}
+
+.timelineBody {
+  min-width: 0;
+}
+
+.timelineMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 6px;
+  color: rgba(234, 241, 255, 0.7);
+  font-size: 12px;
+}
+
+.coverageNote,
+.coverageNoteProminent {
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.coverageNoteProminent {
+  border: 1px solid rgba(242, 193, 78, 0.42);
+  background: rgba(242, 193, 78, 0.08);
+}
+
+.coverageNoteCritical {
+  border: 1px solid rgba(239, 68, 68, 0.44);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.reasonList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .srOnly {
@@ -114,6 +228,11 @@
   .dataView {
     grid-template-columns: 1fr;
   }
+
+  .detailHeroMetrics,
+  .detailMetricGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 720px) {
@@ -129,5 +248,10 @@
   .segmented {
     flex-wrap: wrap;
   }
-}
 
+  .panelMetrics,
+  .detailHeroMetrics,
+  .detailMetricGrid {
+    grid-template-columns: 1fr;
+  }
+}

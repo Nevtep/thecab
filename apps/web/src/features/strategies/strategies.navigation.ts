@@ -1,3 +1,5 @@
+import { SUPPORTED_CHAIN_ID } from "@/wallet/supportedChains";
+
 export function buildStrategiesListHref(input: {
   chainId: number;
   poolId?: string | null;
@@ -21,3 +23,10 @@ export function buildStrategyDetailHref(input: {
   return `/strategies/${input.strategyId}?${params.toString()}`;
 }
 
+export function getStrategiesListHref(chainId = SUPPORTED_CHAIN_ID): string {
+  return buildStrategiesListHref({ chainId });
+}
+
+export function getStrategyDetailHref(strategyId: string, chainId = SUPPORTED_CHAIN_ID): string {
+  return buildStrategyDetailHref({ chainId, strategyId });
+}

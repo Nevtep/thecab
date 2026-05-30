@@ -269,6 +269,7 @@ type PricedMovement = {
 type RewardLikeRow = {
   id: string;
   depositOrStrategyId: string | null;
+  strategyExposureId?: string | null;
   txHash: string;
   logIndex: number;
   rewardType: string;
@@ -491,10 +492,14 @@ function mapPersistedLifecycleActionToEventType(input: {
 }
 
 function rewardMatchesDeposit(input: {
-  reward: Pick<RewardLikeRow, "depositOrStrategyId" | "metadataJson">;
+  reward: Pick<RewardLikeRow, "depositOrStrategyId" | "metadataJson" | "strategyExposureId">;
   depositTokenId: string | null;
   depositId: string;
 }) {
+  if (input.reward.strategyExposureId) {
+    return false;
+  }
+
   if (input.reward.depositOrStrategyId) {
     return input.reward.depositOrStrategyId === input.depositId;
   }
@@ -1968,6 +1973,7 @@ export async function materializeDepositReadModels(
     .select({
       id: rewardEvents.id,
       depositOrStrategyId: rewardEvents.depositOrStrategyId,
+      strategyExposureId: rewardEvents.strategyExposureId,
       txHash: rewardEvents.txHash,
       logIndex: rewardEvents.logIndex,
       rewardType: rewardEvents.rewardType,
@@ -1990,6 +1996,7 @@ export async function materializeDepositReadModels(
           knownDepositTokenIds.length > 0
             ? and(
                 isNull(rewardEvents.depositOrStrategyId),
+                isNull(rewardEvents.strategyExposureId),
                 inArray(sql`${rewardEvents.metadataJson} ->> 'targetTokenId'`, knownDepositTokenIds),
               )
             : sql`false`,

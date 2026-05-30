@@ -103,17 +103,34 @@ export async function parseStrategiesListRequest(request: Request): Promise<Stra
   };
 }
 
-export async function parseStrategyDetailRequest(request: Request, strategyId: string): Promise<StrategyDetailRequest> {
-  const { searchParams } = new URL(request.url);
-  const chainId = z.coerce.number().int().positive().parse(searchParams.get("chainId") ?? SUPPORTED_CHAIN_ID);
-  assertSupportedChain(chainId);
+export function normalizeStrategyDetailParams(searchParams: URLSearchParams, strategyId: string) {
+  const parsed = z.object({
+    chainId: z.coerce.number().int().positive().default(SUPPORTED_CHAIN_ID),
+  }).safeParse({
+    chainId: searchParams.get("chainId") ?? SUPPORTED_CHAIN_ID,
+  });
+
+  if (!parsed.success) {
+    throw new Error("STRATEGIES_REQUEST_FAILED:INVALID_REQUEST", { cause: parsed.error });
+  }
+
+  assertSupportedChain(parsed.data.chainId);
   if (!UUID_PATTERN.test(strategyId)) {
     throw new Error("STRATEGIES_REQUEST_FAILED:INVALID_REQUEST");
   }
   return {
-    walletAddress: await readAuthenticatedWalletAddress(),
-    chainId,
+    chainId: parsed.data.chainId,
     strategyId,
+  };
+}
+
+export async function parseStrategyDetailRequest(request: Request, strategyId: string): Promise<StrategyDetailRequest> {
+  const { searchParams } = new URL(request.url);
+  const normalized = normalizeStrategyDetailParams(searchParams, strategyId);
+  return {
+    walletAddress: await readAuthenticatedWalletAddress(),
+    chainId: normalized.chainId,
+    strategyId: normalized.strategyId,
   };
 }
 
@@ -146,4 +163,3 @@ export function getStrategiesErrorStatus(error: unknown) {
 
   return { code: "internal_error", status: 500, details: undefined };
 }
-

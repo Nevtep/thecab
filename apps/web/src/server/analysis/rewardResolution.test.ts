@@ -159,6 +159,26 @@ test("resolveRewardOwnership leaves strategy rewards unresolved when exposure is
   assert.deepEqual(result.resolutionReasonCodes, ["missingStrategyExposure"]);
 });
 
+test("resolveRewardOwnership does not fall back to manual deposit ownership for strategy-shaped rewards in the same pool", () => {
+  const result = resolveRewardOwnership({
+    candidate: buildCandidate({
+      protocol: "mellow",
+      targetType: "strategy",
+      targetPoolId: "pool-1",
+      targetWrapperAddress: null,
+      targetStakingRewardsAddress: null,
+    }),
+    depositTargets: [buildDepositTarget({ poolId: "pool-1" })],
+    strategyTargets: [buildStrategyTarget({ primaryPoolId: "pool-1", wrapperAddress: "0xother" })],
+  });
+
+  assert.equal(result.resolutionStatus, "unresolved");
+  assert.equal(result.ownerType, "strategy");
+  assert.equal(result.depositId, null);
+  assert.equal(result.strategyExposureId, null);
+  assert.deepEqual(result.resolutionReasonCodes, ["providerDecodedOnly"]);
+});
+
 test("resolveRewardOwnership rejects manual-strategy conflicts instead of guessing", () => {
   const result = resolveRewardOwnership({
     candidate: buildCandidate({

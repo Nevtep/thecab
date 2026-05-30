@@ -8,6 +8,7 @@ import {
 import type {
   StrategiesListRequest,
   StrategiesListResponse,
+  StrategyDetailResponse,
   StrategyDetailRequest,
   StrategyDetailView,
   StrategySummaryView,
@@ -82,6 +83,11 @@ export function buildStrategiesListResponse(input: {
   analysisStatus: "ready" | "stale";
   request: StrategiesListRequest;
   rows: StrategySummaryView[];
+  pageInfo?: {
+    page: number;
+    totalPages: number;
+    totalItems: number;
+  };
   selectedStrategy: StrategyDetailView | null;
   availablePools: Array<{ poolId: string; label: string }>;
 }): StrategiesListResponse {
@@ -134,10 +140,10 @@ export function buildStrategiesListResponse(input: {
       availablePools: input.availablePools,
     },
     page: {
-      page: input.request.page,
+      page: input.pageInfo?.page ?? input.request.page,
       pageSize: input.request.pageSize,
-      totalPages: Math.max(1, Math.ceil(input.rows.length / input.request.pageSize)),
-      totalItems: input.rows.length,
+      totalPages: input.pageInfo?.totalPages ?? Math.max(1, Math.ceil(input.rows.length / input.request.pageSize)),
+      totalItems: input.pageInfo?.totalItems ?? input.rows.length,
     },
     strategies: input.rows,
     selectedStrategy: selected,
@@ -164,9 +170,39 @@ export async function getStrategiesList(input: StrategiesListRequest) {
     analysisStatus,
     request: input,
     rows: listResult.items,
+    pageInfo: {
+      page: listResult.page,
+      totalPages: listResult.totalPages,
+      totalItems: listResult.totalItems,
+    },
     selectedStrategy,
     availablePools,
   });
+}
+
+export function buildStrategyDetailResponse(input: {
+  walletAddress: string;
+  chainId: number;
+  strategy: StrategyDetailView;
+}): StrategyDetailResponse {
+  const historyDays = input.strategy.history.map((item) => item.dayUtc).sort();
+  return {
+    walletAddress: input.walletAddress,
+    chainId: input.chainId,
+    coveredRange: {
+      startDayUtc: historyDays[0] ?? null,
+      endDayUtc: historyDays.at(-1) ?? null,
+    },
+    strategy: {
+      ...input.strategy,
+      coverageNote: {
+        status: input.strategy.coverageStatus,
+        titleKey: `strategies:coverageNote.${input.strategy.coverageStatus}.title`,
+        bodyKey: `strategies:coverageNote.${input.strategy.coverageStatus}.body`,
+        reasonCodes: input.strategy.coverageReasonCodes,
+      },
+    },
+  };
 }
 
 export async function getStrategyDetail(input: StrategyDetailRequest) {
@@ -175,13 +211,9 @@ export async function getStrategyDetail(input: StrategyDetailRequest) {
   if (!strategy) {
     throw new Error("STRATEGIES_REQUEST_FAILED:STRATEGY_NOT_FOUND");
   }
-  return {
+  return buildStrategyDetailResponse({
     walletAddress: input.walletAddress,
     chainId: input.chainId,
-    coveredRange: {
-      startDayUtc: null,
-      endDayUtc: null,
-    },
     strategy,
-  };
+  });
 }

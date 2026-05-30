@@ -3,6 +3,8 @@ import test from "node:test";
 
 import {
   applyStrategiesListRequest,
+  mapStrategyLifecycleRow,
+  mapStrategyRewardRow,
   mapStrategySummaryRow,
   type StrategySummaryRowRecord,
 } from "@/server/strategies/strategies.repository";
@@ -94,3 +96,114 @@ test("applyStrategiesListRequest filters sorts paginates and selects first visib
   assert.equal(result.totalItems, 2);
 });
 
+test("applyStrategiesListRequest composes coverage search sorting pagination and selected fallback", () => {
+  const rows = [
+    mapStrategySummaryRow(createRow({
+      strategyExposureId: "exposure-a",
+      strategyLabel: "WETH / cbBTC-100",
+      primaryPoolId: "pool-1",
+      currentEstimatedValueUsd: "500",
+      totalReturnUsd: "25",
+      coverageStatus: "share_level",
+    })),
+    mapStrategySummaryRow(createRow({
+      strategyExposureId: "exposure-b",
+      strategyLabel: "USDC / cbBTC-100",
+      primaryPoolId: "pool-1",
+      currentEstimatedValueUsd: "300",
+      totalReturnUsd: "10",
+      coverageStatus: "share_level",
+    })),
+    mapStrategySummaryRow(createRow({
+      strategyExposureId: "exposure-c",
+      strategyLabel: "WETH / USDC-100",
+      primaryPoolId: "pool-2",
+      currentEstimatedValueUsd: "700",
+      totalReturnUsd: "-5",
+      coverageStatus: "partial",
+    })),
+  ];
+
+  const result = applyStrategiesListRequest({
+    request: {
+      walletAddress: "0xabc",
+      chainId: 8453,
+      status: "active",
+      protocol: "mellow",
+      poolId: "pool-1",
+      coverage: "share_level",
+      returnSign: "positive",
+      search: "btc",
+      sort: "return_asc",
+      selectedStrategyId: "exposure-a",
+      page: 3,
+      pageSize: 10,
+    },
+    rows,
+  });
+
+  assert.equal(result.page, 1);
+  assert.equal(result.totalPages, 1);
+  assert.equal(result.totalItems, 2);
+  assert.deepEqual(result.items.map((item) => item.strategyExposureId), ["exposure-b", "exposure-a"]);
+  assert.equal(result.selectedStrategyId, "exposure-a");
+});
+
+test("strategy detail row mappers preserve rewards lifecycle traceability and coverage", () => {
+  const reward = mapStrategyRewardRow({
+    id: "reward-1",
+    tokenSymbol: "WETH",
+    tokenAddress: "0xweth",
+    amountRaw: "124300000000000000",
+    amountFormatted: "0.1243",
+    amountUsd: "340.21",
+    claimedAt: new Date("2026-05-24T10:21:00.000Z"),
+    txHash: "0xclaim",
+    resolutionStatus: "resolved",
+    coverageReasonCodes: ["shareLevelAccounting"],
+  });
+  const unresolvedReward = mapStrategyRewardRow({
+    id: "reward-2",
+    tokenSymbol: "AERO",
+    tokenAddress: "0xaero",
+    amountRaw: "128470000000000000000",
+    amountFormatted: "128.47",
+    amountUsd: null,
+    claimedAt: "2026-05-25T06:13:00.000Z",
+    txHash: "0xunresolved",
+    resolutionStatus: "candidate",
+    coverageReasonCodes: ["unresolvedStrategyReward"],
+  });
+  const lifecycle = mapStrategyLifecycleRow({
+    id: "life-1",
+    sequenceIndex: 2,
+    eventType: "strategy_claim",
+    occurredAt: new Date("2026-05-24T10:21:00.000Z"),
+    txHash: "0xclaim",
+    logIndex: 9,
+    blockNumber: "123",
+    usdValue: "340.21",
+    shareDeltaRaw: null,
+    tokenDeltasJson: [{
+      tokenAddress: "0xweth",
+      symbol: "WETH",
+      direction: "in",
+      amountRaw: "124300000000000000",
+      amountFormatted: "0.1243",
+      usdValue: "340.21",
+      priceSource: "alchemyHistorical",
+    }],
+    priceSource: "alchemyHistorical",
+    confidence: "high",
+    coverageStatus: "share_level",
+    coverageReasonCodes: ["shareLevelAccounting"],
+    metadataJson: { rewardType: "aerodrome_gauge" },
+  });
+
+  assert.equal(reward.claimedAt, "2026-05-24T10:21:00.000Z");
+  assert.equal(reward.amountUsd, 340.21);
+  assert.equal(unresolvedReward.resolutionStatus, "unresolved");
+  assert.equal(lifecycle.eventType, "strategy_claim");
+  assert.equal(lifecycle.tokenDeltas[0]?.priceSource, "alchemyHistorical");
+  assert.equal(lifecycle.metadata.rewardType, "aerodrome_gauge");
+});

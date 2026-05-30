@@ -1,9 +1,12 @@
 import type {
   StrategiesListResponse,
+  StrategyDetailResponse,
+  StrategyLifecycleEventType,
   StrategyConfidence,
   StrategyCoverageStatus,
   StrategySummaryView,
 } from "@/features/strategies/strategies.types";
+import { getExplorerBaseUrl } from "@/chains/chains";
 
 export type StrategyRowViewModel = StrategySummaryView & {
   formattedCurrentValue: string;
@@ -23,6 +26,28 @@ export type StrategiesListViewModel = StrategiesListResponse & {
     protocolCoveragePct: string;
   };
   items: StrategyRowViewModel[];
+};
+
+export type StrategyDetailViewModel = StrategyDetailResponse & {
+  formattedHeader: {
+    currentValue: string;
+    totalReturn: string;
+    rewards: string;
+  };
+  coverageNoteView: StrategyDetailResponse["strategy"]["coverageNote"] & {
+    tone: "success" | "warning" | "danger";
+    isProminent: boolean;
+    reasonLabelKeys: string[];
+  };
+  rewardsRows: Array<StrategyDetailResponse["strategy"]["rewards"][number] & {
+    formattedAmountUsd: string;
+    explorerUrl: string | null;
+  }>;
+  lifecycleRows: Array<StrategyDetailResponse["strategy"]["lifecycle"][number] & {
+    labelKey: string;
+    formattedUsdValue: string;
+    explorerUrl: string | null;
+  }>;
 };
 
 function formatUsd(value: number | null) {
@@ -54,12 +79,26 @@ function totalReturnSign(value: number | null): StrategyRowViewModel["totalRetur
   return "neutral";
 }
 
+export function getStrategyCoverageTone(coverageStatus: StrategyCoverageStatus) {
+  if (coverageStatus === "full") return "success" as const;
+  if (coverageStatus === "unknown") return "danger" as const;
+  return "warning" as const;
+}
+
 export function getStrategyCoverageLabelKey(coverageStatus: StrategyCoverageStatus) {
   return `coverage:level.${coverageStatus}`;
 }
 
 export function getStrategyConfidenceLabelKey(confidence: StrategyConfidence) {
   return `coverage:confidence.${confidence}`;
+}
+
+export function getStrategyLifecycleLabelKey(eventType: StrategyLifecycleEventType) {
+  return `strategies:lifecycle.eventTypes.${eventType}`;
+}
+
+export function getStrategyTxExplorerUrl(chainId: number, txHash: string | null) {
+  return txHash ? `${getExplorerBaseUrl(chainId)}/tx/${txHash}` : null;
 }
 
 export function mapStrategiesListResponseToViewModel(response: StrategiesListResponse): StrategiesListViewModel {
@@ -85,3 +124,32 @@ export function mapStrategiesListResponseToViewModel(response: StrategiesListRes
   };
 }
 
+export function mapStrategyDetailResponseToViewModel(response: StrategyDetailResponse): StrategyDetailViewModel {
+  const coverageNoteView = {
+    ...response.strategy.coverageNote,
+    tone: getStrategyCoverageTone(response.strategy.coverageNote.status),
+    isProminent: response.strategy.coverageNote.status !== "full",
+    reasonLabelKeys: response.strategy.coverageNote.reasonCodes.map((reason) => `coverage:reasons.${reason}`),
+  };
+
+  return {
+    ...response,
+    formattedHeader: {
+      currentValue: formatUsd(response.strategy.currentEstimatedValueUsd),
+      totalReturn: formatUsd(response.strategy.totalReturnUsd),
+      rewards: formatUsd(response.strategy.totalRewardsUsd),
+    },
+    coverageNoteView,
+    rewardsRows: response.strategy.rewards.map((reward) => ({
+      ...reward,
+      formattedAmountUsd: formatUsd(reward.amountUsd),
+      explorerUrl: getStrategyTxExplorerUrl(response.chainId, reward.txHash),
+    })),
+    lifecycleRows: response.strategy.lifecycle.map((event) => ({
+      ...event,
+      labelKey: getStrategyLifecycleLabelKey(event.eventType),
+      formattedUsdValue: formatUsd(event.usdValue),
+      explorerUrl: getStrategyTxExplorerUrl(response.chainId, event.txHash),
+    })),
+  };
+}

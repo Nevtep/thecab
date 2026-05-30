@@ -223,7 +223,7 @@
   },
   "strategiesCrossLink": {
     "label": "Estrategia relacionada",
-    "placeholder": "La navegación a Strategies todavía no está activa. Este marcador conserva el id de estrategia destino.",
+    "placeholder": "Abrir el análisis de la estrategia automatizada relacionada.",
     "available": "Abrir estrategia"
   },
   "unattributed": {

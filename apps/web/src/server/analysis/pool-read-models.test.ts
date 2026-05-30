@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  aggregateResolvedPoolRewardTotals,
   buildGroupedLifecycleEvent,
   buildSyntheticGaugeClaimCandidates,
   buildSyntheticGaugeClaimEventKey,
@@ -112,10 +113,62 @@ test("resolvePoolRewardTargetPoolId prefers explicit resolved pool ownership and
 
   assert.equal(resolvePoolRewardTargetPoolId({
     resolvedPoolId: null,
+    relatedId: null,
+    strategyExposureId: "exposure-1",
+    depositToPoolId: new Map([["deposit-1", "pool-1"]]),
+    strategyToPoolId: new Map([["strategy-1", "pool-2"]]),
+    strategyExposureToPoolId: new Map([["exposure-1", "pool-2"]]),
+  }), "pool-2");
+
+  assert.equal(resolvePoolRewardTargetPoolId({
+    resolvedPoolId: null,
     relatedId: "unresolved",
     depositToPoolId: new Map([["deposit-1", "pool-1"]]),
     strategyToPoolId: new Map([["strategy-1", "pool-2"]]),
   }), null);
+});
+
+test("aggregateResolvedPoolRewardTotals adds resolved deposit and strategy exposure rewards without unresolved rows", () => {
+  const totals = aggregateResolvedPoolRewardTotals({
+    rewards: [
+      {
+        resolvedPoolId: null,
+        relatedId: "deposit-1",
+        resolutionStatus: "resolved",
+        rewardType: "reward_claim",
+        amountUsd: 20,
+      },
+      {
+        resolvedPoolId: null,
+        relatedId: null,
+        strategyExposureId: "exposure-1",
+        resolutionStatus: "resolved",
+        rewardType: "reward_claim",
+        amountUsd: 15,
+      },
+      {
+        resolvedPoolId: null,
+        relatedId: null,
+        strategyExposureId: "exposure-1",
+        resolutionStatus: "unresolved",
+        rewardType: "reward_claim",
+        amountUsd: 99,
+      },
+      {
+        resolvedPoolId: "pool-1",
+        relatedId: null,
+        resolutionStatus: "resolved",
+        rewardType: "fee_claim",
+        amountUsd: 3,
+      },
+    ],
+    depositToPoolId: new Map([["deposit-1", "pool-1"]]),
+    strategyToPoolId: new Map(),
+    strategyExposureToPoolId: new Map([["exposure-1", "pool-1"]]),
+  });
+
+  assert.equal(totals.get("pool-1")?.rewardsUsd, 35);
+  assert.equal(totals.get("pool-1")?.feesUsd, 3);
 });
 
 test("buildSyntheticGaugeClaimCandidates keeps unmatched gauge claims for known pools", () => {
@@ -265,7 +318,7 @@ test("buildSyntheticGaugeClaimEventKey stays within pool timeline event key limi
   assert.ok(eventKey.length <= 128);
 });
 
-test("buildSyntheticGaugeClaimRewards values unmatched gauge claims for pool totals", () => {
+test("buildSyntheticGaugeClaimRewards values unmatched gauge claims for diagnostics", () => {
   const rewards = buildSyntheticGaugeClaimRewards({
     chainId: 8453,
     candidates: [

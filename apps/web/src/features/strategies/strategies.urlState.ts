@@ -1,12 +1,3 @@
-import {
-  normalizeOneOf,
-  STRATEGIES_COVERAGE_FILTER_VALUES,
-  STRATEGIES_PAGE_SIZE_VALUES,
-  STRATEGIES_PROTOCOL_FILTER_VALUES,
-  STRATEGIES_RETURN_SIGN_FILTER_VALUES,
-  STRATEGIES_SORT_VALUES,
-  STRATEGIES_STATUS_FILTER_VALUES,
-} from "@/server/strategies/strategies.contract";
 import type {
   StrategiesCoverageFilter,
   StrategiesPageSize,
@@ -15,6 +6,17 @@ import type {
   StrategiesSort,
   StrategiesStatusFilter,
 } from "@/features/strategies/strategies.types";
+import {
+  normalizeStrategiesCoverageFilter,
+  normalizeStrategiesPage,
+  normalizeStrategiesPageSize,
+  normalizeStrategiesProtocolFilter,
+  normalizeStrategiesReturnSignFilter,
+  normalizeStrategiesSearch,
+  normalizeStrategiesSort,
+  normalizeStrategiesStatusFilter,
+  normalizeStrategiesUuid,
+} from "@/features/strategies/strategies.validation";
 
 export type StrategiesListUrlState = {
   status: StrategiesStatusFilter;
@@ -28,9 +30,6 @@ export type StrategiesListUrlState = {
   pageSize: StrategiesPageSize;
   selectedStrategyId: string | null;
 };
-
-const UUID_PATTERN = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
-const SEARCH_MAX_LENGTH = 64;
 
 export function createDefaultStrategiesListUrlState(): StrategiesListUrlState {
   return {
@@ -57,44 +56,18 @@ function pickFirst(searchParams: URLSearchParams, keys: string[]) {
   return null;
 }
 
-function pickUuid(value: string | null): string | null {
-  if (!value) return null;
-  return UUID_PATTERN.test(value) ? value : null;
-}
-
-function pickInt(value: string | null, fallback: number, { min, max }: { min: number; max: number }) {
-  if (!value) return fallback;
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return fallback;
-  const truncated = Math.trunc(parsed);
-  if (truncated < min || truncated > max) return fallback;
-  return truncated;
-}
-
-function pickPageSize(value: string | null, fallback: StrategiesPageSize): StrategiesPageSize {
-  const parsed = pickInt(value, fallback, { min: 1, max: 50 });
-  return (STRATEGIES_PAGE_SIZE_VALUES as readonly number[]).includes(parsed)
-    ? (parsed as StrategiesPageSize)
-    : fallback;
-}
-
-function pickSearch(value: string | null) {
-  return (value ?? "").trim().slice(0, SEARCH_MAX_LENGTH);
-}
-
 export function parseStrategiesListUrlState(searchParams: URLSearchParams): StrategiesListUrlState {
-  const defaults = createDefaultStrategiesListUrlState();
   return {
-    status: normalizeOneOf(searchParams.get("status"), STRATEGIES_STATUS_FILTER_VALUES, defaults.status),
-    protocol: normalizeOneOf(searchParams.get("protocol"), STRATEGIES_PROTOCOL_FILTER_VALUES, defaults.protocol),
-    poolId: pickUuid(pickFirst(searchParams, ["pool", "poolId"])),
-    coverage: normalizeOneOf(searchParams.get("coverage"), STRATEGIES_COVERAGE_FILTER_VALUES, defaults.coverage),
-    returnSign: normalizeOneOf(searchParams.get("returnSign"), STRATEGIES_RETURN_SIGN_FILTER_VALUES, defaults.returnSign),
-    search: pickSearch(searchParams.get("search")),
-    sort: normalizeOneOf(searchParams.get("sort"), STRATEGIES_SORT_VALUES, defaults.sort),
-    page: pickInt(searchParams.get("page"), defaults.page, { min: 1, max: 10000 }),
-    pageSize: pickPageSize(searchParams.get("pageSize"), defaults.pageSize),
-    selectedStrategyId: pickUuid(searchParams.get("selectedStrategyId")),
+    status: normalizeStrategiesStatusFilter(searchParams.get("status")),
+    protocol: normalizeStrategiesProtocolFilter(searchParams.get("protocol")),
+    poolId: normalizeStrategiesUuid(pickFirst(searchParams, ["pool", "poolId"])),
+    coverage: normalizeStrategiesCoverageFilter(searchParams.get("coverage")),
+    returnSign: normalizeStrategiesReturnSignFilter(searchParams.get("returnSign")),
+    search: normalizeStrategiesSearch(searchParams.get("search")),
+    sort: normalizeStrategiesSort(searchParams.get("sort")),
+    page: normalizeStrategiesPage(searchParams.get("page")),
+    pageSize: normalizeStrategiesPageSize(searchParams.get("pageSize")),
+    selectedStrategyId: normalizeStrategiesUuid(searchParams.get("selectedStrategyId")),
   };
 }
 
@@ -147,4 +120,3 @@ export function buildStrategiesApiQueryString(input: {
   if (input.state.selectedStrategyId) params.set("selectedStrategyId", input.state.selectedStrategyId);
   return params.toString();
 }
-

@@ -7,9 +7,9 @@ import {
   getStrategiesListHref,
 } from "@/features/deposits/deposits.navigation";
 
-test("strategies routes remain disabled until the route flag is enabled", () => {
-  assert.equal(getStrategiesListHref(), null);
-  assert.equal(getStrategyDetailHref("strategy-123"), null);
+test("strategies routes point to the live strategy destination", () => {
+  assert.equal(getStrategiesListHref(8453), "/strategies?chainId=8453");
+  assert.equal(getStrategyDetailHref("strategy-123", 8453), "/strategies/strategy-123?chainId=8453");
 });
 
 test("buildDepositsPoolHref preserves chain and pool filter in the URL", () => {

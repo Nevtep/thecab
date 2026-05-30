@@ -10,6 +10,7 @@ import { getOverviewNavigationItems } from "@/features/overview/overview.mappers
 import { StrategiesComponent } from "@/features/strategies/Strategies.component";
 import { mapStrategiesListResponseToViewModel } from "@/features/strategies/strategies.mappers";
 import {
+  createDefaultStrategiesListUrlState,
   parseStrategiesListUrlState,
   serializeStrategiesListUrlState,
 } from "@/features/strategies/strategies.urlState";
@@ -143,8 +144,33 @@ export function StrategiesContainer() {
         onStatusChange={(status) => {
           startTransition(() => updateUrl({ ...urlState, status, page: 1 }));
         }}
+        onProtocolChange={(protocol) => {
+          startTransition(() => updateUrl({ ...urlState, protocol, page: 1 }));
+        }}
+        onCoverageChange={(coverage) => {
+          startTransition(() => updateUrl({ ...urlState, coverage, page: 1 }));
+        }}
+        onReturnSignChange={(returnSign) => {
+          startTransition(() => updateUrl({ ...urlState, returnSign, page: 1 }));
+        }}
+        onSortChange={(sort) => {
+          startTransition(() => updateUrl({ ...urlState, sort, page: 1 }));
+        }}
+        onClearPool={() => {
+          startTransition(() => updateUrl({ ...urlState, poolId: null, page: 1 }));
+        }}
+        onClearFilters={() => {
+          const defaults = createDefaultStrategiesListUrlState();
+          startTransition(() => updateUrl({
+            ...defaults,
+            selectedStrategyId: urlState.selectedStrategyId,
+          }));
+        }}
         onSelectStrategy={(strategyExposureId) => {
           startTransition(() => updateUrl({ ...urlState, selectedStrategyId: strategyExposureId }));
+        }}
+        onOpenPool={(poolId) => {
+          router.push(`/pools/${poolId}`);
         }}
       />
     </ConnectedShell>

@@ -73,6 +73,7 @@
   "confidence": {
     "high": "Confianza alta",
     "medium": "Confianza media",
+    "low": "Confianza baja",
     "degraded": "Confianza degradada",
     "unknown": "Confianza desconocida"
   }

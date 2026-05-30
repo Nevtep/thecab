@@ -3,11 +3,15 @@ import { and, asc, eq } from "drizzle-orm";
 import { getDb } from "@/server/db/client";
 import {
   pools,
+  rewardEvents,
   strategyHistorySnapshots,
+  strategyLifecycleEvents,
   strategyWalletSummaries,
 } from "@/server/db/schema";
 import type {
   StrategiesListRequest,
+  StrategyLifecycleEventView,
+  StrategyRewardView,
   StrategyDetailView,
   StrategySummaryView,
 } from "@/server/strategies/strategies.types";
@@ -96,6 +100,90 @@ type StrategyHistoryRowRecord = {
   cumulativeRewardsUsd: unknown;
 };
 
+export type StrategyRewardRowRecord = {
+  id: string;
+  tokenSymbol: string | null;
+  tokenAddress: string | null;
+  amountRaw: string | null;
+  amountFormatted: string | null;
+  amountUsd: unknown;
+  claimedAt: Date | string | null;
+  txHash: string | null;
+  resolutionStatus: string;
+  coverageReasonCodes: string[] | null;
+};
+
+export type StrategyLifecycleRowRecord = {
+  id: string;
+  sequenceIndex: number;
+  eventType: string;
+  occurredAt: Date | string;
+  txHash: string | null;
+  logIndex: number | null;
+  blockNumber: string | null;
+  usdValue: unknown;
+  shareDeltaRaw: string | null;
+  tokenDeltasJson: unknown;
+  priceSource: string | null;
+  confidence: string;
+  coverageStatus: string;
+  coverageReasonCodes: string[] | null;
+  metadataJson: Record<string, unknown> | null;
+};
+
+function toIso(value: Date | string) {
+  return value instanceof Date ? value.toISOString() : value;
+}
+
+function normalizeEventType(value: string): StrategyLifecycleEventView["eventType"] {
+  switch (value) {
+    case "strategy_deposit":
+    case "strategy_share_receive":
+    case "strategy_stake":
+    case "strategy_claim":
+    case "strategy_unstake":
+    case "strategy_withdraw":
+    case "strategy_share_redeem":
+    case "strategy_close":
+    case "strategy_internal_rebalance":
+    case "strategy_fee_dilution":
+    case "strategy_baseline_transfer_in":
+    case "unresolved_strategy_reward":
+      return value;
+    default:
+      return "strategy_internal_rebalance";
+  }
+}
+
+function normalizePriceSource(value: string | null): StrategyLifecycleEventView["priceSource"] {
+  return value === "alchemyHistorical" || value === "pricePointFallback" || value === "unavailable" || value === "unknown"
+    ? value
+    : null;
+}
+
+function normalizeRewardResolutionStatus(value: string): StrategyRewardView["resolutionStatus"] {
+  return value === "resolved" ? "resolved" : "unresolved";
+}
+
+function normalizeTokenDeltas(value: unknown): StrategyLifecycleEventView["tokenDeltas"] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((candidate) => {
+    const record = asRecord(candidate);
+    const direction = record.direction === "out" ? "out" : record.direction === "in" ? "in" : null;
+    const amountRaw = typeof record.amountRaw === "string" ? record.amountRaw : null;
+    if (!direction || !amountRaw) return [];
+    return [{
+      tokenAddress: typeof record.tokenAddress === "string" ? record.tokenAddress : null,
+      symbol: typeof record.symbol === "string" ? record.symbol : null,
+      direction,
+      amountRaw,
+      amountFormatted: typeof record.amountFormatted === "string" ? record.amountFormatted : null,
+      usdValue: asNumber(record.usdValue),
+      priceSource: normalizePriceSource(typeof record.priceSource === "string" ? record.priceSource : null),
+    }];
+  });
+}
+
 export function mapStrategySummaryRow(row: StrategySummaryRowRecord): StrategySummaryView {
   return {
     id: row.id,
@@ -124,9 +212,46 @@ export function mapStrategySummaryRow(row: StrategySummaryRowRecord): StrategySu
   };
 }
 
+export function mapStrategyRewardRow(row: StrategyRewardRowRecord): StrategyRewardView {
+  return {
+    id: row.id,
+    tokenSymbol: row.tokenSymbol,
+    tokenAddress: row.tokenAddress,
+    amountRaw: row.amountRaw,
+    amountFormatted: row.amountFormatted,
+    amountUsd: asNumber(row.amountUsd),
+    claimedAt: row.claimedAt ? toIso(row.claimedAt) : null,
+    txHash: row.txHash,
+    resolutionStatus: normalizeRewardResolutionStatus(row.resolutionStatus),
+    coverageReasonCodes: row.coverageReasonCodes ?? [],
+  };
+}
+
+export function mapStrategyLifecycleRow(row: StrategyLifecycleRowRecord): StrategyLifecycleEventView {
+  return {
+    id: row.id,
+    sequenceIndex: row.sequenceIndex,
+    eventType: normalizeEventType(row.eventType),
+    occurredAt: toIso(row.occurredAt),
+    txHash: row.txHash,
+    logIndex: row.logIndex,
+    blockNumber: row.blockNumber,
+    usdValue: asNumber(row.usdValue),
+    shareDeltaRaw: row.shareDeltaRaw,
+    tokenDeltas: normalizeTokenDeltas(row.tokenDeltasJson),
+    priceSource: normalizePriceSource(row.priceSource),
+    confidence: normalizeConfidence(row.confidence),
+    coverageStatus: normalizeCoverage(row.coverageStatus),
+    coverageReasonCodes: row.coverageReasonCodes ?? [],
+    metadata: row.metadataJson ?? {},
+  };
+}
+
 function mapStrategyDetailRow(input: {
   row: StrategySummaryRowRecord;
   historyRows: StrategyHistoryRowRecord[];
+  rewardRows: StrategyRewardRowRecord[];
+  lifecycleRows: StrategyLifecycleRowRecord[];
 }): StrategyDetailView {
   const summary = mapStrategySummaryRow(input.row);
   return {
@@ -144,8 +269,8 @@ function mapStrategyDetailRow(input: {
       estimatedValueUsd: asNumber(row.estimatedValueUsd),
       cumulativeRewardsUsd: asNumber(row.cumulativeRewardsUsd) ?? 0,
     })),
-    rewards: [],
-    lifecycle: [],
+    rewards: input.rewardRows.map(mapStrategyRewardRow),
+    lifecycle: input.lifecycleRows.map(mapStrategyLifecycleRow),
     coverageNote: {
       status: summary.coverageStatus,
       titleKey: `strategies:coverageNote.${summary.coverageStatus}.title`,
@@ -198,7 +323,9 @@ export function applyStrategiesListRequest(input: {
     return input.request.sort.endsWith("_asc") ? cmp : -cmp;
   });
 
-  const start = (input.request.page - 1) * input.request.pageSize;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / input.request.pageSize));
+  const page = Math.min(input.request.page, totalPages);
+  const start = (page - 1) * input.request.pageSize;
   const items = filtered.slice(start, start + input.request.pageSize);
   const selectedStrategyId =
     items.find((item) => item.strategyExposureId === input.request.selectedStrategyId)?.strategyExposureId ??
@@ -207,8 +334,9 @@ export function applyStrategiesListRequest(input: {
 
   return {
     items,
+    page,
     totalItems: filtered.length,
-    totalPages: Math.max(1, Math.ceil(filtered.length / input.request.pageSize)),
+    totalPages,
     selectedStrategyId,
   };
 }
@@ -282,6 +410,80 @@ async function readHistoryRows(input: {
     .orderBy(asc(strategyHistorySnapshots.dayUtc));
 }
 
+async function readRewardRows(input: {
+  walletAddress: string;
+  chainId: number;
+  strategyExposureId: string;
+}): Promise<StrategyRewardRowRecord[]> {
+  const db = getDb();
+  return db
+    .select({
+      id: rewardEvents.id,
+      tokenSymbol: rewardEvents.metadataJson,
+      tokenAddress: rewardEvents.tokenAddress,
+      amountRaw: rewardEvents.amountRaw,
+      amountFormatted: rewardEvents.metadataJson,
+      amountUsd: rewardEvents.amountUsd,
+      claimedAt: rewardEvents.occurredAt,
+      txHash: rewardEvents.txHash,
+      resolutionStatus: rewardEvents.resolutionStatus,
+      coverageReasonCodes: rewardEvents.resolutionReasonCodes,
+    })
+    .from(rewardEvents)
+    .where(
+      and(
+        eq(rewardEvents.walletAddress, input.walletAddress.toLowerCase()),
+        eq(rewardEvents.chainId, input.chainId),
+        eq(rewardEvents.strategyExposureId, input.strategyExposureId),
+        eq(rewardEvents.isAccrualSnapshot, false),
+      ),
+    )
+    .orderBy(asc(rewardEvents.occurredAt), asc(rewardEvents.logIndex))
+    .then((rows) => rows.map((row) => {
+      const metadata = asRecord(row.tokenSymbol);
+      return {
+        ...row,
+        tokenSymbol: typeof metadata.tokenSymbol === "string" ? metadata.tokenSymbol : null,
+        amountFormatted: typeof metadata.amountFormatted === "string" ? metadata.amountFormatted : null,
+      };
+    }));
+}
+
+async function readLifecycleRows(input: {
+  walletAddress: string;
+  chainId: number;
+  strategyExposureId: string;
+}): Promise<StrategyLifecycleRowRecord[]> {
+  const db = getDb();
+  return db
+    .select({
+      id: strategyLifecycleEvents.id,
+      sequenceIndex: strategyLifecycleEvents.sequenceIndex,
+      eventType: strategyLifecycleEvents.eventType,
+      occurredAt: strategyLifecycleEvents.occurredAt,
+      txHash: strategyLifecycleEvents.txHash,
+      logIndex: strategyLifecycleEvents.logIndex,
+      blockNumber: strategyLifecycleEvents.blockNumber,
+      usdValue: strategyLifecycleEvents.usdValue,
+      shareDeltaRaw: strategyLifecycleEvents.shareDeltaRaw,
+      tokenDeltasJson: strategyLifecycleEvents.tokenDeltasJson,
+      priceSource: strategyLifecycleEvents.priceSource,
+      confidence: strategyLifecycleEvents.confidence,
+      coverageStatus: strategyLifecycleEvents.coverageStatus,
+      coverageReasonCodes: strategyLifecycleEvents.coverageReasonCodes,
+      metadataJson: strategyLifecycleEvents.metadataJson,
+    })
+    .from(strategyLifecycleEvents)
+    .where(
+      and(
+        eq(strategyLifecycleEvents.walletAddress, input.walletAddress.toLowerCase()),
+        eq(strategyLifecycleEvents.chainId, input.chainId),
+        eq(strategyLifecycleEvents.strategyExposureId, input.strategyExposureId),
+      ),
+    )
+    .orderBy(asc(strategyLifecycleEvents.sequenceIndex));
+}
+
 export async function findStrategySummaries(input: StrategiesListRequest) {
   const rows = (await readSummaryRows(input)).map(mapStrategySummaryRow);
   return applyStrategiesListRequest({ request: input, rows });
@@ -295,12 +497,24 @@ export async function findStrategyDetail(input: {
   const rows = await readSummaryRows(input);
   const row = rows.find((item) => item.strategyExposureId === input.strategyId || item.strategyId === input.strategyId);
   if (!row) return null;
-  const historyRows = await readHistoryRows({
-    walletAddress: input.walletAddress,
-    chainId: input.chainId,
-    strategyExposureId: row.strategyExposureId,
-  });
-  return mapStrategyDetailRow({ row, historyRows });
+  const [historyRows, rewardRows, lifecycleRows] = await Promise.all([
+    readHistoryRows({
+      walletAddress: input.walletAddress,
+      chainId: input.chainId,
+      strategyExposureId: row.strategyExposureId,
+    }),
+    readRewardRows({
+      walletAddress: input.walletAddress,
+      chainId: input.chainId,
+      strategyExposureId: row.strategyExposureId,
+    }),
+    readLifecycleRows({
+      walletAddress: input.walletAddress,
+      chainId: input.chainId,
+      strategyExposureId: row.strategyExposureId,
+    }),
+  ]);
+  return mapStrategyDetailRow({ row, historyRows, rewardRows, lifecycleRows });
 }
 
 export async function findAvailableStrategyPools(input: { walletAddress: string; chainId: number }) {

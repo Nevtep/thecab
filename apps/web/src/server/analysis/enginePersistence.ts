@@ -1714,6 +1714,13 @@ function buildSyntheticRewardSnapshotTxHash(input: {
   return `0x${hash}`;
 }
 
+export function resolvePersistedRewardResolutionStatus(input: {
+  depositOrStrategyId?: string | null;
+  strategyExposureId?: string | null;
+}) {
+  return input.depositOrStrategyId || input.strategyExposureId ? "resolved" as const : "unresolved" as const;
+}
+
 export function buildAccrualRewardSnapshotRows(input: {
   walletAddress: string;
   chainId: number;
@@ -1840,7 +1847,7 @@ export async function persistResolvedRewardEvents(input: {
           occurredAt: claim.occurredAt,
           resolutionBasis: claim.resolutionBasis ?? null,
           resolutionReasonCodes: claim.resolutionReasonCodes ?? [],
-          resolutionStatus: claim.depositOrStrategyId ? "resolved" : "unresolved",
+          resolutionStatus: resolvePersistedRewardResolutionStatus(claim),
           metadataJson: {
             category: claim.category,
             summary: claim.summary,
@@ -1964,6 +1971,17 @@ async function enrichRewardEventsFromMovements(input: {
         AND re.is_accrual_snapshot = false
       JOIN ${assetMovements} am ON am.ledger_event_id = le.id
       LEFT JOIN LATERAL (
+        SELECT count(*)::int AS selected_count
+        FROM ${assetMovements} selected_am
+        WHERE selected_am.ledger_event_id = le.id
+          AND selected_am.wallet_address = ${input.walletAddress}
+          AND selected_am.chain_id = ${input.chainId}
+          AND selected_am.direction_in = true
+          AND (selected_am.metadata_json ->> 'logIndex') IN (
+            SELECT jsonb_array_elements_text(COALESCE(re.metadata_json -> 'movementLogIndexes', '[]'::jsonb))
+          )
+      ) selected_movements ON true
+      LEFT JOIN LATERAL (
         SELECT pp.price_usd
         FROM ${pricePoints} pp
         WHERE pp.chain_id = ${input.chainId}
@@ -1978,6 +1996,7 @@ async function enrichRewardEventsFromMovements(input: {
         AND le.tx_hash = ANY(${txHashesArray})
         AND (
           jsonb_array_length(COALESCE(re.metadata_json -> 'movementLogIndexes', '[]'::jsonb)) = 0
+          OR COALESCE(selected_movements.selected_count, 0) = 0
           OR (am.metadata_json ->> 'logIndex') IN (
             SELECT jsonb_array_elements_text(COALESCE(re.metadata_json -> 'movementLogIndexes', '[]'::jsonb))
           )

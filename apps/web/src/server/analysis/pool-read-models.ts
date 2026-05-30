@@ -838,11 +838,20 @@ export function buildSyntheticGaugeClaimRewards(input: {
 export function resolvePoolRewardTargetPoolId(input: {
   resolvedPoolId?: string | null;
   relatedId: string | null;
+  strategyExposureId?: string | null;
   depositToPoolId: Map<string, string>;
   strategyToPoolId: Map<string, string>;
+  strategyExposureToPoolId?: Map<string, string>;
 }) {
   if (input.resolvedPoolId) {
     return input.resolvedPoolId;
+  }
+
+  if (input.strategyExposureId) {
+    const poolId = input.strategyExposureToPoolId?.get(input.strategyExposureId) ?? null;
+    if (poolId) {
+      return poolId;
+    }
   }
 
   if (!input.relatedId) {
@@ -852,6 +861,51 @@ export function resolvePoolRewardTargetPoolId(input: {
   return input.depositToPoolId.get(input.relatedId)
     ?? input.strategyToPoolId.get(input.relatedId)
     ?? null;
+}
+
+export function aggregateResolvedPoolRewardTotals(input: {
+  rewards: Array<{
+    resolvedPoolId?: string | null;
+    relatedId: string | null;
+    strategyExposureId?: string | null;
+    resolutionStatus: string | null;
+    rewardType: string;
+    amountUsd: number;
+  }>;
+  depositToPoolId: Map<string, string>;
+  strategyToPoolId: Map<string, string>;
+  strategyExposureToPoolId: Map<string, string>;
+}) {
+  const totals = new Map<string, { rewardsUsd: number; feesUsd: number }>();
+
+  for (const reward of input.rewards) {
+    if (reward.resolutionStatus !== "resolved") {
+      continue;
+    }
+
+    const poolId = resolvePoolRewardTargetPoolId({
+      resolvedPoolId: reward.resolvedPoolId,
+      relatedId: reward.relatedId,
+      strategyExposureId: reward.strategyExposureId,
+      depositToPoolId: input.depositToPoolId,
+      strategyToPoolId: input.strategyToPoolId,
+      strategyExposureToPoolId: input.strategyExposureToPoolId,
+    });
+
+    if (!poolId) {
+      continue;
+    }
+
+    const existing = totals.get(poolId) ?? { rewardsUsd: 0, feesUsd: 0 };
+    if (reward.rewardType === "fee_claim") {
+      existing.feesUsd += reward.amountUsd;
+    } else {
+      existing.rewardsUsd += reward.amountUsd;
+    }
+    totals.set(poolId, existing);
+  }
+
+  return totals;
 }
 
 function computeTrackedTokenBalanceValueUsd(input: {
@@ -1257,6 +1311,7 @@ export async function materializePoolReadModels(input: MaterializePoolReadModels
     db.select({
       id: rewardEvents.id,
       depositOrStrategyId: rewardEvents.depositOrStrategyId,
+      strategyExposureId: rewardEvents.strategyExposureId,
       resolvedPoolId: rewardEvents.resolvedPoolId,
       tokenAddress: rewardEvents.tokenAddress,
       amountRaw: rewardEvents.amountRaw,
@@ -1265,6 +1320,7 @@ export async function materializePoolReadModels(input: MaterializePoolReadModels
       rewardType: rewardEvents.rewardType,
       txHash: rewardEvents.txHash,
       logIndex: rewardEvents.logIndex,
+      resolutionStatus: rewardEvents.resolutionStatus,
       metadataJson: rewardEvents.metadataJson,
     }).from(rewardEvents).where(and(eq(rewardEvents.walletAddress, walletAddress), eq(rewardEvents.chainId, input.chainId), eq(rewardEvents.isAccrualSnapshot, false), gte(rewardEvents.occurredAt, startBoundary), lte(rewardEvents.occurredAt, endBoundary))),
     db.select({
@@ -1380,14 +1436,9 @@ export async function materializePoolReadModels(input: MaterializePoolReadModels
 
   const poolsById = new Map(poolRows.map((row) => [row.id, row]));
   const poolIdByAddress = new Map(poolRows.map((row) => [row.poolAddress.toLowerCase(), row.id] as const));
-  const poolIdByGaugeAddress = new Map(
-    poolRows.flatMap((row) => {
-      const gaugeAddress = normalizeTokenAddress((row.metadataJson ?? {}).gaugeAddress);
-      return gaugeAddress ? [[gaugeAddress, row.id] as const] : [];
-    }),
-  );
   const depositToPoolId = new Map<string, string>();
   const strategyToPoolId = new Map<string, string>();
+  const strategyExposureToPoolId = new Map<string, string>();
   const accumulators = new Map<string, PoolAccumulator>();
   const tokenComponentBuckets = new Map<string, Array<{ tokenAddress: string; amount: number; segment: "manual" | "strategy" | "residual" }>>();
   const poolUnderlyingTokenAddresses = new Map(
@@ -1603,6 +1654,7 @@ export async function materializePoolReadModels(input: MaterializePoolReadModels
           : null,
     });
     strategyToPoolId.set(strategy.strategyId, strategy.primaryPoolId);
+    strategyExposureToPoolId.set(strategy.exposureId, strategy.primaryPoolId);
 
     const token0Address = resolveKnownTokenAddress({
       chainId: input.chainId,
@@ -1651,36 +1703,6 @@ export async function materializePoolReadModels(input: MaterializePoolReadModels
       .filter((row): row is typeof row & { primaryPoolId: string; wrapperAddress: string } => Boolean(row.primaryPoolId && row.wrapperAddress))
       .map((row) => [row.wrapperAddress.toLowerCase(), row.primaryPoolId] as const),
   );
-
-  const coveredRewardTxHashSet = new Set(
-    rewardRows.flatMap((row) => {
-      const poolId = resolvePoolRewardTargetPoolId({
-        resolvedPoolId: row.resolvedPoolId,
-        relatedId: row.depositOrStrategyId,
-        depositToPoolId,
-        strategyToPoolId,
-      });
-
-      return poolId ? [row.txHash.toLowerCase()] : [];
-    }),
-  );
-
-  const syntheticGaugeClaimCandidates = poolIdByGaugeAddress.size > 0
-    ? buildSyntheticGaugeClaimCandidates({
-      lifecycleRows: normalizedLifecycleRows,
-      rewardTxHashSet: coveredRewardTxHashSet,
-      protocolContractPoolIdByAddress: poolIdByGaugeAddress,
-    })
-    : [];
-
-  for (const candidate of syntheticGaugeClaimCandidates) {
-    for (const movement of lifecycleMovementsByLedgerEventId.get(candidate.ledgerEventId) ?? []) {
-      const tokenAddress = normalizeTokenAddress(movement.tokenAddress);
-      if (tokenAddress) {
-        relevantTokenAddresses.add(tokenAddress);
-      }
-    }
-  }
 
   for (const lifecycleRow of lifecycleLedgerRows) {
     if (!lifecycleRow.id || !lifecycleRow.classification) {
@@ -1882,15 +1904,6 @@ export async function materializePoolReadModels(input: MaterializePoolReadModels
       capturedAt: input.capturedAt,
     });
 
-    const syntheticGaugeClaimRewards = buildSyntheticGaugeClaimRewards({
-      chainId: input.chainId,
-      candidates: syntheticGaugeClaimCandidates,
-      movementsByLedgerEventId: lifecycleMovementsByLedgerEventId,
-      latestPriceByToken,
-      earliestPriceDayByToken,
-      priceByTokenAndDay,
-    });
-
     const tokenDeltaEventsByPoolId = new Map<string, PoolTokenDeltaEvent[]>();
     for (const tokenDeltaEvent of tokenDeltaEvents) {
       const bucket = tokenDeltaEventsByPoolId.get(tokenDeltaEvent.poolId) ?? [];
@@ -2015,14 +2028,20 @@ export async function materializePoolReadModels(input: MaterializePoolReadModels
     }
 
     for (const reward of rewardRows) {
+      if (reward.resolutionStatus !== "resolved") {
+        continue;
+      }
+
       const relatedId = reward.depositOrStrategyId;
       const rewardMetadata = reward.metadataJson ?? {};
       const rewardTokenAddress = normalizeTokenAddress(reward.tokenAddress);
       const poolId = resolvePoolRewardTargetPoolId({
         resolvedPoolId: reward.resolvedPoolId,
         relatedId,
+        strategyExposureId: reward.strategyExposureId,
         depositToPoolId,
         strategyToPoolId,
+        strategyExposureToPoolId,
       });
       if (!poolId) {
         continue;
@@ -2079,47 +2098,6 @@ export async function materializePoolReadModels(input: MaterializePoolReadModels
           rewardType: reward.rewardType,
           txHash: reward.txHash,
           ...(reward.metadataJson ?? {}),
-        },
-      });
-    }
-
-    for (const reward of syntheticGaugeClaimRewards) {
-      const pool = poolsById.get(reward.poolId);
-      if (!pool) {
-        continue;
-      }
-
-      const accumulator = getOrCreatePoolAccumulator({
-        map: accumulators,
-        poolId: reward.poolId,
-        poolAddress: pool.poolAddress,
-        label: pool.label,
-        tokenSymbols: [],
-        feeTierLabel: asString((pool.metadataJson ?? {}).feeTierLabel),
-      });
-      const dayUtc = dayUtcFromDate(reward.occurredAt);
-
-      accumulator.totalRewardsUsd += reward.amountUsd;
-      accumulator.rewardValueByDay.set(dayUtc, (accumulator.rewardValueByDay.get(dayUtc) ?? 0) + reward.amountUsd);
-      accumulator.lastParticipatedAt = mergeDateBounds(accumulator.lastParticipatedAt, reward.occurredAt, "max");
-      accumulator.timeline.push({
-        eventKey: reward.eventKey,
-        eventType: "claim",
-        occurredAt: reward.occurredAt,
-        confidence: "medium",
-        coverageStatus: accumulator.coverageStatus,
-        attributedValueUsd: reward.amountUsd,
-        sourceLedgerEventId: reward.sourceLedgerEventId,
-        relatedDepositId: null,
-        relatedStrategyId: null,
-        metadataJson: {
-          source: "claim_ledger_fallback",
-          txHash: reward.txHash,
-          gaugeAddress: reward.gaugeAddress,
-          methodLabel: reward.methodLabel,
-          tokenAddress: reward.tokenAddress,
-          amountRaw: reward.amountRaw,
-          ...reward.metadataJson,
         },
       });
     }

@@ -89,25 +89,25 @@
 
 ### Tests for User Story 2
 
-- [ ] T041 [P] [US2] Add materializer tests for strategy_lifecycle_events ordering, event types, tx traceability, and unresolved strategy reward rows in apps/web/src/server/analysis/strategy-read-models.test.ts
-- [ ] T042 [P] [US2] Add detail repository tests for lifecycle, rewards, history snapshots, coverage note payload, and strategy_not_found in apps/web/src/server/strategies/strategies.repository.test.ts
-- [ ] T043 [P] [US2] Add route tests for GET /api/strategies/:strategyId response shape, auth, chain validation, and ownership checks in apps/web/src/server/strategies/strategies.route.test.ts
-- [ ] T044 [P] [US2] Add mapper tests for detail header, exposure summary, rewards, lifecycle, and external tx links in apps/web/src/features/strategies/strategies.mappers.test.ts
+- [X] T041 [P] [US2] Add materializer tests for strategy_lifecycle_events ordering, event types, tx traceability, and unresolved strategy reward rows in apps/web/src/server/analysis/strategy-read-models.test.ts
+- [X] T042 [P] [US2] Add detail repository tests for lifecycle, rewards, history snapshots, coverage note payload, and strategy_not_found in apps/web/src/server/strategies/strategies.repository.test.ts
+- [X] T043 [P] [US2] Add route tests for GET /api/strategies/:strategyId response shape, auth, chain validation, and ownership checks in apps/web/src/server/strategies/strategies.route.test.ts
+- [X] T044 [P] [US2] Add mapper tests for detail header, exposure summary, rewards, lifecycle, and external tx links in apps/web/src/features/strategies/strategies.mappers.test.ts
 - [ ] T045 [P] [US2] Extend Playwright test for selected row detail panel and direct /strategies/[strategyId] route in apps/web/e2e/strategies-dataview-and-navigation.spec.ts
 
 ### Implementation for User Story 2
 
-- [ ] T046 [US2] Extend strategy materializer to persist lifecycle events, reward references, token/share deltas, price source, and coverage reasons in apps/web/src/server/analysis/strategy-read-models.ts
-- [ ] T047 [US2] Implement strategy detail repository read from strategy_wallet_summaries, strategy_history_snapshots, and strategy_lifecycle_events in apps/web/src/server/strategies/strategies.repository.ts
-- [ ] T048 [US2] Extend strategy service to compose StrategyDetailResponse and coverage note payloads in apps/web/src/server/strategies/strategies.service.ts
-- [ ] T049 [US2] Implement GET /api/strategies/[strategyId] route handler in apps/web/src/app/api/strategies/[strategyId]/route.ts
-- [ ] T050 [US2] Implement direct detail query builder and useStrategyDetailViewQuery in apps/web/src/features/strategies/strategies.queries.ts and apps/web/src/queries/hooks.ts
-- [ ] T051 [P] [US2] Implement selected panel header and exposure summary in apps/web/src/features/strategies/components/StrategySelectedPanel.tsx and apps/web/src/features/strategies/components/StrategyExposureSummary.tsx
-- [ ] T052 [P] [US2] Implement resolved/unresolved rewards table in apps/web/src/features/strategies/components/StrategyRewardsTable.tsx
-- [ ] T053 [P] [US2] Implement lifecycle timeline with transaction links and confidence badges in apps/web/src/features/strategies/components/StrategyLifecycleTimeline.tsx
-- [ ] T054 [P] [US2] Implement strategy coverage note component in apps/web/src/features/strategies/components/StrategyCoverageNote.tsx
-- [ ] T055 [US2] Implement StrategyDetail container/component and direct route in apps/web/src/features/strategies/StrategyDetail.container.tsx, apps/web/src/features/strategies/StrategyDetail.component.tsx, and apps/web/src/app/strategies/[strategyId]/page.tsx
-- [ ] T056 [US2] Add lifecycle, reward, and coverage translations in apps/web/src/i18n/locales/en/strategies.json and apps/web/src/i18n/locales/es/strategies.json
+- [X] T046 [US2] Extend strategy materializer to persist lifecycle events, reward references, token/share deltas, price source, and coverage reasons in apps/web/src/server/analysis/strategy-read-models.ts
+- [X] T047 [US2] Implement strategy detail repository read from strategy_wallet_summaries, strategy_history_snapshots, and strategy_lifecycle_events in apps/web/src/server/strategies/strategies.repository.ts
+- [X] T048 [US2] Extend strategy service to compose StrategyDetailResponse and coverage note payloads in apps/web/src/server/strategies/strategies.service.ts
+- [X] T049 [US2] Implement GET /api/strategies/[strategyId] route handler in apps/web/src/app/api/strategies/[strategyId]/route.ts
+- [X] T050 [US2] Implement direct detail query builder and useStrategyDetailViewQuery in apps/web/src/features/strategies/strategies.queries.ts and apps/web/src/queries/hooks.ts
+- [X] T051 [P] [US2] Implement selected panel header and exposure summary in apps/web/src/features/strategies/components/StrategySelectedPanel.tsx and apps/web/src/features/strategies/components/StrategyExposureSummary.tsx
+- [X] T052 [P] [US2] Implement resolved/unresolved rewards table in apps/web/src/features/strategies/components/StrategyRewardsTable.tsx
+- [X] T053 [P] [US2] Implement lifecycle timeline with transaction links and confidence badges in apps/web/src/features/strategies/components/StrategyLifecycleTimeline.tsx
+- [X] T054 [P] [US2] Implement strategy coverage note component in apps/web/src/features/strategies/components/StrategyCoverageNote.tsx
+- [X] T055 [US2] Implement StrategyDetail container/component and direct route in apps/web/src/features/strategies/StrategyDetail.container.tsx, apps/web/src/features/strategies/StrategyDetail.component.tsx, and apps/web/src/app/strategies/[strategyId]/page.tsx
+- [X] T056 [US2] Add lifecycle, reward, and coverage translations in apps/web/src/i18n/locales/en/strategies.json and apps/web/src/i18n/locales/es/strategies.json
 
 **Checkpoint**: User Stories 1 and 2 both work independently: list DataView and selected/detail lifecycle analysis.
 
@@ -121,23 +121,23 @@
 
 ### Tests for User Story 3
 
-- [ ] T057 [P] [US3] Add strategy ownership and reward separation tests in apps/web/src/server/analysis/rewardResolution.test.ts
-- [ ] T058 [P] [US3] Add pool total regression tests for resolved deposit plus strategy rewards in apps/web/src/server/analysis/pool-read-models.test.ts
-- [ ] T059 [P] [US3] Add deposit exclusion regression tests for strategy_exposure_id rewards in apps/web/src/server/analysis/deposit-read-models.test.ts
-- [ ] T060 [P] [US3] Add navigation helper tests for Pool-to-Strategies and Deposit-to-Strategies links in apps/web/src/features/strategies/strategies.navigation.test.ts and apps/web/src/features/deposits/deposits.navigation.test.ts
+- [X] T057 [P] [US3] Add strategy ownership and reward separation tests in apps/web/src/server/analysis/rewardResolution.test.ts
+- [X] T058 [P] [US3] Add pool total regression tests for resolved deposit plus strategy rewards in apps/web/src/server/analysis/pool-read-models.test.ts
+- [X] T059 [P] [US3] Add deposit exclusion regression tests for strategy_exposure_id rewards in apps/web/src/server/analysis/deposit-read-models.test.ts
+- [X] T060 [P] [US3] Add navigation helper tests for Pool-to-Strategies and Deposit-to-Strategies links in apps/web/src/features/strategies/strategies.navigation.test.ts and apps/web/src/features/deposits/deposits.navigation.test.ts
 - [ ] T061 [P] [US3] Extend Playwright test for Pool detail and Deposit detail cross-links to Strategies in apps/web/e2e/strategies-dataview-and-navigation.spec.ts
 
 ### Implementation for User Story 3
 
-- [ ] T062 [US3] Ensure strategy reward ownership resolves through strategy_exposure_id without deposit fallback in apps/web/src/server/analysis/rewardResolution.ts
-- [ ] T063 [US3] Update pool read-model aggregation to include resolved strategy rewards with resolved deposit rewards in apps/web/src/server/analysis/pool-read-models.ts
-- [ ] T064 [US3] Update deposit read-model aggregation to exclude all rewards with strategy_exposure_id in apps/web/src/server/analysis/deposit-read-models.ts
-- [ ] T065 [US3] Persist strategy-to-pool link metadata and pool mapping status for cross-links in apps/web/src/server/analysis/strategy-read-models.ts
-- [ ] T066 [US3] Enable live Strategies route helpers in apps/web/src/features/deposits/deposits.navigation.ts and apps/web/src/features/strategies/strategies.navigation.ts
-- [ ] T067 [US3] Update DepositStrategiesCrossLink to use live Strategies URLs when mellowStrategyCrossLinkId exists in apps/web/src/features/deposits/components/DepositStrategiesCrossLink.tsx
-- [ ] T068 [US3] Add Pool detail automated exposure links to Strategies filtered by pool or selected strategy in apps/web/src/features/pools/components/PoolRelatedLinks.tsx and apps/web/src/features/pools/PoolDetail.component.tsx
-- [ ] T069 [US3] Add strategy back-link to underlying pool in apps/web/src/features/strategies/components/StrategySelectedPanel.tsx
-- [ ] T070 [US3] Add cross-link translations in apps/web/src/i18n/locales/en/strategies.json, apps/web/src/i18n/locales/es/strategies.json, apps/web/src/i18n/locales/en/deposits.json, and apps/web/src/i18n/locales/es/deposits.json
+- [X] T062 [US3] Ensure strategy reward ownership resolves through strategy_exposure_id without deposit fallback in apps/web/src/server/analysis/rewardResolution.ts
+- [X] T063 [US3] Update pool read-model aggregation to include resolved strategy rewards with resolved deposit rewards in apps/web/src/server/analysis/pool-read-models.ts
+- [X] T064 [US3] Update deposit read-model aggregation to exclude all rewards with strategy_exposure_id in apps/web/src/server/analysis/deposit-read-models.ts
+- [X] T065 [US3] Persist strategy-to-pool link metadata and pool mapping status for cross-links in apps/web/src/server/analysis/strategy-read-models.ts
+- [X] T066 [US3] Enable live Strategies route helpers in apps/web/src/features/deposits/deposits.navigation.ts and apps/web/src/features/strategies/strategies.navigation.ts
+- [X] T067 [US3] Update DepositStrategiesCrossLink to use live Strategies URLs when mellowStrategyCrossLinkId exists in apps/web/src/features/deposits/components/DepositStrategiesCrossLink.tsx
+- [X] T068 [US3] Add Pool detail automated exposure links to Strategies filtered by pool or selected strategy in apps/web/src/features/pools/components/PoolRelatedLinks.tsx and apps/web/src/features/pools/PoolDetail.component.tsx
+- [X] T069 [US3] Add strategy back-link to underlying pool in apps/web/src/features/strategies/components/StrategySelectedPanel.tsx
+- [X] T070 [US3] Add cross-link translations in apps/web/src/i18n/locales/en/strategies.json, apps/web/src/i18n/locales/es/strategies.json, apps/web/src/i18n/locales/en/deposits.json, and apps/web/src/i18n/locales/es/deposits.json
 
 **Checkpoint**: User Stories 1, 2, and 3 preserve the product model across Strategies, Pools, and Deposits.
 
@@ -151,19 +151,19 @@
 
 ### Tests for User Story 4
 
-- [ ] T071 [P] [US4] Add coverage-state derivation tests for full/share_level/partial/unknown strategies in apps/web/src/server/analysis/strategy-read-models.test.ts
-- [ ] T072 [P] [US4] Add service tests for mixed-coverage KPI states and unavailable value behavior in apps/web/src/server/strategies/strategies.service.test.ts
-- [ ] T073 [P] [US4] Add mapper tests for coverage note content and non-full styling signals in apps/web/src/features/strategies/strategies.mappers.test.ts
+- [X] T071 [P] [US4] Add coverage-state derivation tests for full/share_level/partial/unknown strategies in apps/web/src/server/analysis/strategy-read-models.test.ts
+- [X] T072 [P] [US4] Add service tests for mixed-coverage KPI states and unavailable value behavior in apps/web/src/server/strategies/strategies.service.test.ts
+- [X] T073 [P] [US4] Add mapper tests for coverage note content and non-full styling signals in apps/web/src/features/strategies/strategies.mappers.test.ts
 - [ ] T074 [P] [US4] Extend Playwright test for visible non-full coverage note and no fabricated internal activity in apps/web/e2e/strategies-dataview-and-navigation.spec.ts
 
 ### Implementation for User Story 4
 
-- [ ] T075 [US4] Implement strategy coverage derivation and reason-code rollup in apps/web/src/server/analysis/strategy-read-models.ts
-- [ ] T076 [US4] Implement mixed-coverage KPI projection and unavailable metric handling in apps/web/src/server/strategies/strategies.service.ts
-- [ ] T077 [US4] Implement coverage-note view model mapping in apps/web/src/features/strategies/strategies.mappers.ts
-- [ ] T078 [US4] Add coverage note UI states and warning/accent behavior in apps/web/src/features/strategies/components/StrategyCoverageNote.tsx and apps/web/src/features/strategies/StrategiesWorkspace.module.css
-- [ ] T079 [US4] Add strategy coverage reason labels in apps/web/src/i18n/locales/en/coverage.json and apps/web/src/i18n/locales/es/coverage.json
-- [ ] T080 [US4] Guard internal strategy activity display behind confidence and source checks in apps/web/src/features/strategies/components/StrategyLifecycleTimeline.tsx
+- [X] T075 [US4] Implement strategy coverage derivation and reason-code rollup in apps/web/src/server/analysis/strategy-read-models.ts
+- [X] T076 [US4] Implement mixed-coverage KPI projection and unavailable metric handling in apps/web/src/server/strategies/strategies.service.ts
+- [X] T077 [US4] Implement coverage-note view model mapping in apps/web/src/features/strategies/strategies.mappers.ts
+- [X] T078 [US4] Add coverage note UI states and warning/accent behavior in apps/web/src/features/strategies/components/StrategyCoverageNote.tsx and apps/web/src/features/strategies/StrategiesWorkspace.module.css
+- [X] T079 [US4] Add strategy coverage reason labels in apps/web/src/i18n/locales/en/coverage.json and apps/web/src/i18n/locales/es/coverage.json
+- [X] T080 [US4] Guard internal strategy activity display behind confidence and source checks in apps/web/src/features/strategies/components/StrategyLifecycleTimeline.tsx
 
 **Checkpoint**: Coverage behavior is honest and visible across the Strategies DataView.
 
@@ -177,20 +177,20 @@
 
 ### Tests for User Story 5
 
-- [ ] T081 [P] [US5] Add URL state parser/serializer tests for status, protocol, pool, coverage, returnSign, search, sort, page, and selectedStrategyId in apps/web/src/features/strategies/strategies.urlState.test.ts
-- [ ] T082 [P] [US5] Add validation tests for bounded search, enum filters, pagination, and selected fallback in apps/web/src/features/strategies/strategies.validation.test.ts
-- [ ] T083 [P] [US5] Add repository tests for composed filters, search, sort, pagination, and selected row fallback in apps/web/src/server/strategies/strategies.repository.test.ts
+- [X] T081 [P] [US5] Add URL state parser/serializer tests for status, protocol, pool, coverage, returnSign, search, sort, page, and selectedStrategyId in apps/web/src/features/strategies/strategies.urlState.test.ts
+- [X] T082 [P] [US5] Add validation tests for bounded search, enum filters, pagination, and selected fallback in apps/web/src/features/strategies/strategies.validation.test.ts
+- [X] T083 [P] [US5] Add repository tests for composed filters, search, sort, pagination, and selected row fallback in apps/web/src/server/strategies/strategies.repository.test.ts
 - [ ] T084 [P] [US5] Extend Playwright test for filters, sorting, clear chips, and narrow-screen drill-in in apps/web/e2e/strategies-dataview-and-navigation.spec.ts
 
 ### Implementation for User Story 5
 
-- [ ] T085 [US5] Implement full Strategies URL state parser, serializer, and normalized query-key helpers in apps/web/src/features/strategies/strategies.urlState.ts
-- [ ] T086 [US5] Implement bounded filter and sort validation in apps/web/src/features/strategies/strategies.validation.ts
-- [ ] T087 [US5] Implement server-side composed filtering, search, sort, pagination, and selected fallback in apps/web/src/server/strategies/strategies.repository.ts
-- [ ] T088 [US5] Implement Strategies filter bar with clearable chips and search in apps/web/src/features/strategies/components/StrategiesFiltersBar.tsx
-- [ ] T089 [US5] Wire URL state mutations and selected row preservation in apps/web/src/features/strategies/Strategies.container.tsx
-- [ ] T090 [US5] Implement responsive stack/drill-in behavior for narrow screens in apps/web/src/features/strategies/Strategies.component.tsx and apps/web/src/features/strategies/StrategiesWorkspace.module.css
-- [ ] T091 [US5] Add filter, sort, pagination, and responsive labels in apps/web/src/i18n/locales/en/strategies.json and apps/web/src/i18n/locales/es/strategies.json
+- [X] T085 [US5] Implement full Strategies URL state parser, serializer, and normalized query-key helpers in apps/web/src/features/strategies/strategies.urlState.ts
+- [X] T086 [US5] Implement bounded filter and sort validation in apps/web/src/features/strategies/strategies.validation.ts
+- [X] T087 [US5] Implement server-side composed filtering, search, sort, pagination, and selected fallback in apps/web/src/server/strategies/strategies.repository.ts
+- [X] T088 [US5] Implement Strategies filter bar with clearable chips and search in apps/web/src/features/strategies/components/StrategiesFiltersBar.tsx
+- [X] T089 [US5] Wire URL state mutations and selected row preservation in apps/web/src/features/strategies/Strategies.container.tsx
+- [X] T090 [US5] Implement responsive stack/drill-in behavior for narrow screens in apps/web/src/features/strategies/Strategies.component.tsx and apps/web/src/features/strategies/StrategiesWorkspace.module.css
+- [X] T091 [US5] Add filter, sort, pagination, and responsive labels in apps/web/src/i18n/locales/en/strategies.json and apps/web/src/i18n/locales/es/strategies.json
 
 **Checkpoint**: All user stories are independently functional and testable.
 
@@ -200,18 +200,18 @@
 
 **Purpose**: Complete validation, regression, quality gates, and documentation before signoff.
 
-- [ ] T092 [P] Add strategy read-model rebuild script implementation in apps/web/src/server/scripts/rebuild-strategy-read-models.ts
-- [ ] T093 [P] Implement analysis strategy regression script for DB rows vs tx sources and reward-total invariants in apps/web/src/server/scripts/analysis-strategy-regression.ts
-- [ ] T094 Update package test script coverage to include Strategies unit tests in apps/web/package.json
-- [ ] T095 Run unit test suite for strategy materializer, route, service, repository, mappers, navigation, URL state, pool totals, and deposit exclusion using apps/web/package.json
-- [ ] T096 Run lint, typecheck, i18n parity, and design-system checks using apps/web/package.json
+- [X] T092 [P] Add strategy read-model rebuild script implementation in apps/web/src/server/scripts/rebuild-strategy-read-models.ts
+- [X] T093 [P] Implement analysis strategy regression script for DB rows vs tx sources and reward-total invariants in apps/web/src/server/scripts/analysis-strategy-regression.ts
+- [X] T094 Update package test script coverage to include Strategies unit tests in apps/web/package.json
+- [X] T095 Run unit test suite for strategy materializer, route, service, repository, mappers, navigation, URL state, pool totals, and deposit exclusion using apps/web/package.json
+- [X] T096 Run lint, typecheck, i18n parity, and design-system checks using apps/web/package.json
 - [ ] T097 Run Playwright DataView/navigation/a11y checks for Strategies using apps/web/e2e/strategies-dataview-and-navigation.spec.ts
-- [ ] T098 Execute quickstart migration, analysis, and read-model rebuild validation from specs/012-strategies-lifecycle/quickstart.md
-- [ ] T099 Run final regression script after fresh analysis and verify strategy_wallet_summaries, strategy_lifecycle_events, reward_events, pool_wallet_summaries, and deposit_wallet_summaries against apps/web/src/server/scripts/analysis-strategy-regression.ts
+- [X] T098 Execute quickstart migration, analysis, and read-model rebuild validation from specs/012-strategies-lifecycle/quickstart.md
+- [X] T099 Run final regression script after fresh analysis and verify strategy_wallet_summaries, strategy_lifecycle_events, reward_events, pool_wallet_summaries, and deposit_wallet_summaries against apps/web/src/server/scripts/analysis-strategy-regression.ts
 - [ ] T100 Manually compare at least three representative transaction hashes against block explorer evidence and record findings in specs/012-strategies-lifecycle/quickstart.md
-- [ ] T101 Confirm Pools total rewards equal resolved deposit rewards plus resolved strategy rewards using SQL in specs/012-strategies-lifecycle/quickstart.md
-- [ ] T102 Confirm Deposits show only deposit-owned rewards and Strategies show only strategy-owned rewards using SQL in specs/012-strategies-lifecycle/quickstart.md
-- [ ] T103 Update implementation notes and any discovered regression caveats in specs/012-strategies-lifecycle/quickstart.md
+- [X] T101 Confirm Pools total rewards equal resolved deposit rewards plus resolved strategy rewards using SQL in specs/012-strategies-lifecycle/quickstart.md
+- [X] T102 Confirm Deposits show only deposit-owned rewards and Strategies show only strategy-owned rewards using SQL in specs/012-strategies-lifecycle/quickstart.md
+- [X] T103 Update implementation notes and any discovered regression caveats in specs/012-strategies-lifecycle/quickstart.md
 
 ---
 

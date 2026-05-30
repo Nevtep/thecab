@@ -223,7 +223,7 @@
   },
   "strategiesCrossLink": {
     "label": "Related strategy",
-    "placeholder": "Strategies routing is not live yet. This placeholder preserves the target strategy id.",
+    "placeholder": "Open the related automated strategy analysis.",
     "available": "Open strategy"
   },
   "unattributed": {

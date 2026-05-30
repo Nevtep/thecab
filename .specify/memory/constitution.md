@@ -1,21 +1,21 @@
 <!--
 Sync Impact Report
-- Version change: template placeholder version -> 1.0.0
+- Version change: 1.0.0 -> 1.1.0
 - Modified principles:
-	- template principle 1 -> I. Brand-True Control Tower Experience
-	- template principle 2 -> II. Localization-First Product Copy and Formatting
-	- template principle 3 -> III. Chain-Aware Domain and Identity Integrity
-	- template principle 4 -> IV. Provider and API Contract Discipline
-	- template principle 5 -> V. Layered Architecture and Explainable Analytics
+  - Technical Standards and Non-Negotiables: added browser automation exclusion
+  - Delivery Workflow and Quality Gates: added unit/regression/manual validation policy
 - Added sections:
-  - Technical Standards and Non-Negotiables
-  - Delivery Workflow and Quality Gates
+  - None
 - Removed sections:
   - None
 - Templates requiring updates:
   - ✅ updated: .specify/templates/plan-template.md
   - ✅ updated: .specify/templates/spec-template.md
   - ✅ updated: .specify/templates/tasks-template.md
+  - ✅ updated: specs/012-strategies-lifecycle/plan.md
+  - ✅ updated: specs/012-strategies-lifecycle/research.md
+  - ✅ updated: specs/012-strategies-lifecycle/tasks.md
+  - ✅ updated: specs/012-strategies-lifecycle/quickstart.md
   - ⚠ pending: .specify/templates/commands/*.md (directory not present)
 - Follow-up TODOs:
   - None
@@ -122,6 +122,15 @@ Rationale: Explainability is mandatory for trust, debugging, and future model ev
 5. API constraints:
 	- Routes MUST be typed, chain-scoped, and backed by normalized persistence.
 	- Feature code MUST use typed query hooks rather than raw fetch spread across UI.
+6. Testing constraints:
+	- Playwright, browser E2E suites, and automated browser/a11y tests are out of scope for
+	  this repository and MUST NOT be added as feature requirements, generated tasks, or
+	  release gates.
+	- Auth-gated UI behavior is validated manually by the product owner or developer running
+	  the app, while automated coverage focuses on unit, mapper, service, route, materializer,
+	  integration, and deterministic regression scripts.
+	- Any future request to introduce browser automation requires a constitution amendment
+	  before specs, plans, or tasks may include that work.
 
 ## Delivery Workflow and Quality Gates
 
@@ -139,6 +148,10 @@ Rationale: Explainability is mandatory for trust, debugging, and future model ev
 	- i18n parity checks for en/es namespaces.
 	- Tests for locale normalization and formatting helpers.
 	- Regression checks for coverage-state rendering and unsupported-chain handling.
+	- Unit, route, service, materializer, and deterministic regression tests are the default
+	  automated quality gate for feature work.
+	- Browser automation, including Playwright, MUST NOT be required for signoff. Manual
+	  screenshots or product-owner validation may be recorded when the app is auth-gated.
 5. Review gate:
 	- PR review MUST verify constitutional compliance before merge.
 	- Violations require explicit justification and tracked remediation tasks.
@@ -165,4 +178,4 @@ Compliance review expectations:
 	explainability requirements.
 3. Non-compliant work MUST be blocked or tracked with a remediation deadline.
 
-**Version**: 1.0.0 | **Ratified**: 2026-05-12 | **Last Amended**: 2026-05-12
+**Version**: 1.1.0 | **Ratified**: 2026-05-12 | **Last Amended**: 2026-05-30

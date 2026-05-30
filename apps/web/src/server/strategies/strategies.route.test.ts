@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import {
   getStrategiesErrorStatus,
+  normalizeStrategyDetailParams,
   normalizeStrategiesListQueryParams,
 } from "@/server/strategies/strategies.route";
 
@@ -45,3 +46,21 @@ test("getStrategiesErrorStatus maps stable strategy errors", () => {
   assert.equal(getStrategiesErrorStatus(new Error("STRATEGIES_REQUEST_FAILED:STRATEGY_NOT_FOUND")).status, 404);
 });
 
+test("normalizeStrategyDetailParams validates chain and strategy identity", () => {
+  const normalized = normalizeStrategyDetailParams(
+    new URLSearchParams("chainId=8453"),
+    "123e4567-e89b-12d3-a456-426614174111",
+  );
+
+  assert.equal(normalized.chainId, 8453);
+  assert.equal(normalized.strategyId, "123e4567-e89b-12d3-a456-426614174111");
+
+  assert.throws(
+    () => normalizeStrategyDetailParams(new URLSearchParams("chainId=8453"), "not-a-strategy-id"),
+    /INVALID_REQUEST/,
+  );
+  assert.throws(
+    () => normalizeStrategyDetailParams(new URLSearchParams("chainId=1"), "123e4567-e89b-12d3-a456-426614174111"),
+    /UNSUPPORTED_CHAIN/,
+  );
+});

@@ -18,8 +18,10 @@ import {
 import { cabColors } from "@/design-system/tokens";
 import { PoolExposureBar } from "@/features/pools/components/PoolExposureBar";
 import { PoolHistoryChart } from "@/features/pools/components/PoolHistoryChart";
+import { PoolRelatedLinks } from "@/features/pools/components/PoolRelatedLinks";
 import { PoolMetadataFooter } from "@/features/pools/components/PoolMetadataFooter";
 import { PoolTimeline } from "@/features/pools/components/PoolTimeline";
+import { buildStrategiesListHref } from "@/features/strategies/strategies.navigation";
 import { getPoolsCoverageLabelKey } from "@/features/pools/pools.mappers";
 import type { PoolDetailRange, PoolDetailViewModel } from "@/features/pools/pools.types";
 
@@ -78,7 +80,8 @@ export function PoolDetailComponent(input: PoolDetailComponentProps) {
     );
   }
 
-  const header = input.viewModel.header;
+  const viewModel = input.viewModel;
+  const header = viewModel.header;
   const detailReasonLabels = header.coverageReasonCodes.map((reasonCode) =>
     t(`coverage:reasons.${reasonCode}`, { defaultValue: reasonCode }),
   );
@@ -232,6 +235,24 @@ export function PoolDetailComponent(input: PoolDetailComponentProps) {
           },
         ]}
       />
+      {input.viewModel.related.strategies.length > 0 ? (
+        <PoolRelatedLinks
+          title={t("pools:sections.related")}
+          labels={{
+            deposit: t("pools:values.deposit"),
+            strategy: t("pools:values.strategy"),
+          }}
+          deposits={viewModel.related.deposits}
+          strategies={viewModel.related.strategies.map((strategy) => ({
+            ...strategy,
+            href: buildStrategiesListHref({
+              chainId: viewModel.chainId,
+              poolId: viewModel.header.poolId,
+              selectedStrategyId: strategy.id,
+            }),
+          }))}
+        />
+      ) : null}
       <PoolHistoryChart data={input.viewModel.chart} title={t("pools:sections.performance")} />
       <PoolTimeline
         title={t("pools:sections.events")}
