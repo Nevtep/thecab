@@ -1,0 +1,40 @@
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useTranslation } from "react-i18next";
+
+import { StrategiesContainer } from "@/features/strategies/Strategies.container";
+import { useCabWallet } from "@/wallet/useCabWallet";
+
+export default function StrategiesPage() {
+  const router = useRouter();
+  const { t } = useTranslation(["navigation"]);
+  const { status, isAuthenticated, isAuthReady } = useCabWallet();
+
+  useEffect(() => {
+    if (!isAuthReady) {
+      return;
+    }
+
+    if (status === "disconnected" || !isAuthenticated) {
+      router.replace("/");
+    }
+  }, [isAuthenticated, isAuthReady, router, status]);
+
+  if (!isAuthReady || status === "disconnected" || !isAuthenticated) {
+    return null;
+  }
+
+  return (
+    <>
+      <a href="#strategies-content" className="cab-skip-link">
+        {t("navigation:a11y.skipToContent", { defaultValue: "Skip to main content" })}
+      </a>
+      <div id="strategies-content" tabIndex={-1}>
+        <StrategiesContainer />
+      </div>
+    </>
+  );
+}
+

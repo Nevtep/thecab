@@ -54,28 +54,28 @@
 
 ### Tests for User Story 1
 
-- [ ] T022 [P] [US1] Add materializer tests for strategy summary/history rows and no manual deposit leakage in apps/web/src/server/analysis/strategy-read-models.test.ts
-- [ ] T023 [P] [US1] Add repository tests for list filtering, selected bootstrap, KPI aggregation, and DB-only reads in apps/web/src/server/strategies/strategies.repository.test.ts
-- [ ] T024 [P] [US1] Add route tests for GET /api/strategies auth, chain validation, analysis gating, invalid query, and list response shape in apps/web/src/server/strategies/strategies.route.test.ts
-- [ ] T025 [P] [US1] Add service tests for KPI mixed-coverage aggregation and first visible selected strategy in apps/web/src/server/strategies/strategies.service.test.ts
-- [ ] T026 [P] [US1] Add mapper tests for DataView row, KPI, selected-row, empty, and locked view models in apps/web/src/features/strategies/strategies.mappers.test.ts
-- [ ] T027 [P] [US1] Add Playwright coverage for analysis gate and first-screen DataView shell in apps/web/e2e/strategies-dataview-and-navigation.spec.ts
+- [X] T022 [P] [US1] Add materializer tests for strategy summary/history rows and no manual deposit leakage in apps/web/src/server/analysis/strategy-read-models.test.ts
+- [X] T023 [P] [US1] Add repository tests for list filtering, selected bootstrap, KPI aggregation, and DB-only reads in apps/web/src/server/strategies/strategies.repository.test.ts
+- [X] T024 [P] [US1] Add route tests for GET /api/strategies auth, chain validation, analysis gating, invalid query, and list response shape in apps/web/src/server/strategies/strategies.route.test.ts
+- [X] T025 [P] [US1] Add service tests for KPI mixed-coverage aggregation and first visible selected strategy in apps/web/src/server/strategies/strategies.service.test.ts
+- [X] T026 [P] [US1] Add mapper tests for DataView row, KPI, selected-row, empty, and locked view models in apps/web/src/features/strategies/strategies.mappers.test.ts
+- [X] T027 [P] [US1] Add Playwright coverage for analysis gate and first-screen DataView shell in apps/web/e2e/strategies-dataview-and-navigation.spec.ts
 
 ### Implementation for User Story 1
 
-- [ ] T028 [US1] Implement strategy summary/history materialization from strategies, strategy_exposures, reward_events, price_points, and pool metadata in apps/web/src/server/analysis/strategy-read-models.ts
-- [ ] T029 [US1] Implement strategy list repository reads, KPI aggregation, selected bootstrap, available pool filters, and pagination in apps/web/src/server/strategies/strategies.repository.ts
-- [ ] T030 [US1] Implement strategy list service with analysis-ready gating, no-store semantics, and stable error mapping in apps/web/src/server/strategies/strategies.service.ts
-- [ ] T031 [US1] Implement GET /api/strategies route handler in apps/web/src/app/api/strategies/route.ts
-- [ ] T032 [US1] Implement Strategies query builders in apps/web/src/features/strategies/strategies.queries.ts
-- [ ] T033 [US1] Enable typed useStrategiesQuery with normalized filters in apps/web/src/queries/hooks.ts
-- [ ] T034 [US1] Implement Strategies container that reads wallet, analysis status, URL state, and list query in apps/web/src/features/strategies/Strategies.container.tsx
-- [ ] T035 [US1] Implement DataView shell layout and responsive workspace styles in apps/web/src/features/strategies/Strategies.component.tsx and apps/web/src/features/strategies/StrategiesWorkspace.module.css
-- [ ] T036 [P] [US1] Implement KPI strip component with coverage-aware metric states in apps/web/src/features/strategies/components/StrategiesKpiStrip.tsx
-- [ ] T037 [P] [US1] Implement master list table and identity cells in apps/web/src/features/strategies/components/StrategiesTable.tsx and apps/web/src/features/strategies/components/StrategyIdentityCell.tsx
-- [ ] T038 [P] [US1] Implement initial selected strategy panel shell and empty state in apps/web/src/features/strategies/components/StrategySelectedPanel.tsx and apps/web/src/features/strategies/components/StrategiesEmptyState.tsx
-- [ ] T039 [US1] Implement /strategies page route in apps/web/src/app/strategies/page.tsx
-- [ ] T040 [US1] Update navigation resources and sidebar wiring so Strategies appears as a real connected destination in apps/web/src/i18n/locales/en/navigation.json, apps/web/src/i18n/locales/es/navigation.json, and apps/web/src/design-system/layout/CabSidebarNavItem.tsx
+- [X] T028 [US1] Implement strategy summary/history materialization from strategies, strategy_exposures, reward_events, price_points, and pool metadata in apps/web/src/server/analysis/strategy-read-models.ts
+- [X] T029 [US1] Implement strategy list repository reads, KPI aggregation, selected bootstrap, available pool filters, and pagination in apps/web/src/server/strategies/strategies.repository.ts
+- [X] T030 [US1] Implement strategy list service with analysis-ready gating, no-store semantics, and stable error mapping in apps/web/src/server/strategies/strategies.service.ts
+- [X] T031 [US1] Implement GET /api/strategies route handler in apps/web/src/app/api/strategies/route.ts
+- [X] T032 [US1] Implement Strategies query builders in apps/web/src/features/strategies/strategies.queries.ts
+- [X] T033 [US1] Enable typed useStrategiesQuery with normalized filters in apps/web/src/queries/hooks.ts
+- [X] T034 [US1] Implement Strategies container that reads wallet, analysis status, URL state, and list query in apps/web/src/features/strategies/Strategies.container.tsx
+- [X] T035 [US1] Implement DataView shell layout and responsive workspace styles in apps/web/src/features/strategies/Strategies.component.tsx and apps/web/src/features/strategies/StrategiesWorkspace.module.css
+- [X] T036 [P] [US1] Implement KPI strip component with coverage-aware metric states in apps/web/src/features/strategies/components/StrategiesKpiStrip.tsx
+- [X] T037 [P] [US1] Implement master list table and identity cells in apps/web/src/features/strategies/components/StrategiesTable.tsx and apps/web/src/features/strategies/components/StrategyIdentityCell.tsx
+- [X] T038 [P] [US1] Implement initial selected strategy panel shell and empty state in apps/web/src/features/strategies/components/StrategySelectedPanel.tsx and apps/web/src/features/strategies/components/StrategiesEmptyState.tsx
+- [X] T039 [US1] Implement /strategies page route in apps/web/src/app/strategies/page.tsx
+- [X] T040 [US1] Update navigation resources and sidebar wiring so Strategies appears as a real connected destination in apps/web/src/i18n/locales/en/navigation.json, apps/web/src/i18n/locales/es/navigation.json, and apps/web/src/design-system/layout/CabSidebarNavItem.tsx
 
 **Checkpoint**: User Story 1 is independently functional and testable as the MVP Strategies DataView.
 

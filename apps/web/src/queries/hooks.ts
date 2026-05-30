@@ -208,7 +208,7 @@ export function useStrategiesQuery(
 ) {
   return useQuery<StrategiesListResponse>({
     ...getStrategiesListQueryOptions(input),
-    enabled: (options?.enabled ?? false) && Boolean(input.walletAddress),
+    enabled: (options?.enabled ?? true) && Boolean(input.walletAddress),
   });
 }
 
@@ -222,7 +222,7 @@ export function useStrategyDetailQuery(
       strategyId: input.strategyId ?? "",
     }),
     enabled:
-      (options?.enabled ?? false) && Boolean(input.walletAddress) && Boolean(input.strategyId),
+      (options?.enabled ?? true) && Boolean(input.walletAddress) && Boolean(input.strategyId),
   });
 }
 

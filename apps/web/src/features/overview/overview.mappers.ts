@@ -260,8 +260,9 @@ export function getOverviewNavigationItems(
       key: "strategies",
       iconName: "strategies",
       labelKey: "navigation:items.strategies",
-      stateKey: analysisReady ? "comingSoon" : "requiresAnalysis",
-      disabled: true,
+      href: analysisReady ? "/strategies" : undefined,
+      stateKey: analysisReady ? "active" : "requiresAnalysis",
+      disabled: !analysisReady,
     },
     {
       key: "rewards",
