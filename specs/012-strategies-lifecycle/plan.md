@@ -14,7 +14,7 @@ The technical approach extends the existing analysis finalization layer with wal
 **Language/Version**: TypeScript 5.x strict mode  
 **Primary Dependencies**: Next.js 16 App Router, React 19, TanStack Query, Tamagui-based internal design system (`@/design-system`), Drizzle ORM, PostgreSQL, Trigger.dev v4, i18next + react-i18next, wagmi/WalletConnect via `useCabWallet`, Recharts for DS chart primitives  
 **Storage**: PostgreSQL via Drizzle; existing normalized analysis tables plus three new wallet-scoped strategy read models  
-**Testing**: Node test runner with `tsx` and experimental module mocks for unit/service/route/materializer coverage; Playwright for gated routing, master-detail DataView behavior, Deposits/Pools cross-link navigation, and responsive flow; existing lint/typecheck/i18n/design-system checks  
+**Testing**: Node test runner with `tsx` and experimental module mocks for unit/service/route/materializer coverage; deterministic regression scripts for DB/reward ownership invariants; manual auth-gated UI signoff for DataView behavior; existing lint/typecheck/i18n/design-system checks. Playwright and browser E2E suites are excluded by constitution v1.1.0.
 **Target Platform**: Browser clients on the existing Next.js web app; server route handlers backed by Postgres; Base mainnet (chainId 8453) for product v1  
 **Project Type**: Web application monorepo with implementation under `apps/web/`  
 **Performance Goals**: `GET /api/strategies` p95 <= 200ms from DB only; `GET /api/strategies/:strategyId` p95 <= 300ms from DB only; zero provider/RPC calls in request flow; desktop first screen shows KPI strip, at least five rows when available, and selected analysis panel without initial vertical scroll  
@@ -139,8 +139,6 @@ apps/web/
 │   ├── strategies.navigation.test.ts             # NEW
 │   ├── strategies.urlState.test.ts               # NEW
 │   └── strategies.validation.test.ts             # NEW
-└── e2e/
-    └── strategies-dataview-and-navigation.spec.ts # NEW
 ```
 
 **Structure Decision**: Keep work inside `apps/web`, following the existing Pools and Deposits pattern: analysis materializer -> read-model tables -> server repository/service/route -> query hooks -> feature container/component. No new packages or separate app are introduced.

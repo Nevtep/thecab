@@ -16,6 +16,7 @@ Sync Impact Report
   - ✅ updated: specs/012-strategies-lifecycle/research.md
   - ✅ updated: specs/012-strategies-lifecycle/tasks.md
   - ✅ updated: specs/012-strategies-lifecycle/quickstart.md
+  - ✅ updated: AGENTS.md
   - ⚠ pending: .specify/templates/commands/*.md (directory not present)
 - Follow-up TODOs:
   - None

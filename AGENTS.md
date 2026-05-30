@@ -78,4 +78,6 @@ Backend, engine, API, mapper, navigation, and URL-state changes need focused uni
 - Deposit surfaces show deposit-owned rewards only.
 - Strategy surfaces show strategy-owned rewards only.
 
+Do not add Playwright, browser E2E, or automated browser/a11y tests. Automated coverage should use unit, route, service, mapper, materializer, integration, and deterministic regression tests. Auth-gated UI behavior is validated through manual product/developer signoff evidence recorded in the feature quickstart or tasks.
+
 Do not describe a feature as complete until the relevant unit tests and requested regression checks have either passed or been explicitly reported as not run.

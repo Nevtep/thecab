@@ -104,6 +104,9 @@
   (Moralis vs Alchemy Prices vs RPC/log/contract reads).
 - **CA-006 Explainability**: Feature MUST describe coverage/confidence behavior when data
   reconstruction is partial or unknown.
+- **CA-007 Testing Boundary**: Feature MUST define automated validation without Playwright,
+  browser E2E, or automated browser/a11y suites. Auth-gated UI validation, when needed,
+  MUST be manual and recorded as product/developer signoff evidence.
 
 *Example of marking unclear requirements:*
 

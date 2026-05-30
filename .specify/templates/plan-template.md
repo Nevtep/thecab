@@ -41,6 +41,9 @@
   substitution, stable backend error codes, and Trigger.dev background execution boundaries.
 - Explainability gate: Confirm raw-to-normalized ingestion path, coverage/confidence model,
   and traceability for analytics outputs.
+- Testing boundary gate: Confirm automated coverage uses unit, route, service,
+  materializer, integration, and deterministic regression tests. Do not include Playwright,
+  browser E2E, or automated browser/a11y suites as plan dependencies or signoff gates.
 
 ## Project Structure
 

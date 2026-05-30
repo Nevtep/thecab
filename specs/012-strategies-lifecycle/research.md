@@ -93,12 +93,12 @@
 
 ## Decision 8: Testing Extends Backend, Engine, UI, And Regression Layers
 
-**Decision**: Planning requires unit tests for strategy materialization, route/service/repository, mappers, URL state, navigation helpers, and reward aggregation; Playwright for DataView/gating/cross-link flows; and a regression script for DB rows vs chain transaction evidence.
+**Decision**: Planning requires unit tests for strategy materialization, route/service/repository, mappers, URL state, navigation helpers, and reward aggregation; a regression script for DB rows vs chain transaction evidence; and manual auth-gated UI signoff for DataView/gating/cross-link flows. Playwright and browser E2E suites are excluded by constitution v1.1.0.
 
-**Rationale**: The feature touches both analysis correctness and a new data-dense UI. Unit tests catch deterministic mapping and aggregation mistakes; E2E tests catch navigation and responsive behavior; regression checks catch real-chain/provider mismatch.
+**Rationale**: The feature touches both analysis correctness and a new data-dense UI. Unit tests catch deterministic mapping and aggregation mistakes; manual UI signoff catches auth-gated navigation and responsive behavior; regression checks catch real-chain/provider mismatch.
 
 **Alternatives considered**:
 
-- Add only E2E coverage: too slow and misses materializer edge cases.
+- Add browser E2E coverage: rejected by constitution and too slow for the auth-gated app.
 - Add only backend coverage: misses the core DataView behavior and cross-link UX.
 - Rely on existing analysis smoke: useful baseline but not specific to strategy reward ownership or DataView contracts.

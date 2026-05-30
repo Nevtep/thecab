@@ -177,12 +177,7 @@ Implementation should add focused unit coverage for:
 - strategy URL state and selected-row behavior;
 - Strategies mappers for coverage note and DataView metrics.
 
-## 7. Run UI Validation
-
-```bash
-cd apps/web
-pnpm test:a11y -- strategies-dataview-and-navigation.spec.ts
-```
+## 7. Run Manual Auth-Gated UI Validation
 
 Expected checkpoints:
 
@@ -193,6 +188,10 @@ Expected checkpoints:
 - Deposit detail cross-link opens the relevant strategy when present;
 - narrow viewport can reach lifecycle and coverage details in no more than two interactions;
 - non-full coverage strategies show a visible coverage note.
+
+Playwright, browser E2E, and automated browser/a11y suites are intentionally excluded by
+constitution v1.1.0. Record manual screenshots or product-owner confirmation for
+auth-gated UI behavior instead.
 
 ## 8. Final Regression Acceptance
 
@@ -215,6 +214,10 @@ Expected checkpoints:
   - `0x46f63be7e6bda313c3559bc9bee295d7d85de99a3903a8ac266152dd7a051dd6`
   - `0xe1755f34427255d7b615b25b11e2f7d6ff8cb8430e1fbcdc64c685c61994b39c`
   - `0x66e3c84386b10a3cdb2d452c29c0770c43708d23fb115b3916d8ced126a289fb`
+- Product-owner UI signoff recorded from screenshots captured on 2026-05-30 at
+  `/strategies` and `/strategies?selectedStrategyId=895cc80b-4985-4a4b-8e96-4089e7e0fece`.
+  The screenshots show populated KPI strip, active Strategies navigation, strategy table,
+  selected strategy panel, claimed reward values, lifecycle entries, and coverage notes.
 
 Before marking feature complete:
 
