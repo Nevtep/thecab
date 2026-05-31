@@ -1,6 +1,8 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 
 import type { AnalysisMode, AnalysisStatus, AnalysisStatusResponse } from "@/analysis/analysisStatus";
+import { getActivityQueryOptions } from "@/features/activity/activity.queries";
+import type { ActivityViewModel, ActivityUrlState } from "@/features/activity/activity.types";
 import type { DepositDetailResponse, DepositsListResponse } from "@/features/deposits/deposits.types";
 import type {
   DepositsListUrlState,
@@ -255,11 +257,13 @@ export function useGovernanceQuery(input: WalletScopedInput) {
   });
 }
 
-export function useActivityQuery(input: WalletScopedInput) {
-  return useQuery({
-    queryKey: queryKeys.activity(input),
-    queryFn: () => apiClient(`/api/activity?chainId=${input.chainId}`),
-    enabled: false,
+export function useActivityQuery(
+  input: WalletScopedInput & { state: ActivityUrlState },
+  options?: { enabled?: boolean },
+) {
+  return useQuery<ActivityViewModel>({
+    ...getActivityQueryOptions(input),
+    enabled: (options?.enabled ?? true) && Boolean(input.walletAddress),
   });
 }
 

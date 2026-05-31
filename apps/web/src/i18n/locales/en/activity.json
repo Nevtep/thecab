@@ -1,3 +1,104 @@
 {
-  "title": "TODO"
+  "title": "Activity",
+  "subtitle": "Inspect interpreted wallet activity across deposits, strategies, rewards, governance, pools, and unsupported events.",
+  "states": {
+    "loadingTitle": "Loading activity",
+    "errorTitle": "Activity could not be loaded"
+  },
+  "locked": {
+    "title": "Activity is waiting for analysis",
+    "description": "Run or finish historical analysis before reviewing the interpreted activity ledger."
+  },
+  "empty": {
+    "noEventsTitle": "No activity found",
+    "noEventsDescription": "No supported activity rows were found for this wallet and chain.",
+    "filteredTitle": "No matching activity",
+    "filteredDescription": "No activity rows match the selected filters."
+  },
+  "actions": {
+    "refresh": "Refresh",
+    "deposit": "Deposit",
+    "withdraw": "Withdraw",
+    "swap": "Swap",
+    "claim": "Claim",
+    "strategy": "Strategy",
+    "governance": "Governance",
+    "transfer": "Transfer",
+    "airdrop": "Airdrop",
+    "unsupported": "Unsupported",
+    "ambiguous": "Ambiguous"
+  },
+  "surfaces": {
+    "wallet": "Wallet",
+    "pools": "Pools",
+    "deposits": "Deposits",
+    "strategies": "Strategies",
+    "rewards": "Rewards",
+    "governance": "Governance",
+    "unknown": "Unknown"
+  },
+  "confidence": {
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low",
+    "none": "None"
+  },
+  "kpis": {
+    "totalEvents": "Total events",
+    "interpretedEvents": "Interpreted events",
+    "totalValue": "Non-excluded value",
+    "coverage": "Coverage",
+    "allHistory": "All history",
+    "excludesUnsupported": "Excludes unresolved/excluded",
+    "nonExcluded": "Excluded rows stay out",
+    "classificationCoverage": "Evidence-backed rows"
+  },
+  "filters": {
+    "search": "Search",
+    "searchPlaceholder": "Search activity, tx, token, reason...",
+    "surface": "Surface",
+    "action": "Action",
+    "coverage": "Coverage",
+    "confidence": "Confidence"
+  },
+  "panels": {
+    "events": "Activity events",
+    "selectedActivity": "Selected activity"
+  },
+  "table": {
+    "columns": {
+      "dateTime": "Date / time",
+      "action": "Action",
+      "surface": "Surface",
+      "movement": "Movement",
+      "value": "Value",
+      "coverage": "Coverage",
+      "confidence": "Confidence",
+      "tx": "Tx"
+    }
+  },
+  "selected": {
+    "empty": "Select an activity row to inspect evidence.",
+    "loading": "Loading activity detail",
+    "action": "Action",
+    "surface": "Surface",
+    "occurredAt": "Time",
+    "txHash": "Transaction",
+    "coverage": "Coverage",
+    "confidence": "Confidence",
+    "movements": "Movements",
+    "reasonCodes": "Reason codes"
+  },
+  "reasons": {
+    "airdrop_spam": "Spam-like airdrop excluded",
+    "missingClassificationEvidence": "Missing classification evidence",
+    "partialClassificationEvidence": "Partial classification evidence",
+    "unavailableClassificationEvidence": "Classification evidence unavailable",
+    "malicious": "Malicious activity",
+    "unsupported": "Unsupported activity",
+    "ambiguous": "Ambiguous activity",
+    "discarded": "Discarded activity",
+    "unresolved": "Unresolved activity",
+    "unavailable": "Unavailable evidence"
+  }
 }

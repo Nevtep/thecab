@@ -1,3 +1,104 @@
 {
-  "title": "PENDIENTE"
+  "title": "Actividad",
+  "subtitle": "Inspeccioná la actividad interpretada de la wallet en depósitos, estrategias, recompensas, gobernanza, pools y eventos no soportados.",
+  "states": {
+    "loadingTitle": "Cargando actividad",
+    "errorTitle": "No se pudo cargar la actividad"
+  },
+  "locked": {
+    "title": "La actividad espera el análisis",
+    "description": "Ejecutá o terminá el análisis histórico antes de revisar el ledger de actividad interpretada."
+  },
+  "empty": {
+    "noEventsTitle": "No se encontró actividad",
+    "noEventsDescription": "No se encontraron filas de actividad soportada para esta wallet y red.",
+    "filteredTitle": "No hay actividad coincidente",
+    "filteredDescription": "Ninguna fila de actividad coincide con los filtros seleccionados."
+  },
+  "actions": {
+    "refresh": "Actualizar",
+    "deposit": "Depósito",
+    "withdraw": "Retiro",
+    "swap": "Swap",
+    "claim": "Claim",
+    "strategy": "Estrategia",
+    "governance": "Gobernanza",
+    "transfer": "Transferencia",
+    "airdrop": "Airdrop",
+    "unsupported": "No soportado",
+    "ambiguous": "Ambiguo"
+  },
+  "surfaces": {
+    "wallet": "Wallet",
+    "pools": "Pools",
+    "deposits": "Depósitos",
+    "strategies": "Estrategias",
+    "rewards": "Recompensas",
+    "governance": "Gobernanza",
+    "unknown": "Desconocido"
+  },
+  "confidence": {
+    "high": "Alta",
+    "medium": "Media",
+    "low": "Baja",
+    "none": "Nula"
+  },
+  "kpis": {
+    "totalEvents": "Eventos totales",
+    "interpretedEvents": "Eventos interpretados",
+    "totalValue": "Valor no excluido",
+    "coverage": "Cobertura",
+    "allHistory": "Todo el historial",
+    "excludesUnsupported": "Excluye no resuelto/excluido",
+    "nonExcluded": "Las filas excluidas no suman",
+    "classificationCoverage": "Filas con evidencia"
+  },
+  "filters": {
+    "search": "Buscar",
+    "searchPlaceholder": "Buscar actividad, tx, token, razón...",
+    "surface": "Superficie",
+    "action": "Acción",
+    "coverage": "Cobertura",
+    "confidence": "Confianza"
+  },
+  "panels": {
+    "events": "Eventos de actividad",
+    "selectedActivity": "Actividad seleccionada"
+  },
+  "table": {
+    "columns": {
+      "dateTime": "Fecha / hora",
+      "action": "Acción",
+      "surface": "Superficie",
+      "movement": "Movimiento",
+      "value": "Valor",
+      "coverage": "Cobertura",
+      "confidence": "Confianza",
+      "tx": "Tx"
+    }
+  },
+  "selected": {
+    "empty": "Seleccioná una fila de actividad para inspeccionar evidencia.",
+    "loading": "Cargando detalle de actividad",
+    "action": "Acción",
+    "surface": "Superficie",
+    "occurredAt": "Hora",
+    "txHash": "Transacción",
+    "coverage": "Cobertura",
+    "confidence": "Confianza",
+    "movements": "Movimientos",
+    "reasonCodes": "Códigos de razón"
+  },
+  "reasons": {
+    "airdrop_spam": "Airdrop tipo spam excluido",
+    "missingClassificationEvidence": "Falta evidencia de clasificación",
+    "partialClassificationEvidence": "Evidencia de clasificación parcial",
+    "unavailableClassificationEvidence": "Evidencia de clasificación no disponible",
+    "malicious": "Actividad maliciosa",
+    "unsupported": "Actividad no soportada",
+    "ambiguous": "Actividad ambigua",
+    "discarded": "Actividad descartada",
+    "unresolved": "Actividad no resuelta",
+    "unavailable": "Evidencia no disponible"
+  }
 }

@@ -25,5 +25,11 @@
     "INVALID_REWARDS_FILTERS": "Los filtros de rewards no son válidos.",
     "ANALYSIS_NOT_FOUND": "Ejecute un análisis antes de ver rewards.",
     "REWARDS_READ_FAILED": "Ocurrió un problema al cargar rewards."
+  },
+  "activity": {
+    "UNAUTHENTICATED_WALLET": "Conecte su billetera para ver actividad.",
+    "UNSUPPORTED_CHAIN": "Esta red todavía no es compatible con actividad.",
+    "INVALID_ACTIVITY_FILTERS": "Los filtros de actividad no son válidos.",
+    "ACTIVITY_READ_FAILED": "Ocurrió un problema al cargar actividad."
   }
 }

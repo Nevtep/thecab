@@ -19,6 +19,10 @@ type RewardsParams = BaseParams & {
   filters?: Record<string, unknown>;
 };
 
+type ActivityParams = BaseParams & {
+  filters?: Record<string, unknown>;
+};
+
 export const queryKeys = {
   overview: ({ chainId, walletAddress, range }: OverviewParams) =>
     ["overview", chainId, walletAddress ?? "", range] as const,
@@ -56,8 +60,8 @@ export const queryKeys = {
     ["rewards", chainId, walletAddress ?? "", JSON.stringify(filters ?? {})] as const,
   governance: ({ chainId, walletAddress }: BaseParams) =>
     ["governance", chainId, walletAddress ?? ""] as const,
-  activity: ({ chainId, walletAddress }: BaseParams) =>
-    ["activity", chainId, walletAddress ?? ""] as const,
+  activity: ({ chainId, walletAddress, filters }: ActivityParams) =>
+    ["activity", chainId, walletAddress ?? "", JSON.stringify(filters ?? {})] as const,
   settings: ({ chainId, walletAddress }: BaseParams) =>
     ["settings", chainId, walletAddress ?? ""] as const,
 };

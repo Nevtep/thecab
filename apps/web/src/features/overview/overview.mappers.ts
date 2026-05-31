@@ -283,8 +283,9 @@ export function getOverviewNavigationItems(
       key: "activity",
       iconName: "activity",
       labelKey: "navigation:items.activity",
-      stateKey: analysisReady ? "comingSoon" : "requiresAnalysis",
-      disabled: true,
+      href: analysisReady ? "/activity" : undefined,
+      stateKey: analysisReady ? "active" : "requiresAnalysis",
+      disabled: !analysisReady,
     },
     {
       key: "settings",
