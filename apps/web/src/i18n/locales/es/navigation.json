@@ -10,7 +10,8 @@
     "settings": "Configuración"
   },
   "descriptions": {
-    "strategies": "Análisis de exposiciones automatizadas"
+    "strategies": "Análisis de exposiciones automatizadas",
+    "governance": "veAERO, votos y rewards"
   },
   "a11y": {
     "openMenu": "Abrir menú de navegación",

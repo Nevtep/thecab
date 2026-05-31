@@ -112,9 +112,9 @@ test("runAnalysisRunTask orchestrates slices and downstream phases in order", as
   });
   assert.deepEqual(
     updateRunProgressCalls.map((call) => call.stage),
-    ["planning", "slices", "activity", "pools", "finalize"],
+    ["planning", "slices", "activity", "governance", "pools", "finalize"],
   );
-  assert.deepEqual(triggeredPhases, ["phase-activity", "phase-pools", "phase-finalize"]);
+  assert.deepEqual(triggeredPhases, ["phase-activity", "phase-governance", "phase-pools", "phase-finalize"]);
   assert.equal(updateSliceCalls.length, 1);
   assert.equal(updateSliceCalls[0]?.status, "failed");
   assert.equal(finalizeCalls.length, 0);

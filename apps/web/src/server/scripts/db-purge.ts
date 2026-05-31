@@ -148,6 +148,22 @@ async function main() {
         query: `delete from deposit_wallet_summaries where wallet_address = $1 and chain_id = $2`,
       },
       {
+        label: "governance_metric_snapshots",
+        query: `delete from governance_metric_snapshots where wallet_address = $1 and chain_id = $2`,
+      },
+      {
+        label: "governance_reward_rows",
+        query: `delete from governance_reward_rows where wallet_address = $1 and chain_id = $2`,
+      },
+      {
+        label: "governance_epoch_summaries",
+        query: `delete from governance_epoch_summaries where wallet_address = $1 and chain_id = $2`,
+      },
+      {
+        label: "governance_lock_exposures",
+        query: `delete from governance_lock_exposures where wallet_address = $1 and chain_id = $2`,
+      },
+      {
         label: "governance_events",
         query: `delete from governance_events where wallet_address = $1 and chain_id = $2`,
       },

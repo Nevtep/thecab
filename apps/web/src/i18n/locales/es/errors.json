@@ -31,5 +31,12 @@
     "UNSUPPORTED_CHAIN": "Esta red todavía no es compatible con actividad.",
     "INVALID_ACTIVITY_FILTERS": "Los filtros de actividad no son válidos.",
     "ACTIVITY_READ_FAILED": "Ocurrió un problema al cargar actividad."
+  },
+  "governance": {
+    "UNAUTHENTICATED_WALLET": "Conecte su billetera para ver gobernanza.",
+    "UNSUPPORTED_CHAIN": "Esta red todavía no es compatible con gobernanza.",
+    "INVALID_GOVERNANCE_FILTERS": "Los filtros de gobernanza no son válidos.",
+    "ANALYSIS_NOT_READY": "Ejecute un análisis antes de ver gobernanza.",
+    "GOVERNANCE_READ_FAILED": "Ocurrió un problema al cargar gobernanza."
   }
 }

@@ -83,7 +83,11 @@
     "historicalCapitalPartial": "La cobertura de capital histórico es parcial",
     "governancePoolMappingUnavailable": "El mapeo de pool de gobernanza no está disponible",
     "walletPoolAggregateAttribution": "Se usó atribución agregada wallet-pool",
-    "analysisNotReady": "El análisis histórico no está listo"
+    "analysisNotReady": "El análisis histórico no está listo",
+    "governanceEvidencePartial": "La clasificación de gobernanza es parcial",
+    "governanceEpochUnresolved": "El contexto de epoch de gobernanza no está resuelto",
+    "governancePoolAssociationMissing": "Falta asociación de pool para gobernanza",
+    "governanceRewardExcluded": "Reward con forma de gobernanza excluido de los totales"
   },
   "confidence": {
     "high": "Confianza alta",

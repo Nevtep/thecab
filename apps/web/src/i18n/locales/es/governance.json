@@ -1,3 +1,74 @@
 {
-  "title": "PENDIENTE"
+  "title": "Gobernanza",
+  "subtitle": "Inspeccione locks veAERO, votos, relays, fees, bribes, rebases y rewards de gobernanza.",
+  "kpis": {
+    "lockedAero": "AERO bloqueado",
+    "veAeroExposure": "Exposición veAERO",
+    "lockExpiry": "Vencimiento del lock",
+    "governanceRewards": "Rewards de gobernanza",
+    "estimatedReturn": "Retorno de gobernanza estimado",
+    "coverage": "Cobertura"
+  },
+  "filters": {
+    "searchPlaceholder": "Buscar epoch, tx, token, pool...",
+    "eventType": "Tipo de evento",
+    "rewardType": "Tipo de reward",
+    "protocolSurface": "Superficie",
+    "coverage": "Cobertura",
+    "confidence": "Confianza",
+    "clear": "Limpiar filtros"
+  },
+  "surfaces": {
+    "voting_escrow": "Voting escrow",
+    "voter": "Voter",
+    "relay": "Relay",
+    "briber": "Briber",
+    "fee_distributor": "Fee distributor",
+    "reward_distributor": "Reward distributor",
+    "unknown": "Desconocida"
+  },
+  "events": {
+    "lock_created": "Lock creado",
+    "lock_increased": "Lock incrementado",
+    "lock_extended": "Lock extendido",
+    "lock_relocked": "Relock",
+    "lock_withdrawn": "Lock retirado",
+    "vote_cast": "Voto emitido",
+    "vote_reset": "Voto reseteado",
+    "relay_joined": "Relay activado",
+    "relay_exited": "Relay desactivado",
+    "bribe_claim": "Claim de bribe",
+    "fee_claim": "Claim de fee",
+    "rebase_claim": "Claim de rebase",
+    "governance_reward": "Reward de gobernanza",
+    "unsupported_governance": "Gobernanza no soportada",
+    "excluded_governance": "Gobernanza excluida"
+  },
+  "rewards": {
+    "bribe": "Bribe",
+    "fee": "Fee",
+    "rebase": "Rebase",
+    "relay": "Reward de relay",
+    "unknown": "Desconocido"
+  },
+  "states": {
+    "locked": "Ejecute análisis para inspeccionar Gobernanza.",
+    "empty": "No se encontró actividad de gobernanza.",
+    "partial": "Parte de la actividad de gobernanza está parcial o no resuelta.",
+    "unsupported": "La actividad con forma de gobernanza no soportada sigue siendo inspeccionable."
+  },
+  "detail": {
+    "title": "Detalle de gobernanza seleccionado",
+    "actionSummary": "Resumen de acción",
+    "transaction": "Transacción",
+    "protocolSurface": "Superficie de protocolo",
+    "tokenMovements": "Movimientos de token",
+    "valueEffect": "Efecto de valor",
+    "epochContext": "Contexto de epoch",
+    "poolContext": "Contexto de pool",
+    "classificationEvidence": "Evidencia de clasificación",
+    "linkedContexts": "Contextos vinculados",
+    "coverageNotes": "Notas de cobertura",
+    "evidenceSources": "Fuentes de evidencia"
+  }
 }

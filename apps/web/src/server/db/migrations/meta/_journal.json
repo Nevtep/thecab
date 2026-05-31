@@ -92,6 +92,13 @@
       "when": 1780170374338,
       "tag": "0012_stormy_polaris",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1780250000000,
+      "tag": "0013_governance_read_models",
+      "breakpoints": true
     }
   ]
 }

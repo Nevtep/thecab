@@ -39,13 +39,14 @@ La revisión se hizo contra:
   - `apps/web/src/queries`
   - `apps/web/src/i18n`
   - `apps/web/src/design-system`
-- Specs activas hasta `specs/013-rewards-dataview`.
+- Specs activas hasta `specs/014-activity-dataview`.
+- Siguiente spec creado para cerrar Governance: `specs/015-governance-engine-dataview`.
 
 Esta es una revisión estática y de estado de implementación. No certifica que la calidad de datos sea correcta para todas las wallets. El engine todavía necesita regresiones más profundas contra transacciones reales de Base y filas reales de la base analizada.
 
 ## 3. Estado General
 
-El producto tiene una base fuerte hasta Rewards:
+El producto tiene una base fuerte hasta Activity:
 
 - Landing existente.
 - Conexión de wallet existente.
@@ -56,6 +57,7 @@ El producto tiene una base fuerte hasta Rewards:
 - Deposits list/detail.
 - Strategies list/detail.
 - Rewards DataView.
+- Activity DataView en primera versión funcional.
 - Settings básico.
 - Design system interno activo.
 - i18next con inglés y español.
@@ -65,8 +67,8 @@ El producto tiene una base fuerte hasta Rewards:
 
 El producto todavía no cumple todo el product spec porque falta cerrar una sección de primer nivel y estabilizar otra:
 
-- Governance.
-- Activity, ya implementada en una primera versión funcional pero todavía con gaps de engine y explainability.
+- Governance: pendiente como sección de primer nivel y como procesamiento explícito de engine.
+- Activity: implementada en una primera versión funcional, todavía con gaps de engine, fixtures y explainability profunda.
 
 Además, varias pantallas existentes necesitan cerrar gaps de explicabilidad, consistencia visual y semántica de datos.
 
@@ -83,8 +85,8 @@ Además, varias pantallas existentes necesitan cerrar gaps de explicabilidad, co
 | Deposits | Implementado con gaps | Lista/detalle, lifecycle, chart, movements y decomposition existen. Falta pulir DS y validar semántica. |
 | Strategies | Implementado con gaps | Lista/detalle existen. Falta actividad interna dedicada y relación explícita con pools subyacentes. |
 | Rewards | Implementado con gaps | DataView existe. Faltan breakdowns completos, custom date range y vista completa de excluidos/no resueltos. |
-| Governance | Pendiente | Hay tabla `governance_events` y navegación disabled, pero no DataView/API/read model/UI. |
-| Activity | En implementación avanzada | DataView/API/detail rail ya existen. Quedan gaps de rebalance explainability profunda, links desde todas las superficies y estabilización del engine con más fixtures reales. |
+| Governance | Pendiente | Hay tabla `governance_events` y navegación disabled, pero no DataView/read model/UI ni procesamiento completo de tx governance. Siguiente spec: `015-governance-engine-dataview`. |
+| Activity | En implementación avanzada | DataView/API/detail rail ya existen. Checks de typecheck, unit, i18n, DS y regression pasaron. Quedan gaps de rebalance explainability profunda, links desde todas las superficies y estabilización del engine con más fixtures reales. |
 | Settings | Básico implementado | Faltan limpiar cache local, preferencias de formato numérico y separación más clara de diagnostics. |
 | CSV/export | Correctamente ausente | El product spec lo excluye de v1. |
 
@@ -103,7 +105,7 @@ El shell conectado ya expresa la arquitectura de producto:
 - Activity.
 - Settings.
 
-La navegación está acoplada al estado de análisis: las secciones históricas profundas se bloquean hasta que el análisis está listo o stale. Governance y Activity figuran como coming soon, que hoy refleja el estado real pero no el alcance final del product spec.
+La navegación está acoplada al estado de análisis: las secciones históricas profundas se bloquean hasta que el análisis está listo o stale. Activity ya tiene una primera versión funcional; Governance sigue siendo la sección de primer nivel pendiente.
 
 ### 5.2 Design System
 
@@ -199,9 +201,9 @@ Esa transacción es un airdrop de phishing y no debe sumar como reward. Los caso
 
 ## 6. Features Pendientes De Primer Nivel
 
-### 6.1 Governance DataView
+### 6.1 Governance Engine Y DataView
 
-**Estado:** implementación avanzada, lista para testing funcional con limitaciones conocidas.
+**Estado:** pendiente. Es el siguiente feature spec: `specs/015-governance-engine-dataview`.
 
 El product spec requiere una sección Governance de primer nivel. Debe cubrir:
 
@@ -221,6 +223,7 @@ Existe hoy:
 - Tabla `governance_events`.
 - Clasificación parcial de rewards governance desde Rewards.
 - Item de navegación Governance disabled.
+- Evidencia de que el engine todavía no procesa todas las superficies governance requeridas por el product spec.
 
 Falta:
 
@@ -229,6 +232,8 @@ Falta:
 - Módulo `features/governance`.
 - Repositorio, service y route layer.
 - Read models governance.
+- Procesamiento explícito de tx governance desde veAERO/VotingEscrow, Voter, relays, bribe/fee/reward distributors y AERO transfers relacionados.
+- Persistencia de locks, votes, resets, relay participation, claims de fees, bribes y rebases con coverage/confidence.
 - Container/component split.
 - Namespace i18n.
 - URL/filter state.
@@ -241,15 +246,15 @@ Falta:
 
 Recomendación:
 
-1. Implementar Governance como DataView DB-only y analysis-gated.
-2. Leer únicamente tablas normalizadas/read models.
-3. Empezar con eventos que el engine ya detecta.
-4. Mostrar cobertura limitada cuando falte decode o evidencia.
+1. Extender primero el engine para clasificar tx governance con evidencia explícita.
+2. Implementar Governance como DataView analysis-gated y DB-only.
+3. Leer únicamente tablas normalizadas/read models.
+4. Mostrar cobertura limitada cuando falte decode, epoch, pool o reward association.
 5. Reutilizar rewards compartidos sin duplicar totals.
 
 ### 6.2 Activity DataView
 
-**Estado:** pendiente.
+**Estado:** implementación avanzada, lista para testing funcional con limitaciones conocidas.
 
 Activity debe ser el audit trail transaccional detrás de cada métrica del producto.
 

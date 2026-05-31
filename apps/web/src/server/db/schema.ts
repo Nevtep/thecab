@@ -586,6 +586,127 @@ export const governanceEvents = pgTable(
   ],
 );
 
+export const governanceLockExposures = pgTable(
+  "governance_lock_exposures",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    runId: uuid("run_id").references(() => analysisRuns.id, { onDelete: "cascade" }),
+    chainId: integer("chain_id").notNull(),
+    walletAddress: varchar("wallet_address", { length: 42 }).notNull(),
+    lockId: varchar("lock_id", { length: 128 }),
+    status: varchar("status", { length: 24 }).notNull().default("unknown"),
+    lockedAeroAmount: numeric("locked_aero_amount", { precision: 78, scale: 18 }),
+    lockedAeroValueUsd: numeric("locked_aero_value_usd", { precision: 38, scale: 18 }),
+    veAeroExposure: numeric("ve_aero_exposure", { precision: 78, scale: 18 }),
+    createdAtUtc: timestamp("created_at_utc", { withTimezone: true }),
+    expiresAtUtc: timestamp("expires_at_utc", { withTimezone: true }),
+    coverageStatus: varchar("coverage_status", { length: 24 }).notNull().default("unavailable"),
+    confidence: varchar("confidence", { length: 16 }).notNull().default("none"),
+    reasonCodes: text("reason_codes").array().notNull().default(sql`'{}'::text[]`),
+    lifecycleJson: jsonb("lifecycle_json").$type<unknown[]>().notNull().default([]),
+    metadataJson: jsonb("metadata_json").$type<Record<string, unknown>>().notNull().default({}),
+    materializedAt: timestamp("materialized_at", { withTimezone: true }).$defaultFn(now).notNull(),
+  },
+  (table) => [
+    index("governance_lock_exposures_wallet_idx").on(table.chainId, table.walletAddress),
+    index("governance_lock_exposures_run_idx").on(table.runId),
+  ],
+);
+
+export const governanceEpochSummaries = pgTable(
+  "governance_epoch_summaries",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    runId: uuid("run_id").references(() => analysisRuns.id, { onDelete: "cascade" }),
+    chainId: integer("chain_id").notNull(),
+    walletAddress: varchar("wallet_address", { length: 42 }).notNull(),
+    epochId: varchar("epoch_id", { length: 64 }).notNull(),
+    epochStartUtc: timestamp("epoch_start_utc", { withTimezone: true }),
+    epochEndUtc: timestamp("epoch_end_utc", { withTimezone: true }),
+    voteMode: varchar("vote_mode", { length: 24 }).notNull().default("unknown"),
+    resetState: varchar("reset_state", { length: 24 }).notNull().default("unknown"),
+    rewardState: varchar("reward_state", { length: 24 }).notNull().default("unknown"),
+    feesUsd: numeric("fees_usd", { precision: 38, scale: 18 }),
+    bribesUsd: numeric("bribes_usd", { precision: 38, scale: 18 }),
+    rebasesUsd: numeric("rebases_usd", { precision: 38, scale: 18 }),
+    votedPoolsJson: jsonb("voted_pools_json").$type<unknown[]>().notNull().default([]),
+    coverageStatus: varchar("coverage_status", { length: 24 }).notNull().default("unavailable"),
+    confidence: varchar("confidence", { length: 16 }).notNull().default("none"),
+    reasonCodes: text("reason_codes").array().notNull().default(sql`'{}'::text[]`),
+    metadataJson: jsonb("metadata_json").$type<Record<string, unknown>>().notNull().default({}),
+    materializedAt: timestamp("materialized_at", { withTimezone: true }).$defaultFn(now).notNull(),
+  },
+  (table) => [
+    uniqueIndex("governance_epoch_summaries_identity_uidx").on(
+      table.chainId,
+      table.walletAddress,
+      table.epochId,
+    ),
+    index("governance_epoch_summaries_wallet_idx").on(table.chainId, table.walletAddress),
+    index("governance_epoch_summaries_run_idx").on(table.runId),
+  ],
+);
+
+export const governanceRewardRows = pgTable(
+  "governance_reward_rows",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    runId: uuid("run_id").references(() => analysisRuns.id, { onDelete: "cascade" }),
+    chainId: integer("chain_id").notNull(),
+    walletAddress: varchar("wallet_address", { length: 42 }).notNull(),
+    rewardEventId: uuid("reward_event_id").references(() => rewardEvents.id, { onDelete: "set null" }),
+    governanceEventId: uuid("governance_event_id").references(() => governanceEvents.id, { onDelete: "set null" }),
+    txHash: varchar("tx_hash", { length: 66 }).notNull(),
+    logIndex: integer("log_index").notNull().default(0),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }).notNull(),
+    rewardType: varchar("reward_type", { length: 32 }).notNull(),
+    tokenAddress: varchar("token_address", { length: 42 }),
+    tokenSymbol: varchar("token_symbol", { length: 24 }),
+    amountRaw: numeric("amount_raw", { precision: 78, scale: 0 }),
+    amountDecimal: numeric("amount_decimal", { precision: 78, scale: 18 }),
+    valueUsdAtClaim: numeric("value_usd_at_claim", { precision: 38, scale: 18 }),
+    epochId: varchar("epoch_id", { length: 64 }),
+    poolId: uuid("pool_id").references(() => pools.id, { onDelete: "set null" }),
+    coverageStatus: varchar("coverage_status", { length: 24 }).notNull().default("unavailable"),
+    confidence: varchar("confidence", { length: 16 }).notNull().default("none"),
+    affectsTotals: boolean("affects_totals").notNull().default(false),
+    contextJson: jsonb("context_json").$type<Record<string, unknown>>().notNull().default({}),
+    evidenceJson: jsonb("evidence_json").$type<Record<string, unknown>>().notNull().default({}),
+    materializedAt: timestamp("materialized_at", { withTimezone: true }).$defaultFn(now).notNull(),
+  },
+  (table) => [
+    uniqueIndex("governance_reward_rows_identity_uidx").on(
+      table.chainId,
+      table.walletAddress,
+      table.txHash,
+      table.logIndex,
+      table.rewardType,
+    ),
+    index("governance_reward_rows_wallet_claimed_idx").on(table.chainId, table.walletAddress, table.claimedAt),
+    index("governance_reward_rows_reward_event_idx").on(table.rewardEventId),
+    index("governance_reward_rows_pool_idx").on(table.chainId, table.walletAddress, table.poolId),
+  ],
+);
+
+export const governanceMetricSnapshots = pgTable(
+  "governance_metric_snapshots",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    runId: uuid("run_id").references(() => analysisRuns.id, { onDelete: "cascade" }),
+    chainId: integer("chain_id").notNull(),
+    walletAddress: varchar("wallet_address", { length: 42 }).notNull(),
+    summaryJson: jsonb("summary_json").$type<Record<string, unknown>>().notNull().default({}),
+    selectedDetailJson: jsonb("selected_detail_json").$type<Record<string, unknown> | null>(),
+    coverageStatus: varchar("coverage_status", { length: 24 }).notNull().default("unavailable"),
+    confidence: varchar("confidence", { length: 16 }).notNull().default("none"),
+    materializedAt: timestamp("materialized_at", { withTimezone: true }).$defaultFn(now).notNull(),
+  },
+  (table) => [
+    index("governance_metric_snapshots_wallet_idx").on(table.chainId, table.walletAddress),
+    index("governance_metric_snapshots_run_idx").on(table.runId),
+  ],
+);
+
 export const attributionStates = pgTable(
   "attribution_states",
   {

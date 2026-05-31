@@ -233,6 +233,28 @@ export async function runAnalysisRunTask(
 
     await deps.updateAnalysisRunProgress(payload.runId, {
       status: "running",
+      stage: "governance",
+      progressPct: 84,
+    });
+
+    const governanceResult = await deps.triggerAndWait("phase-governance", {
+      runId: payload.runId,
+      walletAddress: payload.walletAddress,
+      chainId: payload.chainId,
+    });
+    if (!governanceResult.ok) {
+      await deps.finalizeAnalysisRun({
+        runId: payload.runId,
+        status: "failed",
+        coverage: "partial",
+        coverageReasonsJson: ["unknownError"],
+        lastError: governanceResult.error instanceof Error ? governanceResult.error.message : "Governance phase failed",
+      });
+      throw governanceResult.error;
+    }
+
+    await deps.updateAnalysisRunProgress(payload.runId, {
+      status: "running",
       stage: "pools",
       progressPct: 88,
     });

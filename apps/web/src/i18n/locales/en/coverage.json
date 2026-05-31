@@ -83,7 +83,11 @@
     "historicalCapitalPartial": "Historical capital coverage is partial",
     "governancePoolMappingUnavailable": "Governance pool mapping is unavailable",
     "walletPoolAggregateAttribution": "Wallet-pool aggregate attribution was used",
-    "analysisNotReady": "Historical analysis is not ready"
+    "analysisNotReady": "Historical analysis is not ready",
+    "governanceEvidencePartial": "Governance classification is partial",
+    "governanceEpochUnresolved": "Governance epoch context is unresolved",
+    "governancePoolAssociationMissing": "Governance pool association is missing",
+    "governanceRewardExcluded": "Governance-like reward was excluded from totals"
   },
   "confidence": {
     "high": "High confidence",

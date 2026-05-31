@@ -1,3 +1,74 @@
 {
-  "title": "TODO"
+  "title": "Governance",
+  "subtitle": "Inspect veAERO locks, votes, relays, fees, bribes, rebases, and governance rewards.",
+  "kpis": {
+    "lockedAero": "Locked AERO",
+    "veAeroExposure": "veAERO exposure",
+    "lockExpiry": "Lock expiry",
+    "governanceRewards": "Governance rewards",
+    "estimatedReturn": "Estimated governance return",
+    "coverage": "Coverage"
+  },
+  "filters": {
+    "searchPlaceholder": "Search epoch, tx, token, pool...",
+    "eventType": "Event type",
+    "rewardType": "Reward type",
+    "protocolSurface": "Surface",
+    "coverage": "Coverage",
+    "confidence": "Confidence",
+    "clear": "Clear filters"
+  },
+  "surfaces": {
+    "voting_escrow": "Voting escrow",
+    "voter": "Voter",
+    "relay": "Relay",
+    "briber": "Briber",
+    "fee_distributor": "Fee distributor",
+    "reward_distributor": "Reward distributor",
+    "unknown": "Unknown"
+  },
+  "events": {
+    "lock_created": "Lock created",
+    "lock_increased": "Lock increased",
+    "lock_extended": "Lock extended",
+    "lock_relocked": "Relocked",
+    "lock_withdrawn": "Lock withdrawn",
+    "vote_cast": "Vote cast",
+    "vote_reset": "Vote reset",
+    "relay_joined": "Relay joined",
+    "relay_exited": "Relay exited",
+    "bribe_claim": "Bribe claim",
+    "fee_claim": "Fee claim",
+    "rebase_claim": "Rebase claim",
+    "governance_reward": "Governance reward",
+    "unsupported_governance": "Unsupported governance",
+    "excluded_governance": "Excluded governance"
+  },
+  "rewards": {
+    "bribe": "Bribe",
+    "fee": "Fee",
+    "rebase": "Rebase",
+    "relay": "Relay reward",
+    "unknown": "Unknown"
+  },
+  "states": {
+    "locked": "Run analysis to inspect Governance.",
+    "empty": "No governance activity was found.",
+    "partial": "Some governance activity is partial or unresolved.",
+    "unsupported": "Unsupported governance-like activity remains inspectable."
+  },
+  "detail": {
+    "title": "Selected governance detail",
+    "actionSummary": "Action summary",
+    "transaction": "Transaction",
+    "protocolSurface": "Protocol surface",
+    "tokenMovements": "Token movements",
+    "valueEffect": "Value effect",
+    "epochContext": "Epoch context",
+    "poolContext": "Pool context",
+    "classificationEvidence": "Classification evidence",
+    "linkedContexts": "Linked contexts",
+    "coverageNotes": "Coverage notes",
+    "evidenceSources": "Evidence sources"
+  }
 }

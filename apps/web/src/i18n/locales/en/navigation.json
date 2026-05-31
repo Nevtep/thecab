@@ -10,7 +10,8 @@
     "settings": "Settings"
   },
   "descriptions": {
-    "strategies": "Automated exposure analysis"
+    "strategies": "Automated exposure analysis",
+    "governance": "veAERO, votes, and rewards"
   },
   "a11y": {
     "openMenu": "Open navigation menu",

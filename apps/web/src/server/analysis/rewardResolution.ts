@@ -110,7 +110,12 @@ export function resolveRewardOwnership(input: {
       externalStrategyPositionReferenceStatus: "unresolved",
     };
   }
-  if (surfaceKind === "governance_voter_claim") {
+  if (
+    surfaceKind === "governance_voter_claim" ||
+    surfaceKind === "governance_bribe_claim" ||
+    surfaceKind === "governance_fee_claim" ||
+    surfaceKind === "governance_rebase_claim"
+  ) {
     return {
       resolutionStatus: "resolved",
       ownerType: null,

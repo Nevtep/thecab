@@ -31,5 +31,12 @@
     "UNSUPPORTED_CHAIN": "This chain is not supported for activity yet.",
     "INVALID_ACTIVITY_FILTERS": "The activity filters are invalid.",
     "ACTIVITY_READ_FAILED": "Something went wrong while loading activity."
+  },
+  "governance": {
+    "UNAUTHENTICATED_WALLET": "Please connect your wallet to view governance.",
+    "UNSUPPORTED_CHAIN": "This chain is not supported for governance yet.",
+    "INVALID_GOVERNANCE_FILTERS": "The governance filters are invalid.",
+    "ANALYSIS_NOT_READY": "Run analysis before viewing governance.",
+    "GOVERNANCE_READ_FAILED": "Something went wrong while loading governance."
   }
 }

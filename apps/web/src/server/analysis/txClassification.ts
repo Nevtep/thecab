@@ -24,6 +24,12 @@ export type SurfaceKind =
   | "strategy_wrapper_withdraw"
   | "gauge_reward_unknown_surface"
   | "governance_voter_claim"
+  | "governance_voting_escrow"
+  | "governance_vote"
+  | "governance_relay"
+  | "governance_bribe_claim"
+  | "governance_fee_claim"
+  | "governance_rebase_claim"
   | "airdrop_spam"
   | "other";
 
@@ -39,6 +45,8 @@ export type EconomicComponentKind =
   | "strategy_withdraw_partial"
   | "deposit_close"
   | "principal_return"
+  | "governance_action"
+  | "governance_reward"
   | "excluded_airdrop";
 
 export type EconomicComponent = {
@@ -115,6 +123,12 @@ const SURFACE_KIND_VALUES = new Set<SurfaceKind>([
   "strategy_wrapper_withdraw",
   "gauge_reward_unknown_surface",
   "governance_voter_claim",
+  "governance_voting_escrow",
+  "governance_vote",
+  "governance_relay",
+  "governance_bribe_claim",
+  "governance_fee_claim",
+  "governance_rebase_claim",
   "airdrop_spam",
   "other",
 ]);

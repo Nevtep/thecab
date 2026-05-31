@@ -266,6 +266,27 @@ test("resolveRewardOwnership preserves governance claims separately from LP owne
   assert.deepEqual(result.resolutionReasonCodes, ["governanceReward"]);
 });
 
+test("resolveRewardOwnership keeps explicit governance reward surfaces out of deposit and strategy totals", () => {
+  const result = resolveRewardOwnership({
+    candidate: buildCandidate({
+      surfaceKind: "governance_bribe_claim",
+      economicComponentKind: "governance_reward",
+      targetType: "deposit",
+      targetPoolId: "pool-1",
+    }),
+    depositTargets: [buildDepositTarget({ poolId: "pool-1" })],
+    strategyTargets: [buildStrategyTarget({ primaryPoolId: "pool-1" })],
+  });
+
+  assert.equal(result.resolutionStatus, "resolved");
+  assert.equal(result.ownerType, null);
+  assert.equal(result.depositId, null);
+  assert.equal(result.strategyExposureId, null);
+  assert.equal(result.resolvedPoolId, null);
+  assert.equal(result.resolutionBasis, "governance_claim");
+  assert.deepEqual(result.resolutionReasonCodes, ["governanceReward"]);
+});
+
 test("resolveRewardOwnership marks spam-like airdrops as excluded instead of unresolved rewards", () => {
   const result = resolveRewardOwnership({
     candidate: buildCandidate({

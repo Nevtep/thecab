@@ -8,6 +8,8 @@ import type {
   DepositsListUrlState,
 } from "@/features/deposits/deposits.urlState";
 import { buildDepositsApiQueryString, normalizeFiltersForQueryKey } from "@/features/deposits/deposits.urlState";
+import { getGovernanceQueryOptions } from "@/features/governance/governance.queries";
+import type { GovernanceUrlState, GovernanceViewModel } from "@/features/governance/governance.types";
 import type { PoolDetailRange, PoolDetailResponse, PoolsListFilters, PoolsListResponse } from "@/features/pools/pools.types";
 import {
   getStrategiesListQueryOptions,
@@ -249,11 +251,13 @@ export function useRewardsQuery(
   });
 }
 
-export function useGovernanceQuery(input: WalletScopedInput) {
-  return useQuery({
-    queryKey: queryKeys.governance(input),
-    queryFn: () => apiClient(`/api/governance?chainId=${input.chainId}`),
-    enabled: false,
+export function useGovernanceQuery(
+  input: WalletScopedInput & { state: GovernanceUrlState },
+  options?: { enabled?: boolean },
+) {
+  return useQuery<GovernanceViewModel>({
+    ...getGovernanceQueryOptions(input),
+    enabled: (options?.enabled ?? true) && Boolean(input.walletAddress),
   });
 }
 

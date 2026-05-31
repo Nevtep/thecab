@@ -25,8 +25,13 @@ import {
 import { insertRawProviderRecord } from "@/server/providers/raw-provider-records.repository";
 import {
   classifySupplementalExplorerEvidence,
+  parseSurfaceKind,
   type SupplementalExplorerEvidenceInput,
 } from "@/server/analysis/txClassification";
+import {
+  classifyGovernanceSurface,
+  type GovernanceClassification,
+} from "@/server/analysis/governance-classification";
 import type { OverviewProtocolPosition } from "@/server/protocol-positions/protocolPositions.types";
 
 type ManualPositionArtifacts = {
@@ -665,6 +670,30 @@ function isAerodromeVotingEscrowInteraction(input: {
     || text.includes("relock")
     || text.includes("delegate")
     || text.includes("vote");
+}
+
+export function buildGovernancePersistenceMetadata(input: {
+  classification: GovernanceClassification;
+  existingMetadataJson?: Record<string, unknown> | null;
+}): Record<string, unknown> {
+  if (!input.classification.isGovernance) {
+    return {
+      ...(input.existingMetadataJson ?? {}),
+    };
+  }
+
+  return {
+    ...(input.existingMetadataJson ?? {}),
+    governanceClassification: {
+      isGovernance: true,
+      eventType: input.classification.eventType,
+      protocolSurface: input.classification.protocolSurface,
+      coverageState: input.classification.coverageState,
+      confidence: input.classification.confidence,
+      reasonCodes: input.classification.reasonCodes,
+      evidenceBasis: input.classification.evidenceBasis,
+    },
+  };
 }
 
 async function upsertPool(input: {
@@ -1491,6 +1520,16 @@ export async function classifyRunLedgerEvents(input: {
       suspiciousOutflowCount,
       trustedOutflowCount,
     });
+    const governanceClassification = classifyGovernanceSurface({
+      txHash: row.txHash,
+      category,
+      methodLabel,
+      summary,
+      protocol: counterpartyInfo?.protocol ?? null,
+      surfaceKind: parseSurfaceKind(row.metadataJson.surfaceKind),
+      rewardType: asString(row.metadataJson.rewardType),
+      metadataJson: row.metadataJson,
+    });
     const claimMethods = new Set(["getrewards", "getreward", "claim", "claimfees", "claimrewards", "collect"]);
     const depositMethods = new Set([
       "deposit",
@@ -1518,6 +1557,8 @@ export async function classifyRunLedgerEvents(input: {
       classification = "approve";
     } else if (isSwap) {
       classification = "swap";
+    } else if (governanceClassification.isGovernance) {
+      classification = "governance";
     } else if (isAerodromeVotingEscrowInteraction({
       category,
       methodLabel,
@@ -1625,9 +1666,10 @@ export async function classifyRunLedgerEvents(input: {
       classification = "other";
     }
 
-    const nextMetadataJson = {
-      ...row.metadataJson,
-    } satisfies Record<string, unknown>;
+    const nextMetadataJson = buildGovernancePersistenceMetadata({
+      classification: governanceClassification,
+      existingMetadataJson: row.metadataJson,
+    }) satisfies Record<string, unknown>;
     const supplemental = classifySupplementalExplorerEvidence(
       input.supplementalEvidenceByTxHash?.[row.txHash.toLowerCase()],
     );

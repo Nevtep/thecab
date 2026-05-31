@@ -255,6 +255,36 @@ test("buildAccrualRewardSnapshotRows preserves reward source metadata used by Re
   assert.deepEqual(snapshot?.metadataJson.movementLogIndexes, [7]);
 });
 
+test("buildGovernancePersistenceMetadata preserves explicit governance evidence", async () => {
+  const {
+    buildGovernancePersistenceMetadata,
+  } = await import("@/server/analysis/enginePersistence");
+
+  const metadata = buildGovernancePersistenceMetadata({
+    existingMetadataJson: { source: "fixture" },
+    classification: {
+      isGovernance: true,
+      eventType: "vote_cast",
+      protocolSurface: "voter",
+      coverageState: "full",
+      confidence: "high",
+      reasonCodes: ["explicitVoterSurface"],
+      evidenceBasis: ["surfaceKind:governance_vote"],
+    },
+  });
+
+  assert.equal(metadata.source, "fixture");
+  assert.deepEqual(metadata.governanceClassification, {
+    isGovernance: true,
+    eventType: "vote_cast",
+    protocolSurface: "voter",
+    coverageState: "full",
+    confidence: "high",
+    reasonCodes: ["explicitVoterSurface"],
+    evidenceBasis: ["surfaceKind:governance_vote"],
+  });
+});
+
 test("resolveManualDepositDisplayMetadata prefers canonical pool metadata over numeric fallback symbols", async () => {
   const { resolveManualDepositDisplayMetadata } = await import("@/server/analysis/enginePersistence");
 
