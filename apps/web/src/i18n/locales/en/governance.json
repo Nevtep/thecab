@@ -9,6 +9,15 @@
     "estimatedReturn": "Estimated governance return",
     "coverage": "Coverage"
   },
+  "actions": {
+    "refresh": "Refresh"
+  },
+  "panels": {
+    "lock": "Lock status",
+    "timeline": "Vote timeline by epoch",
+    "rewards": "Governance rewards",
+    "breakdown": "Reward type breakdown"
+  },
   "filters": {
     "searchPlaceholder": "Search epoch, tx, token, pool...",
     "eventType": "Event type",
@@ -17,6 +26,51 @@
     "coverage": "Coverage",
     "confidence": "Confidence",
     "clear": "Clear filters"
+  },
+  "lock": {
+    "empty": "No veAERO lock exposure has been materialized for this wallet.",
+    "status": "Status",
+    "lockId": "Lock ID",
+    "createdAt": "Created",
+    "expiresAt": "Expires",
+    "lockedAero": "Locked AERO",
+    "veAero": "veAERO",
+    "coverage": "Coverage",
+    "confidence": "Confidence",
+    "lifecycle": "Lock lifecycle",
+    "noLifecycle": "No lock lifecycle evidence has been materialized yet.",
+    "statuses": {
+      "active": "Active",
+      "expired": "Expired",
+      "withdrawn": "Withdrawn",
+      "partial": "Partial",
+      "unknown": "Unknown"
+    }
+  },
+  "timeline": {
+    "empty": "No epoch vote summaries have been materialized yet.",
+    "votedPools": "Voted pools",
+    "voteMode": "Vote mode",
+    "rewardState": "Rewards",
+    "resetState": "Reset",
+    "voteModes": {
+      "manual": "Manual",
+      "relay": "Relay",
+      "mixed": "Mixed",
+      "unknown": "Unknown"
+    },
+    "rewardStates": {
+      "claimed": "Claimed",
+      "pending": "Pending",
+      "none": "None",
+      "partial": "Partial",
+      "unknown": "Unknown"
+    },
+    "resetStates": {
+      "not_reset": "Not reset",
+      "reset": "Reset",
+      "unknown": "Unknown"
+    }
   },
   "surfaces": {
     "voting_escrow": "Voting escrow",
@@ -52,15 +106,53 @@
     "unknown": "Unknown"
   },
   "states": {
+    "loading": "Loading Governance...",
+    "errorTitle": "Governance could not load",
     "locked": "Run analysis to inspect Governance.",
     "empty": "No governance activity was found.",
     "partial": "Some governance activity is partial or unresolved.",
     "unsupported": "Unsupported governance-like activity remains inspectable."
   },
+  "locked": {
+    "title": "Governance requires completed analysis",
+    "description": "Run historical analysis to inspect veAERO lock exposure, votes, epochs, and governance rewards."
+  },
+  "empty": {
+    "title": "No governance activity found",
+    "description": "The current wallet has no supported governance activity in the persisted analysis output.",
+    "rewardsTitle": "No governance rewards",
+    "rewardsDescription": "Rewards will appear here when bribe, fee, rebase, or relay claims are materialized."
+  },
+  "confidence": {
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low",
+    "none": "None"
+  },
+  "table": {
+    "date": "Date / Epoch",
+    "rewardType": "Reward type",
+    "token": "Token",
+    "amount": "Amount",
+    "value": "Value at claim",
+    "epoch": "Epoch",
+    "pool": "Pool",
+    "coverage": "Coverage",
+    "confidence": "Confidence"
+  },
+  "breakdown": {
+    "subtitle": "Value by governance reward type",
+    "empty": "No claim value is available for reward breakdown.",
+    "total": "Total"
+  },
   "detail": {
     "title": "Selected governance detail",
+    "empty": "Select a governance reward or event to inspect classification context.",
+    "loading": "Loading selected governance detail...",
     "actionSummary": "Action summary",
     "transaction": "Transaction",
+    "txHash": "Tx hash",
+    "occurredAt": "Occurred at",
     "protocolSurface": "Protocol surface",
     "tokenMovements": "Token movements",
     "valueEffect": "Value effect",
@@ -69,6 +161,9 @@
     "classificationEvidence": "Classification evidence",
     "linkedContexts": "Linked contexts",
     "coverageNotes": "Coverage notes",
-    "evidenceSources": "Evidence sources"
+    "evidenceSources": "Evidence sources",
+    "coverage": "Coverage",
+    "confidence": "Confidence",
+    "affectsTotals": "Affects totals"
   }
 }

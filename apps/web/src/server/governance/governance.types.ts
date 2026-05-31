@@ -17,7 +17,7 @@ export type GovernanceSortKey = typeof GOVERNANCE_SORT_KEYS[number];
 export type GovernanceErrorCode = typeof GOVERNANCE_ERROR_CODES[number];
 
 export type GovernanceAnalysisState = {
-  status: "idle" | "queued" | "running" | "ready" | "failed" | "stale";
+  status: "not_analyzed" | "queued" | "running" | "ready" | "failed" | "stale";
   runId: string | null;
   completedAt: string | null;
   isStale: boolean;
@@ -160,6 +160,7 @@ export type GovernanceSelectedDetail = {
 };
 
 export type GovernanceResponse = {
+  screenKind: "locked" | "empty" | "ready";
   walletAddress: string;
   chainId: number;
   analysis: GovernanceAnalysisState;
@@ -217,4 +218,9 @@ export type GovernanceFilters = {
     value: string;
     removeTarget: string;
   }>;
+};
+
+export type GovernanceRequest = Omit<GovernanceFilters, "activeChips"> & {
+  walletAddress: string;
+  chainId: number;
 };

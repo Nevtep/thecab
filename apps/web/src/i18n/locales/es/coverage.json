@@ -6,6 +6,7 @@
     "partial": "Cobertura parcial",
     "unknown": "Cobertura desconocida",
     "unresolved": "No resuelto",
+    "unsupported": "No soportado",
     "excluded": "Excluido",
     "unavailable": "No disponible",
     "estimated": "Estimado"

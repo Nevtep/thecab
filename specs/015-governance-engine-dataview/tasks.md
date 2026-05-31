@@ -90,30 +90,30 @@
 
 ### Tests for User Story 2
 
-- [ ] T042 [P] [US2] Add Governance API route contract tests in apps/web/src/server/governance/governance.route.test.ts
-- [ ] T043 [P] [US2] Add Governance service summary/readiness tests in apps/web/src/server/governance/governance.service.test.ts
-- [ ] T044 [P] [US2] Add Governance repository DB-only query tests in apps/web/src/server/governance/governance.repository.test.ts
-- [ ] T045 [P] [US2] Add Governance feature mapper tests for KPI/lock/timeline/rewards/breakdown in apps/web/src/features/governance/governance.mappers.test.ts
+- [X] T042 [P] [US2] Add Governance API route contract tests in apps/web/src/server/governance/governance.route.test.ts
+- [X] T043 [P] [US2] Add Governance service summary/readiness tests in apps/web/src/server/governance/governance.service.test.ts
+- [X] T044 [P] [US2] Add Governance repository DB-only query tests in apps/web/src/server/governance/governance.repository.test.ts
+- [X] T045 [P] [US2] Add Governance feature mapper tests for KPI/lock/timeline/rewards/breakdown in apps/web/src/features/governance/governance.mappers.test.ts
 
 ### Implementation for User Story 2
 
-- [ ] T046 [US2] Implement Governance repository DB reads in apps/web/src/server/governance/governance.repository.ts
-- [ ] T047 [US2] Implement Governance service assembling GovernanceViewModel in apps/web/src/server/governance/governance.service.ts
-- [ ] T048 [US2] Implement Governance route validation and locked/ready responses in apps/web/src/server/governance/governance.route.ts
-- [ ] T049 [US2] Implement Next API route wrapper in apps/web/src/app/api/governance/route.ts
-- [ ] T050 [US2] Implement Governance query options in apps/web/src/features/governance/governance.queries.ts
-- [ ] T051 [US2] Implement Governance data mappers in apps/web/src/features/governance/governance.mappers.ts
-- [ ] T052 [US2] Implement Governance page shell in apps/web/src/app/governance/page.tsx
-- [ ] T053 [US2] Implement Governance container data/loading/locked handling in apps/web/src/features/governance/Governance.container.tsx
-- [ ] T054 [US2] Implement Governance component first-screen layout in apps/web/src/features/governance/Governance.component.tsx
-- [ ] T055 [US2] Implement KPI strip using CabImpactMetricCard in apps/web/src/features/governance/components/GovernanceKpiStrip.tsx
-- [ ] T056 [US2] Implement persistent lock status panel in apps/web/src/features/governance/components/GovernanceLockPanel.tsx
-- [ ] T057 [US2] Implement compact epoch timeline in apps/web/src/features/governance/components/GovernanceEpochTimeline.tsx
-- [ ] T058 [US2] Implement governance rewards table with shared DataTable in apps/web/src/features/governance/components/GovernanceRewardsTable.tsx
-- [ ] T059 [US2] Implement reward-type/value breakdown with DS chart primitives in apps/web/src/features/governance/components/GovernanceRewardBreakdown.tsx
-- [ ] T060 [US2] Implement selected-detail rail shell in apps/web/src/features/governance/components/SelectedGovernanceRail.tsx
-- [ ] T061 [US2] Implement Governance empty/locked/partial states in apps/web/src/features/governance/components/GovernanceEmptyState.tsx
-- [ ] T062 [US2] Enable Governance navigation as analysis-gated in apps/web/src/features/overview/overview.mappers.ts
+- [X] T046 [US2] Implement Governance repository DB reads in apps/web/src/server/governance/governance.repository.ts
+- [X] T047 [US2] Implement Governance service assembling GovernanceViewModel in apps/web/src/server/governance/governance.service.ts
+- [X] T048 [US2] Implement Governance route validation and locked/ready responses in apps/web/src/server/governance/governance.route.ts
+- [X] T049 [US2] Implement Next API route wrapper in apps/web/src/app/api/governance/route.ts
+- [X] T050 [US2] Implement Governance query options in apps/web/src/features/governance/governance.queries.ts
+- [X] T051 [US2] Implement Governance data mappers in apps/web/src/features/governance/governance.mappers.ts
+- [X] T052 [US2] Implement Governance page shell in apps/web/src/app/governance/page.tsx
+- [X] T053 [US2] Implement Governance container data/loading/locked handling in apps/web/src/features/governance/Governance.container.tsx
+- [X] T054 [US2] Implement Governance component first-screen layout in apps/web/src/features/governance/Governance.component.tsx
+- [X] T055 [US2] Implement KPI strip using CabImpactMetricCard in apps/web/src/features/governance/components/GovernanceKpiStrip.tsx
+- [X] T056 [US2] Implement persistent lock status panel in apps/web/src/features/governance/components/GovernanceLockPanel.tsx
+- [X] T057 [US2] Implement compact epoch timeline in apps/web/src/features/governance/components/GovernanceEpochTimeline.tsx
+- [X] T058 [US2] Implement governance rewards table with shared DataTable in apps/web/src/features/governance/components/GovernanceRewardsTable.tsx
+- [X] T059 [US2] Implement reward-type/value breakdown with DS chart primitives in apps/web/src/features/governance/components/GovernanceRewardBreakdown.tsx
+- [X] T060 [US2] Implement selected-detail rail shell in apps/web/src/features/governance/components/SelectedGovernanceRail.tsx
+- [X] T061 [US2] Implement Governance empty/locked/partial states in apps/web/src/features/governance/components/GovernanceEmptyState.tsx
+- [X] T062 [US2] Enable Governance navigation as analysis-gated in apps/web/src/features/overview/overview.mappers.ts
 
 **Checkpoint**: User Story 2 renders the mandatory Governance control surface from DB-backed data.
 

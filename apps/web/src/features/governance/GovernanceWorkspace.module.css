@@ -1,4 +1,119 @@
 .workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.kpiGrid {
   display: grid;
-  gap: 12px;
+  grid-template-columns: repeat(6, minmax(170px, 1fr));
+  gap: 8px;
+}
+
+.dataView {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.34fr);
+  gap: 8px;
+  align-items: start;
+}
+
+.leftArea,
+.rail,
+.panelGrid,
+.breakdownLegend,
+.epochList,
+.lockLifecycle {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.rail {
+  position: sticky;
+  top: 12px;
+  max-height: calc(100vh - 96px);
+  overflow: auto;
+}
+
+.panelGrid {
+  grid-template-columns: minmax(360px, 0.82fr) minmax(0, 1fr);
+}
+
+.epochList {
+  grid-template-columns: repeat(4, minmax(190px, 1fr));
+}
+
+.epochCard {
+  min-width: 0;
+}
+
+.breakdownLayout {
+  display: grid;
+  grid-template-columns: minmax(230px, 0.4fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.legendRow {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.legendDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.miniBar {
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(184, 199, 230, 0.12);
+  overflow: hidden;
+}
+
+.miniBarFill {
+  height: 100%;
+  border-radius: inherit;
+}
+
+.tableFooter {
+  border-top: 1px solid rgba(184, 199, 230, 0.12);
+}
+
+.mono {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 1440px) {
+  .kpiGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .epochList {
+    grid-template-columns: repeat(2, minmax(190px, 1fr));
+  }
+}
+
+@media (max-width: 1180px) {
+  .dataView,
+  .panelGrid,
+  .breakdownLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .rail {
+    position: static;
+    max-height: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .kpiGrid,
+  .epochList {
+    grid-template-columns: 1fr;
+  }
 }

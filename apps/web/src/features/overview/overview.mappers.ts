@@ -276,8 +276,9 @@ export function getOverviewNavigationItems(
       key: "governance",
       iconName: "governance",
       labelKey: "navigation:items.governance",
-      stateKey: analysisReady ? "comingSoon" : "requiresAnalysis",
-      disabled: true,
+      href: analysisReady ? "/governance" : undefined,
+      stateKey: analysisReady ? "active" : "requiresAnalysis",
+      disabled: !analysisReady,
     },
     {
       key: "activity",

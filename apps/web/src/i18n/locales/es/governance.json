@@ -9,6 +9,15 @@
     "estimatedReturn": "Retorno de gobernanza estimado",
     "coverage": "Cobertura"
   },
+  "actions": {
+    "refresh": "Actualizar"
+  },
+  "panels": {
+    "lock": "Estado del lock",
+    "timeline": "Línea de voto por epoch",
+    "rewards": "Rewards de gobernanza",
+    "breakdown": "Desglose por tipo de reward"
+  },
   "filters": {
     "searchPlaceholder": "Buscar epoch, tx, token, pool...",
     "eventType": "Tipo de evento",
@@ -17,6 +26,51 @@
     "coverage": "Cobertura",
     "confidence": "Confianza",
     "clear": "Limpiar filtros"
+  },
+  "lock": {
+    "empty": "No se materializó exposición veAERO para esta wallet.",
+    "status": "Estado",
+    "lockId": "Lock ID",
+    "createdAt": "Creación",
+    "expiresAt": "Vencimiento",
+    "lockedAero": "AERO bloqueado",
+    "veAero": "veAERO",
+    "coverage": "Cobertura",
+    "confidence": "Confianza",
+    "lifecycle": "Ciclo de vida del lock",
+    "noLifecycle": "Todavía no hay evidencia materializada del ciclo de vida del lock.",
+    "statuses": {
+      "active": "Activo",
+      "expired": "Vencido",
+      "withdrawn": "Retirado",
+      "partial": "Parcial",
+      "unknown": "Desconocido"
+    }
+  },
+  "timeline": {
+    "empty": "Todavía no se materializaron resúmenes de voto por epoch.",
+    "votedPools": "Pools votados",
+    "voteMode": "Modo de voto",
+    "rewardState": "Rewards",
+    "resetState": "Reset",
+    "voteModes": {
+      "manual": "Manual",
+      "relay": "Relay",
+      "mixed": "Mixto",
+      "unknown": "Desconocido"
+    },
+    "rewardStates": {
+      "claimed": "Cobrados",
+      "pending": "Pendientes",
+      "none": "Sin rewards",
+      "partial": "Parcial",
+      "unknown": "Desconocido"
+    },
+    "resetStates": {
+      "not_reset": "Sin reset",
+      "reset": "Reset",
+      "unknown": "Desconocido"
+    }
   },
   "surfaces": {
     "voting_escrow": "Voting escrow",
@@ -52,15 +106,53 @@
     "unknown": "Desconocido"
   },
   "states": {
+    "loading": "Cargando Gobernanza...",
+    "errorTitle": "No se pudo cargar Gobernanza",
     "locked": "Ejecute análisis para inspeccionar Gobernanza.",
     "empty": "No se encontró actividad de gobernanza.",
     "partial": "Parte de la actividad de gobernanza está parcial o no resuelta.",
     "unsupported": "La actividad con forma de gobernanza no soportada sigue siendo inspeccionable."
   },
+  "locked": {
+    "title": "Gobernanza requiere análisis completo",
+    "description": "Ejecutá el análisis histórico para inspeccionar locks veAERO, votos, epochs y rewards de gobernanza."
+  },
+  "empty": {
+    "title": "No se encontró actividad de gobernanza",
+    "description": "La wallet actual no tiene actividad de gobernanza soportada en la salida persistida del análisis.",
+    "rewardsTitle": "Sin rewards de gobernanza",
+    "rewardsDescription": "Los bribes, fees, rebases o claims de relay aparecerán acá cuando estén materializados."
+  },
+  "confidence": {
+    "high": "Alta",
+    "medium": "Media",
+    "low": "Baja",
+    "none": "Nula"
+  },
+  "table": {
+    "date": "Fecha / Epoch",
+    "rewardType": "Tipo de reward",
+    "token": "Token",
+    "amount": "Monto",
+    "value": "Valor al claim",
+    "epoch": "Epoch",
+    "pool": "Pool",
+    "coverage": "Cobertura",
+    "confidence": "Confianza"
+  },
+  "breakdown": {
+    "subtitle": "Valor por tipo de reward de gobernanza",
+    "empty": "No hay valor de claims disponible para el desglose.",
+    "total": "Total"
+  },
   "detail": {
     "title": "Detalle de gobernanza seleccionado",
+    "empty": "Seleccioná un reward o evento de gobernanza para inspeccionar el contexto de clasificación.",
+    "loading": "Cargando detalle de gobernanza seleccionado...",
     "actionSummary": "Resumen de acción",
     "transaction": "Transacción",
+    "txHash": "Hash de tx",
+    "occurredAt": "Ocurrió",
     "protocolSurface": "Superficie de protocolo",
     "tokenMovements": "Movimientos de token",
     "valueEffect": "Efecto de valor",
@@ -69,6 +161,9 @@
     "classificationEvidence": "Evidencia de clasificación",
     "linkedContexts": "Contextos vinculados",
     "coverageNotes": "Notas de cobertura",
-    "evidenceSources": "Fuentes de evidencia"
+    "evidenceSources": "Fuentes de evidencia",
+    "coverage": "Cobertura",
+    "confidence": "Confianza",
+    "affectsTotals": "Afecta totales"
   }
 }
