@@ -46,6 +46,7 @@ type Props = {
     getRewardType: (value: string) => string;
     getCoverage: (value: string) => string;
     getConfidence: (value: string) => string;
+    unavailable: string;
     formatDateTime: (value: string | null) => string;
     formatAmount: (value: string | null) => string;
     formatUsd: (value: string | null) => string;
@@ -119,7 +120,7 @@ export function GovernanceRewardsTable({ viewModel, state, labels, loading = fal
       header: labels.epoch,
       cell: ({ row }) => (
         <DataTableStackedCell
-          title={row.original.epochId ? `Epoch ${row.original.epochId}` : "n/a"}
+          title={row.original.epochId ? `Epoch ${row.original.epochId}` : labels.unavailable}
           subtitle={row.original.pool?.label ?? labels.pool}
         />
       ),

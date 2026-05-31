@@ -40,6 +40,7 @@ type Props = {
     open: string;
     yes: string;
     no: string;
+    unavailable: string;
     getActionLabel: (key: string) => string;
     getSurface: (value: string) => string;
     getCoverage: (value: string) => string;
@@ -57,20 +58,20 @@ function toneForCoverage(coverage: string) {
   return "neutral" as const;
 }
 
-function shortHash(value: string | null) {
-  return value ? `${value.slice(0, 6)}...${value.slice(-4)}` : "n/a";
+function shortHash(value: string | null, unavailable: string) {
+  return value ? `${value.slice(0, 6)}...${value.slice(-4)}` : unavailable;
 }
 
 function asString(value: unknown) {
   return typeof value === "string" && value.trim().length > 0 ? value : null;
 }
 
-function recordLabel(record: Record<string, unknown> | null) {
-  if (!record) return "n/a";
+function recordLabel(record: Record<string, unknown> | null, unavailable: string) {
+  if (!record) return unavailable;
   const explicit = record.label;
   if (typeof explicit === "string" && explicit.trim().length > 0) return explicit;
   const id = record.epochId ?? record.poolId ?? record.id;
-  return typeof id === "string" ? id : "n/a";
+  return typeof id === "string" ? id : unavailable;
 }
 
 function sourceEvidenceLabel(record: Record<string, unknown>) {
@@ -136,7 +137,7 @@ export function SelectedGovernanceRail({ selectedDetail, chainId, loading = fals
                     label: labels.txHash,
                     value: selectedDetail.transaction.txHash ? (
                       <CabTxHash hash={selectedDetail.transaction.txHash} href={selectedDetail.transaction.externalTxUrl} />
-                    ) : shortHash(null),
+                    ) : shortHash(null, labels.unavailable),
                   },
                   { key: "time", label: labels.occurredAt, value: labels.formatDateTime(selectedDetail.transaction.occurredAt), valueVariant: "mono" },
                   { key: "surface", label: labels.protocolSurface, value: labels.getSurface(selectedDetail.protocolSurface), valueVariant: "mono" },
@@ -163,8 +164,8 @@ export function SelectedGovernanceRail({ selectedDetail, chainId, loading = fals
                             decorative
                           />
                           <CabStack gap="$1" minWidth={0}>
-                            <CabText variant="body" fontSize={12}>{tokenSymbol ?? tokenAddress ?? "n/a"}</CabText>
-                            <CabText variant="caption" color={cabColors.text.secondary}>{labels.amount}: {amount ?? "n/a"}</CabText>
+                            <CabText variant="body" fontSize={12}>{tokenSymbol ?? tokenAddress ?? labels.unavailable}</CabText>
+                            <CabText variant="caption" color={cabColors.text.secondary}>{labels.amount}: {amount ?? labels.unavailable}</CabText>
                           </CabStack>
                         </CabStack>
                         <CabText variant="data" fontSize={12}>{labels.formatUsd(amountUsd)}</CabText>
@@ -182,8 +183,8 @@ export function SelectedGovernanceRail({ selectedDetail, chainId, loading = fals
                 items={[
                   { key: "value", label: labels.valueEffect, value: labels.formatUsd(selectedDetail.valueEffect.valueUsd), valueVariant: "mono" },
                   { key: "valueCoverage", label: labels.coverage, value: labels.getCoverage(selectedDetail.valueEffect.coverageState), valueVariant: "mono" },
-                  { key: "epoch", label: labels.epochContext, value: recordLabel(selectedDetail.epochContext), valueVariant: "mono" },
-                  { key: "pool", label: labels.poolContext, value: recordLabel(selectedDetail.poolContext), valueVariant: "mono" },
+                  { key: "epoch", label: labels.epochContext, value: recordLabel(selectedDetail.epochContext, labels.unavailable), valueVariant: "mono" },
+                  { key: "pool", label: labels.poolContext, value: recordLabel(selectedDetail.poolContext, labels.unavailable), valueVariant: "mono" },
                   { key: "confidence", label: labels.confidence, value: labels.getConfidence(selectedDetail.coverageNotes.confidence), valueVariant: "mono" },
                 ]}
               />
@@ -235,7 +236,7 @@ export function SelectedGovernanceRail({ selectedDetail, chainId, loading = fals
                   <CabStack row alignItems="center" justifyContent="space-between" gap="$2">
                     <CabStack gap="$1">
                       <CabText variant="body" fontSize={12}>{link.kind}</CabText>
-                      <CabText variant="mono" fontSize={11} color={cabColors.text.secondary}>{shortHash(link.entityId)}</CabText>
+                      <CabText variant="mono" fontSize={11} color={cabColors.text.secondary}>{shortHash(link.entityId, labels.unavailable)}</CabText>
                     </CabStack>
                     <CabIcon name="externalLink" size="sm" tone="signal" />
                   </CabStack>

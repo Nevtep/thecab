@@ -35,43 +35,43 @@ function parseNumeric(value: string | null | undefined) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function formatAmount(value: string | null | undefined, locale: string, maximumFractionDigits = 4) {
+function formatAmount(value: string | null | undefined, locale: string, unavailable: string, maximumFractionDigits = 4) {
   const parsed = parseNumeric(value);
-  return parsed === null ? "n/a" : formatTokenAmount(parsed, locale, { maximumFractionDigits });
+  return parsed === null ? unavailable : formatTokenAmount(parsed, locale, { maximumFractionDigits });
 }
 
-function formatCurrency(value: string | null | undefined, locale: string) {
+function formatCurrency(value: string | null | undefined, locale: string, unavailable: string) {
   const parsed = parseNumeric(value);
-  return parsed === null ? "n/a" : formatUsd(parsed, locale);
+  return parsed === null ? unavailable : formatUsd(parsed, locale);
 }
 
-function formatDate(value: string | null | undefined, locale: string) {
-  return value ? formatDateTime(value, locale) : "n/a";
+function formatDate(value: string | null | undefined, locale: string, unavailable: string) {
+  return value ? formatDateTime(value, locale) : unavailable;
 }
 
-function formatKpiValue(viewModel: GovernanceViewModel, id: keyof GovernanceViewModel["summary"] | "coverage", locale: string) {
+function formatKpiValue(viewModel: GovernanceViewModel, id: keyof GovernanceViewModel["summary"] | "coverage", locale: string, unavailable: string) {
   if (id === "coverage") {
     return viewModel.summary.overallCoverage.coverageState;
   }
   if (id === "lockExpiry") {
     const days = viewModel.summary.lockExpiry.remainingDays;
-    return days === null ? "n/a" : formatTokenAmount(days, locale, { maximumFractionDigits: 0 });
+    return days === null ? unavailable : formatTokenAmount(days, locale, { maximumFractionDigits: 0 });
   }
   if (id === "governanceRewardsClaimedUsd") {
-    return formatCurrency(viewModel.summary.governanceRewardsClaimedUsd.valueUsd, locale);
+    return formatCurrency(viewModel.summary.governanceRewardsClaimedUsd.valueUsd, locale, unavailable);
   }
   if (id === "estimatedGovernanceReturn") {
     const value = parseNumeric(viewModel.summary.estimatedGovernanceReturn.value);
-    return value === null ? "n/a" : formatPercentPoints(value, locale);
+    return value === null ? unavailable : formatPercentPoints(value, locale);
   }
-  if (id === "lockedAero") return formatAmount(viewModel.summary.lockedAero.value, locale, 2);
-  if (id === "veAeroExposure") return formatAmount(viewModel.summary.veAeroExposure.value, locale, 2);
-  return "n/a";
+  if (id === "lockedAero") return formatAmount(viewModel.summary.lockedAero.value, locale, unavailable, 2);
+  if (id === "veAeroExposure") return formatAmount(viewModel.summary.veAeroExposure.value, locale, unavailable, 2);
+  return unavailable;
 }
 
-function kpiMeta(viewModel: GovernanceViewModel, id: keyof GovernanceViewModel["summary"] | "coverage", locale: string) {
-  if (id === "lockedAero") return formatCurrency(viewModel.summary.lockedAero.valueUsd, locale);
-  if (id === "lockExpiry") return viewModel.summary.lockExpiry.expiresAt ? formatDate(viewModel.summary.lockExpiry.expiresAt, locale) : null;
+function kpiMeta(viewModel: GovernanceViewModel, id: keyof GovernanceViewModel["summary"] | "coverage", locale: string, unavailable: string) {
+  if (id === "lockedAero") return formatCurrency(viewModel.summary.lockedAero.valueUsd, locale, unavailable);
+  if (id === "lockExpiry") return viewModel.summary.lockExpiry.expiresAt ? formatDate(viewModel.summary.lockExpiry.expiresAt, locale, unavailable) : null;
   if (id === "coverage") return viewModel.summary.overallCoverage.confidence;
   if (id === "estimatedGovernanceReturn") return viewModel.summary.estimatedGovernanceReturn.reasonCodes[0] ?? null;
   return null;
@@ -79,6 +79,7 @@ function kpiMeta(viewModel: GovernanceViewModel, id: keyof GovernanceViewModel["
 
 export function GovernanceComponent(input: Props) {
   const { i18n, t } = useTranslation(["governance", "coverage", "common", "errors"]);
+  const unavailable = t("common:unavailable");
 
   if (input.screenState === "loading") {
     return <CabLoadingPanel label={t("governance:states.loading")} />;
@@ -169,8 +170,8 @@ export function GovernanceComponent(input: Props) {
         summary={input.viewModel.summary}
         labels={{
           getLabel: (key) => t(key),
-          formatValue: (id) => formatKpiValue(input.viewModel!, id, i18n.language),
-          getMeta: (id) => kpiMeta(input.viewModel!, id, i18n.language),
+          formatValue: (id) => formatKpiValue(input.viewModel!, id, i18n.language, unavailable),
+          getMeta: (id) => kpiMeta(input.viewModel!, id, i18n.language, unavailable),
         }}
       />
 
@@ -230,9 +231,10 @@ export function GovernanceComponent(input: Props) {
                 getCoverage: (value) => t(`coverage:level.${value}`, { defaultValue: value }),
                 getConfidence: (value) => t(`governance:confidence.${value}`, { defaultValue: value }),
                 getEvent: (value) => t(`governance:events.${value}`, { defaultValue: value }),
-                formatDateTime: (value) => formatDate(value, i18n.language),
-                formatAmount: (value) => formatAmount(value, i18n.language, 2),
-                formatUsd: (value) => formatCurrency(value, i18n.language),
+                unavailable,
+                formatDateTime: (value) => formatDate(value, i18n.language, unavailable),
+                formatAmount: (value) => formatAmount(value, i18n.language, unavailable, 2),
+                formatUsd: (value) => formatCurrency(value, i18n.language, unavailable),
               }}
             />
             <GovernanceEpochTimeline
@@ -251,7 +253,8 @@ export function GovernanceComponent(input: Props) {
                 getVoteMode: (value) => t(`governance:timeline.voteModes.${value}`, { defaultValue: value }),
                 getRewardState: (value) => t(`governance:timeline.rewardStates.${value}`, { defaultValue: value }),
                 getResetState: (value) => t(`governance:timeline.resetStates.${value}`, { defaultValue: value }),
-                formatUsd: (value) => formatCurrency(value, i18n.language),
+                unavailable,
+                formatUsd: (value) => formatCurrency(value, i18n.language, unavailable),
               }}
             />
           </div>
@@ -281,9 +284,10 @@ export function GovernanceComponent(input: Props) {
               getRewardType: (value) => t(`governance:rewards.${value}`, { defaultValue: value }),
               getCoverage: (value) => t(`coverage:level.${value}`, { defaultValue: value }),
               getConfidence: (value) => t(`governance:confidence.${value}`, { defaultValue: value }),
-              formatDateTime: (value) => formatDate(value, i18n.language),
-              formatAmount: (value) => formatAmount(value, i18n.language, 6),
-              formatUsd: (value) => formatCurrency(value, i18n.language),
+              unavailable,
+              formatDateTime: (value) => formatDate(value, i18n.language, unavailable),
+              formatAmount: (value) => formatAmount(value, i18n.language, unavailable, 6),
+              formatUsd: (value) => formatCurrency(value, i18n.language, unavailable),
             }}
             onStateChange={input.onStateChange}
           />
@@ -296,8 +300,8 @@ export function GovernanceComponent(input: Props) {
               empty: t("governance:breakdown.empty"),
               total: t("governance:breakdown.total"),
               getRewardType: (value) => t(`governance:rewards.${value}`, { defaultValue: value }),
-              formatUsd: (value) => formatCurrency(value, i18n.language),
-              formatPercent: (value) => value ? `${formatAmount(value, i18n.language, 1)}%` : "n/a",
+              formatUsd: (value) => formatCurrency(value, i18n.language, unavailable),
+              formatPercent: (value) => value ? `${formatAmount(value, i18n.language, unavailable, 1)}%` : unavailable,
             }}
           />
         </CabStack>
@@ -335,13 +339,14 @@ export function GovernanceComponent(input: Props) {
             open: t("common:openExternalLink"),
             yes: t("common:yes"),
             no: t("common:no"),
+            unavailable,
             getActionLabel: (key) => t(key, { defaultValue: key }),
             getSurface: (value) => t(`governance:surfaces.${value}`, { defaultValue: value }),
             getCoverage: (value) => t(`coverage:level.${value}`, { defaultValue: value }),
             getConfidence: (value) => t(`governance:confidence.${value}`, { defaultValue: value }),
             getReason: (value) => t(value, { defaultValue: t(`coverage:reasons.${value}`, { defaultValue: value }) }),
-            formatDateTime: (value) => formatDate(value, i18n.language),
-            formatUsd: (value) => formatCurrency(value, i18n.language),
+            formatDateTime: (value) => formatDate(value, i18n.language, unavailable),
+            formatUsd: (value) => formatCurrency(value, i18n.language, unavailable),
           }}
           onOpenHref={input.onOpenHref}
         />

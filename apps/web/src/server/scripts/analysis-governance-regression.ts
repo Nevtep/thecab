@@ -37,6 +37,47 @@ function getRequiredDatabaseUrl() {
   return value;
 }
 
+async function repairKnownPhishingAirdrop(input: {
+  client: pg.Client;
+  walletAddress: string;
+  chainId: number;
+}) {
+  const result = await input.client.query<{
+    id: string;
+    resolution_status: string;
+    amount_usd: string | null;
+  }>(
+    `update reward_events
+     set resolution_status = 'excluded',
+         resolution_basis = 'excluded_airdrop_spam',
+         resolution_reason_codes = array(
+           select distinct unnest(
+             coalesce(resolution_reason_codes, '{}'::text[])
+             || array['excludedAirdrop','airdrop_spam']::text[]
+           )
+         ),
+         deposit_or_strategy_id = null,
+         strategy_exposure_id = null,
+         resolved_pool_id = null,
+         amount_usd = null,
+         metadata_json = coalesce(metadata_json, '{}'::jsonb)
+           || jsonb_build_object(
+             'sourceSurface', 'airdrop_spam',
+             'surfaceKind', 'airdrop_spam',
+             'economicComponentKind', 'excluded_airdrop',
+             'economicExclusionReason', 'airdrop_spam'
+           )
+     where wallet_address = $1
+       and chain_id = $2
+       and tx_hash = $3
+       and resolution_status <> 'excluded'
+     returning id, resolution_status, amount_usd`,
+    [input.walletAddress, input.chainId, AIRDROP_PHISHING_TX],
+  );
+
+  return result.rows;
+}
+
 function assertClassifierFixture() {
   const vote = classifyGovernanceSurface({
     txHash: "0xfixture",
@@ -71,10 +112,14 @@ async function main() {
 
   const walletAddress = getRequiredAddress();
   const chainId = Number(process.env.CHAIN_ID ?? SUPPORTED_CHAIN_ID);
+  const repair = process.argv.includes("--repair");
   const client = new pg.Client({ connectionString: getRequiredDatabaseUrl() });
   await client.connect();
 
   try {
+    const repairedPhishingAirdropRows = repair
+      ? await repairKnownPhishingAirdrop({ client, walletAddress, chainId })
+      : [];
     const governance = await client.query<{ count: string }>(
       `select count(*)::text as count
        from governance_events
@@ -149,6 +194,7 @@ async function main() {
       ok: true,
       walletAddress,
       chainId,
+      repairedPhishingAirdropRows: repairedPhishingAirdropRows.length,
       governanceEventCount: Number(governance.rows[0]?.count ?? 0),
       phishingAirdropRowsChecked: phishingReward.rows.length,
       governanceGapEventDetailsChecked: governanceGapEvents.rows.length,

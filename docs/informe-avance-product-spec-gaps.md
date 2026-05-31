@@ -1,6 +1,6 @@
 # The Cab - Informe De Avance, Features Pendientes Y Gaps Contra Product Spec
 
-**Fecha:** 2026-05-30  
+**Fecha:** 2026-05-31  
 **Referencia principal:** `docs/spec/the-cab-product-technical-spec.md` v1.4.3  
 **Referencias de soporte:** `docs/spec/the-cab-feature-feasibility-implementation-architecture.md`, `docs/spec/the-cab-brand-spec.md`, planes activos en `specs/`
 
@@ -46,7 +46,7 @@ Esta es una revisión estática y de estado de implementación. No certifica que
 
 ## 3. Estado General
 
-El producto tiene una base fuerte hasta Activity:
+El producto tiene una base fuerte hasta Activity y una primera implementacion de Governance lista para testing:
 
 - Landing existente.
 - Conexión de wallet existente.
@@ -58,6 +58,7 @@ El producto tiene una base fuerte hasta Activity:
 - Strategies list/detail.
 - Rewards DataView.
 - Activity DataView en primera versión funcional.
+- Governance DataView en primera version funcional, DB-only y analysis-gated.
 - Settings básico.
 - Design system interno activo.
 - i18next con inglés y español.
@@ -65,9 +66,9 @@ El producto tiene una base fuerte hasta Activity:
 - Pipeline de análisis con Trigger.dev.
 - Providers Moralis y Alchemy encapsulados.
 
-El producto todavía no cumple todo el product spec porque falta cerrar una sección de primer nivel y estabilizar otra:
+El producto todavía no cumple todo el product spec porque falta estabilizar el engine con mas evidencia real:
 
-- Governance: pendiente como sección de primer nivel y como procesamiento explícito de engine.
+- Governance: implementada como DataView, pero la corrida final de la wallet analizada materializo `0` eventos governance; falta estabilizar clasificacion/materializacion real.
 - Activity: implementada en una primera versión funcional, todavía con gaps de engine, fixtures y explainability profunda.
 
 Además, varias pantallas existentes necesitan cerrar gaps de explicabilidad, consistencia visual y semántica de datos.
@@ -85,8 +86,8 @@ Además, varias pantallas existentes necesitan cerrar gaps de explicabilidad, co
 | Deposits | Implementado con gaps | Lista/detalle, lifecycle, chart, movements y decomposition existen. Falta pulir DS y validar semántica. |
 | Strategies | Implementado con gaps | Lista/detalle existen. Falta actividad interna dedicada y relación explícita con pools subyacentes. |
 | Rewards | Implementado con gaps | DataView existe. Faltan breakdowns completos, custom date range y vista completa de excluidos/no resueltos. |
-| Governance | Pendiente | Hay tabla `governance_events` y navegación disabled, pero no DataView/read model/UI ni procesamiento completo de tx governance. Siguiente spec: `015-governance-engine-dataview`. |
-| Activity | En implementación avanzada | DataView/API/detail rail ya existen. Checks de typecheck, unit, i18n, DS y regression pasaron. Quedan gaps de rebalance explainability profunda, links desde todas las superficies y estabilización del engine con más fixtures reales. |
+| Governance | Ready for testing con gap de engine | DataView, API DB-only, filtros, links, selected detail, read models y regression existen. La DB lista de la wallet actual produjo `0` eventos governance, asi que falta hardening de clasificacion/materializacion real. |
+| Activity | En implementación avanzada | DataView/API/detail rail ya existen. Checks de typecheck, unit, i18n, DS y regression pasaron. Se desactivo evidencia explorer live por default en `phase-activity`; quedan gaps de explainability profunda y estabilización con mas fixtures reales. |
 | Settings | Básico implementado | Faltan limpiar cache local, preferencias de formato numérico y separación más clara de diagnostics. |
 | CSV/export | Correctamente ausente | El product spec lo excluye de v1. |
 
@@ -105,7 +106,7 @@ El shell conectado ya expresa la arquitectura de producto:
 - Activity.
 - Settings.
 
-La navegación está acoplada al estado de análisis: las secciones históricas profundas se bloquean hasta que el análisis está listo o stale. Activity ya tiene una primera versión funcional; Governance sigue siendo la sección de primer nivel pendiente.
+La navegación está acoplada al estado de análisis: las secciones históricas profundas se bloquean hasta que el análisis está listo o stale. Activity y Governance ya tienen primeras versiones funcionales como DataViews DB-only; el riesgo principal se movió al engine y a la calidad de materialización.
 
 ### 5.2 Design System
 
@@ -203,7 +204,7 @@ Esa transacción es un airdrop de phishing y no debe sumar como reward. Los caso
 
 ### 6.1 Governance Engine Y DataView
 
-**Estado:** pendiente. Es el siguiente feature spec: `specs/015-governance-engine-dataview`.
+**Estado:** ready for testing con gap de engine. Implementado bajo `specs/015-governance-engine-dataview`.
 
 El product spec requiere una sección Governance de primer nivel. Debe cubrir:
 
@@ -220,35 +221,28 @@ El product spec requiere una sección Governance de primer nivel. Debe cubrir:
 
 Existe hoy:
 
-- Tabla `governance_events`.
-- Clasificación parcial de rewards governance desde Rewards.
-- Item de navegación Governance disabled.
-- Evidencia de que el engine todavía no procesa todas las superficies governance requeridas por el product spec.
-
-Falta:
-
 - Ruta `/governance`.
-- API `/api/governance`.
-- Módulo `features/governance`.
+- API `/api/governance` DB-only.
+- Módulo `features/governance` con container/component split.
 - Repositorio, service y route layer.
-- Read models governance.
-- Procesamiento explícito de tx governance desde veAERO/VotingEscrow, Voter, relays, bribe/fee/reward distributors y AERO transfers relacionados.
-- Persistencia de locks, votes, resets, relay participation, claims de fees, bribes y rebases con coverage/confidence.
-- Container/component split.
-- Namespace i18n.
-- URL/filter state.
-- Detail rail.
-- Panel de locks.
-- Timeline de votos.
-- Panel de governance rewards.
-- Panel de relay.
-- Relación con pools y rewards sin doble conteo.
+- Read models governance para events, lock exposure, epoch summaries, reward rows y metric snapshots.
+- KPI strip, lock panel persistente, timeline compacta por epoch, rewards table, breakdown y selected-detail rail.
+- Filtros, search, paginación compartida, URL state, chips activos y estados empty/locked/partial.
+- Links explícitos hacia Activity, Rewards y Pools cuando existe identidad/evidencia.
+- Namespace i18n inglés/español y copy visible sin `n/a` feature-local.
+- Regresión governance que preserva el airdrop phishing conocido como excluded.
+
+Falta o queda parcial:
+
+- La DB lista de la wallet actual produjo `0` eventos governance, por lo que no hay evidencia de materialización poblada para esa wallet.
+- El engine todavía necesita más fixtures reales para veAERO/VotingEscrow, Voter, relays, bribe/fee/reward distributors y AERO transfers relacionados.
+- La validación visual con estado poblado requiere una wallet/fixture con actividad governance materializada.
 
 Recomendación:
 
-1. Extender primero el engine para clasificar tx governance con evidencia explícita.
-2. Implementar Governance como DataView analysis-gated y DB-only.
-3. Leer únicamente tablas normalizadas/read models.
+1. Mantener Governance como DataView analysis-gated y DB-only.
+2. Usar Activity para encontrar por qué las tx governance reales no se materializan en esta wallet.
+3. Expandir fixtures/regresiones con transacciones governance reales.
 4. Mostrar cobertura limitada cuando falte decode, epoch, pool o reward association.
 5. Reutilizar rewards compartidos sin duplicar totals.
 
@@ -279,7 +273,7 @@ Falta o queda parcial:
 - Rebalance/source allocation explanation profunda desde `canonicalInference`.
 - Links explícitos desde todas las superficies existentes hacia Activity.
 - Más fixtures determinísticas para explorer-enriched, ambiguous, unsupported y Mellow strategy rows.
-- Governance processing sigue limitado, por lo que Activity todavía no puede representar todos los eventos governance del product spec.
+- Governance processing sigue limitado por materialización real en la wallet actual, por lo que Activity todavía es clave para auditar por qué no aparecen eventos governance.
 - Más clasificación engine contra transacciones reales; no agregar heurísticas de ownership sin evidencia explícita.
 
 Recomendación:
@@ -550,8 +544,8 @@ Alcance:
 
 Motivo:
 
-- Es la otra sección de primer nivel pendiente.
-- Depende de tener eventos y Activity auditables.
+- Ya está implementada como primera versión DataView.
+- Depende de tener eventos governance reales materializados para validar estados poblados.
 
 Alcance:
 
@@ -604,18 +598,16 @@ Debe incluir:
 - Regression cases.
 - UI con DS.
 
-### `015-governance-dataview`
+### `015-governance-engine-dataview`
 
-Objetivo: crear la pantalla Governance como sección first-class.
+Objetivo: crear la pantalla Governance como sección first-class y agregar procesamiento/materialización governance al engine.
 
-Debe incluir:
+Estado:
 
-- Locks.
-- Votes.
-- Rewards governance.
-- Rebases/relay.
-- Relaciones con pools/rewards.
-- Cobertura explícita.
+- Tasks completas.
+- Typecheck, unit, i18n, DS y regression pasan.
+- Request path DB-only verificado.
+- Gap remanente: la wallet actual no materializa eventos governance poblados.
 
 ### `016-product-spec-gap-closure`
 
@@ -656,6 +648,6 @@ Debe incluir:
 
 The Cab está en una etapa avanzada de construcción de vistas históricas, pero todavía no está cerrado contra el product spec. La UI principal ya permite ver suficiente producto como para avanzar, pero también expone que el engine necesita un pase fuerte de clasificación, coverage y regresión.
 
-La recomendación es no seguir puliendo Rewards visualmente por ahora. Conviene completar Activity y Governance como DataViews first-class, usar Activity para auditar el engine, y después volver a cerrar los gaps de Overview, Pools, Deposits, Strategies, Rewards y Settings con una pasada de consistencia DS/i18n/chain/query.
+La recomendación es no seguir puliendo Rewards visualmente por ahora. Activity y Governance ya existen como DataViews first-class; conviene usarlas para auditar el engine, estabilizar clasificación/materialización con transacciones reales, y después volver a cerrar los gaps de Overview, Pools, Deposits, Strategies, Rewards y Settings con una pasada de consistencia DS/i18n/chain/query.
 
 La regla más importante para los próximos pasos es mantener visible la incertidumbre. Cuando falte evidencia, el producto debe mostrar unresolved, partial, excluded o unavailable. No debe fabricar ownership, rewards, lifecycle events ni aggregates para que una pantalla parezca más completa.

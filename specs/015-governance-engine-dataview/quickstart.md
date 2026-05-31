@@ -27,6 +27,34 @@ Expected:
 - DS check passes with Governance using shared primitives.
 - Governance regression passes for supported, partial, unresolved, unsupported, and excluded fixtures.
 
+### Implementation Validation - 2026-05-31
+
+Executed against the current local workspace and the ready local DB after the fresh analysis run completed:
+
+- `pnpm --dir apps/web typecheck`: passed.
+- `pnpm --dir apps/web test:unit`: passed, 330/330 tests.
+- `pnpm --dir apps/web i18n:check`: passed.
+- `pnpm --dir apps/web ds:check`: passed. The remaining hardcoded-hex advisory is outside Governance (`src/app/design-system/page.tsx`, `src/app/globals.css`).
+- `pnpm --dir apps/web analysis:governance-regression`: passed.
+  - Wallet: `0x0ecd939b7fca4dc4a0675d8d28bad12cefae0954`.
+  - Chain: Base `8453`.
+  - `governanceEventCount`: `0`.
+  - `phishingAirdropRowsChecked`: `1`.
+  - `governanceGapEventDetailsChecked`: `0`.
+  - `governanceGapRewardDetailsChecked`: `0`.
+
+Validation notes:
+
+- Governance request-time route/service/repository paths were reviewed for provider calls. They remain DB-only; the only explorer-related usage in the request path is chain-config URL formatting for outbound links.
+- Governance repository query profiling on the local ready DB showed sub-millisecond execution for the current result set. No new SQL index was added because the measured workload did not justify one:
+  - `governance_reward_rows` page query: `0` rows, `0.095ms`.
+  - `governance_events` scope query: `0` rows, `0.017ms`.
+  - `governance_epoch_summaries` scope query: `0` rows, `0.024ms`.
+  - `governance_lock_exposures` scope query: `0` rows, `0.014ms`.
+  - `governance_metric_snapshots` latest query: `1` row, `0.068ms`.
+- Governance user-facing fallback copy now uses the localized `common:unavailable` key instead of feature-local `n/a` text.
+- The current analyzed wallet produced no persisted Governance events. This validates stable empty/locked/no-results behavior, but it does not prove rich populated Governance rows for this wallet. The remaining risk is engine classification/materialization coverage for real governance transactions, not request-time UI composition.
+
 ## Scenario 1: First-Screen Governance Load
 
 1. Connect a wallet with completed historical analysis and governance activity.
@@ -136,3 +164,9 @@ Manual visual signoff should record:
 - No speculative APR marketing language is present.
 - The page feels dense, technical, premium, and evidence-backed.
 - Filters and selected-detail updates do not look like full-page reloads.
+
+Current signoff status:
+
+- Technical feature signoff is complete after passing typecheck, unit, i18n, DS, DB-only route review, query profiling, and governance regression.
+- Auth-gated visual signoff against `branding/guidelines/Governance Mockup.png` remains manual and user-owned.
+- Because the current ready DB has no materialized Governance events for the connected wallet, final populated-state visual signoff requires either a wallet/fixture with Governance events or a later engine stabilization pass that materializes them.

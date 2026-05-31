@@ -24,6 +24,7 @@ type Props = {
     getCoverage: (value: string) => string;
     getConfidence: (value: string) => string;
     getEvent: (value: string) => string;
+    unavailable: string;
     formatDateTime: (value: string | null) => string;
     formatAmount: (value: string | null) => string;
     formatUsd: (value: string | null) => string;
@@ -60,7 +61,7 @@ export function GovernanceLockPanel({ lockPanel, labels }: Props) {
             <CabKeyValueList
               items={[
                 { key: "status", label: labels.status, value: labels.getStatus(lockPanel.status), valueVariant: "mono" },
-                { key: "lockId", label: labels.lockId, value: lockPanel.lockId ?? "n/a", valueVariant: "mono" },
+                { key: "lockId", label: labels.lockId, value: lockPanel.lockId ?? labels.unavailable, valueVariant: "mono" },
                 { key: "createdAt", label: labels.createdAt, value: labels.formatDateTime(lockPanel.createdAt), valueVariant: "mono" },
                 { key: "expiresAt", label: labels.expiresAt, value: labels.formatDateTime(lockPanel.expiresAt), valueVariant: "mono" },
                 {

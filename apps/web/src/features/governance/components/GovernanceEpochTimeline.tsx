@@ -21,6 +21,7 @@ type Props = {
     getVoteMode: (value: string) => string;
     getRewardState: (value: string) => string;
     getResetState: (value: string) => string;
+    unavailable: string;
     formatUsd: (value: string | null) => string;
   };
 };
@@ -59,7 +60,7 @@ export function GovernanceEpochTimeline({ epochs, labels }: Props) {
                     <CabText variant="body" fontSize={12}>
                       {epoch.votedPools.length > 0
                         ? epoch.votedPools.slice(0, 3).map((pool) => pool.label).join(" · ")
-                        : "n/a"}
+                        : labels.unavailable}
                     </CabText>
                   </CabStack>
                   <CabStack row justifyContent="space-between" gap="$2">

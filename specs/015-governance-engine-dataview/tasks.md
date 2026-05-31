@@ -207,18 +207,18 @@
 
 **Purpose**: Validate constitution gates, performance, copy, docs, and manual signoff.
 
-- [ ] T099 [P] Add Governance quickstart validation notes after implementation in specs/015-governance-engine-dataview/quickstart.md
-- [ ] T100 [P] Add product progress update for Governance implementation in docs/informe-avance-product-spec-gaps.md
-- [ ] T101 Run unit suite and fix failures in affected files under apps/web/src
-- [ ] T102 Run typecheck and fix failures in affected files under apps/web/src
-- [ ] T103 Run i18n parity check and fix missing keys in apps/web/src/i18n/locales
-- [ ] T104 Run design-system check and replace feature-local UI drift in apps/web/src/features/governance
-- [ ] T105 Run governance regression and fix classification/reconciliation drift in apps/web/src/server/scripts/analysis-governance-regression.ts
-- [ ] T106 Profile Governance repository queries against local DB and add SQL indexes in apps/web/src/server/db/schema.ts only if needed
-- [ ] T107 Verify request-time Governance route has no Moralis/Alchemy/RPC/explorer calls in apps/web/src/server/governance and apps/web/src/app/api/governance/route.ts
-- [ ] T108 Record manual auth-gated UI signoff against Governance mockup direction in specs/015-governance-engine-dataview/quickstart.md
-- [ ] T109 Review for hardcoded user-facing Governance copy and replace with i18next keys in apps/web/src/features/governance
-- [ ] T110 Review chain-aware identity usage across Governance API/query/link paths in apps/web/src/server/governance, apps/web/src/features/governance, and apps/web/src/queries
+- [X] T099 [P] Add Governance quickstart validation notes after implementation in specs/015-governance-engine-dataview/quickstart.md
+- [X] T100 [P] Add product progress update for Governance implementation in docs/informe-avance-product-spec-gaps.md
+- [X] T101 Run unit suite and fix failures in affected files under apps/web/src
+- [X] T102 Run typecheck and fix failures in affected files under apps/web/src
+- [X] T103 Run i18n parity check and fix missing keys in apps/web/src/i18n/locales
+- [X] T104 Run design-system check and replace feature-local UI drift in apps/web/src/features/governance
+- [X] T105 Run governance regression and fix classification/reconciliation drift in apps/web/src/server/scripts/analysis-governance-regression.ts
+- [X] T106 Profile Governance repository queries against local DB and add SQL indexes in apps/web/src/server/db/schema.ts only if needed
+- [X] T107 Verify request-time Governance route has no Moralis/Alchemy/RPC/explorer calls in apps/web/src/server/governance and apps/web/src/app/api/governance/route.ts
+- [X] T108 Record manual auth-gated UI signoff against Governance mockup direction in specs/015-governance-engine-dataview/quickstart.md
+- [X] T109 Review for hardcoded user-facing Governance copy and replace with i18next keys in apps/web/src/features/governance
+- [X] T110 Review chain-aware identity usage across Governance API/query/link paths in apps/web/src/server/governance, apps/web/src/features/governance, and apps/web/src/queries
 
 ---
 
