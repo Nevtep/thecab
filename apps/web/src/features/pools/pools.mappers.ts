@@ -1,5 +1,5 @@
 import { getExplorerBaseUrl } from "@/chains/chains";
-import { formatCompactNumber, formatDateTime, formatDayRange, formatPercent, formatUsd } from "@/i18n/formatters";
+import { formatCompactNumber, formatDateTime, formatDayRange, formatNumber, formatPercent, formatUnit, formatUsd } from "@/i18n/formatters";
 
 import type { PoolDetailResponse, PoolsListResponse } from "@/features/pools/pools.types";
 
@@ -12,12 +12,10 @@ function formatInvestedDays(value: number | null, locale: string) {
     return null;
   }
 
-  return new Intl.NumberFormat(locale, {
-    style: "unit",
-    unit: "day",
+  return formatUnit(Math.max(1, Math.round(value)), locale, "day", {
     unitDisplay: "short",
     maximumFractionDigits: 0,
-  }).format(Math.max(1, Math.round(value)));
+  });
 }
 
 function formatAddressLabel(value: string) {
@@ -81,9 +79,9 @@ function normalizePoolTokenSymbols(tokenSymbols: string[]) {
 }
 
 function formatInteger(value: number, locale: string) {
-  return new Intl.NumberFormat(locale, {
+  return formatNumber(value, locale, {
     maximumFractionDigits: 0,
-  }).format(value);
+  });
 }
 
 function formatPositionTokenAmount(value: number, locale: string) {
@@ -93,10 +91,10 @@ function formatPositionTokenAmount(value: number, locale: string) {
     return formatCompactNumber(value, locale);
   }
 
-  return new Intl.NumberFormat(locale, {
+  return formatNumber(value, locale, {
     minimumFractionDigits: 0,
     maximumFractionDigits: absoluteValue >= 1 ? 2 : 4,
-  }).format(value);
+  });
 }
 
 function formatPositionTokens(
@@ -117,10 +115,10 @@ function formatPositionTokens(
 }
 
 function formatRangeValue(value: number, locale: string, fractionDigits: number | null) {
-  return new Intl.NumberFormat(locale, {
+  return formatNumber(value, locale, {
     minimumFractionDigits: fractionDigits ?? 0,
     maximumFractionDigits: fractionDigits ?? 6,
-  }).format(value);
+  });
 }
 
 function formatTickRange(lower: number | null, upper: number | null, locale: string) {

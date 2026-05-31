@@ -101,6 +101,7 @@
     "status": "Estado",
     "pool": "Pool",
     "countingRule": "Regla de conteo",
+    "loading": "Cargando reward seleccionado…",
     "empty": "Selecciona una fila de reward para inspeccionar su evidencia."
   },
   "ownershipTrace": {

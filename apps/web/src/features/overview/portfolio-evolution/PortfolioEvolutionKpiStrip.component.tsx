@@ -1,6 +1,6 @@
 "use client";
 
-import { CabCard, CabKpiStrip, CabStack, CabText } from "@/design-system";
+import { CabImpactMetricCard, CabKpiStrip } from "@/design-system";
 import { cabColors } from "@/design-system/tokens";
 import type { PortfolioEvolutionSummary } from "@/features/overview/portfolio-evolution/portfolioEvolution.utils";
 import { formatPercent, formatUsd } from "@/i18n/formatters";
@@ -27,73 +27,61 @@ export function PortfolioEvolutionKpiStrip({ summary, locale }: PortfolioEvoluti
       key: "initial",
       label: t("portfolioEvolution.kpis.initialValue"),
       value: formatNullableCurrency(summary.initialValueUsd, locale, fallback),
-      tone: "neutral" as const,
+      accentColor: cabColors.brand.electricBlue,
+      iconName: "wallet" as const,
     },
     {
       key: "final",
       label: t("portfolioEvolution.kpis.finalValue"),
       value: formatNullableCurrency(summary.finalValueUsd, locale, fallback),
-      tone: "neutral" as const,
+      accentColor: cabColors.brand.signalTeal,
+      iconName: "coins" as const,
     },
     {
       key: "absolute",
       label: t("portfolioEvolution.kpis.absoluteChange"),
       value: formatNullableCurrency(summary.absoluteChangeUsd, locale, fallback),
-      tone: summary.absoluteChangeUsd !== null && summary.absoluteChangeUsd >= 0 ? "success" as const : "danger" as const,
+      accentColor: summary.absoluteChangeUsd !== null && summary.absoluteChangeUsd >= 0
+        ? cabColors.semantic.success
+        : cabColors.semantic.danger,
+      iconName: summary.absoluteChangeUsd !== null && summary.absoluteChangeUsd >= 0 ? "arrowUpToLine" as const : "arrowDownToLine" as const,
     },
     {
       key: "changePct",
       label: t("portfolioEvolution.kpis.changePct"),
       value: formatNullablePercent(summary.changePct, locale, fallback),
-      tone: summary.changePct !== null && summary.changePct >= 0 ? "success" as const : "danger" as const,
+      accentColor: summary.changePct !== null && summary.changePct >= 0
+        ? cabColors.semantic.success
+        : cabColors.semantic.danger,
+      iconName: "activity" as const,
     },
     {
       key: "rewards",
       label: t("portfolioEvolution.kpis.accumulatedRewards"),
       value: formatNullableCurrency(summary.accumulatedRewardsUsd, locale, fallback),
-      tone: "warning" as const,
+      accentColor: cabColors.brand.cabGold,
+      iconName: "rewards" as const,
     },
     {
       key: "rebalances",
       label: t("portfolioEvolution.kpis.detectedRebalances"),
       value: String(summary.detectedRebalanceCount),
-      tone: "info" as const,
+      accentColor: cabColors.semantic.info,
+      iconName: "refreshCcw" as const,
     },
   ];
 
   return (
     <CabKpiStrip>
       {items.map((item) => (
-        <div key={item.key} style={{ flex: "1 1 160px", minWidth: 150 }}>
-          <CabCard density="default">
-            <CabStack gap="$2">
-              <CabText variant="caption" fontSize={11}>
-                {item.label}
-              </CabText>
-              <CabText
-                variant="label"
-                fontSize={18}
-                style={{
-                  color:
-                    item.key === "rewards"
-                      ? cabColors.dataViz.violet
-                      : item.tone === "success"
-                      ? "#22C55E"
-                      : item.tone === "danger"
-                        ? "#EF4444"
-                        : item.tone === "warning"
-                          ? "#F2C14E"
-                          : item.tone === "info"
-                            ? "#38BDF8"
-                            : undefined,
-                  fontVariantNumeric: "tabular-nums",
-                }}
-              >
-                {item.value}
-              </CabText>
-            </CabStack>
-          </CabCard>
-        </div>
+        <CabImpactMetricCard
+          key={item.key}
+          label={item.label}
+          value={item.value}
+          accentColor={item.accentColor}
+          iconName={item.iconName}
+          size="compact"
+        />
       ))}
     </CabKpiStrip>
   );

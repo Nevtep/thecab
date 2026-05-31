@@ -1,6 +1,6 @@
 "use client";
 
-import { CabCard, CabDataPanel, CabKeyValueList, CabStack, CabText, CabTokenIcon } from "@/design-system";
+import { CabCard, CabDataPanel, CabKeyValueList, CabLoadingPanel, CabStack, CabText, CabTokenIcon } from "@/design-system";
 import { RewardClaimDetails } from "@/features/rewards/components/RewardClaimDetails";
 import { RewardCoverageNotes } from "@/features/rewards/components/RewardCoverageNotes";
 import { RewardOwnershipTrace } from "@/features/rewards/components/RewardOwnershipTrace";
@@ -12,6 +12,7 @@ import styles from "@/features/rewards/RewardsWorkspace.module.css";
 
 type Props = {
   selectedReward: SelectedReward | null;
+  loading?: boolean;
   labels: {
     title: string;
     amount: string;
@@ -20,6 +21,7 @@ type Props = {
     coverage: string;
     confidence: string;
     empty: string;
+    loading: string;
     getCoverage: (coverage: string) => string;
     getConfidence: (confidence: string) => string;
     getSource: (source: string) => string;
@@ -43,7 +45,15 @@ type Props = {
   };
 };
 
-export function SelectedRewardRail({ selectedReward, labels }: Props) {
+export function SelectedRewardRail({ selectedReward, loading = false, labels }: Props) {
+  if (loading) {
+    return (
+      <aside className={styles.rail}>
+        <CabLoadingPanel label={labels.loading} />
+      </aside>
+    );
+  }
+
   if (!selectedReward) {
     return (
       <CabDataPanel>

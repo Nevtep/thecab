@@ -10,7 +10,7 @@ import { getOverviewNavigationItems } from "@/features/overview/overview.mappers
 import { PoolsComponent } from "@/features/pools/Pools.component";
 import { mapPoolDetailResponseToViewModel, mapPoolsListResponseToViewModel } from "@/features/pools/pools.mappers";
 import { createDefaultPoolsListFilters } from "@/features/pools/pools.queries";
-import { buildDepositsPoolHref } from "@/features/deposits/deposits.navigation"; // Import buildDepositsPoolHref
+import { buildDepositsPoolHref } from "@/features/deposits/deposits.navigation";
 import type { PoolDetailRange } from "@/features/pools/pools.types";
 import { useAnalysisStatusQuery, usePoolDetailQuery, usePoolsQuery } from "@/queries/hooks";
 import { queryKeys } from "@/queries/keys";
@@ -35,6 +35,8 @@ export function PoolsContainer({ selectedPoolId = null }: { selectedPoolId?: str
   const [detailRange, setDetailRange] = useState<PoolDetailRange>("90d");
   const [expandedPoolId, setExpandedPoolId] = useState<string | null>(selectedPoolId);
   const [collapsedSelectedPoolId, setCollapsedSelectedPoolId] = useState<string | null>(null);
+  const [poolPageSize, setPoolPageSize] = useState(20);
+  const [poolCursorStack, setPoolCursorStack] = useState<Array<string | null>>([null]);
 
   const walletAddress = address?.toLowerCase() ?? "";
   const resolvedChainId = chainId ?? SUPPORTED_CHAIN_ID;
@@ -53,6 +55,8 @@ export function PoolsContainer({ selectedPoolId = null }: { selectedPoolId?: str
       walletAddress,
       chainId: resolvedChainId,
       filters,
+      cursor: poolCursorStack[poolCursorStack.length - 1] ?? null,
+      limit: poolPageSize,
     },
     {
       enabled: isWalletReady,
@@ -104,7 +108,15 @@ export function PoolsContainer({ selectedPoolId = null }: { selectedPoolId?: str
     }
 
     void queryClient.invalidateQueries({
-      queryKey: queryKeys.pools({ chainId: resolvedChainId, walletAddress, filters }),
+      queryKey: queryKeys.pools({
+        chainId: resolvedChainId,
+        walletAddress,
+        filters: {
+          ...filters,
+          cursor: poolCursorStack[poolCursorStack.length - 1] ?? null,
+          limit: poolPageSize,
+        },
+      }),
     });
 
     if (selectedPoolId) {
@@ -112,7 +124,7 @@ export function PoolsContainer({ selectedPoolId = null }: { selectedPoolId?: str
         queryKey: queryKeys.poolDetail(resolvedChainId, selectedPoolId, detailRange),
       });
     }
-  }, [analysisStatusQuery.data?.status, detailRange, filters, queryClient, resolvedChainId, selectedPoolId, walletAddress]);
+  }, [analysisStatusQuery.data?.status, detailRange, filters, poolCursorStack, poolPageSize, queryClient, resolvedChainId, selectedPoolId, walletAddress]);
 
   const resolvedExpandedPoolId = selectedPoolId
     ? collapsedSelectedPoolId === selectedPoolId
@@ -128,6 +140,19 @@ export function PoolsContainer({ selectedPoolId = null }: { selectedPoolId?: str
     () => (poolsQuery.data ? mapPoolsListResponseToViewModel(poolsQuery.data, i18n.language) : null),
     [i18n.language, poolsQuery.data],
   );
+  const poolsPagination = useMemo(() => {
+    const page = poolCursorStack.length;
+    const rowCountOnPage = viewModel?.items.length ?? 0;
+    const hasMore = poolsQuery.data?.page.hasMore ?? false;
+
+    return {
+      page,
+      pageSize: poolPageSize,
+      totalRows: (page - 1) * poolPageSize + rowCountOnPage + (hasMore ? poolPageSize : 0),
+      totalPages: hasMore ? page + 1 : Math.max(1, page),
+      pageSizeOptions: [10, 20, 50],
+    };
+  }, [poolCursorStack.length, poolPageSize, poolsQuery.data?.page.hasMore, viewModel?.items.length]);
   const detailViewModel = useMemo(
     () => (detailQuery.data ? mapPoolDetailResponseToViewModel(detailQuery.data, i18n.language) : null),
     [detailQuery.data, i18n.language],
@@ -219,6 +244,8 @@ export function PoolsContainer({ selectedPoolId = null }: { selectedPoolId?: str
         filters={filters}
         selectedPoolId={selectedPoolId}
         errorCode={poolsQuery.error instanceof Error ? poolsQuery.error.message : null}
+        isRefreshing={poolsQuery.isFetching && !poolsQuery.isLoading}
+        pagination={poolsPagination}
         detailPanel={selectedPoolId && detailScreenState ? {
           poolId: selectedPoolId,
           screenState: detailScreenState,
@@ -226,7 +253,7 @@ export function PoolsContainer({ selectedPoolId = null }: { selectedPoolId?: str
           errorCode: detailQuery.error instanceof Error ? detailQuery.error.message : null,
           range: detailRange,
           onRangeChange: setDetailRange,
-          onOpenDeposits: () => router.push(buildDepositsPoolHref({ chainId: resolvedChainId, poolId: selectedPoolId })), // Added onOpenDeposits
+          onOpenDeposits: () => router.push(buildDepositsPoolHref({ chainId: resolvedChainId, poolId: selectedPoolId })),
           onRetry: () => void detailQuery.refetch(),
           onClose: () => router.push("/pools"),
         } : null}
@@ -234,11 +261,31 @@ export function PoolsContainer({ selectedPoolId = null }: { selectedPoolId?: str
         onSearchChange={(value) => {
           startTransition(() => {
             setFilters((current) => ({ ...current, search: value }));
+            setPoolCursorStack([null]);
           });
         }}
         onStatusChange={(value) => {
           startTransition(() => {
             setFilters((current) => ({ ...current, status: value }));
+            setPoolCursorStack([null]);
+          });
+        }}
+        onPageChange={(page) => {
+          startTransition(() => {
+            setPoolCursorStack((current) => {
+              if (page <= 1) return [null];
+              if (page < current.length) return current.slice(0, page);
+              if (page === current.length + 1 && poolsQuery.data?.page.nextCursor) {
+                return [...current, poolsQuery.data.page.nextCursor];
+              }
+              return current;
+            });
+          });
+        }}
+        onPageSizeChange={(pageSize) => {
+          startTransition(() => {
+            setPoolPageSize(pageSize);
+            setPoolCursorStack([null]);
           });
         }}
         onSelectPool={(poolId) => router.push(`/pools/${poolId}`)}

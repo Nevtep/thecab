@@ -2,6 +2,7 @@
 
 import { CabBadge, CabStack, CabText, CabTooltip } from "@/design-system";
 import type { DepositSummaryRowViewModel } from "@/features/deposits/deposits.mappers";
+import { formatPercentPoints } from "@/i18n/formatters";
 
 type PositionLabelCellProps = {
   row: Pick<
@@ -12,18 +13,19 @@ type PositionLabelCellProps = {
     | "poolKind"
     | "openedByTransferIn"
   >;
+  locale: string;
   transferInLabel: string;
   transferInTooltip: string;
 };
 
-function formatFeeTier(bps: number | null) {
+function formatFeeTier(bps: number | null, locale: string) {
   if (bps === null) return null;
   const pct = bps / 10000;
-  return `${pct.toFixed(pct >= 1 ? 2 : 3)}%`;
+  return formatPercentPoints(pct, locale);
 }
 
-export function PositionLabelCell({ row, transferInLabel, transferInTooltip }: PositionLabelCellProps) {
-  const feeTier = formatFeeTier(row.feeTierBps);
+export function PositionLabelCell({ row, locale, transferInLabel, transferInTooltip }: PositionLabelCellProps) {
+  const feeTier = formatFeeTier(row.feeTierBps, locale);
   const idLabel = row.tokenId ? `#${row.tokenId}` : null;
   const secondary = [idLabel, feeTier].filter(Boolean).join(" · ");
 

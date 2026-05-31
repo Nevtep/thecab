@@ -1,5 +1,6 @@
 import { cabColors } from "@/design-system/tokens";
 import type { OverviewViewModel } from "@/features/overview/overview.types";
+import { formatNumber } from "@/i18n/formatters";
 
 type Translate = (key: string, options?: Record<string, unknown>) => string;
 
@@ -37,9 +38,9 @@ export type CapitalAllocationStatusBadge = {
 export function formatDistributionTokenAmount(amount: number, locale: string) {
   const maximumFractionDigits = amount >= 1_000 ? 2 : amount >= 1 ? 4 : 6;
 
-  return new Intl.NumberFormat(locale, {
+  return formatNumber(amount, locale, {
     maximumFractionDigits,
-  }).format(amount);
+  });
 }
 
 export function getDistributionSliceLabel(slice: DistributionSlice, translate: Translate) {

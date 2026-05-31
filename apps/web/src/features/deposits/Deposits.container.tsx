@@ -182,7 +182,21 @@ export function DepositsContainer() {
 
   const onSortChange = useCallback(
     (sort: DepositsSortField, direction: DepositsSortDirection) => {
-      pushUrlState({ ...urlState, sort, direction });
+      pushUrlState({ ...urlState, sort, direction, page: 1 });
+    },
+    [pushUrlState, urlState],
+  );
+
+  const onPageChange = useCallback(
+    (page: number) => {
+      pushUrlState({ ...urlState, page });
+    },
+    [pushUrlState, urlState],
+  );
+
+  const onPageSizeChange = useCallback(
+    (pageSize: number) => {
+      pushUrlState({ ...urlState, pageSize, page: 1 });
     },
     [pushUrlState, urlState],
   );
@@ -273,6 +287,7 @@ export function DepositsContainer() {
         selectedDepositId={urlState.selectedDepositId}
         selectedDepositReturnTo={serializeDepositsListUrlState(urlState) ? `/deposits?${serializeDepositsListUrlState(urlState)}` : "/deposits"}
         errorCode={depositsQuery.error instanceof Error ? depositsQuery.error.message : null}
+        isRefreshing={depositsQuery.isFetching && !depositsQuery.isLoading}
         onRetry={onRetry}
         onStatusChange={onStatusChange}
         onClearPool={onClearPool}
@@ -281,6 +296,8 @@ export function DepositsContainer() {
         onClearDateRange={onClearDateRange}
         onReturnSignChange={onReturnSignChange}
         onSortChange={onSortChange}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
         onSelectRow={onSelectRow}
         onCloseDetail={onCloseDetail}
         onOpenStrategies={onOpenStrategies}

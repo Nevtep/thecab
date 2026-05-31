@@ -105,7 +105,7 @@ export function StrategiesContainer() {
 
   function updateUrl(nextState: typeof urlState) {
     const query = serializeStrategiesListUrlState(nextState);
-    router.replace(query ? `/strategies?${query}` : "/strategies");
+    router.replace(query ? `/strategies?${query}` : "/strategies", { scroll: false });
   }
 
   return (
@@ -137,6 +137,7 @@ export function StrategiesContainer() {
         viewModel={viewModel}
         urlState={urlState}
         errorCode={strategiesQuery.error instanceof Error ? strategiesQuery.error.message : null}
+        isRefreshing={strategiesQuery.isFetching && !strategiesQuery.isLoading}
         onRetry={() => void strategiesQuery.refetch()}
         onSearchChange={(value) => {
           startTransition(() => updateUrl({ ...urlState, search: value, page: 1 }));
@@ -165,6 +166,12 @@ export function StrategiesContainer() {
             ...defaults,
             selectedStrategyId: urlState.selectedStrategyId,
           }));
+        }}
+        onPageChange={(page) => {
+          startTransition(() => updateUrl({ ...urlState, page }));
+        }}
+        onPageSizeChange={(pageSize) => {
+          startTransition(() => updateUrl({ ...urlState, pageSize, page: 1 }));
         }}
         onSelectStrategy={(strategyExposureId) => {
           startTransition(() => updateUrl({ ...urlState, selectedStrategyId: strategyExposureId }));

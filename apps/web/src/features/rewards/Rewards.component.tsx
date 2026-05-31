@@ -22,6 +22,7 @@ type RewardsComponentProps = {
   viewModel: RewardsViewModel | null;
   urlState: RewardsUrlState;
   errorCode: string | null;
+  isRefreshing?: boolean;
   onRetry: () => void;
   onStateChange: (state: RewardsUrlState) => void;
   onClearFilter: (target: string) => void;
@@ -99,6 +100,11 @@ export function RewardsComponent(input: RewardsComponentProps) {
       page: 1,
     });
   }
+  const selectedRewardIsLoading = Boolean(
+    input.isRefreshing &&
+    input.urlState.selectedRewardEventId &&
+    input.viewModel.selectedReward?.rewardEventId !== input.urlState.selectedRewardEventId,
+  );
 
   return (
     <CabStack className={styles.workspace}>
@@ -122,7 +128,6 @@ export function RewardsComponent(input: RewardsComponentProps) {
           pool: t("rewards:filters.pool"),
           rewardType: t("rewards:filters.rewardType"),
           coverage: t("rewards:filters.coverage"),
-          rowsPerPage: t("common:rowsPerPage"),
           all: t("common:all"),
           clearAll: t("common:clearAll"),
           getDatePreset: (value) => t(`rewards:datePresets.${value}`, { defaultValue: value }),
@@ -208,6 +213,8 @@ export function RewardsComponent(input: RewardsComponentProps) {
               tx: t("rewards:table.columns.tx"),
               previous: t("common:previous"),
               next: t("common:next"),
+              page: (page, totalPages) => t("common:pageIndicator", { page, totalPages }),
+              rowsPerPage: t("common:rowsPerPage"),
               showing: (from, to, total) => t("common:showingRange", { from, to, total }),
               emptyTitle: t("rewards:empty.filteredTitle"),
               emptyDescription: t("rewards:empty.filteredDescription"),
@@ -216,11 +223,13 @@ export function RewardsComponent(input: RewardsComponentProps) {
               getConfidence: labels.getConfidence,
               getSource: labels.getSource,
             }}
+            loading={input.isRefreshing}
             onStateChange={input.onStateChange}
           />
         </CabStack>
         <SelectedRewardRail
           selectedReward={input.viewModel.selectedReward}
+          loading={selectedRewardIsLoading}
           labels={{
             title: t("rewards:panels.selectedReward"),
             amount: t("rewards:selected.amount"),
@@ -229,6 +238,7 @@ export function RewardsComponent(input: RewardsComponentProps) {
             coverage: t("rewards:selected.coverage"),
             confidence: t("rewards:selected.confidence"),
             empty: t("rewards:selected.empty"),
+            loading: t("rewards:selected.loading"),
             getCoverage: labels.getCoverage,
             getConfidence: labels.getConfidence,
             getSource: labels.getSource,

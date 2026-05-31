@@ -21,6 +21,7 @@ export * from "@/design-system/data-display/DataTableCell.component";
 export * from "@/design-system/data-display/DataTableEmptyState.component";
 export * from "@/design-system/data-display/DataTableHeader.component";
 export * from "@/design-system/data-display/DataTableLoadingState.component";
+export * from "@/design-system/data-display/DataTablePagination.component";
 export * from "@/design-system/data-display/DataTableRow.component";
 export * from "@/design-system/data-display/DataTableSortHeader.component";
 export * from "@/design-system/data-display/DataTableToolbar.component";

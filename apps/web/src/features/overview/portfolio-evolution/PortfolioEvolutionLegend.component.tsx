@@ -1,6 +1,6 @@
 "use client";
 
-import { CabStack, CabText } from "@/design-system";
+import { CabStack, CabText, cabColors } from "@/design-system";
 import type { PortfolioEvolutionEventType } from "@/features/overview/portfolio-evolution/portfolioEvolution.utils";
 import {
   portfolioEvolutionEventMeta,
@@ -42,7 +42,7 @@ function ToggleChip({
         borderRadius: 999,
         border: `1px solid ${active ? color : "rgba(184, 199, 230, 0.16)"}`,
         background: active ? `${color}1A` : "rgba(15, 24, 38, 0.72)",
-        color: active ? "#EAF1FF" : "#B8C7E6",
+        color: active ? cabColors.text.primary : cabColors.text.secondary,
         cursor: "pointer",
       }}
     >

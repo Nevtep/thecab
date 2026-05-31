@@ -30,6 +30,14 @@ export const queryKeys = {
     ["overview-chart", chainId, walletAddress ?? "", range] as const,
   overviewProtocolPositions: ({ chainId, walletAddress, range }: OverviewParams) =>
     ["overview-protocol-positions", chainId, walletAddress ?? "", range] as const,
+  overviewScope: ({ chainId, walletAddress }: BaseParams) =>
+    [
+      ["overview", chainId, walletAddress ?? ""] as const,
+      ["overview-shell", chainId, walletAddress ?? ""] as const,
+      ["overview-activity", chainId, walletAddress ?? ""] as const,
+      ["overview-chart", chainId, walletAddress ?? ""] as const,
+      ["overview-protocol-positions", chainId, walletAddress ?? ""] as const,
+    ],
   analysisStatus: ({ chainId, walletAddress }: BaseParams) =>
     ["analysis-status", chainId, walletAddress ?? ""] as const,
   pools: ({ chainId, walletAddress, filters }: PoolsParams) =>

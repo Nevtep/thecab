@@ -206,7 +206,7 @@
 
 .rangeFallback,
 .secondaryText {
-  color: #8494B2;
+  color: var(--cab-text-muted);
 }
 
 .underlyingList {
@@ -234,7 +234,7 @@
 }
 
 .updatedText {
-  color: #B8C7E6;
+  color: var(--cab-text-secondary);
 }
 
 .footer {

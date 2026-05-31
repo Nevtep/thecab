@@ -4,7 +4,6 @@ import { CabButton, CabDataPanel, CabInput, CabStack, CabText } from "@/design-s
 import {
   REWARDS_COVERAGE_OPTIONS,
   REWARDS_DATE_PRESET_OPTIONS,
-  REWARDS_PAGE_SIZE_OPTIONS,
   REWARDS_SOURCE_OPTIONS,
 } from "@/features/rewards/rewards.filters";
 import type { RewardsUrlState, RewardsViewModel } from "@/features/rewards/rewards.types";
@@ -21,7 +20,6 @@ type Props = {
     pool: string;
     rewardType: string;
     coverage: string;
-    rowsPerPage: string;
     all: string;
     clearAll: string;
     getDatePreset: (value: string) => string;
@@ -112,16 +110,6 @@ export function RewardsFiltersBar({ state, viewModel, labels, onStateChange, onC
         >
           {REWARDS_COVERAGE_OPTIONS.map((coverage) => (
             <option key={coverage} value={coverage}>{coverage === "all" ? labels.all : labels.getCoverage(coverage)}</option>
-          ))}
-        </select>
-        <select
-          className={styles.select}
-          aria-label={labels.rowsPerPage}
-          value={state.pageSize}
-          onChange={(event) => onStateChange({ ...state, pageSize: Number(event.target.value) as RewardsUrlState["pageSize"], page: 1 })}
-        >
-          {REWARDS_PAGE_SIZE_OPTIONS.map((pageSize) => (
-            <option key={pageSize} value={pageSize}>{pageSize}</option>
           ))}
         </select>
         <CabButton tone="ghost" controlSize="sm" onPress={onClearAll}>{labels.clearAll}</CabButton>

@@ -24,6 +24,7 @@ type ExpandedComposition = NonNullable<PoolsExpandedBreakdown>;
 type CompositionRow = ExpandedComposition["manualDeposits"][number] | ExpandedComposition["automatedStrategies"][number];
 
 const columnHelper = createColumnHelper<PoolRow>();
+const compositionColumnHelper = createColumnHelper<CompositionRow>();
 
 function toneForStatus(status: PoolsListViewModel["items"][number]["status"]) {
   switch (status) {
@@ -165,6 +166,72 @@ function CompositionSection(input: {
   rows: CompositionRow[];
   labels: PoolsTableProps["labels"]["composition"];
 }) {
+  const columns = useMemo<Array<ColumnDef<CompositionRow, unknown>>>(() => [
+    compositionColumnHelper.display({
+      id: "id",
+      header: () => input.labels.columns.id,
+      cell: ({ row }) => (
+        <DataTableStackedCell
+          title={row.original.idLabel}
+          subtitle={row.original.idMeta ?? undefined}
+          align="left"
+        />
+      ),
+    }),
+    compositionColumnHelper.display({
+      id: "type",
+      header: () => input.labels.columns.type,
+      cell: ({ row }) => (
+        <CabBadge tone={row.original.type === "manual" ? "neutral" : "info"} size="sm">
+          {getTypeLabel(row.original.type, input.labels)}
+        </CabBadge>
+      ),
+    }),
+    compositionColumnHelper.display({
+      id: "range",
+      header: () => input.labels.columns.range,
+      cell: ({ row }) => (
+        <DataTableValueCell
+          primary={
+            <CabBadge tone={toneForRangeState(row.original.rangeState)} size="sm">
+              {getRangeLabel(row.original.rangeState, input.labels)}
+            </CabBadge>
+          }
+          secondary={row.original.rangeDetail ?? undefined}
+          align="left"
+        />
+      ),
+    }),
+    compositionColumnHelper.display({
+      id: "staking",
+      header: () => input.labels.columns.staking,
+      cell: ({ row }) => (
+        <DataTableStatusCell
+          tone={toneForStakingState(row.original.stakingState)}
+          label={getStakingLabel(row.original.stakingState, input.labels)}
+        />
+      ),
+    }),
+    compositionColumnHelper.display({
+      id: "underlying",
+      header: () => input.labels.columns.underlying,
+      cell: ({ row }) => (
+        <DataTableValueCell primary={row.original.underlyingLabel ?? input.labels.unavailable} align="left" />
+      ),
+    }),
+    compositionColumnHelper.display({
+      id: "apr",
+      header: () => input.labels.columns.apr,
+      meta: { numeric: true },
+      cell: ({ row }) => (
+        <DataTablePercentCell
+          value={row.original.aprLabel ?? input.labels.unavailable}
+          tone="neutral"
+        />
+      ),
+    }),
+  ], [input.labels]);
+
   if (input.rows.length === 0) {
     return null;
   }
@@ -172,60 +239,13 @@ function CompositionSection(input: {
   return (
     <section className={styles.compositionSection}>
       <div className={styles.compositionSectionTitle}>{input.title}</div>
-      <div className={styles.compositionTableWrap}>
-        <table className={styles.compositionTable}>
-          <thead>
-            <tr>
-              <th className={styles.compositionHeaderCell}>{input.labels.columns.id}</th>
-              <th className={styles.compositionHeaderCell}>{input.labels.columns.type}</th>
-              <th className={styles.compositionHeaderCell}>{input.labels.columns.range}</th>
-              <th className={styles.compositionHeaderCell}>{input.labels.columns.staking}</th>
-              <th className={styles.compositionHeaderCell}>{input.labels.columns.underlying}</th>
-              <th className={[styles.compositionHeaderCell, styles.compositionHeaderCellNumeric].join(" ")}>{input.labels.columns.apr}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {input.rows.map((row) => (
-              <tr key={row.rowId} className={styles.compositionRow}>
-                <td className={[styles.compositionCell, styles.compositionCellId].join(" ")}>
-                  <div className={styles.compositionIdentifier}>
-                    <span className={styles.compositionIdentifierLabel}>{row.idLabel}</span>
-                    {row.idMeta ? <span className={styles.compositionIdentifierMeta}>{row.idMeta}</span> : null}
-                  </div>
-                </td>
-                <td className={styles.compositionCell}>
-                  <CabBadge tone={row.type === "manual" ? "neutral" : "info"} size="sm">
-                    {getTypeLabel(row.type, input.labels)}
-                  </CabBadge>
-                </td>
-                <td className={styles.compositionCell}>
-                  <div className={styles.compositionStack}>
-                    <CabBadge tone={toneForRangeState(row.rangeState)} size="sm">
-                      {getRangeLabel(row.rangeState, input.labels)}
-                    </CabBadge>
-                    {row.rangeDetail ? <span className={styles.compositionMeta}>{row.rangeDetail}</span> : null}
-                  </div>
-                </td>
-                <td className={styles.compositionCell}>
-                  <CabBadge tone={toneForStakingState(row.stakingState)} size="sm">
-                    {getStakingLabel(row.stakingState, input.labels)}
-                  </CabBadge>
-                </td>
-                <td className={styles.compositionCell}>
-                  <span className={row.underlyingLabel ? styles.compositionUnderlying : styles.compositionMuted}>
-                    {row.underlyingLabel ?? input.labels.unavailable}
-                  </span>
-                </td>
-                <td className={[styles.compositionCell, styles.compositionCellNumeric].join(" ")}>
-                  <span className={row.aprLabel ? styles.compositionApr : styles.compositionMuted}>
-                    {row.aprLabel ?? input.labels.unavailable}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        columns={columns}
+        data={input.rows}
+        rowKey={(row) => row.rowId}
+        surface="embedded"
+        stickyHeader={false}
+      />
     </section>
   );
 }

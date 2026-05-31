@@ -18,6 +18,7 @@ const columnHelper = createColumnHelper<StrategyRowViewModel>();
 
 type StrategiesTableProps = {
   items: StrategyRowViewModel[];
+  loading?: boolean;
   labels: {
     strategy: string;
     status: string;
@@ -39,7 +40,7 @@ function returnTone(sign: StrategyRowViewModel["totalReturnSign"]) {
   return "neutral" as const;
 }
 
-export function StrategiesTable({ items, labels, getCoverageLabel, onSelect }: StrategiesTableProps) {
+export function StrategiesTable({ items, loading = false, labels, getCoverageLabel, onSelect }: StrategiesTableProps) {
   const selectedRowId = items.find((item) => item.isSelected)?.strategyExposureId ?? null;
   const columns = useMemo<Array<ColumnDef<StrategyRowViewModel, unknown>>>(() => {
     const all = [
@@ -137,6 +138,7 @@ export function StrategiesTable({ items, labels, getCoverageLabel, onSelect }: S
       selectedRowId={selectedRowId}
       onRowSelect={onSelect}
       stickyHeader
+      loading={loading}
     />
   );
 }

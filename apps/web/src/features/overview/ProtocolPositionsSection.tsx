@@ -23,7 +23,7 @@ import {
 import { cabColors } from "@/design-system/tokens";
 import { formatWalletAddressLabel } from "@/features/overview/overview.mappers";
 import type { OverviewViewModel } from "@/features/overview/overview.types";
-import { formatDateTime, formatPercent, formatUsd } from "@/i18n/formatters";
+import { formatDateTime, formatNumber, formatPercent, formatUsd } from "@/i18n/formatters";
 
 import styles from "./ProtocolPositionsSection.module.css";
 
@@ -294,9 +294,9 @@ function buildUnderlyingAssets(row: ProtocolPositionRow) {
 function formatProtocolTokenAmount(amount: number, locale: string) {
   const maximumFractionDigits = amount >= 1_000 ? 2 : amount >= 1 ? 4 : 6;
 
-  return new Intl.NumberFormat(locale, {
+  return formatNumber(amount, locale, {
     maximumFractionDigits,
-  }).format(amount);
+  });
 }
 
 export function ProtocolPositionsSection({
@@ -405,21 +405,21 @@ export function ProtocolPositionsSection({
             />
             <CabImpactMetricCard
               label={t("protocolPositions.metrics.positionsDetected")}
-              value={new Intl.NumberFormat(locale).format(protocolPositions.summary.totalCount)}
+              value={formatNumber(protocolPositions.summary.totalCount, locale)}
               iconName="radar"
               accentColor={cabColors.brand.electricBlue}
               size="compact"
             />
             <CabImpactMetricCard
               label={t("protocolPositions.metrics.strategyExposures")}
-              value={new Intl.NumberFormat(locale).format(strategyExposureCount)}
+              value={formatNumber(strategyExposureCount, locale)}
               iconName="strategies"
               accentColor={cabColors.dataViz.violet}
               size="compact"
             />
             <CabImpactMetricCard
               label={t("protocolPositions.metrics.poolsCovered")}
-              value={new Intl.NumberFormat(locale).format(poolsCoveredCount)}
+              value={formatNumber(poolsCoveredCount, locale)}
               iconName="pools"
               accentColor={cabColors.brand.cabGold}
               size="compact"

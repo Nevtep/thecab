@@ -101,6 +101,7 @@
     "status": "Status",
     "pool": "Pool",
     "countingRule": "Counting rule",
+    "loading": "Loading selected reward…",
     "empty": "Select a reward row to inspect its evidence."
   },
   "ownershipTrace": {

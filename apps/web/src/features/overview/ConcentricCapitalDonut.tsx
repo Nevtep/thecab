@@ -11,7 +11,7 @@ import type {
 } from "@/features/overview/capitalAllocation.utils";
 import type { OverviewRange } from "@/features/overview/overview.types";
 import { withAlpha } from "@/features/overview/capitalAllocation.utils";
-import { formatPercent, formatUsd } from "@/i18n/formatters";
+import { formatNumber, formatPercent, formatUsd } from "@/i18n/formatters";
 
 type ConcentricCapitalDonutProps = {
   items: CapitalAllocationSliceSummary[];
@@ -148,7 +148,7 @@ export function ConcentricCapitalDonut({
                   cornerRadius: 8,
                   valueFormatter: (value: number) => selectedBreakdown?.usesEstimatedValue
                     ? formatUsd(value, i18n.language)
-                    : new Intl.NumberFormat(i18n.language, { maximumFractionDigits: 4 }).format(value),
+                    : formatNumber(value, i18n.language, { maximumFractionDigits: 4 }),
                 }]
               : []),
           ]}

@@ -36,6 +36,23 @@ test("isGovernanceRewardCandidate keeps standard reward claims in reward process
   }), false);
 });
 
+test("isExcludedAirdropRewardLedgerRow marks known phishing airdrop txs as excluded reward activity", async () => {
+  const { isExcludedAirdropRewardLedgerRow } = await import("@/server/trigger/tasks/phase-rewards.task");
+  const phishingTxHash = "0xca23a1618b416be4f082ae26e59dd9bfcea5e028f00a2cd9f1b8dd95fbff77ea";
+
+  assert.equal(phishingTxHash.startsWith("0xca23a161"), true);
+  assert.equal(isExcludedAirdropRewardLedgerRow({
+    classification: "airdrop",
+    metadataJson: {
+      economicExclusionReason: "airdrop_spam",
+    },
+  }), true);
+  assert.equal(isExcludedAirdropRewardLedgerRow({
+    classification: "claim",
+    metadataJson: {},
+  }), false);
+});
+
 test("resolveRewardClaimTarget leaves Aerodrome claims unresolved when token identity is absent", async () => {
   const { resolveRewardClaimTarget } = await import("@/server/trigger/tasks/phase-rewards.task");
 

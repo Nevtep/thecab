@@ -8,18 +8,18 @@ import {
   CabCard,
   CabEmptyState,
   CabErrorPanel,
+  CabImpactMetricCard,
   CabLoadingPanel,
   CabStack,
   CabText,
 } from "@/design-system";
+import { cabColors } from "@/design-system/tokens";
 import { StrategyCoverageNote } from "@/features/strategies/components/StrategyCoverageNote";
 import { StrategyExposureSummary } from "@/features/strategies/components/StrategyExposureSummary";
 import { StrategyLifecycleTimeline } from "@/features/strategies/components/StrategyLifecycleTimeline";
 import { StrategyRewardsTable } from "@/features/strategies/components/StrategyRewardsTable";
 import { mapStrategyDetailResponseToViewModel } from "@/features/strategies/strategies.mappers";
 import type { StrategyDetailResponse } from "@/features/strategies/strategies.types";
-
-import styles from "@/features/strategies/StrategiesWorkspace.module.css";
 
 type StrategyDetailComponentProps = {
   screenState: "loading" | "error" | "empty" | "ready";
@@ -72,20 +72,29 @@ export function StrategyDetailComponent(input: StrategyDetailComponentProps) {
             </CabBadge>
           </CabStack>
           <CabText variant="caption">{strategy.poolLabel ?? t("strategies:detail.poolUnavailable")}</CabText>
-          <div className={styles.detailHeroMetrics}>
-            <div>
-              <CabText variant="caption">{t("strategies:detail.currentValue")}</CabText>
-              <CabText variant="data">{viewModel.formattedHeader.currentValue}</CabText>
-            </div>
-            <div>
-              <CabText variant="caption">{t("strategies:detail.totalReturn")}</CabText>
-              <CabText variant="data">{viewModel.formattedHeader.totalReturn}</CabText>
-            </div>
-            <div>
-              <CabText variant="caption">{t("strategies:detail.rewards")}</CabText>
-              <CabText variant="data">{viewModel.formattedHeader.rewards}</CabText>
-            </div>
-          </div>
+          <CabStack row gap="$3" flexWrap="wrap">
+            <CabImpactMetricCard
+              label={t("strategies:detail.currentValue")}
+              value={viewModel.formattedHeader.currentValue}
+              accentColor={cabColors.brand.signalTeal}
+              iconName="coins"
+              size="compact"
+            />
+            <CabImpactMetricCard
+              label={t("strategies:detail.totalReturn")}
+              value={viewModel.formattedHeader.totalReturn}
+              accentColor={cabColors.brand.cabGold}
+              iconName="activity"
+              size="compact"
+            />
+            <CabImpactMetricCard
+              label={t("strategies:detail.rewards")}
+              value={viewModel.formattedHeader.rewards}
+              accentColor={cabColors.semantic.info}
+              iconName="rewards"
+              size="compact"
+            />
+          </CabStack>
         </CabStack>
       </CabCard>
 

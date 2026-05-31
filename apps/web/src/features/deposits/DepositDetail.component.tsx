@@ -13,6 +13,7 @@ import {
   CabStack,
   CabText,
 } from "@/design-system";
+import { getExplorerTokenUrl, getSupportedChain } from "@/chains/chains";
 import { cabColors } from "@/design-system/tokens";
 import { DepositCoveredRangeNote } from "@/features/deposits/components/DepositCoveredRangeNote";
 import { DepositDetailHeader } from "@/features/deposits/components/DepositDetailHeader";
@@ -34,9 +35,10 @@ type DepositDetailComponentProps = {
   onClose?: () => void;
 };
 
-function explorerUrl(tokenId: string | null) {
+function explorerUrl(chainId: number, tokenId: string | null) {
   if (!tokenId) return null;
-  return `https://basescan.org/token/0x827922686190790b37229fd06084350e74485b72?a=${tokenId}`;
+  const positionManagerAddress = getSupportedChain(chainId)?.aerodromePositionManagerAddress ?? null;
+  return positionManagerAddress ? getExplorerTokenUrl(chainId, positionManagerAddress, tokenId) : null;
 }
 
 export function DepositDetailComponent(input: DepositDetailComponentProps) {
@@ -68,6 +70,7 @@ export function DepositDetailComponent(input: DepositDetailComponentProps) {
   }
 
   const deposit = input.response.deposit;
+  const depositExplorerUrl = explorerUrl(input.response.chainId, deposit.tokenId);
   const viewModel = mapDepositDetailResponseToViewModel({
     response: input.response,
     locale: input.locale,
@@ -81,7 +84,7 @@ export function DepositDetailComponent(input: DepositDetailComponentProps) {
         subtitle={viewModel.header.subtitle}
         statusLabel={viewModel.header.statusLabel}
         tokenIdLabel={viewModel.header.tokenIdLabel}
-        explorerUrl={explorerUrl(deposit.tokenId)}
+        explorerUrl={depositExplorerUrl}
         viewInExplorerLabel={viewModel.actions.viewInExplorerLabel}
         rewardsHref={buildDepositRewardsHref(deposit.depositId)}
         viewRewardsLabel={t("navigation:items.rewards")}
@@ -168,11 +171,11 @@ export function DepositDetailComponent(input: DepositDetailComponentProps) {
       ) : null}
 
       <CabStack row gap="$2" flexWrap="wrap">
-        {explorerUrl(deposit.tokenId) ? (
+        {depositExplorerUrl ? (
           <CabButton
             tone="warning"
             onPress={() => {
-              window.open(explorerUrl(deposit.tokenId)!, "_blank", "noopener,noreferrer");
+              window.open(depositExplorerUrl, "_blank", "noopener,noreferrer");
             }}
           >
             {viewModel.actions.viewInExplorerLabel}

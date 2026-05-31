@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import { CabLineChart } from "@/design-system";
 import { cabColors } from "@/design-system/tokens";
+import { formatDateParts } from "@/i18n/formatters";
 
 export function PoolHistoryChart(input: {
   data: Array<{
@@ -18,13 +19,11 @@ export function PoolHistoryChart(input: {
 }) {
   const { i18n } = useTranslation();
   const chartData = useMemo(() => {
-    const formatter = new Intl.DateTimeFormat(i18n.language, {
-      month: "short",
-      day: "numeric",
-    });
-
     return input.data.map((point) => ({
-      dateLabel: formatter.format(new Date(point.timestamp)),
+      dateLabel: formatDateParts(point.timestamp, i18n.language, {
+        month: "short",
+        day: "numeric",
+      }),
       deployedValueUsd: point.deployedValueUsd,
     }));
   }, [i18n.language, input.data]);

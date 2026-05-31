@@ -9,6 +9,7 @@ import {
   CabLoadingPanel,
   CabSectionHeader,
   CabStack,
+  DataTablePagination,
 } from "@/design-system";
 import { PoolDetailComponent } from "@/features/pools/PoolDetail.component";
 import { PoolsFiltersBar } from "@/features/pools/components/PoolsFiltersBar";
@@ -31,6 +32,14 @@ type PoolsComponentProps = {
   filters: PoolsListFilters;
   selectedPoolId?: string | null;
   errorCode: string | null;
+  isRefreshing?: boolean;
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalRows: number;
+    totalPages: number;
+    pageSizeOptions: number[];
+  };
   detailPanel?: {
     poolId: string;
     screenState: "loading" | "ready" | "error" | "locked";
@@ -45,6 +54,8 @@ type PoolsComponentProps = {
   onRetry: () => void;
   onSearchChange: (value: string) => void;
   onStatusChange: (value: PoolsListFilters["status"]) => void;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
   onSelectPool: (poolId: string) => void;
   expandedPoolId: string | null;
   onToggleExpand: (poolId: string) => void;
@@ -54,7 +65,7 @@ type PoolsComponentProps = {
 };
 
 export function PoolsComponent(input: PoolsComponentProps) {
-  const { t } = useTranslation(["pools", "coverage"]);
+  const { t } = useTranslation(["pools", "coverage", "common"]);
 
   if (input.screenState === "loading") {
     return <CabLoadingPanel label={t("pools:states.loading")} />;
@@ -176,6 +187,23 @@ export function PoolsComponent(input: PoolsComponentProps) {
             }}
             getCoverageLabel={(coverageStatus) => t(getPoolsCoverageLabelKey(coverageStatus))}
             onSelect={input.onSelectPool}
+          />
+          <DataTablePagination
+            page={input.pagination.page}
+            pageSize={input.pagination.pageSize}
+            totalRows={input.pagination.totalRows}
+            totalPages={input.pagination.totalPages}
+            pageSizeOptions={input.pagination.pageSizeOptions}
+            loading={input.isRefreshing}
+            labels={{
+              previous: t("common:previous"),
+              next: t("common:next"),
+              page: (page, totalPages) => t("common:pageIndicator", { page, totalPages }),
+              rowsPerPage: t("common:rowsPerPage"),
+              showing: (from, to, total) => t("common:showingRange", { from, to, total }),
+            }}
+            onPageChange={input.onPageChange}
+            onPageSizeChange={input.onPageSizeChange}
           />
         </CabStack>
       </div>

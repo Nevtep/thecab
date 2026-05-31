@@ -97,6 +97,13 @@ export function isGovernanceRewardCandidate(input: {
   return true;
 }
 
+export function isExcludedAirdropRewardLedgerRow(input: {
+  classification: string | null;
+  metadataJson: Record<string, unknown>;
+}) {
+  return input.classification === "airdrop" || input.metadataJson.economicExclusionReason === "airdrop_spam";
+}
+
 export function resolveRewardClaimTarget(input: {
   candidate: RewardCandidateInput;
   depositTargets: RewardDepositTarget[];
@@ -228,6 +235,14 @@ export const phaseRewardsTask = task({
         }))
         .map((row) => row.txHash.toLowerCase()),
     );
+    const excludedAirdropTxHashes = new Set(
+      ledgerRows
+        .filter((row) => isExcludedAirdropRewardLedgerRow({
+          classification: row.classification,
+          metadataJson: row.metadataJson,
+        }))
+        .map((row) => row.txHash.toLowerCase()),
+    );
     const depositTargets = depositRows.map((row) => ({
       depositId: row.depositId,
       poolId: row.poolId,
@@ -250,6 +265,7 @@ export const phaseRewardsTask = task({
 
     const resolvedClaims = latestRewardCandidates.map((candidate, index) => {
       const governanceCandidate = governanceCandidateTxHashes.has(candidate.txHash.toLowerCase());
+      const excludedAirdropCandidate = excludedAirdropTxHashes.has(candidate.txHash.toLowerCase());
       const candidateWithGovernanceSurface = governanceCandidate
         ? { ...candidate, surfaceKind: "governance_voter_claim" as const, economicComponentKind: candidate.economicComponentKind ?? "reward_claim" }
         : candidate;
@@ -261,31 +277,42 @@ export const phaseRewardsTask = task({
         depositTargets,
         strategyTargets,
       });
+      const resolvedTarget = excludedAirdropCandidate
+        ? {
+            depositOrStrategyId: null,
+            strategyExposureId: null,
+            resolvedPoolId: null,
+            targetType: candidateWithPool.targetType,
+            resolutionBasis: "excluded_airdrop_spam",
+            resolutionReasonCodes: ["excludedAirdrop", "airdrop_spam"],
+            resolutionStatus: "excluded" as const,
+          }
+        : resolution;
 
       return {
         txHash: candidateWithPool.txHash,
         logIndex: index,
-        rewardType: governanceCandidate ? "governance_reward" : inferRewardType(candidateWithPool),
-        depositOrStrategyId: resolution.depositOrStrategyId,
-        strategyExposureId: resolution.strategyExposureId,
-        resolvedPoolId: resolution.resolvedPoolId,
+        rewardType: excludedAirdropCandidate ? "excluded_airdrop" : governanceCandidate ? "governance_reward" : inferRewardType(candidateWithPool),
+        depositOrStrategyId: resolvedTarget.depositOrStrategyId,
+        strategyExposureId: resolvedTarget.strategyExposureId,
+        resolvedPoolId: resolvedTarget.resolvedPoolId,
         occurredAt: candidateWithPool.occurredAt,
-        resolutionBasis: resolution.resolutionBasis,
+        resolutionBasis: resolvedTarget.resolutionBasis,
         category: candidateWithPool.category,
         summary: candidateWithPool.summary,
         protocol: candidateWithPool.protocol,
-        targetType: resolution.targetType,
-        resolutionReasonCodes: resolution.resolutionReasonCodes,
-        resolutionStatus: resolution.resolutionStatus,
+        targetType: resolvedTarget.targetType,
+        resolutionReasonCodes: resolvedTarget.resolutionReasonCodes,
+        resolutionStatus: resolvedTarget.resolutionStatus,
         targetTokenId: candidateWithPool.targetTokenId,
         targetWrapperAddress: candidateWithPool.targetWrapperAddress,
-        surfaceKind: candidateWithPool.surfaceKind,
+        surfaceKind: excludedAirdropCandidate ? "airdrop_spam" : candidateWithPool.surfaceKind,
         componentKey: candidateWithPool.componentKey,
         economicComponentKind: candidateWithPool.economicComponentKind,
         movementLogIndexes: candidateWithPool.movementLogIndexes,
-        feeAttributionBasis: resolution.feeAttributionBasis,
-        externalStrategyPositionReference: resolution.externalStrategyPositionReference,
-        externalStrategyPositionReferenceStatus: resolution.externalStrategyPositionReferenceStatus,
+        feeAttributionBasis: excludedAirdropCandidate ? null : resolution.feeAttributionBasis,
+        externalStrategyPositionReference: excludedAirdropCandidate ? null : resolution.externalStrategyPositionReference,
+        externalStrategyPositionReferenceStatus: excludedAirdropCandidate ? "unresolved" as const : resolution.externalStrategyPositionReferenceStatus,
       };
     });
 

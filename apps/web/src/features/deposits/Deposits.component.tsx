@@ -10,6 +10,7 @@ import {
   CabLoadingPanel,
   CabSectionHeader,
   CabStack,
+  DataTablePagination,
   DataTableEmptyState,
 } from "@/design-system";
 import { DepositDetailContainer } from "@/features/deposits/DepositDetail.container";
@@ -51,6 +52,7 @@ type DepositsComponentProps = {
   selectedDepositId: string | null;
   selectedDepositReturnTo: string | null;
   errorCode: string | null;
+  isRefreshing?: boolean;
   onRetry: () => void;
   onStatusChange: (value: DepositsStatusFilter) => void;
   onClearPool: () => void;
@@ -59,6 +61,8 @@ type DepositsComponentProps = {
   onClearDateRange: () => void;
   onReturnSignChange: (value: DepositsReturnSignFilter) => void;
   onSortChange: (sort: DepositsSortField, direction: DepositsSortDirection) => void;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: number) => void;
   onSelectRow: (depositId: string) => void;
   onCloseDetail: () => void;
   onOpenStrategies: () => void;
@@ -66,7 +70,7 @@ type DepositsComponentProps = {
 
 export function DepositsComponent(input: DepositsComponentProps) {
   const { onCloseDetail, selectedDepositId } = input;
-  const { t } = useTranslation(["deposits"]);
+  const { t } = useTranslation(["deposits", "common"]);
 
   useEffect(() => {
     if (!selectedDepositId) {
@@ -224,6 +228,7 @@ export function DepositsComponent(input: DepositsComponentProps) {
           />
           <DepositsTable
             items={input.viewModel.items}
+            loading={input.isRefreshing}
             locale={input.locale}
             hiddenColumns={input.hiddenColumns}
             sort={input.sort}
@@ -240,6 +245,23 @@ export function DepositsComponent(input: DepositsComponentProps) {
             emptyState={filteredEmptyState}
             onSortChange={input.onSortChange}
             onSelectRow={input.onSelectRow}
+          />
+          <DataTablePagination
+            page={input.viewModel.page.page}
+            pageSize={input.viewModel.page.pageSize}
+            totalRows={input.viewModel.page.totalCount}
+            totalPages={Math.max(1, Math.ceil(input.viewModel.page.totalCount / input.viewModel.page.pageSize))}
+            pageSizeOptions={[10, 25, 50, 100]}
+            loading={input.isRefreshing}
+            labels={{
+              previous: t("common:previous"),
+              next: t("common:next"),
+              page: (page, totalPages) => t("common:pageIndicator", { page, totalPages }),
+              rowsPerPage: t("common:rowsPerPage"),
+              showing: (from, to, total) => t("common:showingRange", { from, to, total }),
+            }}
+            onPageChange={input.onPageChange}
+            onPageSizeChange={input.onPageSizeChange}
           />
         </CabStack>
       </div>

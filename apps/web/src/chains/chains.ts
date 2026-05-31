@@ -11,6 +11,7 @@ export type SupportedChain = {
   moralisChain: string;
   alchemyNetwork: string;
   rpcUrlEnvVar: string;
+  aerodromePositionManagerAddress: string;
 };
 
 export const SUPPORTED_CHAINS: Record<SupportedChainKey, SupportedChain> = {
@@ -23,6 +24,7 @@ export const SUPPORTED_CHAINS: Record<SupportedChainKey, SupportedChain> = {
     moralisChain: "base",
     alchemyNetwork: "base-mainnet",
     rpcUrlEnvVar: "ALCHEMY_BASE_RPC_URL",
+    aerodromePositionManagerAddress: "0x827922686190790b37229fd06084350e74485b72",
   },
 } as const;
 
@@ -49,4 +51,13 @@ export function getAlchemyNetwork(chainId: number): string {
 
 export function getExplorerBaseUrl(chainId: number): string {
   return assertSupportedChain(chainId).explorerBaseUrl;
+}
+
+export function getExplorerTxUrl(chainId: number, txHash: string): string {
+  return `${getExplorerBaseUrl(chainId)}/tx/${txHash}`;
+}
+
+export function getExplorerTokenUrl(chainId: number, tokenAddress: string, tokenId?: string | null): string {
+  const suffix = tokenId ? `?a=${tokenId}` : "";
+  return `${getExplorerBaseUrl(chainId)}/token/${tokenAddress}${suffix}`;
 }

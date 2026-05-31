@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 
-import { CabBadge, CabButton, CabCard, CabStack, CabText } from "@/design-system";
+import { CabBadge, CabButton, CabCard, CabImpactMetricCard, CabStack, CabText } from "@/design-system";
+import { cabColors } from "@/design-system/tokens";
 import { buildStrategyRewardsHref } from "@/features/rewards/rewards.navigation";
 import { StrategyCoverageNote } from "@/features/strategies/components/StrategyCoverageNote";
 import { StrategyExposureSummary } from "@/features/strategies/components/StrategyExposureSummary";
@@ -10,8 +11,6 @@ import { StrategyLifecycleTimeline } from "@/features/strategies/components/Stra
 import { StrategyRewardsTable } from "@/features/strategies/components/StrategyRewardsTable";
 import type { StrategyDetailView } from "@/features/strategies/strategies.types";
 import { formatUsd } from "@/i18n/formatters";
-
-import styles from "@/features/strategies/StrategiesWorkspace.module.css";
 
 type StrategySelectedPanelProps = {
   chainId: number;
@@ -67,26 +66,35 @@ export function StrategySelectedPanel({ chainId, locale, onOpenPool, strategy, l
         <CabStack gap="$2">
           <CabText variant="heading">{strategy.strategyLabel}</CabText>
           <CabText variant="caption">{strategy.poolLabel ?? "—"}</CabText>
-          <div className={styles.panelMetrics}>
-            <div>
-              <CabText variant="caption">{labels.currentValue}</CabText>
-              <CabText variant="label">{formatNullableUsd(strategy.currentEstimatedValueUsd, locale)}</CabText>
-            </div>
-            <div>
-              <CabText variant="caption">{labels.shares}</CabText>
-              <CabText variant="label">{strategy.currentSharesRaw} {strategy.shareSymbol ?? ""}</CabText>
-            </div>
-            <div>
-              <CabText variant="caption">{labels.totalReturn}</CabText>
-              <CabText variant="label">{formatNullableUsd(strategy.totalReturnUsd, locale)}</CabText>
-            </div>
+          <CabStack row gap="$2" flexWrap="wrap">
+            <CabImpactMetricCard
+              label={labels.currentValue}
+              value={formatNullableUsd(strategy.currentEstimatedValueUsd, locale)}
+              accentColor={cabColors.brand.signalTeal}
+              iconName="coins"
+              size="compact"
+            />
+            <CabImpactMetricCard
+              label={labels.shares}
+              value={`${strategy.currentSharesRaw} ${strategy.shareSymbol ?? ""}`.trim()}
+              accentColor={cabColors.brand.electricBlue}
+              iconName="pools"
+              size="compact"
+            />
+            <CabImpactMetricCard
+              label={labels.totalReturn}
+              value={formatNullableUsd(strategy.totalReturnUsd, locale)}
+              accentColor={cabColors.brand.cabGold}
+              iconName="activity"
+              size="compact"
+            />
             <CabBadge size="sm" tone={strategy.coverageStatus === "full" ? "success" : "warning"}>
               {translate(`coverage:level.${strategy.coverageStatus}`)}
             </CabBadge>
             <CabBadge size="sm" tone={strategy.confidence === "high" ? "success" : "warning"}>
               {translate(`coverage:confidence.${strategy.confidence}`)}
             </CabBadge>
-          </div>
+          </CabStack>
           {strategy.primaryPoolId && onOpenPool ? (
             <CabButton tone="secondary" controlSize="sm" onPress={() => onOpenPool(strategy.primaryPoolId!)}>
               {labels.openPool}

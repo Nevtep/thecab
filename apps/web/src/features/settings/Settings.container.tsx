@@ -111,11 +111,8 @@ export function SettingsContainer() {
     }
 
     void Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["overview", resolvedChainId, walletAddress] }),
-      queryClient.invalidateQueries({ queryKey: ["overview-shell", resolvedChainId, walletAddress] }),
-      queryClient.invalidateQueries({ queryKey: ["overview-activity", resolvedChainId, walletAddress] }),
-      queryClient.invalidateQueries({ queryKey: ["overview-chart", resolvedChainId, walletAddress] }),
-      queryClient.invalidateQueries({ queryKey: ["overview-protocol-positions", resolvedChainId, walletAddress] }),
+      ...queryKeys.overviewScope({ chainId: resolvedChainId, walletAddress })
+        .map((queryKey) => queryClient.invalidateQueries({ queryKey })),
       queryClient.invalidateQueries({ queryKey: queryKeys.settings({ chainId: resolvedChainId, walletAddress }) }),
     ]);
   }, [analysisStatusQuery.data?.status, queryClient, resolvedChainId, walletAddress]);
@@ -126,11 +123,8 @@ export function SettingsContainer() {
     }
 
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["overview", resolvedChainId, walletAddress] }),
-      queryClient.invalidateQueries({ queryKey: ["overview-shell", resolvedChainId, walletAddress] }),
-      queryClient.invalidateQueries({ queryKey: ["overview-activity", resolvedChainId, walletAddress] }),
-      queryClient.invalidateQueries({ queryKey: ["overview-chart", resolvedChainId, walletAddress] }),
-      queryClient.invalidateQueries({ queryKey: ["overview-protocol-positions", resolvedChainId, walletAddress] }),
+      ...queryKeys.overviewScope({ chainId: resolvedChainId, walletAddress })
+        .map((queryKey) => queryClient.invalidateQueries({ queryKey })),
     ]);
   }
 

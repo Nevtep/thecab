@@ -3,6 +3,7 @@ import { and, eq, gte, ilike, isNotNull, isNull, lte, or, sql } from "drizzle-or
 import { readAnalysisStatusContext } from "@/server/analysis/analysis-run.repository";
 import { getDb } from "@/server/db/client";
 import { performanceSnapshots, pools, rewardEvents } from "@/server/db/schema";
+import { getExplorerTxUrl, getSupportedChain } from "@/server/chains";
 import type {
   RewardEventRow,
   RewardsCoverageState,
@@ -77,8 +78,7 @@ function shortId(id: string | null, prefix: string) {
 
 function getExternalTxUrl(chainId: number, txHash: string | null) {
   if (!txHash) return null;
-  if (chainId === 8453) return `https://basescan.org/tx/${txHash}`;
-  return null;
+  return getSupportedChain(chainId) ? getExplorerTxUrl(chainId, txHash) : null;
 }
 
 function normalizeResolutionStatus(value: string): RewardsResolutionStatus {

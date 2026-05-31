@@ -82,7 +82,7 @@ export function RewardsContainer() {
 
   function updateUrl(nextState: typeof urlState) {
     const query = serializeRewardsUrlState(nextState);
-    router.replace(query ? `/rewards?${query}` : "/rewards");
+    router.replace(query ? `/rewards?${query}` : "/rewards", { scroll: false });
   }
 
   return (
@@ -111,6 +111,7 @@ export function RewardsContainer() {
         viewModel={viewModel}
         urlState={urlState}
         errorCode={rewardsQuery.error instanceof Error ? rewardsQuery.error.message : null}
+        isRefreshing={rewardsQuery.isFetching && !rewardsQuery.isLoading}
         onRetry={() => void rewardsQuery.refetch()}
         onStateChange={(nextState) => startTransition(() => updateUrl(nextState))}
         onClearFilter={(target) => startTransition(() => updateUrl(resetRewardsFilter(urlState, target)))}

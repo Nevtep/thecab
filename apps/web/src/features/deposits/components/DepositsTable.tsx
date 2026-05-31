@@ -85,6 +85,7 @@ function toneForConfidence(confidence: DepositSummaryRowViewModel["confidence"])
 
 type DepositsTableProps = {
   items: DepositSummaryRowViewModel[];
+  loading?: boolean;
   locale: string;
   hiddenColumns: DepositsTableColumnKey[];
   sort: DepositsSortField;
@@ -102,6 +103,7 @@ type DepositsTableProps = {
 
 export function DepositsTable({
   items,
+  loading = false,
   locale,
   hiddenColumns,
   sort,
@@ -127,6 +129,7 @@ export function DepositsTable({
         cell: (info) => (
           <PositionLabelCell
             row={info.row.original}
+            locale={locale}
             transferInLabel={labels.transferIn.badge}
             transferInTooltip={labels.transferIn.tooltip}
           />
@@ -262,6 +265,7 @@ export function DepositsTable({
       selectedRowId={selectedDepositId ?? null}
       onRowSelect={onSelectRow}
       emptyState={emptyState}
+      loading={loading}
     />
   );
 }

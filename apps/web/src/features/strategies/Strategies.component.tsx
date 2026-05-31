@@ -6,6 +6,8 @@ import {
   CabErrorPanel,
   CabLoadingPanel,
   CabSectionHeader,
+  CabStack,
+  DataTablePagination,
 } from "@/design-system";
 import { StrategiesEmptyState } from "@/features/strategies/components/StrategiesEmptyState";
 import { StrategiesFiltersBar } from "@/features/strategies/components/StrategiesFiltersBar";
@@ -22,6 +24,7 @@ type StrategiesComponentProps = {
   viewModel: StrategiesListViewModel | null;
   urlState: StrategiesListUrlState;
   errorCode: string | null;
+  isRefreshing?: boolean;
   onRetry: () => void;
   onSearchChange: (value: string) => void;
   onStatusChange: (value: StrategiesListUrlState["status"]) => void;
@@ -31,12 +34,14 @@ type StrategiesComponentProps = {
   onSortChange: (value: StrategiesListUrlState["sort"]) => void;
   onClearPool: () => void;
   onClearFilters: () => void;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (pageSize: StrategiesListUrlState["pageSize"]) => void;
   onSelectStrategy: (strategyExposureId: string) => void;
   onOpenPool: (poolId: string) => void;
 };
 
 export function StrategiesComponent(input: StrategiesComponentProps) {
-  const { i18n, t } = useTranslation(["strategies", "coverage"]);
+  const { i18n, t } = useTranslation(["strategies", "coverage", "common"]);
 
   if (input.screenState === "loading") {
     return <CabLoadingPanel label={t("strategies:states.loadingTitle")} />;
@@ -126,22 +131,42 @@ export function StrategiesComponent(input: StrategiesComponentProps) {
         onClearFilters={() => input.onClearFilters()}
       />
       <div className={styles.dataView}>
-        <StrategiesTable
-          items={input.viewModel.items}
-          labels={{
-            strategy: t("strategies:table.columns.strategy"),
-            status: t("strategies:table.columns.status"),
-            currentValue: t("strategies:table.columns.currentValue"),
-            shares: t("strategies:table.columns.shares"),
-            rewards: t("strategies:table.columns.claimedRewards"),
-            result: t("strategies:table.columns.result"),
-            apr: t("strategies:table.columns.estimatedApr"),
-            coverage: t("strategies:table.columns.coverage"),
-            select: t("strategies:actions.openStrategy"),
-          }}
-          getCoverageLabel={(coverage) => t(getStrategyCoverageLabelKey(coverage))}
-          onSelect={input.onSelectStrategy}
-        />
+        <CabStack gap="$2">
+          <StrategiesTable
+            items={input.viewModel.items}
+            loading={input.isRefreshing}
+            labels={{
+              strategy: t("strategies:table.columns.strategy"),
+              status: t("strategies:table.columns.status"),
+              currentValue: t("strategies:table.columns.currentValue"),
+              shares: t("strategies:table.columns.shares"),
+              rewards: t("strategies:table.columns.claimedRewards"),
+              result: t("strategies:table.columns.result"),
+              apr: t("strategies:table.columns.estimatedApr"),
+              coverage: t("strategies:table.columns.coverage"),
+              select: t("strategies:actions.openStrategy"),
+            }}
+            getCoverageLabel={(coverage) => t(getStrategyCoverageLabelKey(coverage))}
+            onSelect={input.onSelectStrategy}
+          />
+          <DataTablePagination
+            page={input.viewModel.page.page}
+            pageSize={input.viewModel.page.pageSize}
+            totalRows={input.viewModel.page.totalItems}
+            totalPages={input.viewModel.page.totalPages}
+            pageSizeOptions={[10, 25, 50]}
+            loading={input.isRefreshing}
+            labels={{
+              previous: t("common:previous"),
+              next: t("common:next"),
+              page: (page, totalPages) => t("common:pageIndicator", { page, totalPages }),
+              rowsPerPage: t("common:rowsPerPage"),
+              showing: (from, to, total) => t("common:showingRange", { from, to, total }),
+            }}
+            onPageChange={input.onPageChange}
+            onPageSizeChange={(pageSize) => input.onPageSizeChange(pageSize as StrategiesListUrlState["pageSize"])}
+          />
+        </CabStack>
         <StrategySelectedPanel
           chainId={input.viewModel.chainId}
           locale={i18n.language}

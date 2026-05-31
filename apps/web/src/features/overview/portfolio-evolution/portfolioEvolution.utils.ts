@@ -1,4 +1,5 @@
 import type { OverviewRange, OverviewViewModel } from "@/features/overview/overview.types";
+import { formatDateParts } from "@/i18n/formatters";
 
 export type PortfolioEvolutionEventType =
   | "cash_out"
@@ -56,7 +57,7 @@ export type PortfolioEvolutionModel = {
 };
 
 function roundUsd(value: number) {
-  return Number(value.toFixed(2));
+  return Math.round(value * 100) / 100;
 }
 
 function toBucketTimestamp(timestamp: string, range: OverviewRange) {
@@ -74,26 +75,26 @@ export function formatPortfolioEvolutionBucketLabel(timestamp: string, range: Ov
   const date = new Date(timestamp);
 
   if (range === "24h") {
-    return new Intl.DateTimeFormat(locale, { hour: "numeric" }).format(date);
+    return formatDateParts(date, locale, { hour: "numeric" });
   }
 
-  return new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", timeZone: "UTC" }).format(date);
+  return formatDateParts(date, locale, { month: "short", day: "numeric", timeZone: "UTC" });
 }
 
 export function formatPortfolioEvolutionBucketTimestamp(timestamp: string, range: OverviewRange, locale: string) {
   const date = new Date(timestamp);
 
   if (range === "24h") {
-    return new Intl.DateTimeFormat(locale, {
+    return formatDateParts(date, locale, {
       dateStyle: "medium",
       timeStyle: "short",
-    }).format(date);
+    });
   }
 
-  return new Intl.DateTimeFormat(locale, {
+  return formatDateParts(date, locale, {
     dateStyle: "medium",
     timeZone: "UTC",
-  }).format(date);
+  });
 }
 
 function buildMarkerBucketsFromChartEvents(

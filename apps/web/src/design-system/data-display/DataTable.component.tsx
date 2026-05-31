@@ -35,6 +35,7 @@ export type DataTableProps<TData extends RowData> = {
   columns: Array<ColumnDef<TData, unknown>>;
   data: TData[];
   rowKey: (row: TData) => string;
+  surface?: "card" | "embedded";
   selectedRowId?: string | null;
   onRowSelect?: (rowId: string) => void;
   sorting?: SortingState;
@@ -54,6 +55,7 @@ export function DataTable<TData extends RowData>({
   columns,
   data,
   rowKey,
+  surface = "card",
   selectedRowId,
   onRowSelect,
   sorting,
@@ -92,8 +94,8 @@ export function DataTable<TData extends RowData>({
   const resolvedLoadingState = loadingState ?? <DataTableLoadingState />;
   const resolvedEmptyState = emptyState ?? <DataTableEmptyState />;
 
-  return (
-    <CabCard density="compact" padding={0} gap={0}>
+  const tableContent = (
+    <>
       {toolbar}
       {loading && isEmpty ? (
         resolvedLoadingState
@@ -135,6 +137,16 @@ export function DataTable<TData extends RowData>({
           {loading ? <div className={styles.loadingOverlay}>{resolvedLoadingState}</div> : null}
         </div>
       )}
+    </>
+  );
+
+  if (surface === "embedded") {
+    return <div className={styles.embeddedSurface}>{tableContent}</div>;
+  }
+
+  return (
+    <CabCard density="compact" padding={0} gap={0}>
+      {tableContent}
     </CabCard>
   );
 }

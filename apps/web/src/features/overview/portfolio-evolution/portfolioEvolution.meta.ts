@@ -40,7 +40,7 @@ export const portfolioEvolutionEventMeta: Record<
   },
   redeploy: {
     labelKey: "overview:portfolioEvolution.events.redeploy",
-    color: "#8B5CF6",
+    color: cabColors.dataViz.violet,
     tone: "neutral",
   },
   lock: {
@@ -50,7 +50,7 @@ export const portfolioEvolutionEventMeta: Record<
   },
   vote: {
     labelKey: "overview:portfolioEvolution.events.vote",
-    color: "#6366F1",
+    color: cabColors.dataViz.cobalt,
     tone: "info",
   },
 };

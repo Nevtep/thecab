@@ -132,13 +132,22 @@ export function useWarmOverviewMutation() {
 }
 
 export function usePoolsQuery(
-  input: WalletScopedInput & { filters: PoolsListFilters },
+  input: WalletScopedInput & { filters: PoolsListFilters; cursor?: string | null; limit?: number },
   options?: { enabled?: boolean },
 ) {
   return useQuery<PoolsListResponse>({
-    queryKey: queryKeys.pools(input),
+    queryKey: queryKeys.pools({
+      chainId: input.chainId,
+      walletAddress: input.walletAddress,
+      filters: { ...input.filters, cursor: input.cursor ?? null, limit: input.limit ?? null },
+    }),
     queryFn: () =>
-      apiClient(`/api/pools?${buildPoolsListQueryString({ chainId: input.chainId, filters: input.filters })}`),
+      apiClient(`/api/pools?${buildPoolsListQueryString({
+        chainId: input.chainId,
+        filters: input.filters,
+        cursor: input.cursor,
+        limit: input.limit,
+      })}`),
     enabled: (options?.enabled ?? true) && Boolean(input.walletAddress),
   });
 }

@@ -19,5 +19,6 @@ export function getRewardsQueryOptions(input: {
       apiClient<RewardsResponse>(
         `/api/rewards?${buildRewardsApiQueryString({ chainId: input.chainId, state: input.state })}`,
       ),
+    placeholderData: (previousData: RewardsResponse | undefined) => previousData,
   };
 }

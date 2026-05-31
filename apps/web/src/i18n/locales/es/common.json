@@ -21,5 +21,6 @@
   "yes": "Sí",
   "no": "No",
   "previous": "Anterior",
-  "next": "Siguiente"
+  "next": "Siguiente",
+  "pageIndicator": "Página {{page}} / {{totalPages}}"
 }

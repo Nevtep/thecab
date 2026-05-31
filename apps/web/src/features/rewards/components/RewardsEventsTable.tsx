@@ -5,17 +5,18 @@ import { useMemo } from "react";
 
 import {
   CabBadge,
-  CabButton,
   CabStack,
   CabText,
   CabTokenIcon,
   CabTxHash,
   DataTable,
   DataTableEmptyState,
+  DataTablePagination,
   DataTableStatusCell,
   DataTableToolbar,
   DataTableValueCell,
 } from "@/design-system";
+import { REWARDS_PAGE_SIZE_OPTIONS } from "@/features/rewards/rewards.filters";
 import type { RewardEventRow, RewardsUrlState, RewardsViewModel } from "@/features/rewards/rewards.types";
 
 import styles from "@/features/rewards/RewardsWorkspace.module.css";
@@ -41,6 +42,8 @@ type Props = {
     tx: string;
     previous: string;
     next: string;
+    page: (page: number, totalPages: number) => string;
+    rowsPerPage: string;
     showing: (from: number, to: number, total: number) => string;
     emptyTitle: string;
     emptyDescription: string;
@@ -49,6 +52,7 @@ type Props = {
     getConfidence: (confidence: string) => string;
     getSource: (source: string) => string;
   };
+  loading?: boolean;
   onStateChange: (state: RewardsUrlState) => void;
 };
 
@@ -65,7 +69,7 @@ function ownerLabel(row: RewardEventRow, labels: Props["labels"]) {
   return labels.getSource(row.owner.status);
 }
 
-export function RewardsEventsTable({ viewModel, state, labels, onStateChange }: Props) {
+export function RewardsEventsTable({ viewModel, state, labels, loading = false, onStateChange }: Props) {
   const pagination = viewModel.events.pagination;
   const from = pagination.totalRows === 0 ? 0 : (pagination.page - 1) * pagination.pageSize + 1;
   const to = Math.min(pagination.totalRows, pagination.page * pagination.pageSize);
@@ -216,9 +220,10 @@ export function RewardsEventsTable({ viewModel, state, labels, onStateChange }: 
         columns={columns}
         data={viewModel.events.rows}
         rowKey={(row) => row.rewardEventId}
-        selectedRowId={viewModel.selectedReward?.rewardEventId ?? null}
+        selectedRowId={state.selectedRewardEventId ?? viewModel.selectedReward?.rewardEventId ?? null}
         onRowSelect={(rewardEventId) => onStateChange({ ...state, selectedRewardEventId: rewardEventId })}
         stickyHeader
+        loading={loading}
         toolbar={
           <DataTableToolbar
             title={labels.title}
@@ -232,27 +237,23 @@ export function RewardsEventsTable({ viewModel, state, labels, onStateChange }: 
           />
         }
       />
-      <CabStack row className={styles.pagination}>
-        <CabButton
-          tone="ghost"
-          controlSize="sm"
-          disabled={state.page <= 1}
-          onPress={() => onStateChange({ ...state, page: Math.max(1, state.page - 1) })}
-        >
-          {labels.previous}
-        </CabButton>
-        <CabText className={styles.numeric} fontSize={12}>
-          {pagination.page} / {pagination.totalPages}
-        </CabText>
-        <CabButton
-          tone="ghost"
-          controlSize="sm"
-          disabled={state.page >= pagination.totalPages}
-          onPress={() => onStateChange({ ...state, page: state.page + 1 })}
-        >
-          {labels.next}
-        </CabButton>
-      </CabStack>
+      <DataTablePagination
+        page={pagination.page}
+        pageSize={pagination.pageSize}
+        totalRows={pagination.totalRows}
+        totalPages={pagination.totalPages}
+        pageSizeOptions={REWARDS_PAGE_SIZE_OPTIONS}
+        loading={loading}
+        labels={{
+          previous: labels.previous,
+          next: labels.next,
+          page: labels.page,
+          rowsPerPage: labels.rowsPerPage,
+          showing: labels.showing,
+        }}
+        onPageChange={(page) => onStateChange({ ...state, page })}
+        onPageSizeChange={(pageSize) => onStateChange({ ...state, pageSize: pageSize as RewardsUrlState["pageSize"], page: 1 })}
+      />
     </CabStack>
   );
 }

@@ -42,6 +42,27 @@ export function formatTokenAmount(
   }).format(value);
 }
 
+export function formatNumber(
+  value: number,
+  locale: string,
+  options: Intl.NumberFormatOptions = {},
+): string {
+  return new Intl.NumberFormat(locale, options).format(value);
+}
+
+export function formatUnit(
+  value: number,
+  locale: string,
+  unit: Intl.NumberFormatOptions["unit"],
+  options: Omit<Intl.NumberFormatOptions, "style" | "unit"> = {},
+): string {
+  return new Intl.NumberFormat(locale, {
+    style: "unit",
+    unit,
+    ...options,
+  }).format(value);
+}
+
 export function formatPercent(value: number, locale: string): string {
   return new Intl.NumberFormat(locale, {
     style: "percent",
@@ -74,6 +95,14 @@ export function formatDate(value: Date | string, locale: string): string {
   return new Intl.DateTimeFormat(locale, {
     dateStyle: "medium",
   }).format(new Date(value));
+}
+
+export function formatDateParts(
+  value: Date | string,
+  locale: string,
+  options: Intl.DateTimeFormatOptions,
+): string {
+  return new Intl.DateTimeFormat(locale, options).format(new Date(value));
 }
 
 export function formatDayRange(startDayUtc: string | null, endDayUtc: string | null, locale: string): string | null {
