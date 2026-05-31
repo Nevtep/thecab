@@ -20,12 +20,23 @@
   },
   "filters": {
     "searchPlaceholder": "Search epoch, tx, token, pool...",
+    "datePreset": "Date range",
     "eventType": "Event type",
     "rewardType": "Reward type",
     "protocolSurface": "Surface",
+    "epoch": "Epoch",
+    "pool": "Pool",
+    "token": "Token",
     "coverage": "Coverage",
     "confidence": "Confidence",
+    "selected": "Selected",
     "clear": "Clear filters"
+  },
+  "datePresets": {
+    "7d": "7d",
+    "30d": "30d",
+    "90d": "90d",
+    "1y": "1y"
   },
   "lock": {
     "empty": "No veAERO lock exposure has been materialized for this wallet.",
@@ -120,6 +131,8 @@
   "empty": {
     "title": "No governance activity found",
     "description": "The current wallet has no supported governance activity in the persisted analysis output.",
+    "filteredTitle": "No governance results match",
+    "filteredDescription": "Adjust or clear filters to inspect governance rewards, epochs, and events.",
     "rewardsTitle": "No governance rewards",
     "rewardsDescription": "Rewards will appear here when bribe, fee, rebase, or relay claims are materialized."
   },

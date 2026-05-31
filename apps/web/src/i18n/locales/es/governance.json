@@ -20,12 +20,23 @@
   },
   "filters": {
     "searchPlaceholder": "Buscar epoch, tx, token, pool...",
+    "datePreset": "Rango de fecha",
     "eventType": "Tipo de evento",
     "rewardType": "Tipo de reward",
     "protocolSurface": "Superficie",
+    "epoch": "Epoch",
+    "pool": "Pool",
+    "token": "Token",
     "coverage": "Cobertura",
     "confidence": "Confianza",
+    "selected": "Seleccionado",
     "clear": "Limpiar filtros"
+  },
+  "datePresets": {
+    "7d": "7d",
+    "30d": "30d",
+    "90d": "90d",
+    "1y": "1a"
   },
   "lock": {
     "empty": "No se materializó exposición veAERO para esta wallet.",
@@ -120,6 +131,8 @@
   "empty": {
     "title": "No se encontró actividad de gobernanza",
     "description": "La wallet actual no tiene actividad de gobernanza soportada en la salida persistida del análisis.",
+    "filteredTitle": "No hay resultados de gobernanza",
+    "filteredDescription": "Ajustá o limpiá los filtros para inspeccionar rewards, epochs y eventos de gobernanza.",
     "rewardsTitle": "Sin rewards de gobernanza",
     "rewardsDescription": "Los bribes, fees, rebases o claims de relay aparecerán acá cuando estén materializados."
   },

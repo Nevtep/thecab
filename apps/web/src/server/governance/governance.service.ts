@@ -100,6 +100,7 @@ function remainingDays(expiresAt: string | null) {
 export function createGovernanceActiveChips(input: GovernanceRequest): GovernanceResponse["filters"]["activeChips"] {
   const chips: GovernanceResponse["filters"]["activeChips"] = [];
   if (input.search) chips.push({ id: "search", labelKey: "governance:filters.searchPlaceholder", value: input.search, removeTarget: "search" });
+  if (input.datePreset !== "all") chips.push({ id: "datePreset", labelKey: "governance:filters.datePreset", value: input.datePreset, removeTarget: "datePreset" });
   if (input.eventType !== "all") chips.push({ id: "eventType", labelKey: "governance:filters.eventType", value: input.eventType, removeTarget: "eventType" });
   if (input.rewardType !== "all") chips.push({ id: "rewardType", labelKey: "governance:filters.rewardType", value: input.rewardType, removeTarget: "rewardType" });
   if (input.protocolSurface !== "all") chips.push({ id: "protocolSurface", labelKey: "governance:filters.protocolSurface", value: input.protocolSurface, removeTarget: "protocolSurface" });
@@ -108,6 +109,14 @@ export function createGovernanceActiveChips(input: GovernanceRequest): Governanc
   if (input.tokenAddress) chips.push({ id: "tokenAddress", labelKey: "governance:filters.token", value: input.tokenAddress, removeTarget: "tokenAddress" });
   if (input.coverage) chips.push({ id: "coverage", labelKey: "governance:filters.coverage", value: input.coverage, removeTarget: "coverage" });
   if (input.confidence) chips.push({ id: "confidence", labelKey: "governance:filters.confidence", value: input.confidence, removeTarget: "confidence" });
+  if (input.selectedGovernanceId) {
+    chips.push({
+      id: "selectedGovernanceId",
+      labelKey: "governance:filters.selected",
+      value: input.selectedGovernanceId,
+      removeTarget: "selected",
+    });
+  }
   return chips;
 }
 

@@ -153,7 +153,16 @@ function shouldPersistExplorerEvidence(evidence: ExplorerEvidence) {
   if (evidence.sourceRefs.length === 0) {
     return false;
   }
-  return evidence.sourceRefs.every((sourceRef) => sourceRef.status === "complete");
+  if (evidence.evidenceGapReasonCodes.includes("explorerRequestDebounced")) {
+    return false;
+  }
+  if (evidence.evidenceGapReasonCodes.includes("explorerRateLimited")) {
+    return false;
+  }
+  if (evidence.evidenceGapReasonCodes.includes("missingExplorerCredentials")) {
+    return false;
+  }
+  return true;
 }
 
 function isExplorerEvidenceRateLimited(chainId: number) {
@@ -377,4 +386,23 @@ export async function fetchExplorerTransactionEvidence(input: ExplorerClientConf
       }
     }
   }
+}
+
+export async function readCachedExplorerTransactionEvidence(input: {
+  chainId: number;
+  txHash: string;
+}) {
+  const txHash = normalizeTxHash(input.txHash);
+  return readProviderCachedResponse<ExplorerEvidence>({
+    provider: "basescan",
+    endpoint: EXPLORER_TRANSACTION_EVIDENCE_ENDPOINT,
+    chainId: input.chainId,
+    walletAddress: null,
+    cacheKey: buildExplorerTransactionEvidenceCacheKey({
+      chainId: input.chainId,
+      txHash,
+    }),
+    maxAgeMs: null,
+    readOrder: "db-first",
+  });
 }

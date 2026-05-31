@@ -9,8 +9,10 @@ import { runCanonicalInference } from "@/server/analysis/canonicalInference";
 import { classifyRunLedgerEvents } from "@/server/analysis/enginePersistence";
 import { getDb } from "@/server/db/client";
 import { processedTxs, rawProviderRecords } from "@/server/db/schema";
+import { getEnv } from "@/server/env";
 import {
   fetchExplorerTransactionEvidence,
+  readCachedExplorerTransactionEvidence,
   type ExplorerEvidence,
 } from "@/server/providers/explorer";
 
@@ -35,6 +37,8 @@ type PhaseActivityPerfEvent = Record<string, unknown> & {
   walletAddress: string;
 };
 
+type SupplementalExplorerEvidenceMode = "disabled" | "cache_only" | "live";
+
 function elapsedMs(startedAt: number) {
   return Math.round(performance.now() - startedAt);
 }
@@ -44,6 +48,10 @@ function logPhaseActivityPerf(event: PhaseActivityPerfEvent) {
     phase: "phase-activity",
     ...event,
   }));
+}
+
+function uniqueTxHashes(txHashes: string[]) {
+  return [...new Set(txHashes.map((txHash) => txHash.toLowerCase()))];
 }
 
 function parseWalletTokenSignals(value: unknown): WalletTokenSignal[] {
@@ -96,16 +104,33 @@ async function collectSupplementalExplorerEvidence(input: {
   walletAddress: string;
   chainId: number;
   txHashes: string[];
+  mode: SupplementalExplorerEvidenceMode;
 }) {
   const startedAt = performance.now();
+  if (input.mode === "disabled") {
+    logPhaseActivityPerf({
+      event: "supplemental_evidence_skipped",
+      runId: input.runId,
+      chainId: input.chainId,
+      walletAddress: input.walletAddress.toLowerCase(),
+      txCount: input.txHashes.length,
+      mode: input.mode,
+      reason: "disabled",
+    });
+    return {};
+  }
+
   logPhaseActivityPerf({
     event: "supplemental_evidence_started",
     runId: input.runId,
     chainId: input.chainId,
     walletAddress: input.walletAddress.toLowerCase(),
     txCount: input.txHashes.length,
+    mode: input.mode,
   });
   const evidenceByTxHash: Record<string, ExplorerEvidence> = {};
+  let cacheHitCount = 0;
+  let liveFetchCount = 0;
   const slowestTxs: Array<{
     txHash: string;
     totalMs: number;
@@ -116,13 +141,42 @@ async function collectSupplementalExplorerEvidence(input: {
   for (const [index, txHash] of input.txHashes.entries()) {
     const txStartedAt = performance.now();
     const fetchStartedAt = performance.now();
-    const evidence = await fetchExplorerTransactionEvidence({
+    const cachedEvidence = await readCachedExplorerTransactionEvidence({
       chainId: input.chainId,
       txHash,
     });
+    const evidence = cachedEvidence ?? (
+      input.mode === "live"
+        ? await fetchExplorerTransactionEvidence({
+          chainId: input.chainId,
+          txHash,
+        })
+        : null
+    );
     const fetchMs = elapsedMs(fetchStartedAt);
-    evidenceByTxHash[txHash.toLowerCase()] = evidence;
     const totalMs = elapsedMs(txStartedAt);
+    if (cachedEvidence) {
+      cacheHitCount += 1;
+    } else if (evidence && input.mode === "live") {
+      liveFetchCount += 1;
+    }
+    if (!evidence) {
+      if ((index + 1) % 250 === 0 || index === input.txHashes.length - 1) {
+        logPhaseActivityPerf({
+          event: "supplemental_evidence_cache_progress",
+          runId: input.runId,
+          chainId: input.chainId,
+          walletAddress: input.walletAddress.toLowerCase(),
+          completedTxCount: index + 1,
+          totalTxCount: input.txHashes.length,
+          cacheHitCount,
+          liveFetchCount,
+          mode: input.mode,
+        });
+      }
+      continue;
+    }
+    evidenceByTxHash[txHash.toLowerCase()] = evidence;
     slowestTxs.push({
       txHash: txHash.toLowerCase(),
       totalMs,
@@ -144,6 +198,9 @@ async function collectSupplementalExplorerEvidence(input: {
         lastTxElapsedMs: totalMs,
         lastFetchMs: fetchMs,
         lastGapReasons: evidence.evidenceGapReasonCodes,
+        cacheHitCount,
+        liveFetchCount,
+        mode: input.mode,
       });
     }
   }
@@ -154,6 +211,10 @@ async function collectSupplementalExplorerEvidence(input: {
     walletAddress: input.walletAddress.toLowerCase(),
     txCount: input.txHashes.length,
     elapsedMs: elapsedMs(startedAt),
+    cacheHitCount,
+    liveFetchCount,
+    evidenceCount: Object.keys(evidenceByTxHash).length,
+    mode: input.mode,
     slowestTxs,
   });
   return evidenceByTxHash;
@@ -248,7 +309,8 @@ export const phaseActivityTask = task({
       walletAddress,
       elapsedMs: elapsedMs(loadSlicesStartedAt),
       sliceCount: slices.length,
-      txCount: txRows.length,
+      rawTxRowCount: txRows.length,
+      txCount: uniqueTxHashes(txRows.map((row) => row.txHash)).length,
     });
 
     const tokenSignalsStartedAt = performance.now();
@@ -275,12 +337,14 @@ export const phaseActivityTask = task({
       spamTokenCount: spamTokenAddresses.length,
     });
 
-    const txHashes = txRows.map((row) => row.txHash);
+    const txHashes = uniqueTxHashes(txRows.map((row) => row.txHash));
+    const supplementalExplorerEvidenceMode = getEnv().ANALYSIS_SUPPLEMENTAL_EXPLORER_EVIDENCE;
     const supplementalEvidenceByTxHash = await collectSupplementalExplorerEvidence({
       walletAddress: payload.walletAddress,
       chainId: payload.chainId,
       runId: payload.runId,
       txHashes,
+      mode: supplementalExplorerEvidenceMode,
     });
 
     const classifyStartedAt = performance.now();

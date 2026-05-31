@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  createDefaultGovernanceUrlState,
   buildGovernanceApiQueryString,
   normalizeGovernanceFiltersForQueryKey,
   parseGovernanceUrlState,
@@ -56,4 +57,26 @@ test("resetGovernanceFilter clears one filter while preserving selected row", ()
   assert.equal(next.selectedKind, "event");
   assert.equal(next.selectedGovernanceId, selectedGovernanceId);
   assert.equal(next.page, 1);
+});
+
+test("governance URL state accepts inbound explicit IDs and epoch selections", () => {
+  const fromReward = parseGovernanceUrlState(new URLSearchParams(`datePreset=7d&rewardEventId=${selectedGovernanceId}`));
+  assert.equal(fromReward.datePreset, "7d");
+  assert.equal(fromReward.selectedKind, "reward");
+  assert.equal(fromReward.selectedGovernanceId, selectedGovernanceId);
+
+  const fromEpoch = parseGovernanceUrlState(new URLSearchParams("kind=epoch&selected=170"));
+  assert.equal(fromEpoch.selectedKind, "epoch");
+  assert.equal(fromEpoch.selectedGovernanceId, "170");
+  assert.equal(serializeGovernanceUrlState(fromEpoch), "kind=epoch&selected=170");
+});
+
+test("resetGovernanceFilter can remove selected inbound context and clear all state", () => {
+  const state = parseGovernanceUrlState(new URLSearchParams(`kind=reward&selected=${selectedGovernanceId}&rewardType=bribe&page=2`));
+  const next = resetGovernanceFilter(state, "selected");
+  assert.equal(next.selectedKind, null);
+  assert.equal(next.selectedGovernanceId, null);
+  assert.equal(next.rewardType, "bribe");
+  assert.equal(next.page, 1);
+  assert.deepEqual(createDefaultGovernanceUrlState().selectedGovernanceId, null);
 });

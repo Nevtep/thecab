@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { CabBox, CabButton, CabErrorPanel, CabIcon, CabLoadingPanel, CabSectionHeader, CabStack, CabText } from "@/design-system";
 import { GovernanceEmptyState } from "@/features/governance/components/GovernanceEmptyState";
 import { GovernanceEpochTimeline } from "@/features/governance/components/GovernanceEpochTimeline";
+import { GovernanceFiltersBar } from "@/features/governance/components/GovernanceFiltersBar";
 import { GovernanceKpiStrip } from "@/features/governance/components/GovernanceKpiStrip";
 import { GovernanceLockPanel } from "@/features/governance/components/GovernanceLockPanel";
 import { GovernanceRewardBreakdown } from "@/features/governance/components/GovernanceRewardBreakdown";
@@ -23,6 +24,9 @@ type Props = {
   isRefreshing?: boolean;
   onRetry: () => void;
   onStateChange: (state: GovernanceUrlState) => void;
+  onClearFilter: (target: string) => void;
+  onClearAll: () => void;
+  onOpenHref: (href: string) => void;
 };
 
 function parseNumeric(value: string | null | undefined) {
@@ -106,10 +110,39 @@ export function GovernanceComponent(input: Props) {
 
   if (!input.viewModel) {
     return (
-      <GovernanceEmptyState
-        title={t("governance:empty.title")}
-        description={t("governance:empty.description")}
-      />
+      <CabStack className={styles.workspace}>
+        <CabSectionHeader title={t("governance:title")} subtitle={t("governance:subtitle")} />
+        <GovernanceFiltersBar
+          state={input.urlState}
+          viewModel={input.viewModel}
+          labels={{
+            searchPlaceholder: t("governance:filters.searchPlaceholder"),
+            datePreset: t("governance:filters.datePreset"),
+            eventType: t("governance:filters.eventType"),
+            rewardType: t("governance:filters.rewardType"),
+            protocolSurface: t("governance:filters.protocolSurface"),
+            epoch: t("governance:filters.epoch"),
+            token: t("governance:filters.token"),
+            coverage: t("governance:filters.coverage"),
+            confidence: t("governance:filters.confidence"),
+            all: t("common:all"),
+            clearAll: t("common:clearAll"),
+            getDatePreset: (value) => t(`governance:datePresets.${value}`, { defaultValue: value }),
+            getEvent: (value) => t(`governance:events.${value}`, { defaultValue: value }),
+            getRewardType: (value) => t(`governance:rewards.${value}`, { defaultValue: value }),
+            getSurface: (value) => t(`governance:surfaces.${value}`, { defaultValue: value }),
+            getCoverage: (value) => t(`coverage:level.${value}`, { defaultValue: value }),
+            getConfidence: (value) => t(`governance:confidence.${value}`, { defaultValue: value }),
+          }}
+          onStateChange={input.onStateChange}
+          onClearFilter={input.onClearFilter}
+          onClearAll={input.onClearAll}
+        />
+        <GovernanceEmptyState
+          title={t("governance:empty.title")}
+          description={t("governance:empty.description")}
+        />
+      </CabStack>
     );
   }
 
@@ -141,10 +174,37 @@ export function GovernanceComponent(input: Props) {
         }}
       />
 
+      <GovernanceFiltersBar
+        state={input.urlState}
+        viewModel={input.viewModel}
+        labels={{
+          searchPlaceholder: t("governance:filters.searchPlaceholder"),
+          datePreset: t("governance:filters.datePreset"),
+          eventType: t("governance:filters.eventType"),
+          rewardType: t("governance:filters.rewardType"),
+          protocolSurface: t("governance:filters.protocolSurface"),
+          epoch: t("governance:filters.epoch"),
+          token: t("governance:filters.token"),
+          coverage: t("governance:filters.coverage"),
+          confidence: t("governance:filters.confidence"),
+          all: t("common:all"),
+          clearAll: t("common:clearAll"),
+          getDatePreset: (value) => t(`governance:datePresets.${value}`, { defaultValue: value }),
+          getEvent: (value) => t(`governance:events.${value}`, { defaultValue: value }),
+          getRewardType: (value) => t(`governance:rewards.${value}`, { defaultValue: value }),
+          getSurface: (value) => t(`governance:surfaces.${value}`, { defaultValue: value }),
+          getCoverage: (value) => t(`coverage:level.${value}`, { defaultValue: value }),
+          getConfidence: (value) => t(`governance:confidence.${value}`, { defaultValue: value }),
+        }}
+        onStateChange={input.onStateChange}
+        onClearFilter={input.onClearFilter}
+        onClearAll={input.onClearAll}
+      />
+
       {input.screenState === "empty" ? (
         <GovernanceEmptyState
-          title={t("governance:empty.title")}
-          description={t("governance:empty.description")}
+          title={input.viewModel.filters.activeChips.length > 0 ? t("governance:empty.filteredTitle") : t("governance:empty.title")}
+          description={input.viewModel.filters.activeChips.length > 0 ? t("governance:empty.filteredDescription") : t("governance:empty.description")}
         />
       ) : null}
 
@@ -283,6 +343,7 @@ export function GovernanceComponent(input: Props) {
             formatDateTime: (value) => formatDate(value, i18n.language),
             formatUsd: (value) => formatCurrency(value, i18n.language),
           }}
+          onOpenHref={input.onOpenHref}
         />
       </CabBox>
     </CabStack>

@@ -11,6 +11,7 @@ import {
   normalizeGovernanceProtocolSurface,
   normalizeGovernanceRewardType,
   normalizeGovernanceSearch,
+  normalizeGovernanceSelectionId,
   normalizeGovernanceSelectionKind,
   normalizeGovernanceSortDirection,
   normalizeGovernanceSortKey,
@@ -49,9 +50,12 @@ function pickFirst(searchParams: URLSearchParams, keys: string[]) {
 }
 
 export function parseGovernanceUrlState(searchParams: URLSearchParams): GovernanceUrlState {
+  const explicitSelectionKind =
+    normalizeGovernanceSelectionKind(pickFirst(searchParams, ["selectedKind", "kind"])) ??
+    (searchParams.get("governanceEventId") ? "event" : searchParams.get("rewardEventId") ? "reward" : null);
   return {
     search: normalizeGovernanceSearch(searchParams.get("search")),
-    datePreset: normalizeGovernanceDatePreset(searchParams.get("range")),
+    datePreset: normalizeGovernanceDatePreset(pickFirst(searchParams, ["datePreset", "range"])),
     eventType: normalizeGovernanceEventType(searchParams.get("eventType")),
     rewardType: normalizeGovernanceRewardType(searchParams.get("rewardType")),
     protocolSurface: normalizeGovernanceProtocolSurface(searchParams.get("protocolSurface")),
@@ -60,8 +64,8 @@ export function parseGovernanceUrlState(searchParams: URLSearchParams): Governan
     tokenAddress: normalizeGovernanceAddress(searchParams.get("tokenAddress")),
     coverage: normalizeGovernanceCoverage(searchParams.get("coverage")),
     confidence: normalizeGovernanceConfidence(searchParams.get("confidence")),
-    selectedKind: normalizeGovernanceSelectionKind(pickFirst(searchParams, ["selectedKind", "kind"])),
-    selectedGovernanceId: normalizeGovernanceUuid(pickFirst(searchParams, ["selectedGovernanceId", "selected"])),
+    selectedKind: explicitSelectionKind,
+    selectedGovernanceId: normalizeGovernanceSelectionId(pickFirst(searchParams, ["selectedGovernanceId", "selected", "rewardEventId", "governanceEventId"])),
     sort: {
       key: normalizeGovernanceSortKey(searchParams.get("sort")),
       direction: normalizeGovernanceSortDirection(searchParams.get("direction")),
@@ -137,6 +141,8 @@ export function resetGovernanceFilter(state: GovernanceUrlState, target: string)
     tokenAddress: target === "tokenAddress" ? null : state.tokenAddress,
     coverage: target === "coverage" ? null : state.coverage,
     confidence: target === "confidence" ? null : state.confidence,
+    selectedKind: target === "selected" ? null : state.selectedKind,
+    selectedGovernanceId: target === "selected" ? null : state.selectedGovernanceId,
     page: 1,
   };
 }

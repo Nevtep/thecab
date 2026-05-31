@@ -11,6 +11,7 @@ import {
 
 const UUID_PATTERN = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 const ADDRESS_PATTERN = /^0x[a-fA-F0-9]{40}$/;
+const SELECTION_PATTERN = /^[a-zA-Z0-9:_-]{1,128}$/;
 
 const datePresets = new Set<GovernanceUrlState["datePreset"]>(["7d", "30d", "90d", "1y", "all", "custom"]);
 const eventTypes = new Set<GovernanceUrlState["eventType"]>(GOVERNANCE_EVENT_TYPES);
@@ -65,6 +66,11 @@ export function normalizeGovernanceConfidence(value: string | null): GovernanceU
 
 export function normalizeGovernanceUuid(value: string | null): string | null {
   return value && UUID_PATTERN.test(value) ? value : null;
+}
+
+export function normalizeGovernanceSelectionId(value: string | null): string | null {
+  const normalized = (value ?? "").trim();
+  return SELECTION_PATTERN.test(normalized) ? normalized : null;
 }
 
 export function normalizeGovernanceAddress(value: string | null): string | null {

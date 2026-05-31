@@ -21,8 +21,10 @@ const RESPONSE_HEADERS = {
 
 const UUID_PATTERN = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 const ADDRESS_PATTERN = /^0x[a-fA-F0-9]{40}$/;
+const SELECTION_PATTERN = /^[a-zA-Z0-9:_-]{1,128}$/;
 const nullableUuid = z.string().regex(UUID_PATTERN).nullable().default(null);
 const nullableAddress = z.string().regex(ADDRESS_PATTERN).transform((value) => value.toLowerCase()).nullable().default(null);
+const nullableSelectionId = z.string().trim().regex(SELECTION_PATTERN).nullable().default(null);
 
 const governanceQuerySchema = z.object({
   chainId: z.coerce.number().int().positive().default(SUPPORTED_CHAIN_ID),
@@ -37,7 +39,7 @@ const governanceQuerySchema = z.object({
   coverage: z.enum(GOVERNANCE_COVERAGE_STATES).nullable().default(null),
   confidence: z.enum(GOVERNANCE_CONFIDENCE_STATES).nullable().default(null),
   selectedKind: z.enum(["event", "reward", "epoch", "metric"]).nullable().default(null),
-  selectedGovernanceId: nullableUuid,
+  selectedGovernanceId: nullableSelectionId,
   sort: z.enum(GOVERNANCE_SORT_KEYS).default("occurredAt"),
   direction: z.enum(["asc", "desc"]).default("desc"),
   page: z.coerce.number().int().min(1).default(1),
@@ -63,6 +65,8 @@ const allowedParams = new Set([
   "confidence",
   "selectedKind",
   "selectedGovernanceId",
+  "governanceEventId",
+  "rewardEventId",
   "kind",
   "selected",
   "sort",
@@ -101,8 +105,16 @@ export function normalizeGovernanceQueryParams(searchParams: URLSearchParams) {
     tokenAddress: searchParams.get("tokenAddress") ?? null,
     coverage: searchParams.get("coverage") ?? null,
     confidence: searchParams.get("confidence") ?? null,
-    selectedKind: searchParams.get("selectedKind") ?? searchParams.get("kind") ?? null,
-    selectedGovernanceId: searchParams.get("selectedGovernanceId") ?? searchParams.get("selected") ?? null,
+    selectedKind:
+      searchParams.get("selectedKind") ??
+      searchParams.get("kind") ??
+      (searchParams.get("governanceEventId") ? "event" : searchParams.get("rewardEventId") ? "reward" : null),
+    selectedGovernanceId:
+      searchParams.get("selectedGovernanceId") ??
+      searchParams.get("selected") ??
+      searchParams.get("governanceEventId") ??
+      searchParams.get("rewardEventId") ??
+      null,
     sort: searchParams.get("sort") ?? undefined,
     direction: searchParams.get("direction") ?? undefined,
     page: searchParams.get("page") ?? undefined,

@@ -184,20 +184,20 @@
 
 ### Tests for User Story 5
 
-- [ ] T088 [P] [US5] Add Governance URL state filter/share tests in apps/web/src/features/governance/governance.urlState.test.ts
-- [ ] T089 [P] [US5] Add Governance service filter/pagination tests in apps/web/src/server/governance/governance.service.test.ts
-- [ ] T090 [P] [US5] Add Governance route invalid filter tests in apps/web/src/server/governance/governance.route.test.ts
-- [ ] T091 [P] [US5] Add no-results mapper tests in apps/web/src/features/governance/governance.mappers.test.ts
+- [X] T088 [P] [US5] Add Governance URL state filter/share tests in apps/web/src/features/governance/governance.urlState.test.ts
+- [X] T089 [P] [US5] Add Governance service filter/pagination tests in apps/web/src/server/governance/governance.service.test.ts
+- [X] T090 [P] [US5] Add Governance route invalid filter tests in apps/web/src/server/governance/governance.route.test.ts
+- [X] T091 [P] [US5] Add no-results mapper tests in apps/web/src/features/governance/governance.mappers.test.ts
 
 ### Implementation for User Story 5
 
-- [ ] T092 [US5] Implement Governance filters bar in apps/web/src/features/governance/components/GovernanceFiltersBar.tsx
-- [ ] T093 [US5] Wire filter/search/sort/page/pageSize state into Governance container in apps/web/src/features/governance/Governance.container.tsx
-- [ ] T094 [US5] Apply Governance filters and pagination in repository queries in apps/web/src/server/governance/governance.repository.ts
-- [ ] T095 [US5] Preserve selected detail or fallback selection after filters in apps/web/src/server/governance/governance.service.ts
-- [ ] T096 [US5] Add active filter chips and clear-all behavior in apps/web/src/features/governance/Governance.component.tsx
-- [ ] T097 [US5] Add no-results and selected-unavailable states in apps/web/src/features/governance/components/GovernanceEmptyState.tsx
-- [ ] T098 [US5] Add Governance inbound links from Activity/Rewards/Pools using explicit IDs in apps/web/src/features/activity/activity.navigation.ts, apps/web/src/features/rewards/rewards.navigation.ts, and apps/web/src/features/pools/PoolDetail.component.tsx
+- [X] T092 [US5] Implement Governance filters bar in apps/web/src/features/governance/components/GovernanceFiltersBar.tsx
+- [X] T093 [US5] Wire filter/search/sort/page/pageSize state into Governance container in apps/web/src/features/governance/Governance.container.tsx
+- [X] T094 [US5] Apply Governance filters and pagination in repository queries in apps/web/src/server/governance/governance.repository.ts
+- [X] T095 [US5] Preserve selected detail or fallback selection after filters in apps/web/src/server/governance/governance.service.ts
+- [X] T096 [US5] Add active filter chips and clear-all behavior in apps/web/src/features/governance/Governance.component.tsx
+- [X] T097 [US5] Add no-results and selected-unavailable states in apps/web/src/features/governance/components/GovernanceEmptyState.tsx
+- [X] T098 [US5] Add Governance inbound links from Activity/Rewards/Pools using explicit IDs in apps/web/src/features/activity/activity.navigation.ts, apps/web/src/features/rewards/rewards.navigation.ts, and apps/web/src/features/pools/PoolDetail.component.tsx
 
 **Checkpoint**: User Story 5 makes Governance filterable/shareable while preserving layout and evidence boundaries.
 

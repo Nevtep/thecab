@@ -10,6 +10,7 @@ type Props = {
   selectedDetail: GovernanceViewModel["selectedDetail"];
   chainId: number;
   loading?: boolean;
+  onOpenHref?: (href: string) => void;
   labels: {
     title: string;
     empty: string;
@@ -91,7 +92,7 @@ function movementKey(record: Record<string, unknown>, index: number) {
   ].filter(Boolean).join(":");
 }
 
-export function SelectedGovernanceRail({ selectedDetail, chainId, loading = false, labels }: Props) {
+export function SelectedGovernanceRail({ selectedDetail, chainId, loading = false, labels, onOpenHref }: Props) {
   if (loading) {
     return <CabLoadingPanel label={labels.loading} />;
   }
@@ -222,7 +223,15 @@ export function SelectedGovernanceRail({ selectedDetail, chainId, loading = fals
           {selectedDetail.linkedContexts.length > 0 ? (
             <CabStack gap="$2">
               {selectedDetail.linkedContexts.map((link) => (
-                <a key={`${link.kind}:${link.entityId}`} href={link.route} style={{ textDecoration: "none" }}>
+                <a
+                  key={`${link.kind}:${link.entityId}`}
+                  href={link.route}
+                  style={{ textDecoration: "none" }}
+                  onClick={onOpenHref ? (event) => {
+                    event.preventDefault();
+                    onOpenHref(link.route);
+                  } : undefined}
+                >
                   <CabStack row alignItems="center" justifyContent="space-between" gap="$2">
                     <CabStack gap="$1">
                       <CabText variant="body" fontSize={12}>{link.kind}</CabText>

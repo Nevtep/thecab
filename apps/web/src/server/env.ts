@@ -28,6 +28,7 @@ const envSchema = z.object({
   ANALYSIS_REBALANCE_WINDOW_HOURS: z.coerce.number().int().positive().default(24),
   ANALYSIS_REORG_SOFT_BLOCKS: z.coerce.number().int().positive().default(32),
   ANALYSIS_STATUS_STALE_DAYS: z.coerce.number().int().positive().default(7),
+  ANALYSIS_SUPPLEMENTAL_EXPLORER_EVIDENCE: z.enum(["disabled", "cache_only", "live"]).default("cache_only"),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;

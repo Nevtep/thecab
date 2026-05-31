@@ -27,3 +27,20 @@ test("getGovernanceHref carries explicit cross-surface IDs without fabricating c
     "/governance?chainId=8453&rewardEventId=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa&poolId=bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb&epochId=170",
   );
 });
+
+test("getGovernanceHref supports explicit inbound Activity and Rewards identities", () => {
+  assert.equal(
+    getGovernanceHref({
+      chainId: 8453,
+      governanceEventId: "77777777-7777-4777-8777-777777777777",
+    }),
+    "/governance?chainId=8453&governanceEventId=77777777-7777-4777-8777-777777777777",
+  );
+  assert.equal(
+    getGovernanceHref({
+      chainId: 8453,
+      rewardEventId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    }),
+    "/governance?chainId=8453&rewardEventId=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+  );
+});

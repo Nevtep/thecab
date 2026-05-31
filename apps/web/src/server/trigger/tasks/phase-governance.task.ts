@@ -64,7 +64,7 @@ async function loadRunTxHashes(payload: PhaseGovernanceTaskPayload) {
     .select({ txHash: processedTxs.txHash })
     .from(processedTxs)
     .where(eq(processedTxs.firstRunId, payload.runId));
-  return txRows.map((row) => row.txHash.toLowerCase());
+  return [...new Set(txRows.map((row) => row.txHash.toLowerCase()))];
 }
 
 async function loadLedgerRows(payload: PhaseGovernanceTaskPayload): Promise<GovernanceLedgerInput[]> {

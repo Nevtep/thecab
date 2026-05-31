@@ -199,3 +199,29 @@ test("mapGovernanceResponseToViewModel normalizes identity, reason codes, and or
   assert.equal(viewModel.selectedDetail.linkedContexts.length, 1);
   assert.equal(viewModel.selectedDetail.sourceEvidenceRefs.length, 1);
 });
+
+test("mapGovernanceResponseToViewModel preserves no-results and selected-unavailable state", () => {
+  const noResults = mapGovernanceResponseToViewModel({
+    ...response,
+    screenKind: "empty",
+    filters: {
+      ...response.filters,
+      search: "missing",
+      activeChips: [{ id: "search", labelKey: "governance:filters.searchPlaceholder", value: "missing", removeTarget: "search" }],
+    },
+    rewards: {
+      rows: [],
+      pagination: { page: 1, pageSize: 10, totalRows: 0, totalPages: 0 },
+    },
+    selectedDetail: {
+      ...response.selectedDetail,
+      selectionKind: "empty",
+      selectionId: null,
+    },
+  });
+
+  assert.equal(noResults.screenKind, "empty");
+  assert.equal(noResults.rewards.rows.length, 0);
+  assert.equal(noResults.filters.activeChips[0]?.id, "search");
+  assert.equal(noResults.selectedDetail.selectionKind, "empty");
+});

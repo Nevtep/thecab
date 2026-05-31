@@ -177,14 +177,17 @@ test("buildEmptyGovernanceSummary keeps mandatory KPI slots present", () => {
 
 test("createGovernanceActiveChips reports active product filters", () => {
   const chips = createGovernanceActiveChips(request({
+    datePreset: "30d",
     eventType: "vote_cast",
     rewardType: "bribe",
     protocolSurface: "voter",
     coverage: "partial",
     confidence: "low",
+    selectedKind: "reward",
+    selectedGovernanceId: rewardId,
   }));
 
-  assert.deepEqual(chips.map((chip) => chip.id), ["eventType", "rewardType", "protocolSurface", "coverage", "confidence"]);
+  assert.deepEqual(chips.map((chip) => chip.id), ["datePreset", "eventType", "rewardType", "protocolSurface", "coverage", "confidence", "selectedGovernanceId"]);
 });
 
 test("buildLockedGovernanceResponse preserves filters without fabricating data", () => {
@@ -343,4 +346,41 @@ test("buildReadyGovernanceResponse can select compact epoch details separately f
   assert.equal(response.selectedDetail.valueEffect.valueUsd, "1500.00");
   assert.equal((response.selectedDetail.epochContext as { rewardState: string }).rewardState, "claimed");
   assert.ok(response.selectedDetail.linkedContexts.some((link) => link.kind === "pool" && link.entityId === "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"));
+});
+
+test("buildReadyGovernanceResponse preserves explicit selected detail when filters hide table rows", () => {
+  const selected = reward({ governanceRewardId: "ffffffff-ffff-4fff-8fff-ffffffffffff", rewardType: "fee" });
+  const response = buildReadyGovernanceResponse({
+    request: request({ rewardType: "bribe", selectedKind: "reward", selectedGovernanceId: selected.governanceRewardId, page: 2, pageSize: 10 }),
+    analysis: readyAnalysis,
+    repository: repository({
+      allRewardRows: [selected],
+      rewardRows: [],
+      totalRewardRows: 0,
+      selectedDetailTarget: { kind: "reward", reward: selected },
+    }),
+  });
+
+  assert.equal(response.screenKind, "ready");
+  assert.equal(response.rewards.pagination.totalRows, 0);
+  assert.equal(response.rewards.pagination.page, 2);
+  assert.equal(response.selectedDetail.selectionId, selected.governanceRewardId);
+  assert.ok(response.filters.activeChips.some((chip) => chip.id === "selectedGovernanceId"));
+});
+
+test("buildReadyGovernanceResponse falls back to empty selected detail when filters produce no visible target", () => {
+  const response = buildReadyGovernanceResponse({
+    request: request({ search: "no-match" }),
+    analysis: readyAnalysis,
+    repository: repository({
+      rewardRows: [],
+      totalRewardRows: 0,
+      events: [],
+      selectedDetailTarget: null,
+    }),
+  });
+
+  assert.equal(response.selectedDetail.selectionKind, "empty");
+  assert.equal(response.rewards.pagination.totalRows, 0);
+  assert.ok(response.filters.activeChips.some((chip) => chip.id === "search"));
 });

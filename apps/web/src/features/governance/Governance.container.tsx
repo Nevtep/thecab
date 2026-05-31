@@ -9,7 +9,9 @@ import { CabSidebar, CabSidebarNavItem, CabStack, CabText, CabTopNav, ConnectedS
 import { GovernanceComponent } from "@/features/governance/Governance.component";
 import { mapGovernanceResponseToViewModel } from "@/features/governance/governance.mappers";
 import {
+  createDefaultGovernanceUrlState,
   parseGovernanceUrlState,
+  resetGovernanceFilter,
   serializeGovernanceUrlState,
 } from "@/features/governance/governance.urlState";
 import { getOverviewNavigationItems } from "@/features/overview/overview.mappers";
@@ -112,6 +114,9 @@ export function GovernanceContainer() {
         isRefreshing={governanceQuery.isFetching && !governanceQuery.isLoading}
         onRetry={() => void governanceQuery.refetch()}
         onStateChange={(nextState) => startTransition(() => updateUrl(nextState))}
+        onClearFilter={(target) => startTransition(() => updateUrl(resetGovernanceFilter(urlState, target)))}
+        onClearAll={() => startTransition(() => updateUrl(createDefaultGovernanceUrlState()))}
+        onOpenHref={(href) => router.push(href)}
       />
     </ConnectedShell>
   );

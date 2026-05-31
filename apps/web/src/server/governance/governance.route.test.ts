@@ -67,6 +67,20 @@ test("normalizeGovernanceQueryParams applies aliases and defaults", () => {
   assert.equal(normalized.pageSize, 25);
 });
 
+test("normalizeGovernanceQueryParams accepts inbound governance and reward identity aliases", () => {
+  const governance = normalizeGovernanceQueryParams(new URLSearchParams(`chainId=8453&governanceEventId=${selectedGovernanceId}`));
+  assert.equal(governance.selectedKind, "event");
+  assert.equal(governance.selectedGovernanceId, selectedGovernanceId);
+
+  const reward = normalizeGovernanceQueryParams(new URLSearchParams(`chainId=8453&rewardEventId=${selectedGovernanceId}`));
+  assert.equal(reward.selectedKind, "reward");
+  assert.equal(reward.selectedGovernanceId, selectedGovernanceId);
+
+  const epoch = normalizeGovernanceQueryParams(new URLSearchParams("chainId=8453&kind=epoch&selected=170"));
+  assert.equal(epoch.selectedKind, "epoch");
+  assert.equal(epoch.selectedGovernanceId, "170");
+});
+
 test("normalizeGovernanceQueryParams rejects unknown params and invalid controls", () => {
   assert.throws(() => normalizeGovernanceQueryParams(new URLSearchParams("chainId=8453&unexpected=1")), /INVALID_GOVERNANCE_FILTERS/);
   assert.throws(() => normalizeGovernanceQueryParams(new URLSearchParams("chainId=8453&pageSize=13")), /INVALID_GOVERNANCE_FILTERS/);

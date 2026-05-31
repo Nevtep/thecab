@@ -144,6 +144,26 @@ function includesSearch(haystack: string[], search: string) {
   return haystack.some((value) => value.toLowerCase().includes(needle));
 }
 
+function datePresetStart(input: GovernanceRequest) {
+  const daysByPreset: Partial<Record<GovernanceRequest["datePreset"], number>> = {
+    "7d": 7,
+    "30d": 30,
+    "90d": 90,
+    "1y": 365,
+  };
+  const days = daysByPreset[input.datePreset];
+  if (!days) return null;
+  return Date.now() - days * 24 * 60 * 60 * 1000;
+}
+
+function isInsideDatePreset(value: string | null, input: GovernanceRequest) {
+  const start = datePresetStart(input);
+  if (start === null) return true;
+  if (!value) return false;
+  const time = new Date(value).getTime();
+  return Number.isFinite(time) && time >= start;
+}
+
 function mapLifecycleItem(value: Record<string, unknown>): GovernanceLockLifecycleItem | null {
   const eventId = asString(value.eventId) ?? asString(value.id);
   const eventType = asString(value.eventType);
@@ -304,8 +324,24 @@ function sortRewards(rows: GovernanceRewardRow[], input: GovernanceRequest) {
   });
 }
 
-function filterRewards(rows: GovernanceRewardRow[], input: GovernanceRequest) {
+export function filterGovernanceRewards(rows: GovernanceRewardRow[], input: GovernanceRequest) {
   return rows.filter((row) => {
+    if (!isInsideDatePreset(row.claimedAt, input)) return false;
+    if (input.eventType !== "all") {
+      const rewardEventType =
+        row.rewardType === "bribe" ? "bribe_claim" :
+        row.rewardType === "fee" ? "fee_claim" :
+        row.rewardType === "rebase" ? "rebase_claim" :
+        "governance_reward";
+      if (rewardEventType !== input.eventType) return false;
+    }
+    if (input.protocolSurface !== "all") {
+      const rewardSurface =
+        row.rewardType === "bribe" ? "briber" :
+        row.rewardType === "fee" ? "fee_distributor" :
+        "reward_distributor";
+      if (rewardSurface !== input.protocolSurface) return false;
+    }
     if (input.rewardType !== "all" && row.rewardType !== input.rewardType) return false;
     if (input.epochId && row.epochId !== input.epochId) return false;
     if (input.poolId && row.pool?.poolId !== input.poolId) return false;
@@ -323,8 +359,9 @@ function filterRewards(rows: GovernanceRewardRow[], input: GovernanceRequest) {
   });
 }
 
-function filterEvents(rows: GovernanceRepositoryEventRow[], input: GovernanceRequest) {
+export function filterGovernanceEvents(rows: GovernanceRepositoryEventRow[], input: GovernanceRequest) {
   return rows.filter((row) => {
+    if (!isInsideDatePreset(row.occurredAt, input)) return false;
     if (input.eventType !== "all" && row.eventType !== input.eventType) return false;
     if (input.protocolSurface !== "all" && row.protocolSurface !== input.protocolSurface) return false;
     if (input.coverage && row.coverageState !== input.coverage) return false;
@@ -339,23 +376,36 @@ function buildAvailableFilters(input: {
   events: GovernanceRepositoryEventRow[];
 }) {
   return {
+    eventTypes: Array.from(new Set(input.events.map((event) => event.eventType))).sort(),
     rewardTypes: Array.from(new Set(input.rewardRows.map((row) => row.rewardType))).sort(),
     tokens: Array.from(new Map(input.rewardRows.map((row) => [row.token.address ?? row.token.symbol, row.token])).values()),
     epochs: input.epochs.map((epoch) => ({ epochId: epoch.epochId, label: epoch.epochLabel })),
     protocolSurfaces: Array.from(new Set(input.events.map((event) => event.protocolSurface))).sort(),
+    coverageStates: Array.from(new Set([
+      ...input.rewardRows.map((row) => row.coverageState),
+      ...input.events.map((event) => event.coverageState),
+      ...input.epochs.map((epoch) => epoch.coverageState),
+    ])).sort(),
+    confidenceBands: Array.from(new Set([
+      ...input.rewardRows.map((row) => row.confidence),
+      ...input.events.map((event) => event.confidence),
+      ...input.epochs.map((epoch) => epoch.confidence),
+    ])).sort(),
   };
 }
 
 function resolveSelectedDetailTarget(input: {
   request: GovernanceRequest;
-  rewards: GovernanceRewardRow[];
-  events: GovernanceRepositoryEventRow[];
+  visibleRewards: GovernanceRewardRow[];
+  allRewards: GovernanceRewardRow[];
+  visibleEvents: GovernanceRepositoryEventRow[];
+  allEvents: GovernanceRepositoryEventRow[];
   epochs: GovernanceEpochSummary[];
 }): GovernanceSelectedDetailTarget | null {
   const selectedId = input.request.selectedGovernanceId;
   if (selectedId) {
     if (input.request.selectedKind === "reward") {
-      const reward = input.rewards.find((row) =>
+      const reward = input.allRewards.find((row) =>
         row.governanceRewardId === selectedId ||
         row.rewardEventId === selectedId ||
         row.governanceEventId === selectedId
@@ -363,7 +413,7 @@ function resolveSelectedDetailTarget(input: {
       if (reward) return { kind: "reward", reward };
     }
     if (input.request.selectedKind === "event") {
-      const event = input.events.find((row) => row.governanceEventId === selectedId || row.txHash === selectedId);
+      const event = input.allEvents.find((row) => row.governanceEventId === selectedId || row.txHash === selectedId);
       if (event) return { kind: "event", event };
     }
     if (input.request.selectedKind === "epoch") {
@@ -371,21 +421,21 @@ function resolveSelectedDetailTarget(input: {
       if (epoch) return { kind: "epoch", epoch };
     }
 
-    const reward = input.rewards.find((row) =>
+    const reward = input.allRewards.find((row) =>
       row.governanceRewardId === selectedId ||
       row.rewardEventId === selectedId ||
       row.governanceEventId === selectedId
     );
     if (reward) return { kind: "reward", reward };
-    const event = input.events.find((row) => row.governanceEventId === selectedId || row.txHash === selectedId);
+    const event = input.allEvents.find((row) => row.governanceEventId === selectedId || row.txHash === selectedId);
     if (event) return { kind: "event", event };
     const epoch = input.epochs.find((row) => row.epochId === selectedId);
     if (epoch) return { kind: "epoch", epoch };
   }
 
-  const firstReward = input.rewards[0];
+  const firstReward = input.visibleRewards[0];
   if (firstReward) return { kind: "reward", reward: firstReward };
-  const firstEvent = input.events[0];
+  const firstEvent = input.visibleEvents[0];
   if (firstEvent) return { kind: "event", event: firstEvent };
   const firstEpoch = input.epochs[0];
   return firstEpoch ? { kind: "epoch", epoch: firstEpoch } : null;
@@ -434,8 +484,9 @@ export async function findGovernanceDataView(input: GovernanceRequest): Promise<
   const lockPanel = lockRows[0] ? mapLockPanel(lockRows[0]) : null;
   const epochs = epochRows.map(mapEpoch);
   const allRewardRows = rewardRows.map(mapReward);
-  const events = filterEvents(eventRows.map(mapEvent), input);
-  const filteredRewards = sortRewards(filterRewards(allRewardRows, input), input);
+  const allEvents = eventRows.map(mapEvent);
+  const events = filterGovernanceEvents(allEvents, input);
+  const filteredRewards = sortRewards(filterGovernanceRewards(allRewardRows, input), input);
   const totalRewardRows = filteredRewards.length;
   const startIndex = (input.page - 1) * input.pageSize;
   const pagedRewards = filteredRewards.slice(startIndex, startIndex + input.pageSize);
@@ -450,8 +501,10 @@ export async function findGovernanceDataView(input: GovernanceRequest): Promise<
     events,
     selectedDetailTarget: resolveSelectedDetailTarget({
       request: input,
-      rewards: allRewardRows,
-      events,
+      allRewards: allRewardRows,
+      visibleRewards: filteredRewards,
+      allEvents,
+      visibleEvents: events,
       epochs,
     }),
     metricSnapshot: metricRow
