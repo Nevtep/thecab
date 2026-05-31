@@ -59,7 +59,19 @@
     "surface": "Superficie",
     "action": "Acción",
     "coverage": "Cobertura",
-    "confidence": "Confianza"
+    "confidence": "Confianza",
+    "pool": "Pool",
+    "deposit": "Depósito",
+    "strategy": "Estrategia",
+    "reward": "Recompensa",
+    "governance": "Gobernanza"
+  },
+  "charts": {
+    "timelineTitle": "Actividad en el tiempo",
+    "timelineSubtitle": "Eventos diarios interpretados por estado de cobertura",
+    "coverageTitle": "Distribución de cobertura",
+    "coverageSubtitle": "Calidad de clasificación en el historial filtrado",
+    "totalEvents": "eventos"
   },
   "panels": {
     "events": "Eventos de actividad",
@@ -71,6 +83,7 @@
       "action": "Acción",
       "surface": "Superficie",
       "movement": "Movimiento",
+      "linkedEntity": "Entidad vinculada",
       "value": "Valor",
       "coverage": "Cobertura",
       "confidence": "Confianza",
@@ -87,10 +100,32 @@
     "coverage": "Cobertura",
     "confidence": "Confianza",
     "movements": "Movimientos",
-    "reasonCodes": "Códigos de razón"
+    "linkedEntities": "Entidades vinculadas",
+    "classificationEvidence": "Evidencia de clasificación",
+    "coverageNotes": "Notas de cobertura",
+    "reasonCodes": "Códigos de razón",
+    "noMovements": "No hay movimientos de token persistidos para esta actividad.",
+    "noLinkedEntities": "No hay un vínculo a entidad de producto respaldado por evidencia.",
+    "classificationBasis": "Base",
+    "classificationMetadata": "Evidencia en metadata",
+    "noReasonCodes": "No se registraron códigos de razón.",
+    "affectsTotals": "Afecta totales"
+  },
+  "entityKinds": {
+    "pool": "Pool",
+    "deposit": "Depósito",
+    "strategy": "Estrategia",
+    "reward": "Recompensa",
+    "governance": "Gobernanza",
+    "unavailable": "No disponible"
   },
   "reasons": {
     "airdrop_spam": "Airdrop tipo spam excluido",
+    "explicitPoolEvidence": "Evidencia explícita de pool",
+    "explicitDepositEvidence": "Evidencia explícita de depósito",
+    "explicitStrategyEvidence": "Evidencia explícita de estrategia",
+    "explicitRewardEvidence": "Evidencia explícita de recompensa",
+    "explicitGovernanceEvidence": "Evidencia explícita de gobernanza",
     "missingClassificationEvidence": "Falta evidencia de clasificación",
     "partialClassificationEvidence": "Evidencia de clasificación parcial",
     "unavailableClassificationEvidence": "Evidencia de clasificación no disponible",

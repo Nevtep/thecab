@@ -59,7 +59,19 @@
     "surface": "Surface",
     "action": "Action",
     "coverage": "Coverage",
-    "confidence": "Confidence"
+    "confidence": "Confidence",
+    "pool": "Pool",
+    "deposit": "Deposit",
+    "strategy": "Strategy",
+    "reward": "Reward",
+    "governance": "Governance"
+  },
+  "charts": {
+    "timelineTitle": "Activity over time",
+    "timelineSubtitle": "Daily interpreted events by coverage state",
+    "coverageTitle": "Coverage distribution",
+    "coverageSubtitle": "Classification quality across filtered history",
+    "totalEvents": "events"
   },
   "panels": {
     "events": "Activity events",
@@ -71,6 +83,7 @@
       "action": "Action",
       "surface": "Surface",
       "movement": "Movement",
+      "linkedEntity": "Linked entity",
       "value": "Value",
       "coverage": "Coverage",
       "confidence": "Confidence",
@@ -87,10 +100,32 @@
     "coverage": "Coverage",
     "confidence": "Confidence",
     "movements": "Movements",
-    "reasonCodes": "Reason codes"
+    "linkedEntities": "Linked entities",
+    "classificationEvidence": "Classification evidence",
+    "coverageNotes": "Coverage notes",
+    "reasonCodes": "Reason codes",
+    "noMovements": "No token movements were persisted for this activity.",
+    "noLinkedEntities": "No evidence-backed product entity link is available.",
+    "classificationBasis": "Basis",
+    "classificationMetadata": "Metadata evidence",
+    "noReasonCodes": "No reason codes were recorded.",
+    "affectsTotals": "Affects totals"
+  },
+  "entityKinds": {
+    "pool": "Pool",
+    "deposit": "Deposit",
+    "strategy": "Strategy",
+    "reward": "Reward",
+    "governance": "Governance",
+    "unavailable": "Unavailable"
   },
   "reasons": {
     "airdrop_spam": "Spam-like airdrop excluded",
+    "explicitPoolEvidence": "Explicit pool evidence",
+    "explicitDepositEvidence": "Explicit deposit evidence",
+    "explicitStrategyEvidence": "Explicit strategy evidence",
+    "explicitRewardEvidence": "Explicit reward evidence",
+    "explicitGovernanceEvidence": "Explicit governance evidence",
     "missingClassificationEvidence": "Missing classification evidence",
     "partialClassificationEvidence": "Partial classification evidence",
     "unavailableClassificationEvidence": "Classification evidence unavailable",

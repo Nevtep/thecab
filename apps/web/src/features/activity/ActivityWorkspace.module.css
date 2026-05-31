@@ -1,35 +1,63 @@
 .workspace {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
 }
 
 .kpiGrid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .dataView {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(340px, 0.36fr);
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.34fr);
+  gap: 8px;
   align-items: start;
 }
 
 .leftArea,
 .rail {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
+}
+
+.rail {
+  position: sticky;
+  top: 12px;
+  max-height: calc(100vh - 96px);
+  overflow: auto;
+}
+
+.insightsGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(260px, 0.7fr);
+  gap: 8px;
+  min-width: 0;
+}
+
+.surfaceLegend {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px 10px;
+}
+
+.legendDot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  flex-shrink: 0;
 }
 
 .filtersBar {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
 }
 
@@ -52,7 +80,7 @@
   display: flex;
   flex: 1 1 100%;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 5px;
 }
 
 .chip {
@@ -73,11 +101,20 @@
   .dataView {
     grid-template-columns: 1fr;
   }
+
+  .rail {
+    position: static;
+    max-height: none;
+  }
 }
 
 @media (max-width: 980px) {
   .kpiGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .insightsGrid {
+    grid-template-columns: 1fr;
   }
 }
 

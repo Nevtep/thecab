@@ -16,6 +16,11 @@ export type ActivityRequest = {
   action: ActivityAction | "all";
   coverage: ActivityCoverage | null;
   confidence: ActivityConfidence | null;
+  poolId: string | null;
+  depositId: string | null;
+  strategyId: string | null;
+  rewardEventId: string | null;
+  governanceEventId: string | null;
   selectedActivityId: string | null;
   sort: {
     key: ActivitySortKey;
@@ -36,6 +41,7 @@ export type ActivityMovement = {
 
 export type ActivityLinkedEntity = {
   kind: "pool" | "deposit" | "strategy" | "reward" | "governance" | "unavailable";
+  entityId: string | null;
   label: string;
   href: string | null;
   reasonCode: string | null;
@@ -105,6 +111,28 @@ export type ActivityResponse = {
     contextLabelKey: string | null;
     coverage: ActivityCoverage;
   }>;
+  charts: {
+    timeline: Array<{
+      day: string;
+      label: string;
+      total: number;
+      full: number;
+      partial: number;
+      unresolved: number;
+      excluded: number;
+      unavailable: number;
+    }>;
+    coverageBreakdown: Array<{
+      id: ActivityCoverage;
+      labelKey: string;
+      value: number;
+    }>;
+    surfaceBreakdown: Array<{
+      id: Exclude<ActivitySurfaceFilter, "all">;
+      labelKey: string;
+      value: number;
+    }>;
+  };
   events: {
     rows: ActivityEventRow[];
     pagination: {

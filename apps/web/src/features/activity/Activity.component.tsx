@@ -2,14 +2,15 @@
 
 import { useTranslation } from "react-i18next";
 
-import { CabBox, CabErrorPanel, CabLoadingPanel, CabSectionHeader, CabStack } from "@/design-system";
+import { CabBox, CabButton, CabErrorPanel, CabIcon, CabLoadingPanel, CabSectionHeader, CabStack, CabText } from "@/design-system";
 import { ActivityEmptyState } from "@/features/activity/components/ActivityEmptyState";
 import { ActivityEventsTable } from "@/features/activity/components/ActivityEventsTable";
 import { ActivityFiltersBar } from "@/features/activity/components/ActivityFiltersBar";
+import { ActivityInsightsPanel } from "@/features/activity/components/ActivityInsightsPanel";
 import { ActivityKpiStrip } from "@/features/activity/components/ActivityKpiStrip";
 import { SelectedActivityRail } from "@/features/activity/components/SelectedActivityRail";
 import type { ActivityUrlState, ActivityViewModel } from "@/features/activity/activity.types";
-import { formatDateTime, formatTokenAmount, formatUsd } from "@/i18n/formatters";
+import { formatCompactNumber, formatDateTime, formatTokenAmount, formatUsd } from "@/i18n/formatters";
 
 import styles from "@/features/activity/ActivityWorkspace.module.css";
 
@@ -23,6 +24,7 @@ type Props = {
   onStateChange: (state: ActivityUrlState) => void;
   onClearFilter: (target: string) => void;
   onClearAll: () => void;
+  onOpenHref: (href: string) => void;
 };
 
 function formatKpiValue(locale: string, kpi: ActivityViewModel["kpis"][number]) {
@@ -60,7 +62,7 @@ export function ActivityComponent(input: Props) {
     );
   }
 
-  if (input.screenState === "empty" || !input.viewModel) {
+  if (!input.viewModel) {
     return (
       <CabStack className={styles.workspace}>
         <CabSectionHeader title={t("activity:title")} subtitle={t("activity:subtitle")} />
@@ -97,7 +99,18 @@ export function ActivityComponent(input: Props) {
 
   return (
     <CabStack className={styles.workspace}>
-      <CabSectionHeader title={t("activity:title")} subtitle={t("activity:subtitle")} />
+      <CabSectionHeader
+        title={t("activity:title")}
+        subtitle={t("activity:subtitle")}
+        actions={
+          <CabStack row gap="$2" alignItems="center">
+            <CabButton tone="ghost" controlSize="sm" onPress={input.onRetry}>
+              <CabIcon name="refreshCcw" width={14} height={14} />
+              <CabText variant="caption" fontSize={12}>{t("activity:actions.refresh")}</CabText>
+            </CabButton>
+          </CabStack>
+        }
+      />
       <ActivityKpiStrip
         kpis={input.viewModel.kpis}
         labels={{
@@ -128,6 +141,19 @@ export function ActivityComponent(input: Props) {
       />
       <CabBox className={styles.dataView}>
         <CabStack className={styles.leftArea}>
+          <ActivityInsightsPanel
+            charts={input.viewModel.charts}
+            labels={{
+              timelineTitle: t("activity:charts.timelineTitle"),
+              timelineSubtitle: t("activity:charts.timelineSubtitle"),
+              coverageTitle: t("activity:charts.coverageTitle"),
+              coverageSubtitle: t("activity:charts.coverageSubtitle"),
+              totalEvents: t("activity:charts.totalEvents"),
+              getCoverage: (value) => t(`coverage:level.${value}`, { defaultValue: value }),
+              getSurface: (value) => t(`activity:surfaces.${value}`, { defaultValue: value }),
+              formatCount: (value) => formatCompactNumber(value, i18n.language),
+            }}
+          />
           <ActivityEventsTable
             viewModel={input.viewModel}
             state={input.urlState}
@@ -149,6 +175,10 @@ export function ActivityComponent(input: Props) {
               emptyTitle: t("activity:empty.filteredTitle"),
               emptyDescription: t("activity:empty.filteredDescription"),
               formatDateTime: (value) => formatDateTime(value, i18n.language),
+              formatUsd: (value) => {
+                const parsed = value === null ? null : Number(value);
+                return parsed !== null && Number.isFinite(parsed) ? formatUsd(parsed, i18n.language) : "";
+              },
               getAction: (value) => t(`activity:actions.${value}`, { defaultValue: value }),
               getSurface: (value) => t(`activity:surfaces.${value}`, { defaultValue: value }),
               getCoverage: (value) => t(`coverage:level.${value}`, { defaultValue: value }),
@@ -173,14 +203,38 @@ export function ActivityComponent(input: Props) {
             coverage: t("activity:selected.coverage"),
             confidence: t("activity:selected.confidence"),
             movements: t("activity:selected.movements"),
+            linkedEntities: t("activity:selected.linkedEntities"),
+            classificationEvidence: t("activity:selected.classificationEvidence"),
+            coverageNotes: t("activity:selected.coverageNotes"),
             reasonCodes: t("activity:selected.reasonCodes"),
+            noMovements: t("activity:selected.noMovements"),
+            noLinkedEntities: t("activity:selected.noLinkedEntities"),
+            classificationBasis: t("activity:selected.classificationBasis"),
+            classificationMetadata: t("activity:selected.classificationMetadata"),
+            noReasonCodes: t("activity:selected.noReasonCodes"),
+            affectsTotals: t("activity:selected.affectsTotals"),
+            yes: t("common:yes"),
+            no: t("common:no"),
+            open: t("common:viewDetails"),
             getAction: (value) => t(`activity:actions.${value}`, { defaultValue: value }),
             getSurface: (value) => t(`activity:surfaces.${value}`, { defaultValue: value }),
             getCoverage: (value) => t(`coverage:level.${value}`, { defaultValue: value }),
             getConfidence: (value) => t(`activity:confidence.${value}`, { defaultValue: value }),
             getReason: (value) => t(`activity:reasons.${value}`, { defaultValue: value }),
+            getEntityKind: (value) => t(`activity:entityKinds.${value}`, { defaultValue: value }),
             formatDateTime: (value) => formatDateTime(value, i18n.language),
+            formatAmount: (value) => {
+              const parsed = value === null ? null : Number(value);
+              return parsed !== null && Number.isFinite(parsed)
+                ? formatTokenAmount(parsed, i18n.language, { maximumFractionDigits: 6 })
+                : "";
+            },
+            formatUsd: (value) => {
+              const parsed = value === null ? null : Number(value);
+              return parsed !== null && Number.isFinite(parsed) ? formatUsd(parsed, i18n.language) : "";
+            },
           }}
+          onOpenHref={input.onOpenHref}
         />
       </CabBox>
     </CabStack>

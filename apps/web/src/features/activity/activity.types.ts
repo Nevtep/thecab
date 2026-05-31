@@ -6,6 +6,11 @@ export type ActivityUrlState = {
   action: "all" | "deposit" | "withdraw" | "swap" | "claim" | "strategy" | "governance" | "transfer" | "airdrop" | "unsupported" | "ambiguous";
   coverage: "full" | "partial" | "unresolved" | "excluded" | "unavailable" | null;
   confidence: "high" | "medium" | "low" | "none" | null;
+  poolId: string | null;
+  depositId: string | null;
+  strategyId: string | null;
+  rewardEventId: string | null;
+  governanceEventId: string | null;
   selectedActivityId: string | null;
   sort: {
     key: "occurredAt" | "valueUsd" | "action" | "coverage" | "confidence";

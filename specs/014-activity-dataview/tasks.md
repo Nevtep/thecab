@@ -24,7 +24,7 @@
 - [X] T005 [P] Create empty Activity English i18n namespace in `apps/web/src/i18n/locales/en/activity.json`
 - [X] T006 [P] Create empty Activity Spanish i18n namespace in `apps/web/src/i18n/locales/es/activity.json`
 - [X] T007 [P] Add Activity regression package script placeholder in `apps/web/package.json`
-- [ ] T008 [P] Add Activity feature barrel exports if the project uses them in `apps/web/src/features/activity/index.ts`
+- [X] T008 [P] Add Activity feature barrel exports if the project uses them in `apps/web/src/features/activity/index.ts`
 
 ---
 
@@ -44,9 +44,9 @@
 - [X] T016 Define Activity URL state parser/serializer for filters, selected row, sort, page, and pageSize in `apps/web/src/features/activity/activity.urlState.ts`
 - [X] T017 [P] Add Activity URL state tests for shallow/client state preservation and active filter chips in `apps/web/src/features/activity/activity.urlState.test.ts`
 - [X] T018 Define Activity navigation helpers for incoming context from pools, deposits, strategies, rewards, and overview in `apps/web/src/features/activity/activity.navigation.ts`
-- [ ] T019 [P] Add Activity navigation helper tests for chain-aware cross-surface filter links in `apps/web/src/features/activity/activity.navigation.test.ts`
-- [ ] T020 Define Activity read-model materializer types and pure row-building helpers in `apps/web/src/server/analysis/activity-read-models.ts`
-- [ ] T021 [P] Add Activity read-model unit tests for identity, coverage, valuation, entity links, and summary counts in `apps/web/src/server/analysis/activity-read-models.test.ts`
+- [X] T019 [P] Add Activity navigation helper tests for chain-aware cross-surface filter links in `apps/web/src/features/activity/activity.navigation.test.ts`
+- [X] T020 Define Activity read-model materializer types and pure row-building helpers in `apps/web/src/server/analysis/activity-read-models.ts`
+- [X] T021 [P] Add Activity read-model unit tests for identity, coverage, valuation, entity links, and summary counts in `apps/web/src/server/analysis/activity-read-models.test.ts`
 - [X] T022 Add Activity repository skeleton with DB-only method signatures in `apps/web/src/server/activity/activity.repository.ts`
 - [X] T023 Add Activity service skeleton with analysis gating, filter normalization, and selected-row fallback signatures in `apps/web/src/server/activity/activity.service.ts`
 - [X] T024 Add Activity route handler skeleton that delegates to the service and returns stable errors in `apps/web/src/server/activity/activity.route.ts`
@@ -70,10 +70,10 @@
 
 ### Tests for User Story 1
 
-- [ ] T032 [P] [US1] Add repository tests for paginated Activity ledger rows and summary counts in `apps/web/src/server/activity/activity.repository.test.ts`
-- [ ] T033 [P] [US1] Add service tests for ready, locked, empty, stale-ready, and selected-default states in `apps/web/src/server/activity/activity.service.test.ts`
-- [ ] T034 [P] [US1] Add route tests for `/api/activity` success, locked, unsupported-chain, unauthenticated, and invalid-filter responses in `apps/web/src/server/activity/activity.route.test.ts`
-- [ ] T035 [P] [US1] Add mapper tests for Activity KPI and table view models in `apps/web/src/features/activity/activity.mappers.test.ts`
+- [X] T032 [P] [US1] Add repository tests for paginated Activity ledger rows and summary counts in `apps/web/src/server/activity/activity.repository.test.ts`
+- [X] T033 [P] [US1] Add service tests for ready, locked, empty, stale-ready, and selected-default states in `apps/web/src/server/activity/activity.service.test.ts`
+- [X] T034 [P] [US1] Add route tests for `/api/activity` success, locked, unsupported-chain, unauthenticated, and invalid-filter responses in `apps/web/src/server/activity/activity.route.test.ts`
+- [X] T035 [P] [US1] Add mapper tests for Activity KPI and table view models in `apps/web/src/features/activity/activity.mappers.test.ts`
 
 ### Implementation for User Story 1
 
@@ -104,19 +104,19 @@
 
 ### Tests for User Story 7
 
-- [ ] T050 [P] [US7] Add explorer provider client tests for success, missing credentials, rate limit, malformed response, and chain mismatch in `apps/web/src/server/providers/explorer/client.test.ts`
-- [ ] T051 [P] [US7] Add tx classification tests for explorer-enriched classification without ownership inference in `apps/web/src/server/analysis/txClassification.test.ts`
-- [ ] T052 [P] [US7] Add phase activity tests for persisting supplemental evidence metadata and evidence-gap reasons in `apps/web/src/server/trigger/tasks/phase-activity.test.ts`
+- [X] T050 [P] [US7] Add explorer provider client tests for success, missing credentials, rate limit, malformed response, and chain mismatch in `apps/web/src/server/providers/explorer/client.test.ts`
+- [X] T051 [P] [US7] Add tx classification tests for explorer-enriched classification without ownership inference in `apps/web/src/server/analysis/txClassification.test.ts`
+- [X] T052 [P] [US7] Add phase activity tests for persisting supplemental evidence metadata and evidence-gap reasons in `apps/web/src/server/trigger/tasks/phase-activity.test.ts`
 - [ ] T053 [P] [US7] Add deterministic Activity regression fixture coverage for explorer-enriched, ambiguous, unsupported, and phishing airdrop transactions in `apps/web/src/server/scripts/analysis-activity-regression.ts`
 
 ### Implementation for User Story 7
 
-- [ ] T054 [US7] Implement supplemental explorer client with chain-scoped transaction receipt, logs, internal transfer, and contract interaction fetch helpers in `apps/web/src/server/providers/explorer/client.ts`
-- [ ] T055 [US7] Export explorer provider helpers through `apps/web/src/server/providers/explorer/index.ts`
-- [ ] T056 [US7] Integrate supplemental explorer evidence lookup into the background Activity phase without request-time calls in `apps/web/src/server/trigger/tasks/phase-activity.task.ts`
-- [ ] T057 [US7] Extend tx classification inputs to accept supplemental explorer evidence and return evidence-used or evidence-gap reason codes in `apps/web/src/server/analysis/txClassification.ts`
-- [ ] T058 [US7] Persist supplemental evidence references, conflict reasons, and missing-evidence reasons in Activity materialization in `apps/web/src/server/analysis/activity-read-models.ts`
-- [ ] T059 [US7] Update raw provider record persistence or metadata typing for explorer evidence references in `apps/web/src/server/providers/raw-provider-records.repository.ts`
+- [X] T054 [US7] Implement supplemental explorer client with chain-scoped transaction receipt, logs, internal transfer, and contract interaction fetch helpers in `apps/web/src/server/providers/explorer/client.ts`
+- [X] T055 [US7] Export explorer provider helpers through `apps/web/src/server/providers/explorer/index.ts`
+- [X] T056 [US7] Integrate supplemental explorer evidence lookup into the background Activity phase without request-time calls in `apps/web/src/server/trigger/tasks/phase-activity.task.ts`
+- [X] T057 [US7] Extend tx classification inputs to accept supplemental explorer evidence and return evidence-used or evidence-gap reason codes in `apps/web/src/server/analysis/txClassification.ts`
+- [X] T058 [US7] Persist supplemental evidence references, conflict reasons, and missing-evidence reasons in Activity materialization in `apps/web/src/server/analysis/activity-read-models.ts`
+- [X] T059 [US7] Update raw provider record persistence or metadata typing for explorer evidence references in `apps/web/src/server/providers/raw-provider-records.repository.ts`
 - [ ] T060 [US7] Implement deterministic Activity regression script for known good, ambiguous, unsupported, explorer-enriched, and phishing airdrop cases in `apps/web/src/server/scripts/analysis-activity-regression.ts`
 - [X] T061 [US7] Add `analysis:activity-regression` script command to `apps/web/package.json`
 
@@ -132,18 +132,18 @@
 
 ### Tests for User Story 2
 
-- [ ] T062 [P] [US2] Add Activity read-model tests for Pool, Deposit, Strategy, Reward, Governance, and unavailable linked entities in `apps/web/src/server/analysis/activity-read-models.test.ts`
+- [X] T062 [P] [US2] Add Activity read-model tests for Pool, Deposit, Strategy, Reward, Governance, and unavailable linked entities in `apps/web/src/server/analysis/activity-read-models.test.ts`
 - [ ] T063 [P] [US2] Add service tests for linked entity filtering and selected detail links in `apps/web/src/server/activity/activity.service.test.ts`
 - [ ] T064 [P] [US2] Add mapper tests for linked entity pills, routes, and unavailable reasons in `apps/web/src/features/activity/activity.mappers.test.ts`
 - [ ] T065 [P] [US2] Add cross-surface navigation tests for Activity links from Pools, Deposits, Strategies, Rewards, and Overview in `apps/web/src/features/activity/activity.navigation.test.ts`
 
 ### Implementation for User Story 2
 
-- [ ] T066 [US2] Extend Activity materialization to attach evidence-backed linked entities for Pool, Deposit, StrategyExposure, RewardEvent, and GovernanceEvent in `apps/web/src/server/analysis/activity-read-models.ts`
-- [ ] T067 [US2] Extend Activity repository filters and selected detail queries for linked entity context in `apps/web/src/server/activity/activity.repository.ts`
-- [ ] T068 [US2] Extend Activity service to enforce no pool/time-window ownership fallback and return unavailable link reasons in `apps/web/src/server/activity/activity.service.ts`
-- [ ] T069 [P] [US2] Implement linked entity display component with DS badges and chain-aware routes in `apps/web/src/features/activity/components/ActivityLinkedEntities.tsx`
-- [ ] T070 [US2] Render linked entities in ledger rows and selected detail in `apps/web/src/features/activity/components/ActivityEventsTable.tsx`
+- [X] T066 [US2] Extend Activity materialization to attach evidence-backed linked entities for Pool, Deposit, StrategyExposure, RewardEvent, and GovernanceEvent in `apps/web/src/server/analysis/activity-read-models.ts`
+- [X] T067 [US2] Extend Activity repository filters and selected detail queries for linked entity context in `apps/web/src/server/activity/activity.repository.ts`
+- [X] T068 [US2] Extend Activity service to enforce no pool/time-window ownership fallback and return unavailable link reasons in `apps/web/src/server/activity/activity.service.ts`
+- [X] T069 [P] [US2] Implement linked entity display component with DS badges and chain-aware routes in `apps/web/src/features/activity/components/ActivityLinkedEntities.tsx`
+- [X] T070 [US2] Render linked entities in ledger rows and selected detail in `apps/web/src/features/activity/components/ActivityEventsTable.tsx`
 - [ ] T071 [US2] Add Activity deep links from Overview recent activity rows in `apps/web/src/features/overview/Overview.component.tsx`
 - [ ] T072 [US2] Add Activity evidence links from Pool detail metrics and rebalance surfaces in `apps/web/src/features/pools/PoolDetail.component.tsx`
 - [ ] T073 [US2] Add Activity evidence links from Deposit lifecycle and movements in `apps/web/src/features/deposits/DepositDetail.component.tsx`
@@ -163,7 +163,7 @@
 ### Tests for User Story 3
 
 - [ ] T076 [P] [US3] Add route tests for selectedActivity detail payload and selected-not-found behavior in `apps/web/src/server/activity/activity.route.test.ts`
-- [ ] T077 [P] [US3] Add service tests for selected row fallback when filters remove the selected event in `apps/web/src/server/activity/activity.service.test.ts`
+- [X] T077 [P] [US3] Add service tests for selected row fallback when filters remove the selected event in `apps/web/src/server/activity/activity.service.test.ts`
 - [ ] T078 [P] [US3] Add mapper tests for selected detail, movement rows, classification evidence, and source evidence refs in `apps/web/src/features/activity/activity.mappers.test.ts`
 
 ### Implementation for User Story 3
@@ -171,9 +171,9 @@
 - [X] T079 [US3] Implement selected activity detail repository query with transaction, movements, evidence, coverage, and source refs in `apps/web/src/server/activity/activity.repository.ts`
 - [X] T080 [US3] Implement selected activity detail service behavior with inline loading-compatible fallback state in `apps/web/src/server/activity/activity.service.ts`
 - [X] T081 [P] [US3] Implement selected Activity rail shell and summary sections using DS primitives in `apps/web/src/features/activity/components/SelectedActivityRail.tsx`
-- [ ] T082 [P] [US3] Implement token movement list component with localized formatting in `apps/web/src/features/activity/components/ActivityMovementList.tsx`
-- [ ] T083 [P] [US3] Implement classification evidence component with evidence-used and evidence-gap notes in `apps/web/src/features/activity/components/ActivityClassificationEvidence.tsx`
-- [ ] T084 [P] [US3] Implement coverage notes component with affectsTotals and reason code copy in `apps/web/src/features/activity/components/ActivityCoverageNotes.tsx`
+- [X] T082 [P] [US3] Implement token movement list component with localized formatting in `apps/web/src/features/activity/components/ActivityMovementList.tsx`
+- [X] T083 [P] [US3] Implement classification evidence component with evidence-used and evidence-gap notes in `apps/web/src/features/activity/components/ActivityClassificationEvidence.tsx`
+- [X] T084 [P] [US3] Implement coverage notes component with affectsTotals and reason code copy in `apps/web/src/features/activity/components/ActivityCoverageNotes.tsx`
 - [X] T085 [US3] Wire row selection state, selected rail loading state, and selected-empty state into `apps/web/src/features/activity/Activity.component.tsx`
 - [X] T086 [US3] Update Activity container to preserve selected row during query refresh with no full-page visual reload in `apps/web/src/features/activity/Activity.container.tsx`
 
@@ -215,7 +215,7 @@
 ### Tests for User Story 5
 
 - [X] T096 [P] [US5] Add URL state tests for combined filters, selected row, sort, page, pageSize, and clear-all behavior in `apps/web/src/features/activity/activity.urlState.test.ts`
-- [ ] T097 [P] [US5] Add route tests for every Activity filter and sort option in `apps/web/src/server/activity/activity.route.test.ts`
+- [X] T097 [P] [US5] Add route tests for every Activity filter and sort option in `apps/web/src/server/activity/activity.route.test.ts`
 - [ ] T098 [P] [US5] Add mapper tests for active filter chips, available filters, no-results state, and pagination view model in `apps/web/src/features/activity/activity.mappers.test.ts`
 
 ### Implementation for User Story 5
@@ -240,18 +240,18 @@
 
 ### Tests for User Story 6
 
-- [ ] T106 [P] [US6] Add reward exclusion regression for phishing airdrop staying excluded from rewards and Activity earned value in `apps/web/src/server/analysis/rewardResolution.test.ts`
+- [X] T106 [P] [US6] Add reward exclusion regression for phishing airdrop staying excluded from rewards and Activity earned value in `apps/web/src/server/analysis/rewardResolution.test.ts`
 - [ ] T107 [P] [US6] Add Activity read-model tests for malicious, unsupported, ambiguous, discarded, unresolved, and unavailable rows in `apps/web/src/server/analysis/activity-read-models.test.ts`
 - [ ] T108 [P] [US6] Add mapper tests for non-full row badges, reason copy keys, and affectsTotals false states in `apps/web/src/features/activity/activity.mappers.test.ts`
-- [ ] T109 [P] [US6] Add deterministic regression assertions for the known phishing airdrop transaction in `apps/web/src/server/scripts/analysis-activity-regression.ts`
+- [X] T109 [P] [US6] Add deterministic regression assertions for the known phishing airdrop transaction in `apps/web/src/server/scripts/analysis-activity-regression.ts`
 
 ### Implementation for User Story 6
 
 - [ ] T110 [US6] Extend Activity materialization to preserve unsupported, malicious, ambiguous, discarded, unresolved, and unavailable rows with reason codes in `apps/web/src/server/analysis/activity-read-models.ts`
-- [ ] T111 [US6] Ensure spam/phishing transfer signals from Activity classification cannot create reward rows or earned-value totals in `apps/web/src/server/trigger/tasks/phase-rewards.task.ts`
+- [X] T111 [US6] Ensure spam/phishing transfer signals from Activity classification cannot create reward rows or earned-value totals in `apps/web/src/server/trigger/tasks/phase-rewards.task.ts`
 - [X] T112 [US6] Extend Activity service summaries to count excluded/malicious rows separately from supported interpreted rows in `apps/web/src/server/activity/activity.service.ts`
 - [X] T113 [P] [US6] Add non-full coverage badge and reason rendering in Activity table rows in `apps/web/src/features/activity/components/ActivityEventsTable.tsx`
-- [ ] T114 [P] [US6] Add non-full selected detail messaging in `apps/web/src/features/activity/components/ActivityCoverageNotes.tsx`
+- [X] T114 [P] [US6] Add non-full selected detail messaging in `apps/web/src/features/activity/components/ActivityCoverageNotes.tsx`
 - [X] T115 [US6] Add localized malicious, spam-like, unsupported, ambiguous, discarded, unresolved, and unavailable reason labels in `apps/web/src/i18n/locales/en/activity.json`
 - [X] T116 [US6] Add matching Spanish reason labels in `apps/web/src/i18n/locales/es/activity.json`
 
@@ -263,15 +263,15 @@
 
 **Purpose**: Product-wide consistency, validation, docs, and signoff.
 
-- [ ] T117 [P] Run and fix Activity i18n parity issues in `apps/web/src/i18n/locales/en/activity.json` and `apps/web/src/i18n/locales/es/activity.json`
-- [ ] T118 [P] Run and fix DS compliance issues for Activity components in `apps/web/src/features/activity/`
-- [ ] T119 [P] Run and fix type errors across Activity server, feature, and script files in `apps/web/src/server/activity/` and `apps/web/src/features/activity/`
-- [ ] T120 Run full unit suite and address regressions in `apps/web/src/server/activity/`, `apps/web/src/server/analysis/`, and `apps/web/src/features/activity/`
-- [ ] T121 Run Activity deterministic regression and document output expectations in `apps/web/src/server/scripts/analysis-activity-regression.ts`
-- [ ] T122 Verify no request-time provider, RPC, or explorer calls exist in Activity route/service/repository code in `apps/web/src/server/activity/`
-- [ ] T123 Verify no hardcoded BaseScan URLs, raw chain IDs, user-facing copy, local `new Intl`, or local `toFixed` formatting remain in Activity code in `apps/web/src/features/activity/`
-- [ ] T124 Update Activity quickstart with final validation commands and manual signoff notes in `specs/014-activity-dataview/quickstart.md`
-- [ ] T125 Record known engine coverage limitations and follow-up cases in `docs/informe-avance-product-spec-gaps.md`
+- [X] T117 [P] Run and fix Activity i18n parity issues in `apps/web/src/i18n/locales/en/activity.json` and `apps/web/src/i18n/locales/es/activity.json`
+- [X] T118 [P] Run and fix DS compliance issues for Activity components in `apps/web/src/features/activity/`
+- [X] T119 [P] Run and fix type errors across Activity server, feature, and script files in `apps/web/src/server/activity/` and `apps/web/src/features/activity/`
+- [X] T120 Run full unit suite and address regressions in `apps/web/src/server/activity/`, `apps/web/src/server/analysis/`, and `apps/web/src/features/activity/`
+- [X] T121 Run Activity deterministic regression and document output expectations in `apps/web/src/server/scripts/analysis-activity-regression.ts`
+- [X] T122 Verify no request-time provider, RPC, or explorer calls exist in Activity route/service/repository code in `apps/web/src/server/activity/`
+- [X] T123 Verify no hardcoded BaseScan URLs, raw chain IDs, user-facing copy, local `new Intl`, or local `toFixed` formatting remain in Activity code in `apps/web/src/features/activity/`
+- [X] T124 Update Activity quickstart with final validation commands and manual signoff notes in `specs/014-activity-dataview/quickstart.md`
+- [X] T125 Record known engine coverage limitations and follow-up cases in `docs/informe-avance-product-spec-gaps.md`
 
 ---
 

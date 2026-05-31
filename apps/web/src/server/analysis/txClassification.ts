@@ -55,6 +55,20 @@ export type EconomicComponent = {
  */
 export type EconomicExclusionReason = "airdrop_spam";
 
+export type SupplementalExplorerEvidenceInput = {
+  receipt?: Record<string, unknown> | null;
+  logs?: Array<Record<string, unknown>>;
+  internalTransfers?: Array<Record<string, unknown>>;
+  evidenceGapReasonCodes?: string[];
+};
+
+export type SupplementalExplorerClassification = {
+  supplementalEvidenceUsed: boolean;
+  evidenceUsedReasonCodes: string[];
+  evidenceGapReasonCodes: string[];
+  conflictReasonCodes: string[];
+};
+
 /**
  * Schema version stamped on persisted reward candidates so reclassify can
  * detect stale shapes and regenerate them from history.
@@ -113,6 +127,56 @@ export function parseSurfaceKind(value: unknown): SurfaceKind | null {
   return typeof value === "string" && SURFACE_KIND_VALUES.has(value as SurfaceKind)
     ? (value as SurfaceKind)
     : null;
+}
+
+/**
+ * Convert persisted explorer evidence into stable classification metadata.
+ * This deliberately records what evidence was used or missing without adding
+ * ownership links; ownership still requires explicit deposit/strategy/reward
+ * identity from protocol-backed sources.
+ */
+export function classifySupplementalExplorerEvidence(
+  evidence: SupplementalExplorerEvidenceInput | null | undefined,
+): SupplementalExplorerClassification {
+  if (!evidence) {
+    return {
+      supplementalEvidenceUsed: false,
+      evidenceUsedReasonCodes: [],
+      evidenceGapReasonCodes: ["missingExplorerEvidence"],
+      conflictReasonCodes: [],
+    };
+  }
+
+  const evidenceUsedReasonCodes: string[] = [];
+  const conflictReasonCodes: string[] = [];
+  const gaps = new Set(evidence.evidenceGapReasonCodes ?? []);
+
+  const receipt = evidence.receipt && typeof evidence.receipt === "object" && !Array.isArray(evidence.receipt)
+    ? evidence.receipt
+    : null;
+  if (receipt) {
+    evidenceUsedReasonCodes.push("explorerReceipt");
+    if (receipt.status === "0x0") {
+      conflictReasonCodes.push("revertedTransaction");
+    }
+  } else {
+    gaps.add("missingExplorerReceipt");
+  }
+
+  if ((evidence.logs ?? []).length > 0) {
+    evidenceUsedReasonCodes.push("explorerLogs");
+  }
+
+  if ((evidence.internalTransfers ?? []).length > 0) {
+    evidenceUsedReasonCodes.push("explorerInternalTransfers");
+  }
+
+  return {
+    supplementalEvidenceUsed: evidenceUsedReasonCodes.length > 0,
+    evidenceUsedReasonCodes: [...new Set(evidenceUsedReasonCodes)],
+    evidenceGapReasonCodes: [...gaps].sort(),
+    conflictReasonCodes: [...new Set(conflictReasonCodes)],
+  };
 }
 
 function asRecordArray(value: unknown): Array<Record<string, unknown>> {

@@ -23,6 +23,10 @@ import {
   type MaterializeStrategyReadModelsInput,
 } from "@/server/analysis/strategy-read-models";
 import { insertRawProviderRecord } from "@/server/providers/raw-provider-records.repository";
+import {
+  classifySupplementalExplorerEvidence,
+  type SupplementalExplorerEvidenceInput,
+} from "@/server/analysis/txClassification";
 import type { OverviewProtocolPosition } from "@/server/protocol-positions/protocolPositions.types";
 
 type ManualPositionArtifacts = {
@@ -1268,6 +1272,7 @@ export async function classifyRunLedgerEvents(input: {
   chainId: number;
   txHashes: string[];
   runId: string;
+  supplementalEvidenceByTxHash?: Record<string, SupplementalExplorerEvidenceInput>;
   spamTokenAddresses?: string[];
   walletTokenSignals?: Array<{
     tokenAddress: string;
@@ -1623,6 +1628,13 @@ export async function classifyRunLedgerEvents(input: {
     const nextMetadataJson = {
       ...row.metadataJson,
     } satisfies Record<string, unknown>;
+    const supplemental = classifySupplementalExplorerEvidence(
+      input.supplementalEvidenceByTxHash?.[row.txHash.toLowerCase()],
+    );
+    nextMetadataJson.supplementalExplorerEvidenceUsed = supplemental.supplementalEvidenceUsed;
+    nextMetadataJson.evidenceUsedReasonCodes = supplemental.evidenceUsedReasonCodes;
+    nextMetadataJson.evidenceGapReasonCodes = supplemental.evidenceGapReasonCodes;
+    nextMetadataJson.conflictReasonCodes = supplemental.conflictReasonCodes;
 
     if (isSpoofedTransferActivity) {
       nextMetadataJson.excludeFromUiDefault = true;
@@ -1653,6 +1665,28 @@ export async function classifyRunLedgerEvents(input: {
         metadataJson: nextMetadataJson,
       })
       .where(eq(ledgerEvents.id, row.id));
+
+    if (classification === "airdrop") {
+      await db
+        .update(rewardEvents)
+        .set({
+          depositOrStrategyId: null,
+          strategyExposureId: null,
+          resolvedPoolId: null,
+          resolutionBasis: "excluded_airdrop_spam",
+          resolutionReasonCodes: ["excludedAirdrop", "airdrop_spam"],
+          amountUsd: null,
+          resolutionStatus: "excluded",
+          metadataJson: sql`${rewardEvents.metadataJson} || '{"economicExclusionReason":"airdrop_spam","surfaceKind":"airdrop_spam","economicComponentKind":"excluded_airdrop"}'::jsonb`,
+        })
+        .where(
+          and(
+            eq(rewardEvents.walletAddress, walletAddress),
+            eq(rewardEvents.chainId, input.chainId),
+            eq(rewardEvents.txHash, row.txHash.toLowerCase()),
+          ),
+        );
+    }
     updated += 1;
   }
 

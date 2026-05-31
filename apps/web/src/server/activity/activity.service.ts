@@ -2,6 +2,8 @@ import { projectAnalysisStatus } from "@/server/analysis/status-projection";
 import { findActivity, readActivityAnalysisContext } from "@/server/activity/activity.repository";
 import type { ActivityEventRow, ActivityRequest, ActivityResponse, ActivitySummary } from "@/server/activity/activity.types";
 
+const COVERAGE_ORDER = ["full", "partial", "unresolved", "excluded", "unavailable"] as const;
+
 function asNumber(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string" && value.trim().length > 0) {
@@ -15,7 +17,7 @@ function fixed(value: number, digits = 2) {
   return value.toFixed(digits);
 }
 
-function emptySummary(): ActivitySummary {
+export function buildEmptyActivitySummary(): ActivitySummary {
   return {
     totalEvents: 0,
     interpretedEvents: 0,
@@ -26,7 +28,7 @@ function emptySummary(): ActivitySummary {
   };
 }
 
-function buildSummary(rows: ActivityEventRow[]): ActivitySummary {
+export function buildActivitySummary(rows: ActivityEventRow[]): ActivitySummary {
   const excludedEvents = rows.filter((row) => row.coverage === "excluded").length;
   const unresolvedEvents = rows.filter((row) => row.coverage === "unresolved" || row.coverage === "unavailable").length;
   const fullEvents = rows.filter((row) => row.coverage === "full").length;
@@ -45,7 +47,7 @@ function buildSummary(rows: ActivityEventRow[]): ActivitySummary {
   };
 }
 
-function buildKpis(summary: ActivitySummary): ActivityResponse["kpis"] {
+export function buildActivityKpis(summary: ActivitySummary): ActivityResponse["kpis"] {
   const coverage = Number(summary.coveragePercent) >= 99.9 ? "full" : "partial";
   return [
     {
@@ -83,24 +85,73 @@ function buildKpis(summary: ActivitySummary): ActivityResponse["kpis"] {
   ];
 }
 
-function createActiveChips(input: ActivityRequest): ActivityResponse["activeChips"] {
+export function buildActivityCharts(rows: ActivityEventRow[]): ActivityResponse["charts"] {
+  const dayMap = new Map<string, ActivityResponse["charts"]["timeline"][number]>();
+  const coverageMap = new Map<string, number>();
+  const surfaceMap = new Map<string, number>();
+
+  for (const row of rows) {
+    const day = row.occurredAt.slice(0, 10);
+    const existingDay = dayMap.get(day) ?? {
+      day,
+      label: day.slice(5),
+      total: 0,
+      full: 0,
+      partial: 0,
+      unresolved: 0,
+      excluded: 0,
+      unavailable: 0,
+    };
+    existingDay.total += 1;
+    existingDay[row.coverage] += 1;
+    dayMap.set(day, existingDay);
+    coverageMap.set(row.coverage, (coverageMap.get(row.coverage) ?? 0) + 1);
+    surfaceMap.set(row.surface, (surfaceMap.get(row.surface) ?? 0) + 1);
+  }
+
+  return {
+    timeline: [...dayMap.values()].sort((left, right) => left.day.localeCompare(right.day)).slice(-30),
+    coverageBreakdown: COVERAGE_ORDER
+      .map((coverage) => ({
+        id: coverage,
+        labelKey: `coverage:level.${coverage}`,
+        value: coverageMap.get(coverage) ?? 0,
+      }))
+      .filter((entry) => entry.value > 0),
+    surfaceBreakdown: [...surfaceMap.entries()]
+      .map(([surface, value]) => ({
+        id: surface as ActivityResponse["charts"]["surfaceBreakdown"][number]["id"],
+        labelKey: `activity:surfaces.${surface}`,
+        value,
+      }))
+      .sort((left, right) => right.value - left.value),
+  };
+}
+
+export function createActivityActiveChips(input: ActivityRequest): ActivityResponse["activeChips"] {
   const chips: ActivityResponse["activeChips"] = [];
   if (input.search) chips.push({ id: "search", labelKey: "activity:filters.search", value: input.search, removeTarget: "search" });
   if (input.surface !== "all") chips.push({ id: "surface", labelKey: "activity:filters.surface", value: input.surface, removeTarget: "surface" });
   if (input.action !== "all") chips.push({ id: "action", labelKey: "activity:filters.action", value: input.action, removeTarget: "action" });
   if (input.coverage) chips.push({ id: "coverage", labelKey: "activity:filters.coverage", value: input.coverage, removeTarget: "coverage" });
   if (input.confidence) chips.push({ id: "confidence", labelKey: "activity:filters.confidence", value: input.confidence, removeTarget: "confidence" });
+  if (input.poolId) chips.push({ id: "poolId", labelKey: "activity:filters.pool", value: input.poolId, removeTarget: "poolId" });
+  if (input.depositId) chips.push({ id: "depositId", labelKey: "activity:filters.deposit", value: input.depositId, removeTarget: "depositId" });
+  if (input.strategyId) chips.push({ id: "strategyId", labelKey: "activity:filters.strategy", value: input.strategyId, removeTarget: "strategyId" });
+  if (input.rewardEventId) chips.push({ id: "rewardEventId", labelKey: "activity:filters.reward", value: input.rewardEventId, removeTarget: "rewardEventId" });
+  if (input.governanceEventId) chips.push({ id: "governanceEventId", labelKey: "activity:filters.governance", value: input.governanceEventId, removeTarget: "governanceEventId" });
   return chips;
 }
 
-function buildLockedResponse(input: ActivityRequest, analysis: ActivityResponse["analysis"]): ActivityResponse {
+export function buildLockedActivityResponse(input: ActivityRequest, analysis: ActivityResponse["analysis"]): ActivityResponse {
   return {
     screenKind: "locked",
     walletAddress: input.walletAddress,
     chainId: input.chainId,
     analysis,
-    summary: emptySummary(),
-    kpis: buildKpis(emptySummary()),
+    summary: buildEmptyActivitySummary(),
+    kpis: buildActivityKpis(buildEmptyActivitySummary()),
+    charts: buildActivityCharts([]),
     events: {
       rows: [],
       pagination: {
@@ -116,7 +167,48 @@ function buildLockedResponse(input: ActivityRequest, analysis: ActivityResponse[
       surfaces: [],
       tokens: [],
     },
-    activeChips: createActiveChips(input),
+    activeChips: createActivityActiveChips(input),
+  };
+}
+
+export function buildReadyActivityResponse(input: {
+  request: ActivityRequest;
+  repository: {
+    allRows: ActivityEventRow[];
+    rows: ActivityEventRow[];
+    totalRows: number;
+    availableFilters: ActivityResponse["availableFilters"];
+  };
+  analysis: ActivityResponse["analysis"];
+}): ActivityResponse {
+  const summary = buildActivitySummary(input.repository.allRows);
+  const charts = buildActivityCharts(input.repository.allRows);
+  const selectedActivity =
+    input.repository.rows.find((row) => row.activityId === input.request.selectedActivityId) ??
+    input.repository.allRows.find((row) => row.activityId === input.request.selectedActivityId) ??
+    input.repository.rows[0] ??
+    null;
+
+  return {
+    screenKind: input.repository.totalRows === 0 ? "empty" : "ready",
+    walletAddress: input.request.walletAddress,
+    chainId: input.request.chainId,
+    analysis: input.analysis,
+    summary,
+    kpis: buildActivityKpis(summary),
+    charts,
+    events: {
+      rows: input.repository.rows,
+      pagination: {
+        page: input.request.page,
+        pageSize: input.request.pageSize,
+        totalRows: input.repository.totalRows,
+        totalPages: Math.ceil(input.repository.totalRows / input.request.pageSize),
+      },
+    },
+    selectedActivity,
+    availableFilters: input.repository.availableFilters,
+    activeChips: createActivityActiveChips(input.request),
   };
 }
 
@@ -137,35 +229,9 @@ export async function getActivityDataView(input: ActivityRequest): Promise<Activ
   };
 
   if (projectedStatus.status !== "ready" && projectedStatus.status !== "stale") {
-    return buildLockedResponse(input, analysis);
+    return buildLockedActivityResponse(input, analysis);
   }
 
   const result = await findActivity(input);
-  const summary = buildSummary(result.allRows);
-  const selectedActivity =
-    result.rows.find((row) => row.activityId === input.selectedActivityId) ??
-    result.allRows.find((row) => row.activityId === input.selectedActivityId) ??
-    result.rows[0] ??
-    null;
-
-  return {
-    screenKind: result.totalRows === 0 ? "empty" : "ready",
-    walletAddress: input.walletAddress,
-    chainId: input.chainId,
-    analysis,
-    summary,
-    kpis: buildKpis(summary),
-    events: {
-      rows: result.rows,
-      pagination: {
-        page: input.page,
-        pageSize: input.pageSize,
-        totalRows: result.totalRows,
-        totalPages: Math.ceil(result.totalRows / input.pageSize),
-      },
-    },
-    selectedActivity,
-    availableFilters: result.availableFilters,
-    activeChips: createActiveChips(input),
-  };
+  return buildReadyActivityResponse({ request: input, repository: result, analysis });
 }

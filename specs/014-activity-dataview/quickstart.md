@@ -48,6 +48,15 @@
    pnpm --dir apps/web analysis:activity-regression
    ```
 
+   If a local database already contains the known phishing-airdrop fixture in
+   a stale pre-fix state, repair that deterministic fixture once and rerun the
+   normal regression:
+
+   ```bash
+   pnpm --dir apps/web analysis:activity-regression -- --repair
+   pnpm --dir apps/web analysis:activity-regression
+   ```
+
 6. Manual product/developer signoff:
 
    - Open `/activity` with a wallet whose analysis is ready.
@@ -65,3 +74,22 @@ Record:
 - Regression script output summary.
 - Manual signoff notes for auth-gated UI behavior.
 - Any known coverage limitations or follow-up engine cases.
+
+## Current Validation Snapshot
+
+Last implementation pass:
+
+```bash
+pnpm --dir apps/web typecheck
+pnpm --dir apps/web test:unit
+pnpm --dir apps/web i18n:check
+pnpm --dir apps/web ds:check
+pnpm --dir apps/web analysis:activity-regression
+```
+
+Expected deterministic regression result for the known phishing airdrop:
+
+- Activity row is `airdrop` with `excluded` coverage and `airdrop_spam` reason.
+- Matching reward row is `excluded`, not `resolved` or `unresolved`.
+- Excluded reward has no resolved pool and no USD contribution to pool totals.
+- If the row existed before the exclusion fix, `--repair` can normalize the local fixture before a normal pass.

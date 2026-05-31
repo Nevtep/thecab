@@ -66,12 +66,20 @@ function asRewardCandidate(value: unknown): RewardCandidateInput | null {
   };
 }
 
-function inferRewardType(candidate: RewardCandidateInput) {
+export function inferRewardType(candidate: RewardCandidateInput) {
   if (candidate.economicComponentKind === "fee_claim" || candidate.surfaceKind?.startsWith("pool_fee_claim")) {
     return "fee_claim";
   }
   const text = [candidate.category, candidate.summary].filter(Boolean).join(" ").toLowerCase();
   return text.includes("reward") || text.includes("collect") ? "reward_claim" : "claim";
+}
+
+export function inferPersistedRewardType(input: {
+  candidate: RewardCandidateInput;
+  governanceCandidate: boolean;
+}) {
+  if (input.governanceCandidate) return "governance_reward";
+  return inferRewardType(input.candidate);
 }
 
 export function isGovernanceRewardCandidate(input: {
@@ -292,7 +300,7 @@ export const phaseRewardsTask = task({
       return {
         txHash: candidateWithPool.txHash,
         logIndex: index,
-        rewardType: excludedAirdropCandidate ? "excluded_airdrop" : governanceCandidate ? "governance_reward" : inferRewardType(candidateWithPool),
+        rewardType: inferPersistedRewardType({ candidate: candidateWithPool, governanceCandidate }),
         depositOrStrategyId: resolvedTarget.depositOrStrategyId,
         strategyExposureId: resolvedTarget.strategyExposureId,
         resolvedPoolId: resolvedTarget.resolvedPoolId,

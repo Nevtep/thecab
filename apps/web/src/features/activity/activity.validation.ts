@@ -49,5 +49,5 @@ export function normalizeActivityPage(value: string | null): number {
 
 export function normalizeActivityPageSize(value: string | null): ActivityUrlState["pageSize"] {
   const parsed = Number(value);
-  return pageSizes.has(parsed as ActivityUrlState["pageSize"]) ? parsed as ActivityUrlState["pageSize"] : 25;
+  return pageSizes.has(parsed as ActivityUrlState["pageSize"]) ? parsed as ActivityUrlState["pageSize"] : 10;
 }

@@ -44,6 +44,7 @@ type Props = {
     emptyTitle: string;
     emptyDescription: string;
     formatDateTime: (value: string) => string;
+    formatUsd: (value: string | null) => string;
     getAction: (value: string) => string;
     getSurface: (value: string) => string;
     getCoverage: (value: string) => string;
@@ -68,6 +69,14 @@ function confidenceTone(confidence: string): "neutral" | "success" | "warning" |
   return "danger";
 }
 
+function actionTone(action: string): "neutral" | "success" | "warning" | "danger" | "info" {
+  if (action === "deposit" || action === "claim" || action === "strategy") return "success";
+  if (action === "swap" || action === "governance") return "info";
+  if (action === "airdrop" || action === "unsupported" || action === "ambiguous") return "warning";
+  if (action === "withdraw") return "danger";
+  return "neutral";
+}
+
 export function ActivityEventsTable({ viewModel, state, labels, loading = false, onStateChange }: Props) {
   const pagination = viewModel.events.pagination;
   const from = pagination.totalRows === 0 ? 0 : (pagination.page - 1) * pagination.pageSize + 1;
@@ -86,7 +95,7 @@ export function ActivityEventsTable({ viewModel, state, labels, loading = false,
         header: () => labels.action,
         enableSorting: false,
         cell: ({ getValue }) => (
-          <DataTableStatusCell tone="info" label={labels.getAction(getValue())} />
+          <DataTableStatusCell tone={actionTone(getValue())} label={labels.getAction(getValue())} />
         ),
       }),
       columnHelper.accessor("surface", {
@@ -101,27 +110,37 @@ export function ActivityEventsTable({ viewModel, state, labels, loading = false,
         id: "movement",
         header: () => labels.movement,
         enableSorting: false,
-        cell: ({ row }) => (
-          <CabStack row alignItems="center" gap="$2" minWidth={0}>
-            <CabTokenIcon
-              chainId={viewModel.chainId}
-              tokenAddress={row.original.primaryTokenAddress}
-              symbol={row.original.primaryTokenSymbol}
-              size="sm"
-              decorative
-            />
-            <CabText variant="data" fontSize={12} className={styles.mono}>
-              {row.original.summary}
-            </CabText>
-          </CabStack>
-        ),
+        cell: ({ row }) => {
+          const primaryLink = row.original.linkedEntities[0] ?? null;
+          return (
+            <CabStack row alignItems="center" gap="$2" minWidth={0}>
+              <CabTokenIcon
+                chainId={viewModel.chainId}
+                tokenAddress={row.original.primaryTokenAddress}
+                symbol={row.original.primaryTokenSymbol}
+                size="sm"
+                decorative
+              />
+              <CabStack gap="$1" minWidth={0}>
+                <CabText variant="data" fontSize={12} className={styles.mono}>
+                  {row.original.summary}
+                </CabText>
+                {primaryLink ? (
+                  <CabText variant="caption" fontSize={11}>
+                    {primaryLink.label}
+                  </CabText>
+                ) : null}
+              </CabStack>
+            </CabStack>
+          );
+        },
       }),
       columnHelper.accessor("valueUsd", {
         id: "value",
         header: () => labels.value,
         enableSorting: false,
         meta: { numeric: true },
-        cell: ({ getValue }) => <DataTableValueCell primary={getValue() ?? ""} />,
+        cell: ({ getValue }) => <DataTableValueCell primary={labels.formatUsd(getValue())} />,
       }),
       columnHelper.accessor("coverage", {
         id: "coverage",

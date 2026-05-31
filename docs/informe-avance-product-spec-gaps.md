@@ -63,10 +63,10 @@ El producto tiene una base fuerte hasta Rewards:
 - Pipeline de análisis con Trigger.dev.
 - Providers Moralis y Alchemy encapsulados.
 
-El producto todavía no cumple todo el product spec porque faltan dos secciones de primer nivel:
+El producto todavía no cumple todo el product spec porque falta cerrar una sección de primer nivel y estabilizar otra:
 
 - Governance.
-- Activity.
+- Activity, ya implementada en una primera versión funcional pero todavía con gaps de engine y explainability.
 
 Además, varias pantallas existentes necesitan cerrar gaps de explicabilidad, consistencia visual y semántica de datos.
 
@@ -84,7 +84,7 @@ Además, varias pantallas existentes necesitan cerrar gaps de explicabilidad, co
 | Strategies | Implementado con gaps | Lista/detalle existen. Falta actividad interna dedicada y relación explícita con pools subyacentes. |
 | Rewards | Implementado con gaps | DataView existe. Faltan breakdowns completos, custom date range y vista completa de excluidos/no resueltos. |
 | Governance | Pendiente | Hay tabla `governance_events` y navegación disabled, pero no DataView/API/read model/UI. |
-| Activity | Pendiente | Hay fase engine y preview en Overview, pero no DataView/API/detail route. |
+| Activity | En implementación avanzada | DataView/API/detail rail ya existen. Quedan gaps de rebalance explainability profunda, links desde todas las superficies y estabilización del engine con más fixtures reales. |
 | Settings | Básico implementado | Faltan limpiar cache local, preferencias de formato numérico y separación más clara de diagnostics. |
 | CSV/export | Correctamente ausente | El product spec lo excluye de v1. |
 
@@ -201,7 +201,7 @@ Esa transacción es un airdrop de phishing y no debe sumar como reward. Los caso
 
 ### 6.1 Governance DataView
 
-**Estado:** pendiente.
+**Estado:** implementación avanzada, lista para testing funcional con limitaciones conocidas.
 
 El product spec requiere una sección Governance de primer nivel. Debe cubrir:
 
@@ -255,29 +255,54 @@ Activity debe ser el audit trail transaccional detrás de cada métrica del prod
 
 Existe hoy:
 
-- Fase engine de activity.
-- Preview en Overview.
-- Tablas/eventos de lifecycle.
-- Algunas referencias a tx hash en detalles.
-
-Falta:
-
 - Ruta `/activity`.
-- API `/api/activity`.
-- Módulo `features/activity`.
-- Read model orientado a timeline.
-- Filtros por tipo, protocolo, pool, token, source, coverage, confidence.
-- Detail rail por transacción.
-- Link entre actividad y entidades: pool, deposit, strategy, reward, governance.
-- Empty/loading/error states consistentes.
-- Explicación de actividades excluidas, parciales o no resueltas.
+- API `/api/activity` DB-only.
+- Módulo `features/activity` con container/component split.
+- KPI strip con componentes de impacto del DS.
+- Filtros, chips activos, paginación compartida y selección sin reload visual.
+- Ledger con `DataTable`.
+- Panel derecho de detalle con movimientos, entidades vinculadas, evidencia y notas de cobertura.
+- Charts DS de actividad/cobertura.
+- Read-model helper puro para filas/summary.
+- Cliente explorer suplementario background-only para BaseScan.
+- Persistencia de evidencia explorer como `raw_provider_records`.
+- Metadatos de evidencia suplementaria en clasificación.
+- Regresión determinística para el airdrop phishing conocido.
+
+Falta o queda parcial:
+
+- Rebalance/source allocation explanation profunda desde `canonicalInference`.
+- Links explícitos desde todas las superficies existentes hacia Activity.
+- Más fixtures determinísticas para explorer-enriched, ambiguous, unsupported y Mellow strategy rows.
+- Governance processing sigue limitado, por lo que Activity todavía no puede representar todos los eventos governance del product spec.
+- Más clasificación engine contra transacciones reales; no agregar heurísticas de ownership sin evidencia explícita.
 
 Recomendación:
 
-1. Implementar Activity antes de seguir afinando engine.
-2. Usarla como superficie de debug y auditoría.
-3. No ocultar eventos ambiguos; mostrarlos como no resueltos/parciales.
-4. Evitar heurísticas nuevas para llenar la pantalla.
+1. Usar Activity para auditar el engine antes de cerrar Governance.
+2. Expandir regresiones con casos reales por tipo de superficie.
+3. Completar links cross-surface donde exista entidad explícita.
+4. Completar rebalance/source allocation sólo con datos persistidos por `canonicalInference`.
+5. Mantener request paths DB-only y explorer evidence sólo en background.
+
+### 6.2.1 Activity - Snapshot De Validación 2026-05-30
+
+Checks ejecutados:
+
+```bash
+pnpm --dir apps/web typecheck
+pnpm --dir apps/web test:unit
+pnpm --dir apps/web i18n:check
+pnpm --dir apps/web ds:check
+pnpm --dir apps/web analysis:activity-regression
+```
+
+Resultado relevante:
+
+- `test:unit` pasa con 280 tests.
+- La regresión del tx `0xca23a1618b416be4f082ae26e59dd9bfcea5e028f00a2cd9f1b8dd95fbff77ea` pasa.
+- La DB local tenía una reward pre-fix en estado `unresolved`; se reparó con `analysis:activity-regression -- --repair` y luego la regresión normal quedó verde.
+- El engine ahora actualiza reward rows asociadas a ledger rows clasificadas como `airdrop` para dejarlas `excluded`, sin pool, sin USD contribution y con `airdrop_spam`.
 
 ## 7. Gaps Remanentes Por Feature
 

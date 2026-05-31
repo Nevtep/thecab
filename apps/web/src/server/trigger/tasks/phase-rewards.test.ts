@@ -144,3 +144,28 @@ test("resolveRewardClaimTarget carries excluded airdrop status into persistence 
   assert.equal(result.depositOrStrategyId, null);
   assert.deepEqual(result.resolutionReasonCodes, ["excludedAirdrop"]);
 });
+
+test("inferPersistedRewardType keeps excluded airdrops on the original claim identity for upserts", async () => {
+  const { inferPersistedRewardType } = await import("@/server/trigger/tasks/phase-rewards.task");
+
+  const rewardType = inferPersistedRewardType({
+    governanceCandidate: false,
+    candidate: {
+      txHash: "0xca23a1618b416be4f082ae26e59dd9bfcea5e028f00a2cd9f1b8dd95fbff77ea",
+      occurredAt: new Date("2026-04-01T19:11:23.000Z"),
+      category: "token receive",
+      summary: "Received 500 t.me/s/us_pool - Visit to claim from 0x83...2913",
+      protocol: null,
+      targetType: null,
+      targetTokenId: null,
+      targetStakingRewardsAddress: null,
+      sameTxTokenId: null,
+      shareLifecycleWrapperAddress: null,
+      targetWrapperAddress: null,
+      surfaceKind: "airdrop_spam",
+      economicComponentKind: "excluded_airdrop",
+    },
+  });
+
+  assert.equal(rewardType, "claim");
+});

@@ -116,6 +116,7 @@ export function ActivityContainer() {
         onStateChange={(nextState) => startTransition(() => updateUrl(nextState))}
         onClearFilter={(target) => startTransition(() => updateUrl(resetActivityFilter(urlState, target)))}
         onClearAll={() => startTransition(() => updateUrl(createDefaultActivityUrlState()))}
+        onOpenHref={(href) => router.push(href)}
       />
     </ConnectedShell>
   );

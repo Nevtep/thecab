@@ -20,7 +20,7 @@ test("activity validation normalizes filter inputs conservatively", () => {
   assert.equal(normalizeActivityConfidence("none"), "none");
   assert.equal(normalizeActivityConfidence("bad"), null);
   assert.equal(normalizeActivityPageSize("100"), 100);
-  assert.equal(normalizeActivityPageSize("13"), 25);
+  assert.equal(normalizeActivityPageSize("13"), 10);
   assert.equal(normalizeActivityUuid("123e4567-e89b-12d3-a456-426614174000"), "123e4567-e89b-12d3-a456-426614174000");
   assert.equal(normalizeActivityUuid("bad"), null);
 });

@@ -7,6 +7,11 @@ import { runCanonicalInference } from "@/server/analysis/canonicalInference";
 import { classifyRunLedgerEvents } from "@/server/analysis/enginePersistence";
 import { getDb } from "@/server/db/client";
 import { processedTxs, rawProviderRecords } from "@/server/db/schema";
+import {
+  fetchExplorerTransactionEvidence,
+  type ExplorerEvidence,
+} from "@/server/providers/explorer";
+import { insertRawProviderRecord } from "@/server/providers/raw-provider-records.repository";
 
 export type PhaseActivityTaskPayload = {
   runId: string;
@@ -53,6 +58,45 @@ function parseWalletTokenSignals(value: unknown): WalletTokenSignal[] {
               : null,
     }))
     .filter((item) => item.tokenAddress.length > 0);
+}
+
+export function buildSupplementalExplorerEvidenceMetadata(evidence: ExplorerEvidence): Record<string, unknown> {
+  return {
+    txHash: evidence.txHash,
+    provider: evidence.provider,
+    sourceRefs: evidence.sourceRefs,
+    evidenceGapReasonCodes: evidence.evidenceGapReasonCodes,
+    receiptPresent: evidence.receipt !== null,
+    logCount: evidence.logs.length,
+    internalTransferCount: evidence.internalTransfers.length,
+  };
+}
+
+async function collectSupplementalExplorerEvidence(input: {
+  runId: string;
+  walletAddress: string;
+  chainId: number;
+  txHashes: string[];
+}) {
+  const evidenceByTxHash: Record<string, ExplorerEvidence> = {};
+  for (const txHash of input.txHashes) {
+    const evidence = await fetchExplorerTransactionEvidence({
+      chainId: input.chainId,
+      txHash,
+    });
+    evidenceByTxHash[txHash.toLowerCase()] = evidence;
+    await insertRawProviderRecord({
+      runId: input.runId,
+      provider: evidence.provider,
+      endpoint: "/tx/:txHash/evidence",
+      chainId: input.chainId,
+      walletAddress: input.walletAddress,
+      requestJson: { txHash: txHash.toLowerCase() },
+      responseJson: buildSupplementalExplorerEvidenceMetadata(evidence),
+      confidence: evidence.evidenceGapReasonCodes.length === 0 ? "high" : "low",
+    });
+  }
+  return evidenceByTxHash;
 }
 
 async function loadFallbackWalletTokenSignals(input: {
@@ -121,12 +165,20 @@ export const phaseActivityTask = task({
     const spamTokenAddresses = walletTokenSignals
       .filter((item) => item.possibleSpam || item.verifiedContract === false)
       .map((item) => item.tokenAddress);
+    const txHashes = txRows.map((row) => row.txHash);
+    const supplementalEvidenceByTxHash = await collectSupplementalExplorerEvidence({
+      walletAddress: payload.walletAddress,
+      chainId: payload.chainId,
+      runId: payload.runId,
+      txHashes,
+    });
 
     const classifiedCount = await classifyRunLedgerEvents({
       walletAddress: payload.walletAddress,
       chainId: payload.chainId,
-      txHashes: txRows.map((row) => row.txHash),
+      txHashes,
       runId: payload.runId,
+      supplementalEvidenceByTxHash,
       spamTokenAddresses,
       walletTokenSignals,
     });
@@ -134,7 +186,7 @@ export const phaseActivityTask = task({
     const inference = await runCanonicalInference({
       walletAddress: payload.walletAddress,
       chainId: payload.chainId,
-      txHashes: txRows.map((row) => row.txHash),
+      txHashes,
       runId: payload.runId,
     });
 

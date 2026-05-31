@@ -41,6 +41,11 @@ type MovementDbRow = {
   metadataJson: Record<string, unknown> | null;
 };
 
+export type ActivityLedgerReadModelInput = {
+  ledgerEvent: LedgerDbRow;
+  movements: ActivityMovement[];
+};
+
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
@@ -146,7 +151,7 @@ function resolveTokenSymbol(metadata: Record<string, unknown>, tokenAddress: str
     (tokenAddress ? `${tokenAddress.slice(0, 6)}...${tokenAddress.slice(-4)}` : null);
 }
 
-function mapMovement(row: MovementDbRow): ActivityMovement {
+export function mapActivityMovement(row: MovementDbRow): ActivityMovement {
   const metadata = asRecord(row.metadataJson);
   return {
     id: row.id,
@@ -158,7 +163,7 @@ function mapMovement(row: MovementDbRow): ActivityMovement {
   };
 }
 
-function resolvePrimaryMovement(movements: ActivityMovement[]) {
+export function resolveActivityPrimaryMovement(movements: ActivityMovement[]) {
   return movements
     .map((movement) => ({ movement, value: asNumber(movement.amountUsd) ?? 0 }))
     .sort((left, right) => right.value - left.value)[0]?.movement ?? movements[0] ?? null;
@@ -168,18 +173,81 @@ function buildSummary(row: LedgerDbRow, action: ActivityAction, movements: Activ
   const metadata = asRecord(row.metadataJson);
   const explicit = asString(metadata.summary) ?? asString(metadata.description);
   if (explicit) return explicit;
-  const primary = resolvePrimaryMovement(movements);
+  const primary = resolveActivityPrimaryMovement(movements);
   if (primary?.tokenSymbol) return `${action}:${primary.tokenSymbol}`;
   return row.eventType;
 }
 
-function mapLedgerRow(row: LedgerDbRow, movements: ActivityMovement[]): ActivityEventRow {
+function shortEntity(id: string, prefix: string) {
+  return `${prefix}-${id.slice(0, 4)}...${id.slice(-4)}`;
+}
+
+function buildLinkedEntities(metadata: Record<string, unknown>, chainId: number): ActivityEventRow["linkedEntities"] {
+  const linkedEntities: ActivityEventRow["linkedEntities"] = [];
+  const poolId = asString(metadata.poolId) ?? asString(metadata.primaryPoolId) ?? asString(metadata.resolvedPoolId);
+  const depositId = asString(metadata.depositId) ?? asString(metadata.positionId);
+  const strategyId = asString(metadata.strategyId);
+  const strategyExposureId = asString(metadata.strategyExposureId);
+  const rewardEventId = asString(metadata.rewardEventId) ?? asString(metadata.sourceRewardEventId);
+  const governanceEventId = asString(metadata.governanceEventId);
+
+  if (poolId) {
+    linkedEntities.push({
+      kind: "pool",
+      entityId: poolId,
+      label: asString(metadata.poolLabel) ?? shortEntity(poolId, "Pool"),
+      href: `/pools/${poolId}?chainId=${chainId}`,
+      reasonCode: "explicitPoolEvidence",
+    });
+  }
+  if (depositId) {
+    linkedEntities.push({
+      kind: "deposit",
+      entityId: depositId,
+      label: asString(metadata.depositLabel) ?? shortEntity(depositId, "Dep"),
+      href: `/deposits/${depositId}?chainId=${chainId}`,
+      reasonCode: "explicitDepositEvidence",
+    });
+  }
+  if (strategyExposureId || strategyId) {
+    const entityId = strategyExposureId ?? strategyId!;
+    linkedEntities.push({
+      kind: "strategy",
+      entityId,
+      label: asString(metadata.strategyLabel) ?? shortEntity(entityId, "Strat"),
+      href: `/strategies/${entityId}?chainId=${chainId}`,
+      reasonCode: "explicitStrategyEvidence",
+    });
+  }
+  if (rewardEventId) {
+    linkedEntities.push({
+      kind: "reward",
+      entityId: rewardEventId,
+      label: asString(metadata.rewardLabel) ?? shortEntity(rewardEventId, "Reward"),
+      href: `/rewards?selected=${rewardEventId}`,
+      reasonCode: "explicitRewardEvidence",
+    });
+  }
+  if (governanceEventId) {
+    linkedEntities.push({
+      kind: "governance",
+      entityId: governanceEventId,
+      label: asString(metadata.governanceLabel) ?? shortEntity(governanceEventId, "Gov"),
+      href: null,
+      reasonCode: "explicitGovernanceEvidence",
+    });
+  }
+
+  return linkedEntities;
+}
+
+export function mapActivityLedgerRow(row: LedgerDbRow, movements: ActivityMovement[]): ActivityEventRow {
   const metadata = asRecord(row.metadataJson);
   const action = normalizeAction(row);
   const surface = normalizeSurface(row);
   const coverage = normalizeCoverage(row);
   const confidence = coverage === "excluded" ? "none" : normalizeConfidence(row.confidence);
-  const primaryMovement = resolvePrimaryMovement(movements);
+  const primaryMovement = resolveActivityPrimaryMovement(movements);
   const valueUsd = movements.reduce((sum, movement) => sum + Math.abs(asNumber(movement.amountUsd) ?? 0), 0);
 
   return {
@@ -202,16 +270,21 @@ function mapLedgerRow(row: LedgerDbRow, movements: ActivityMovement[]): Activity
     summary: buildSummary(row, action, movements),
     reasonCodes: getReasonCodes(row, coverage),
     movements,
-    linkedEntities: [],
+    linkedEntities: buildLinkedEntities(metadata, row.chainId),
     metadata,
   };
 }
 
-function matchesActivityRequest(row: ActivityEventRow, input: ActivityRequest) {
+export function matchesActivityRequest(row: ActivityEventRow, input: ActivityRequest) {
   if (input.surface !== "all" && row.surface !== input.surface) return false;
   if (input.action !== "all" && row.action !== input.action) return false;
   if (input.coverage && row.coverage !== input.coverage) return false;
   if (input.confidence && row.confidence !== input.confidence) return false;
+  if (input.poolId && !row.linkedEntities.some((entity) => entity.kind === "pool" && entity.entityId === input.poolId)) return false;
+  if (input.depositId && !row.linkedEntities.some((entity) => entity.kind === "deposit" && entity.entityId === input.depositId)) return false;
+  if (input.strategyId && !row.linkedEntities.some((entity) => entity.kind === "strategy" && entity.entityId === input.strategyId)) return false;
+  if (input.rewardEventId && !row.linkedEntities.some((entity) => entity.kind === "reward" && entity.entityId === input.rewardEventId)) return false;
+  if (input.governanceEventId && !row.linkedEntities.some((entity) => entity.kind === "governance" && entity.entityId === input.governanceEventId)) return false;
   if (input.search) {
     const needle = input.search.toLowerCase();
     const haystack = [
@@ -221,6 +294,7 @@ function matchesActivityRequest(row: ActivityEventRow, input: ActivityRequest) {
       row.summary,
       row.primaryTokenAddress,
       row.primaryTokenSymbol,
+      ...row.linkedEntities.map((entity) => entity.label),
       ...row.reasonCodes,
     ].filter(Boolean).join(" ").toLowerCase();
     if (!haystack.includes(needle)) return false;
@@ -228,7 +302,7 @@ function matchesActivityRequest(row: ActivityEventRow, input: ActivityRequest) {
   return true;
 }
 
-function sortActivityRows(rows: ActivityEventRow[], input: ActivityRequest) {
+export function sortActivityRows(rows: ActivityEventRow[], input: ActivityRequest) {
   return [...rows].sort((left, right) => {
     let cmp = 0;
     switch (input.sort.key) {
@@ -253,7 +327,7 @@ function sortActivityRows(rows: ActivityEventRow[], input: ActivityRequest) {
   });
 }
 
-function calculateAvailableFilters(rows: ActivityEventRow[]): ActivityAvailableFilters {
+export function calculateAvailableActivityFilters(rows: ActivityEventRow[]): ActivityAvailableFilters {
   const actions = new Set<ActivityAction>();
   const surfaces = new Set<Exclude<ActivitySurfaceFilter, "all">>();
   const tokenMap = new Map<string, string | null>();
@@ -339,14 +413,14 @@ export async function findActivity(input: ActivityRequest): Promise<ActivityRepo
   for (const movement of movementRows as MovementDbRow[]) {
     if (!movement.ledgerEventId) continue;
     const existing = movementMap.get(movement.ledgerEventId) ?? [];
-    existing.push(mapMovement(movement));
+    existing.push(mapActivityMovement(movement));
     movementMap.set(movement.ledgerEventId, existing);
   }
 
-  const baseRows = (baseDbRows as LedgerDbRow[]).map((row) => mapLedgerRow(row, []));
+  const baseRows = (baseDbRows as LedgerDbRow[]).map((row) => mapActivityLedgerRow(row, []));
   const filtered = sortActivityRows(
     (filteredDbRows as LedgerDbRow[])
-      .map((row) => mapLedgerRow(row, movementMap.get(row.activityId) ?? []))
+      .map((row) => mapActivityLedgerRow(row, movementMap.get(row.activityId) ?? []))
       .filter((row) => matchesActivityRequest(row, input)),
     input,
   );
@@ -356,6 +430,6 @@ export async function findActivity(input: ActivityRequest): Promise<ActivityRepo
     allRows: filtered,
     rows: filtered.slice(startIndex, startIndex + input.pageSize),
     totalRows: filtered.length,
-    availableFilters: calculateAvailableFilters(baseRows),
+    availableFilters: calculateAvailableActivityFilters(baseRows),
   };
 }

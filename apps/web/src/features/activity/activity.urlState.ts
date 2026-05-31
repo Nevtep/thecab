@@ -19,13 +19,18 @@ export function createDefaultActivityUrlState(): ActivityUrlState {
     action: "all",
     coverage: null,
     confidence: null,
+    poolId: null,
+    depositId: null,
+    strategyId: null,
+    rewardEventId: null,
+    governanceEventId: null,
     selectedActivityId: null,
     sort: {
       key: "occurredAt",
       direction: "desc",
     },
     page: 1,
-    pageSize: 25,
+    pageSize: 10,
   };
 }
 
@@ -44,6 +49,11 @@ export function parseActivityUrlState(searchParams: URLSearchParams): ActivityUr
     action: normalizeActivityAction(searchParams.get("action")),
     coverage: normalizeActivityCoverage(searchParams.get("coverage")),
     confidence: normalizeActivityConfidence(searchParams.get("confidence")),
+    poolId: normalizeActivityUuid(searchParams.get("poolId")),
+    depositId: normalizeActivityUuid(searchParams.get("depositId")),
+    strategyId: normalizeActivityUuid(searchParams.get("strategyId")),
+    rewardEventId: normalizeActivityUuid(searchParams.get("rewardEventId")),
+    governanceEventId: normalizeActivityUuid(searchParams.get("governanceEventId")),
     selectedActivityId: normalizeActivityUuid(pickFirst(searchParams, ["selectedActivityId", "selected"])),
     sort: {
       key: normalizeActivitySortKey(searchParams.get("sort")),
@@ -62,6 +72,11 @@ export function serializeActivityUrlState(state: ActivityUrlState): string {
   if (state.action !== defaults.action) params.set("action", state.action);
   if (state.coverage) params.set("coverage", state.coverage);
   if (state.confidence) params.set("confidence", state.confidence);
+  if (state.poolId) params.set("poolId", state.poolId);
+  if (state.depositId) params.set("depositId", state.depositId);
+  if (state.strategyId) params.set("strategyId", state.strategyId);
+  if (state.rewardEventId) params.set("rewardEventId", state.rewardEventId);
+  if (state.governanceEventId) params.set("governanceEventId", state.governanceEventId);
   if (state.selectedActivityId) params.set("selected", state.selectedActivityId);
   if (state.sort.key !== defaults.sort.key) params.set("sort", state.sort.key);
   if (state.sort.direction !== defaults.sort.direction) params.set("direction", state.sort.direction);
@@ -77,6 +92,11 @@ export function normalizeActivityFiltersForQueryKey(state: ActivityUrlState) {
     action: state.action,
     coverage: state.coverage,
     confidence: state.confidence,
+    poolId: state.poolId,
+    depositId: state.depositId,
+    strategyId: state.strategyId,
+    rewardEventId: state.rewardEventId,
+    governanceEventId: state.governanceEventId,
     selectedActivityId: state.selectedActivityId,
     sort: state.sort,
     page: state.page,
@@ -103,6 +123,11 @@ export function resetActivityFilter(state: ActivityUrlState, target: string): Ac
     action: target === "action" ? "all" : state.action,
     coverage: target === "coverage" ? null : state.coverage,
     confidence: target === "confidence" ? null : state.confidence,
+    poolId: target === "poolId" ? null : state.poolId,
+    depositId: target === "depositId" ? null : state.depositId,
+    strategyId: target === "strategyId" ? null : state.strategyId,
+    rewardEventId: target === "rewardEventId" ? null : state.rewardEventId,
+    governanceEventId: target === "governanceEventId" ? null : state.governanceEventId,
     page: 1,
   };
 }

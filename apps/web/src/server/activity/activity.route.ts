@@ -29,6 +29,11 @@ const activityQuerySchema = z.object({
   action: z.union([z.literal("all"), z.enum(ACTIVITY_ACTION_VALUES)]).default("all"),
   coverage: z.enum(ACTIVITY_COVERAGE_VALUES).nullable().default(null),
   confidence: z.enum(ACTIVITY_CONFIDENCE_VALUES).nullable().default(null),
+  poolId: nullableUuid,
+  depositId: nullableUuid,
+  strategyId: nullableUuid,
+  rewardEventId: nullableUuid,
+  governanceEventId: nullableUuid,
   selectedActivityId: nullableUuid,
   sort: z.enum(ACTIVITY_SORT_KEY_VALUES).default("occurredAt"),
   direction: z.enum(ACTIVITY_SORT_DIRECTION_VALUES).default("desc"),
@@ -38,7 +43,7 @@ const activityQuerySchema = z.object({
     z.literal(ACTIVITY_PAGE_SIZE_VALUES[1]),
     z.literal(ACTIVITY_PAGE_SIZE_VALUES[2]),
     z.literal(ACTIVITY_PAGE_SIZE_VALUES[3]),
-  ])).default(25),
+  ])).default(10),
 });
 
 const allowedParams = new Set([
@@ -48,6 +53,11 @@ const allowedParams = new Set([
   "action",
   "coverage",
   "confidence",
+  "poolId",
+  "depositId",
+  "strategyId",
+  "rewardEventId",
+  "governanceEventId",
   "selectedActivityId",
   "selected",
   "sort",
@@ -81,6 +91,11 @@ export function normalizeActivityQueryParams(searchParams: URLSearchParams) {
     action: searchParams.get("action") ?? undefined,
     coverage: searchParams.get("coverage") ?? null,
     confidence: searchParams.get("confidence") ?? null,
+    poolId: searchParams.get("poolId") ?? null,
+    depositId: searchParams.get("depositId") ?? null,
+    strategyId: searchParams.get("strategyId") ?? null,
+    rewardEventId: searchParams.get("rewardEventId") ?? null,
+    governanceEventId: searchParams.get("governanceEventId") ?? null,
     selectedActivityId: searchParams.get("selectedActivityId") ?? searchParams.get("selected") ?? null,
     sort: searchParams.get("sort") ?? undefined,
     direction: searchParams.get("direction") ?? undefined,
@@ -108,6 +123,11 @@ export async function parseActivityRequest(request: Request): Promise<ActivityRe
     action: normalized.action,
     coverage: normalized.coverage,
     confidence: normalized.confidence,
+    poolId: normalized.poolId,
+    depositId: normalized.depositId,
+    strategyId: normalized.strategyId,
+    rewardEventId: normalized.rewardEventId,
+    governanceEventId: normalized.governanceEventId,
     selectedActivityId: normalized.selectedActivityId,
     sort: {
       key: normalized.sort,
@@ -118,7 +138,7 @@ export async function parseActivityRequest(request: Request): Promise<ActivityRe
   };
 }
 
-function getActivityErrorStatus(error: unknown) {
+export function getActivityErrorStatus(error: unknown) {
   const cause = error instanceof Error ? error.cause : null;
   if (error instanceof z.ZodError || cause instanceof z.ZodError) {
     return { code: "INVALID_ACTIVITY_FILTERS", status: 400, details: error instanceof z.ZodError ? error.issues : cause instanceof z.ZodError ? cause.issues : undefined };
