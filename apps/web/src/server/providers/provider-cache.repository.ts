@@ -11,6 +11,7 @@ import {
 } from "@/server/providers/raw-provider-records.repository";
 
 const PROVIDER_CACHE_PREFIX = "provider-cache:v1";
+type ProviderCacheReadOrder = "redis-first" | "db-first";
 
 function buildProviderCacheStorageKey(input: {
   provider: string;
@@ -37,7 +38,8 @@ export async function readProviderCachedResponse<T>(input: {
   chainId: number;
   walletAddress: string | null;
   cacheKey: string;
-  maxAgeMs: number;
+  maxAgeMs: number | null;
+  readOrder?: ProviderCacheReadOrder;
 }) {
   const storageKey = buildProviderCacheStorageKey(input);
   const requestHash = buildRawProviderRequestHash({
@@ -50,48 +52,71 @@ export async function readProviderCachedResponse<T>(input: {
     },
   });
   const redisClient = getRedisClient();
-  if (redisClient) {
-    const redisPayload = await redisClient.get<T>(storageKey);
+  const readRedisPayload = async () => {
+    if (!redisClient) {
+      return null;
+    }
+    return redisClient.get<T>(storageKey);
+  };
+  const writeRedisPayload = async (payload: T) => {
+    if (!redisClient) {
+      return;
+    }
+    if (input.maxAgeMs === null) {
+      await redisClient.set(storageKey, payload);
+      return;
+    }
+    if (input.maxAgeMs > 0) {
+      await redisClient.set(storageKey, payload, {
+        ex: Math.max(1, Math.ceil(input.maxAgeMs / 1000)),
+      });
+    }
+  };
+
+  if ((input.readOrder ?? "redis-first") === "redis-first") {
+    const redisPayload = await readRedisPayload();
     if (redisPayload !== null) {
       return redisPayload;
     }
   }
 
   const db = getDb();
-  const minimumCreatedAt = new Date(Date.now() - Math.max(0, input.maxAgeMs));
   const walletPredicate = input.walletAddress
     ? eq(rawProviderRecords.walletAddress, input.walletAddress.toLowerCase())
     : isNull(rawProviderRecords.walletAddress);
+  const filters = [
+    eq(rawProviderRecords.provider, input.provider),
+    eq(rawProviderRecords.endpoint, input.endpoint),
+    eq(rawProviderRecords.chainId, input.chainId),
+    walletPredicate,
+    eq(rawProviderRecords.requestHash, requestHash),
+  ];
+  if (input.maxAgeMs !== null) {
+    filters.push(gte(rawProviderRecords.createdAt, new Date(Date.now() - Math.max(0, input.maxAgeMs))));
+  }
   const rows = await db
     .select({
       responseJson: rawProviderRecords.responseJson,
     })
     .from(rawProviderRecords)
-    .where(
-      and(
-        eq(rawProviderRecords.provider, input.provider),
-        eq(rawProviderRecords.endpoint, input.endpoint),
-        eq(rawProviderRecords.chainId, input.chainId),
-        walletPredicate,
-        gte(rawProviderRecords.createdAt, minimumCreatedAt),
-        eq(rawProviderRecords.requestHash, requestHash),
-      ),
-    )
+    .where(and(...filters))
     .orderBy(desc(rawProviderRecords.createdAt))
     .limit(1);
 
   const payload = rows[0]?.responseJson?.payload;
   if (payload === undefined) {
+    if ((input.readOrder ?? "redis-first") === "db-first") {
+      const redisPayload = await readRedisPayload();
+      if (redisPayload !== null) {
+        return redisPayload;
+      }
+    }
     return null;
   }
 
   const parsedPayload = payload as T;
 
-  if (redisClient && input.maxAgeMs > 0) {
-    await redisClient.set(storageKey, parsedPayload, {
-      ex: Math.max(1, Math.ceil(input.maxAgeMs / 1000)),
-    });
-  }
+  await writeRedisPayload(parsedPayload);
 
   return parsedPayload;
 }
@@ -103,14 +128,18 @@ export async function insertProviderCachedResponse(input: {
   walletAddress: string | null;
   cacheKey: string;
   payload: unknown;
-  ttlMs: number;
+  ttlMs: number | null;
 }) {
   const storageKey = buildProviderCacheStorageKey(input);
   const redisClient = getRedisClient();
-  if (redisClient && input.ttlMs > 0) {
-    await redisClient.set(storageKey, input.payload, {
-      ex: Math.max(1, Math.ceil(input.ttlMs / 1000)),
-    });
+  if (redisClient) {
+    if (input.ttlMs === null) {
+      await redisClient.set(storageKey, input.payload);
+    } else if (input.ttlMs > 0) {
+      await redisClient.set(storageKey, input.payload, {
+        ex: Math.max(1, Math.ceil(input.ttlMs / 1000)),
+      });
+    }
   }
 
   return insertRawProviderRecord({

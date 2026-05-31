@@ -106,6 +106,9 @@ test("mapRewardEventRow preserves manual, strategy, governance, unresolved, and 
   assert.equal(strategy.owner.status, "strategy");
   assert.equal(strategy.owner.entityId, strategyExposureId);
   assert.equal(governance.owner.status, "governance");
+  assert.equal(governance.owner.entityId, "cccccccc-cccc-4ccc-8ccc-cccccccccccc");
+  assert.match(governance.owner.route ?? "", /^\/governance\?/);
+  assert.equal(governance.poolContribution.countingRule, "governance_unassociated_no_pool");
   assert.equal(unresolved.coverageState, "unresolved");
   assert.equal(unresolved.poolContribution.status, "unresolved");
   assert.equal(excluded.owner.status, "excluded");

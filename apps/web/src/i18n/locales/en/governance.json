@@ -164,6 +164,17 @@
     "evidenceSources": "Evidence sources",
     "coverage": "Coverage",
     "confidence": "Confidence",
-    "affectsTotals": "Affects totals"
+    "affectsTotals": "Affects totals",
+    "reasonCodes": "Reason codes",
+    "noMovements": "No token movements were materialized for this selection.",
+    "noLinkedContexts": "No explicit product links were materialized for this selection.",
+    "noEvidenceSources": "No source evidence references were materialized for this selection.",
+    "amount": "Amount",
+    "valueUsd": "USD value",
+    "epochSummary": "Epoch summary"
+  },
+  "notes": {
+    "explicitPoolContributionNoDoubleCount": "Same reward identity is counted once and linked to this pool by explicit evidence.",
+    "unassociatedRewardNoPoolContribution": "Reward remains visible in Governance but is not allocated to a pool without explicit evidence."
   }
 }

@@ -120,6 +120,8 @@ const response: GovernanceResponse = {
       {
         governanceRewardId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
         rewardEventId: null,
+        governanceEventId: null,
+        txHash: null,
         claimedAt: "2026-05-20T00:00:00.000Z",
         rewardType: "fee",
         token: { address: null, symbol: "USDC", iconUrl: null },
@@ -129,11 +131,17 @@ const response: GovernanceResponse = {
         pool: null,
         coverageState: "full",
         confidence: "high",
+        affectsTotals: true,
+        poolAssociation: { status: "unassociated", rule: "explicit_pool_evidence_required", reasonCodes: [] },
+        doubleCountingNoteKey: null,
         context: { kind: "epoch", label: "Epoch 170" },
+        sourceEvidenceRefs: [],
       },
       {
         governanceRewardId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
         rewardEventId: null,
+        governanceEventId: null,
+        txHash: null,
         claimedAt: "2026-05-26T00:00:00.000Z",
         rewardType: "bribe",
         token: { address: null, symbol: "AERO", iconUrl: null },
@@ -143,7 +151,11 @@ const response: GovernanceResponse = {
         pool: null,
         coverageState: "full",
         confidence: "high",
+        affectsTotals: true,
+        poolAssociation: { status: "unassociated", rule: "explicit_pool_evidence_required", reasonCodes: [] },
+        doubleCountingNoteKey: null,
         context: { kind: "epoch", label: "Epoch 170" },
+        sourceEvidenceRefs: [],
       },
     ],
     pagination: { page: 1, pageSize: 10, totalRows: 2, totalPages: 1 },
@@ -159,9 +171,15 @@ const response: GovernanceResponse = {
     epochContext: null,
     poolContext: null,
     classificationEvidence: { basis: ["persisted", "persisted"], reasonCodes: [], missingEvidenceReasonCodes: [] },
-    linkedContexts: [],
+    linkedContexts: [
+      { kind: "activity", entityId: "event-1", route: "/activity?governanceEventId=event-1" },
+      { kind: "activity", entityId: "event-1", route: "/activity?governanceEventId=event-1" },
+    ],
     coverageNotes: { coverageState: "full", confidence: "high", affectsTotals: true, reasonCodes: [] },
-    sourceEvidenceRefs: [],
+    sourceEvidenceRefs: [
+      { provider: "etherscan", kind: "logs" },
+      { kind: "logs", provider: "etherscan" },
+    ],
   },
   availableFilters: {},
 };
@@ -176,5 +194,8 @@ test("mapGovernanceResponseToViewModel normalizes identity, reason codes, and or
   assert.deepEqual(viewModel.epochTimeline.epochs.map((epoch) => epoch.epochId), ["170", "171"]);
   assert.deepEqual(viewModel.rewardBreakdown.segments.map((segment) => segment.rewardType), ["bribe", "fee"]);
   assert.deepEqual(viewModel.rewards.rows.map((row) => row.rewardType), ["bribe", "fee"]);
+  assert.deepEqual(viewModel.rewards.rows.map((row) => row.poolAssociation.status), ["unassociated", "unassociated"]);
   assert.deepEqual(viewModel.selectedDetail.classificationEvidence.basis, ["persisted"]);
+  assert.equal(viewModel.selectedDetail.linkedContexts.length, 1);
+  assert.equal(viewModel.selectedDetail.sourceEvidenceRefs.length, 1);
 });

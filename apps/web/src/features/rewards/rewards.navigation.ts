@@ -21,3 +21,20 @@ export function buildDepositRewardsHref(depositId: string) {
 export function buildStrategyRewardsHref(strategyExposureId: string) {
   return buildRewardsHref({ strategyExposureId, source: "strategies" });
 }
+
+export function buildGovernanceRewardsHref(rewardEventId?: string | null) {
+  return buildRewardsHref({
+    source: "governance",
+    selectedRewardEventId: rewardEventId ?? null,
+  });
+}
+
+export function buildGovernanceRewardDetailHref(rewardEventId: string, chainId?: number) {
+  const params = new URLSearchParams({
+    kind: "reward",
+    selected: rewardEventId,
+    rewardEventId,
+  });
+  if (typeof chainId === "number") params.set("chainId", String(chainId));
+  return `/governance?${params.toString()}`;
+}

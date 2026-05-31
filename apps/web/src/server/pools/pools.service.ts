@@ -196,6 +196,12 @@ export async function getPoolDetail(input: PoolDetailRequest): Promise<PoolDetai
   const timelineOffset = input.timelineCursor ? Number.parseInt(input.timelineCursor, 10) : 0;
   const timelineItems = timelineRows.slice(timelineOffset, timelineOffset + input.timelineLimit);
   const nextOffset = timelineOffset + input.timelineLimit;
+  const governanceRewardLinks = timelineItems
+    .filter((row) => row.metadataJson?.governanceReward === true && typeof row.metadataJson.rewardEventId === "string")
+    .map((row) => ({
+      id: row.metadataJson.rewardEventId as string,
+      label: row.eventType,
+    }));
 
   return {
     walletAddress: input.walletAddress,
@@ -284,6 +290,7 @@ export async function getPoolDetail(input: PoolDetailRequest): Promise<PoolDetai
       strategies: timelineItems
         .filter((row) => row.relatedStrategyId)
         .map((row) => ({ id: row.relatedStrategyId!, label: row.eventType })),
+      governanceRewards: governanceRewardLinks,
     },
   };
 }

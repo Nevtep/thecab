@@ -1,3 +1,5 @@
+import { performance } from "node:perf_hooks";
+
 import { and, desc, eq } from "drizzle-orm";
 import { task } from "@trigger.dev/sdk/v3";
 
@@ -11,7 +13,6 @@ import {
   fetchExplorerTransactionEvidence,
   type ExplorerEvidence,
 } from "@/server/providers/explorer";
-import { insertRawProviderRecord } from "@/server/providers/raw-provider-records.repository";
 
 export type PhaseActivityTaskPayload = {
   runId: string;
@@ -26,6 +27,24 @@ type WalletTokenSignal = {
   usdPrice: number | null;
   usdValue: number | null;
 };
+
+type PhaseActivityPerfEvent = Record<string, unknown> & {
+  event: string;
+  runId: string;
+  chainId: number;
+  walletAddress: string;
+};
+
+function elapsedMs(startedAt: number) {
+  return Math.round(performance.now() - startedAt);
+}
+
+function logPhaseActivityPerf(event: PhaseActivityPerfEvent) {
+  console.info(JSON.stringify({
+    phase: "phase-activity",
+    ...event,
+  }));
+}
 
 function parseWalletTokenSignals(value: unknown): WalletTokenSignal[] {
   if (!Array.isArray(value)) {
@@ -78,24 +97,65 @@ async function collectSupplementalExplorerEvidence(input: {
   chainId: number;
   txHashes: string[];
 }) {
+  const startedAt = performance.now();
+  logPhaseActivityPerf({
+    event: "supplemental_evidence_started",
+    runId: input.runId,
+    chainId: input.chainId,
+    walletAddress: input.walletAddress.toLowerCase(),
+    txCount: input.txHashes.length,
+  });
   const evidenceByTxHash: Record<string, ExplorerEvidence> = {};
-  for (const txHash of input.txHashes) {
+  const slowestTxs: Array<{
+    txHash: string;
+    totalMs: number;
+    fetchMs: number;
+    gapReasons: string[];
+  }> = [];
+
+  for (const [index, txHash] of input.txHashes.entries()) {
+    const txStartedAt = performance.now();
+    const fetchStartedAt = performance.now();
     const evidence = await fetchExplorerTransactionEvidence({
       chainId: input.chainId,
       txHash,
     });
+    const fetchMs = elapsedMs(fetchStartedAt);
     evidenceByTxHash[txHash.toLowerCase()] = evidence;
-    await insertRawProviderRecord({
-      runId: input.runId,
-      provider: evidence.provider,
-      endpoint: "/tx/:txHash/evidence",
-      chainId: input.chainId,
-      walletAddress: input.walletAddress,
-      requestJson: { txHash: txHash.toLowerCase() },
-      responseJson: buildSupplementalExplorerEvidenceMetadata(evidence),
-      confidence: evidence.evidenceGapReasonCodes.length === 0 ? "high" : "low",
+    const totalMs = elapsedMs(txStartedAt);
+    slowestTxs.push({
+      txHash: txHash.toLowerCase(),
+      totalMs,
+      fetchMs,
+      gapReasons: evidence.evidenceGapReasonCodes,
     });
+    slowestTxs.sort((left, right) => right.totalMs - left.totalMs);
+    slowestTxs.splice(5);
+
+    if (totalMs >= 1_000 || (index + 1) % 25 === 0 || index === input.txHashes.length - 1) {
+      logPhaseActivityPerf({
+        event: "supplemental_evidence_progress",
+        runId: input.runId,
+        chainId: input.chainId,
+        walletAddress: input.walletAddress.toLowerCase(),
+        completedTxCount: index + 1,
+        totalTxCount: input.txHashes.length,
+        lastTxHash: txHash.toLowerCase(),
+        lastTxElapsedMs: totalMs,
+        lastFetchMs: fetchMs,
+        lastGapReasons: evidence.evidenceGapReasonCodes,
+      });
+    }
   }
+  logPhaseActivityPerf({
+    event: "supplemental_evidence_completed",
+    runId: input.runId,
+    chainId: input.chainId,
+    walletAddress: input.walletAddress.toLowerCase(),
+    txCount: input.txHashes.length,
+    elapsedMs: elapsedMs(startedAt),
+    slowestTxs,
+  });
   return evidenceByTxHash;
 }
 
@@ -140,11 +200,39 @@ async function loadFallbackWalletTokenSignals(input: {
 export const phaseActivityTask = task({
   id: "phase-activity",
   run: async (payload: PhaseActivityTaskPayload) => {
+    const phaseStartedAt = performance.now();
+    const walletAddress = payload.walletAddress.toLowerCase();
+    logPhaseActivityPerf({
+      event: "started",
+      runId: payload.runId,
+      chainId: payload.chainId,
+      walletAddress,
+    });
+
+    const loadRunStartedAt = performance.now();
     const run = await getAnalysisRunById(payload.runId);
+    logPhaseActivityPerf({
+      event: "run_loaded",
+      runId: payload.runId,
+      chainId: payload.chainId,
+      walletAddress,
+      elapsedMs: elapsedMs(loadRunStartedAt),
+      runFound: Boolean(run),
+      runStatus: run?.status ?? null,
+    });
     if (!run || run.status === "cancelled") {
+      logPhaseActivityPerf({
+        event: "skipped",
+        runId: payload.runId,
+        chainId: payload.chainId,
+        walletAddress,
+        reason: !run ? "run_not_found" : "run_cancelled",
+        elapsedMs: elapsedMs(phaseStartedAt),
+      });
       return { classifiedCount: 0 };
     }
 
+    const loadSlicesStartedAt = performance.now();
     const slices = await listRunSlices(payload.runId);
     const db = getDb();
     const txRows = slices.length === 0
@@ -153,8 +241,19 @@ export const phaseActivityTask = task({
         .select({ txHash: processedTxs.txHash })
         .from(processedTxs)
         .where(and(eq(processedTxs.firstRunId, payload.runId)));
+    logPhaseActivityPerf({
+      event: "tx_scope_loaded",
+      runId: payload.runId,
+      chainId: payload.chainId,
+      walletAddress,
+      elapsedMs: elapsedMs(loadSlicesStartedAt),
+      sliceCount: slices.length,
+      txCount: txRows.length,
+    });
 
+    const tokenSignalsStartedAt = performance.now();
     let walletTokenSignals = parseWalletTokenSignals(run.metadataJson.latestWalletTokens);
+    const tokenSignalSource = walletTokenSignals.length === 0 ? "raw_provider_fallback" : "run_metadata";
     if (walletTokenSignals.length === 0) {
       walletTokenSignals = await loadFallbackWalletTokenSignals({
         walletAddress: payload.walletAddress,
@@ -165,6 +264,17 @@ export const phaseActivityTask = task({
     const spamTokenAddresses = walletTokenSignals
       .filter((item) => item.possibleSpam || item.verifiedContract === false)
       .map((item) => item.tokenAddress);
+    logPhaseActivityPerf({
+      event: "wallet_token_signals_loaded",
+      runId: payload.runId,
+      chainId: payload.chainId,
+      walletAddress,
+      elapsedMs: elapsedMs(tokenSignalsStartedAt),
+      source: tokenSignalSource,
+      signalCount: walletTokenSignals.length,
+      spamTokenCount: spamTokenAddresses.length,
+    });
+
     const txHashes = txRows.map((row) => row.txHash);
     const supplementalEvidenceByTxHash = await collectSupplementalExplorerEvidence({
       walletAddress: payload.walletAddress,
@@ -173,6 +283,7 @@ export const phaseActivityTask = task({
       txHashes,
     });
 
+    const classifyStartedAt = performance.now();
     const classifiedCount = await classifyRunLedgerEvents({
       walletAddress: payload.walletAddress,
       chainId: payload.chainId,
@@ -182,12 +293,46 @@ export const phaseActivityTask = task({
       spamTokenAddresses,
       walletTokenSignals,
     });
+    logPhaseActivityPerf({
+      event: "classification_completed",
+      runId: payload.runId,
+      chainId: payload.chainId,
+      walletAddress,
+      elapsedMs: elapsedMs(classifyStartedAt),
+      classifiedCount,
+      txCount: txHashes.length,
+      supplementalEvidenceCount: Object.keys(supplementalEvidenceByTxHash).length,
+    });
 
+    const inferenceStartedAt = performance.now();
     const inference = await runCanonicalInference({
       walletAddress: payload.walletAddress,
       chainId: payload.chainId,
       txHashes,
       runId: payload.runId,
+    });
+    logPhaseActivityPerf({
+      event: "canonical_inference_completed",
+      runId: payload.runId,
+      chainId: payload.chainId,
+      walletAddress,
+      elapsedMs: elapsedMs(inferenceStartedAt),
+      sourceLotCount: inference.sourceLotCount,
+      residualStateCount: inference.residualStateCount,
+      inferredActionCount: inference.inferredActionCount,
+    });
+
+    logPhaseActivityPerf({
+      event: "completed",
+      runId: payload.runId,
+      chainId: payload.chainId,
+      walletAddress,
+      elapsedMs: elapsedMs(phaseStartedAt),
+      classifiedCount,
+      txCount: txHashes.length,
+      sourceLotCount: inference.sourceLotCount,
+      residualStateCount: inference.residualStateCount,
+      inferredActionCount: inference.inferredActionCount,
     });
 
     return {

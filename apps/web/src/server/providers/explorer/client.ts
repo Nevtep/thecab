@@ -1,5 +1,12 @@
+import { randomUUID } from "node:crypto";
+
+import { getRedisClient } from "@/server/cache/redis";
 import { getEnv } from "@/server/env";
 import { assertSupportedChain } from "@/server/chains";
+import {
+  insertProviderCachedResponse,
+  readProviderCachedResponse,
+} from "@/server/providers/provider-cache.repository";
 
 export type ExplorerProvider = "basescan";
 
@@ -31,6 +38,18 @@ export class ExplorerClientError extends Error {
   ) {
     super(message);
   }
+}
+
+const EXPLORER_TRANSACTION_EVIDENCE_ENDPOINT = "/tx/:txHash/evidence";
+const EXPLORER_TRANSACTION_EVIDENCE_INFLIGHT_TTL_SECONDS = 45;
+const EXPLORER_TRANSACTION_EVIDENCE_WAIT_TIMEOUT_MS = 30_000;
+const EXPLORER_TRANSACTION_EVIDENCE_WAIT_INTERVAL_MS = 500;
+const EXPLORER_RATE_LIMIT_COOLDOWN_MS = 60_000;
+const explorerTransactionEvidenceInFlight = new Map<string, Promise<ExplorerEvidence>>();
+const explorerEvidenceRateLimitedUntilByChain = new Map<number, number>();
+
+function waitForDuration(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function normalizeTxHash(txHash: string) {
@@ -101,6 +120,50 @@ function asRecordArray(value: unknown) {
     : [];
 }
 
+function buildExplorerTransactionEvidenceCacheKey(input: {
+  chainId: number;
+  txHash: string;
+}) {
+  return `transaction-evidence:${input.chainId}:${input.txHash.toLowerCase()}`;
+}
+
+function buildExplorerRequestDebouncedEvidence(input: {
+  chainId: number;
+  txHash: string;
+  reason?: "inflight" | "rate_limited";
+}): ExplorerEvidence {
+  const evidenceGapReasonCodes = input.reason === "rate_limited"
+    ? ["explorerRateLimited", "explorerRequestDebounced"]
+    : ["explorerRequestDebounced"];
+  return {
+    chainId: input.chainId,
+    txHash: input.txHash.toLowerCase(),
+    provider: "basescan",
+    receipt: null,
+    logs: [],
+    internalTransfers: [],
+    sourceRefs: [
+      { provider: "basescan", endpoint: "transactionEvidence", status: "failed" },
+    ],
+    evidenceGapReasonCodes,
+  };
+}
+
+function shouldPersistExplorerEvidence(evidence: ExplorerEvidence) {
+  if (evidence.sourceRefs.length === 0) {
+    return false;
+  }
+  return evidence.sourceRefs.every((sourceRef) => sourceRef.status === "complete");
+}
+
+function isExplorerEvidenceRateLimited(chainId: number) {
+  return (explorerEvidenceRateLimitedUntilByChain.get(chainId) ?? 0) > Date.now();
+}
+
+function markExplorerEvidenceRateLimited(chainId: number) {
+  explorerEvidenceRateLimitedUntilByChain.set(chainId, Date.now() + EXPLORER_RATE_LIMIT_COOLDOWN_MS);
+}
+
 export async function fetchExplorerTransactionReceipt(input: ExplorerClientConfig & { txHash: string }) {
   const apiKey = getExplorerApiKey(input.chainId, input.apiKey);
   if (!apiKey) throw new ExplorerClientError("Missing explorer API key", "missing_credentials");
@@ -153,7 +216,7 @@ export async function fetchExplorerContractSource(input: ExplorerClientConfig & 
   return asRecordArray(extractResult(json));
 }
 
-export async function fetchExplorerTransactionEvidence(input: ExplorerClientConfig & { txHash: string }): Promise<ExplorerEvidence> {
+async function fetchExplorerTransactionEvidenceUncached(input: ExplorerClientConfig & { txHash: string }): Promise<ExplorerEvidence> {
   const txHash = normalizeTxHash(input.txHash);
   const base = {
     chainId: input.chainId,
@@ -205,4 +268,113 @@ export async function fetchExplorerTransactionEvidence(input: ExplorerClientConf
     sourceRefs,
     evidenceGapReasonCodes: [...new Set(evidenceGapReasonCodes)],
   };
+}
+
+export async function fetchExplorerTransactionEvidence(input: ExplorerClientConfig & { txHash: string }): Promise<ExplorerEvidence> {
+  const txHash = normalizeTxHash(input.txHash);
+  const shouldUsePersistentCache = input.fetcher === undefined && input.apiKey === undefined;
+  if (!shouldUsePersistentCache) {
+    return fetchExplorerTransactionEvidenceUncached({ ...input, txHash });
+  }
+
+  const cacheKey = buildExplorerTransactionEvidenceCacheKey({
+    chainId: input.chainId,
+    txHash,
+  });
+  const cachedEvidence = await readProviderCachedResponse<ExplorerEvidence>({
+    provider: "basescan",
+    endpoint: EXPLORER_TRANSACTION_EVIDENCE_ENDPOINT,
+    chainId: input.chainId,
+    walletAddress: null,
+    cacheKey,
+    maxAgeMs: null,
+    readOrder: "db-first",
+  });
+  if (cachedEvidence !== null) {
+    return cachedEvidence;
+  }
+
+  if (isExplorerEvidenceRateLimited(input.chainId)) {
+    return buildExplorerRequestDebouncedEvidence({
+      chainId: input.chainId,
+      txHash,
+      reason: "rate_limited",
+    });
+  }
+
+  const localInFlight = explorerTransactionEvidenceInFlight.get(cacheKey);
+  if (localInFlight) {
+    return localInFlight;
+  }
+
+  const redisClient = getRedisClient();
+  const inflightKey = `explorer:evidence:inflight:${input.chainId}:${txHash}`;
+  const lockOwner = randomUUID();
+
+  if (redisClient) {
+    const lockAcquired = await redisClient.set(inflightKey, lockOwner, {
+      nx: true,
+      ex: EXPLORER_TRANSACTION_EVIDENCE_INFLIGHT_TTL_SECONDS,
+    });
+
+    if (!lockAcquired) {
+      const waitStartedAt = Date.now();
+      while (Date.now() - waitStartedAt < EXPLORER_TRANSACTION_EVIDENCE_WAIT_TIMEOUT_MS) {
+        const waitCachedEvidence = await readProviderCachedResponse<ExplorerEvidence>({
+          provider: "basescan",
+          endpoint: EXPLORER_TRANSACTION_EVIDENCE_ENDPOINT,
+          chainId: input.chainId,
+          walletAddress: null,
+          cacheKey,
+          maxAgeMs: null,
+          readOrder: "db-first",
+        });
+
+        if (waitCachedEvidence !== null) {
+          return waitCachedEvidence;
+        }
+
+        await waitForDuration(EXPLORER_TRANSACTION_EVIDENCE_WAIT_INTERVAL_MS);
+      }
+
+      return buildExplorerRequestDebouncedEvidence({
+        chainId: input.chainId,
+        txHash,
+        reason: "inflight",
+      });
+    }
+  }
+
+  const requestPromise = (async () => {
+    const evidence = await fetchExplorerTransactionEvidenceUncached({ ...input, txHash });
+    if (evidence.evidenceGapReasonCodes.includes("explorerRateLimited")) {
+      markExplorerEvidenceRateLimited(input.chainId);
+    }
+    if (shouldPersistExplorerEvidence(evidence)) {
+      await insertProviderCachedResponse({
+        provider: "basescan",
+        endpoint: EXPLORER_TRANSACTION_EVIDENCE_ENDPOINT,
+        chainId: input.chainId,
+        walletAddress: null,
+        cacheKey,
+        payload: evidence,
+        ttlMs: null,
+      });
+    }
+    return evidence;
+  })();
+
+  explorerTransactionEvidenceInFlight.set(cacheKey, requestPromise);
+
+  try {
+    return await requestPromise;
+  } finally {
+    explorerTransactionEvidenceInFlight.delete(cacheKey);
+    if (redisClient) {
+      const currentLockOwner = await redisClient.get<string>(inflightKey);
+      if (currentLockOwner === lockOwner) {
+        await redisClient.del(inflightKey);
+      }
+    }
+  }
 }

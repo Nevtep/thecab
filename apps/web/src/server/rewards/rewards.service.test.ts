@@ -173,3 +173,37 @@ test("buildReadyResponse reports empty ready responses separately from locked re
   assert.equal(response.selectedReward, null);
   assert.equal(response.events.pagination.totalRows, 0);
 });
+
+test("buildReadyResponse preserves Governance reward ownership links and explicit pool counting rule", () => {
+  const governanceReward = reward({
+    rewardEventId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+    owner: {
+      status: "governance",
+      labelKey: "rewards:sources.governance",
+      entityId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      entityLabel: "Gov-dddd...dddd",
+      route: "/governance?chainId=8453&kind=reward&selected=dddddddd-dddd-4ddd-8ddd-dddddddddddd&rewardEventId=dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+    },
+    sourceSurface: "governance_bribe_claim",
+    poolContribution: {
+      status: "contributes",
+      poolId: "33333333-3333-4333-8333-333333333333",
+      poolLabel: "WETH / USDC-100",
+      route: "/pools/33333333-3333-4333-8333-333333333333",
+      countingRule: "governance_explicit_pool",
+    },
+    rewardType: "governance_bribe_claim",
+  });
+  const response = buildReadyResponse({
+    request: request({ selectedRewardEventId: governanceReward.rewardEventId, source: "governance" }),
+    repository: repository([governanceReward]),
+    analysisStatus: "ready",
+    runId: "run-ready",
+    completedAt: "2026-05-17T00:00:00.000Z",
+  });
+
+  assert.equal(response.selectedReward?.ownershipTrace.ownerStatus, "governance");
+  assert.equal(response.selectedReward?.ownershipTrace.linkedEntityRoute, governanceReward.owner.route);
+  assert.equal(response.selectedReward?.poolContribution.countingRuleKey, "rewards:countingRules.governance_explicit_pool");
+  assert.equal(response.distributions.source.items[0]?.id, "governance");
+});

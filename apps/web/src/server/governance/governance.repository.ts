@@ -44,6 +44,7 @@ export type GovernanceRepositoryResult = {
   lockPanel: GovernanceLockPanel | null;
   epochs: GovernanceEpochSummary[];
   events: GovernanceRepositoryEventRow[];
+  selectedDetailTarget: GovernanceSelectedDetailTarget | null;
   metricSnapshot: {
     summary: Record<string, unknown>;
     selectedDetail: GovernanceSelectedDetail | null;
@@ -54,6 +55,10 @@ export type GovernanceRepositoryResult = {
 };
 
 type JsonRecord = Record<string, unknown>;
+export type GovernanceSelectedDetailTarget =
+  | { kind: "reward"; reward: GovernanceRewardRow }
+  | { kind: "event"; event: GovernanceRepositoryEventRow }
+  | { kind: "epoch"; epoch: GovernanceEpochSummary };
 
 const COVERAGE_VALUES = new Set(["full", "partial", "unresolved", "unsupported", "excluded", "unavailable"]);
 const CONFIDENCE_VALUES = new Set(["high", "medium", "low", "none"]);
@@ -211,10 +216,18 @@ function mapEpoch(row: typeof governanceEpochSummaries.$inferSelect): Governance
 
 function mapReward(row: typeof governanceRewardRows.$inferSelect): GovernanceRewardRow {
   const context = asRecord(row.contextJson);
+  const evidence = asRecord(row.evidenceJson);
+  const contextPoolAssociation = asRecord(context.poolAssociation);
+  const evidencePoolAssociation = asRecord(evidence.poolAssociation);
   const poolLabel = asString(context.poolLabel);
+  const poolAssociationReasonCodes = asStringArray(
+    contextPoolAssociation.reasonCodes ?? evidencePoolAssociation.reasonCodes,
+  );
   return {
     governanceRewardId: row.id,
     rewardEventId: row.rewardEventId,
+    governanceEventId: row.governanceEventId,
+    txHash: row.txHash,
     claimedAt: toIso(row.claimedAt),
     rewardType: normalizeRewardType(row.rewardType),
     token: {
@@ -233,10 +246,21 @@ function mapReward(row: typeof governanceRewardRows.$inferSelect): GovernanceRew
       : null,
     coverageState: normalizeCoverage(row.coverageStatus),
     confidence: normalizeConfidence(row.confidence),
+    affectsTotals: row.affectsTotals,
+    poolAssociation: {
+      status: row.poolId ? "explicit" : "unassociated",
+      rule: asString(contextPoolAssociation.rule) ?? asString(evidencePoolAssociation.rule) ?? "explicit_pool_evidence_required",
+      reasonCodes: poolAssociationReasonCodes,
+    },
+    doubleCountingNoteKey: asString(context.doubleCountingNoteKey),
     context: {
       kind: row.epochId ? "epoch" : row.poolId ? "pool" : "reward",
       label: row.epochId ? `Epoch ${row.epochId}` : poolLabel ?? asString(context.label) ?? "Governance reward",
     },
+    sourceEvidenceRefs: [
+      ...asObjectArray(evidence.sourceEvidenceRefs),
+      ...asObjectArray(evidence.evidenceRefs),
+    ],
   };
 }
 
@@ -322,6 +346,51 @@ function buildAvailableFilters(input: {
   };
 }
 
+function resolveSelectedDetailTarget(input: {
+  request: GovernanceRequest;
+  rewards: GovernanceRewardRow[];
+  events: GovernanceRepositoryEventRow[];
+  epochs: GovernanceEpochSummary[];
+}): GovernanceSelectedDetailTarget | null {
+  const selectedId = input.request.selectedGovernanceId;
+  if (selectedId) {
+    if (input.request.selectedKind === "reward") {
+      const reward = input.rewards.find((row) =>
+        row.governanceRewardId === selectedId ||
+        row.rewardEventId === selectedId ||
+        row.governanceEventId === selectedId
+      );
+      if (reward) return { kind: "reward", reward };
+    }
+    if (input.request.selectedKind === "event") {
+      const event = input.events.find((row) => row.governanceEventId === selectedId || row.txHash === selectedId);
+      if (event) return { kind: "event", event };
+    }
+    if (input.request.selectedKind === "epoch") {
+      const epoch = input.epochs.find((row) => row.epochId === selectedId);
+      if (epoch) return { kind: "epoch", epoch };
+    }
+
+    const reward = input.rewards.find((row) =>
+      row.governanceRewardId === selectedId ||
+      row.rewardEventId === selectedId ||
+      row.governanceEventId === selectedId
+    );
+    if (reward) return { kind: "reward", reward };
+    const event = input.events.find((row) => row.governanceEventId === selectedId || row.txHash === selectedId);
+    if (event) return { kind: "event", event };
+    const epoch = input.epochs.find((row) => row.epochId === selectedId);
+    if (epoch) return { kind: "epoch", epoch };
+  }
+
+  const firstReward = input.rewards[0];
+  if (firstReward) return { kind: "reward", reward: firstReward };
+  const firstEvent = input.events[0];
+  if (firstEvent) return { kind: "event", event: firstEvent };
+  const firstEpoch = input.epochs[0];
+  return firstEpoch ? { kind: "epoch", epoch: firstEpoch } : null;
+}
+
 export async function readGovernanceAnalysisContext(input: GovernanceRequest) {
   return readAnalysisStatusContext(input);
 }
@@ -379,6 +448,12 @@ export async function findGovernanceDataView(input: GovernanceRequest): Promise<
     lockPanel,
     epochs,
     events,
+    selectedDetailTarget: resolveSelectedDetailTarget({
+      request: input,
+      rewards: allRewardRows,
+      events,
+      epochs,
+    }),
     metricSnapshot: metricRow
       ? {
           summary: asRecord(metricRow.summaryJson),

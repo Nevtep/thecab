@@ -5,10 +5,12 @@ import {
   readGovernanceAnalysisContext,
   type GovernanceRepositoryEventRow,
   type GovernanceRepositoryResult,
+  type GovernanceSelectedDetailTarget,
 } from "@/server/governance/governance.repository";
 import type {
   GovernanceAnalysisState,
   GovernanceCoverageState,
+  GovernanceEpochSummary,
   GovernanceRequest,
   GovernanceResponse,
   GovernanceRewardRow,
@@ -37,6 +39,20 @@ function asNumber(value: unknown) {
 
 function asString(value: unknown) {
   return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function asObjectArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === "object" && !Array.isArray(entry))
+    : [];
+}
+
+function asStringArray(value: unknown) {
+  return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
 }
 
 function fixed(value: number, digits = 2) {
@@ -119,7 +135,7 @@ export function buildEmptyGovernanceSummary(reasonCodes = ["governanceReadModelU
 function buildSummary(repository: GovernanceRepositoryResult): GovernanceSummary {
   const lockPanel = repository.lockPanel;
   const rewardsUsd = repository.allRewardRows
-    .filter((row) => row.coverageState !== "excluded" && row.coverageState !== "unsupported")
+    .filter((row) => row.affectsTotals)
     .reduce((sum, row) => sum + (asNumber(row.valueUsdAtClaim) ?? 0), 0);
   const summary = repository.metricSnapshot?.summary ?? {};
   const explicitReturn = asString(summary.estimatedGovernanceReturn);
@@ -187,7 +203,7 @@ function buildSummary(repository: GovernanceRepositoryResult): GovernanceSummary
 function buildRewardBreakdown(rows: GovernanceRewardRow[]): GovernanceResponse["rewardBreakdown"] {
   const totals = new Map<GovernanceRewardRow["rewardType"], { value: number; coverageState: GovernanceCoverageState }>();
   for (const row of rows) {
-    if (row.coverageState === "excluded" || row.coverageState === "unsupported") continue;
+    if (!row.affectsTotals) continue;
     const value = asNumber(row.valueUsdAtClaim) ?? 0;
     const existing = totals.get(row.rewardType) ?? { value: 0, coverageState: row.coverageState };
     totals.set(row.rewardType, {
@@ -247,7 +263,101 @@ function emptySelectedDetail(): GovernanceSelectedDetail {
   };
 }
 
-function selectedDetailFromReward(row: GovernanceRewardRow): GovernanceSelectedDetail {
+function dedupeStrings(values: string[]) {
+  return Array.from(new Set(values.filter((value) => value.trim().length > 0)));
+}
+
+function dedupeRecords(values: Array<Record<string, unknown>>) {
+  const seen = new Set<string>();
+  return values.filter((value) => {
+    const key = JSON.stringify(value);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function resolveEventMetadataContext(row: GovernanceRepositoryEventRow) {
+  const metadata = row.metadata;
+  const classification = asRecord(metadata.governanceClassification);
+  const epochId = asString(metadata.epochId) ?? asString(metadata.governanceEpochId) ?? asString(classification.epochId);
+  const poolId = asString(metadata.poolId) ?? asString(metadata.resolvedPoolId) ?? asString(classification.poolId);
+  const poolLabel = asString(metadata.poolLabel) ?? asString(classification.poolLabel);
+  const tokenMovements = asObjectArray(metadata.tokenMovements)
+    .concat(asObjectArray(metadata.assetMovements))
+    .concat(asObjectArray(metadata.movements));
+  const valueUsd = asString(metadata.valueUsd) ??
+    asString(metadata.amountUsd) ??
+    asString(metadata.attributedValueUsd) ??
+    asString(classification.valueUsd);
+  const sourceEvidenceRefs = dedupeRecords([
+    ...row.evidenceRefs,
+    ...asObjectArray(metadata.sourceEvidenceRefs),
+    ...asObjectArray(metadata.evidenceRefs),
+  ]);
+  const evidenceBasis = dedupeStrings([
+    ...asStringArray(classification.evidenceBasis),
+    ...asStringArray(metadata.evidenceBasis),
+  ]);
+  const reasonCodes = dedupeStrings([
+    ...row.reasonCodes,
+    ...asStringArray(classification.reasonCodes),
+    ...asStringArray(metadata.reasonCodes),
+  ]);
+
+  return {
+    epochId,
+    poolId,
+    poolLabel,
+    tokenMovements,
+    valueUsd,
+    sourceEvidenceRefs,
+    evidenceBasis,
+    reasonCodes,
+  };
+}
+
+function selectedDetailFromReward(row: GovernanceRewardRow, chainId: number): GovernanceSelectedDetail {
+  const linkedContexts: GovernanceSelectedDetail["linkedContexts"] = [];
+  if (row.rewardEventId) {
+    const params = new URLSearchParams({ source: "governance", selected: row.rewardEventId });
+    linkedContexts.push({
+      kind: "reward",
+      entityId: row.rewardEventId,
+      route: `/rewards?${params.toString()}`,
+    });
+  }
+  if (row.pool) {
+    linkedContexts.push({
+      kind: "pool",
+      entityId: row.pool.poolId,
+      route: `/pools/${row.pool.poolId}?chainId=${chainId}`,
+    });
+  }
+  if (row.governanceEventId) {
+    const params = new URLSearchParams({
+      chainId: String(chainId),
+      governanceEventId: row.governanceEventId,
+      surface: "governance",
+    });
+    linkedContexts.push({
+      kind: "activity",
+      entityId: row.governanceEventId,
+      route: `/activity?${params.toString()}`,
+    });
+  } else if (row.txHash) {
+    const params = new URLSearchParams({ chainId: String(chainId), search: row.txHash, surface: "governance" });
+    linkedContexts.push({
+      kind: "activity",
+      entityId: row.txHash,
+      route: `/activity?${params.toString()}`,
+    });
+  }
+  const rewardReasonCodes = dedupeStrings([
+    ...row.poolAssociation.reasonCodes,
+    ...(row.doubleCountingNoteKey ? [row.doubleCountingNoteKey] : []),
+  ]);
+
   return {
     ...emptySelectedDetail(),
     selectionKind: "reward",
@@ -256,12 +366,19 @@ function selectedDetailFromReward(row: GovernanceRewardRow): GovernanceSelectedD
       labelKey: `governance:rewards.${row.rewardType}`,
       contextLabel: row.context.label,
     },
-    protocolSurface: "unknown",
+    transaction: {
+      txHash: row.txHash,
+      occurredAt: row.claimedAt,
+      externalTxUrl: row.txHash ? getExplorerTxUrl(chainId, row.txHash) : null,
+    },
+    protocolSurface: row.rewardType === "bribe" ? "briber" : row.rewardType === "fee" ? "fee_distributor" : "reward_distributor",
     tokenMovements: [
       {
         tokenSymbol: row.token.symbol,
         tokenAddress: row.token.address,
         amount: row.amount,
+        amountUsd: row.valueUsdAtClaim,
+        direction: "in",
       },
     ],
     valueEffect: {
@@ -271,20 +388,42 @@ function selectedDetailFromReward(row: GovernanceRewardRow): GovernanceSelectedD
     epochContext: row.epochId ? { epochId: row.epochId, label: `Epoch ${row.epochId}` } : null,
     poolContext: row.pool,
     classificationEvidence: {
-      basis: ["persistedGovernanceRewardRow"],
-      reasonCodes: [],
-      missingEvidenceReasonCodes: row.pool ? [] : ["explicitPoolAssociationUnavailable"],
+      basis: ["persistedGovernanceRewardRow", "rewardEventIdentity", row.poolAssociation.rule],
+      reasonCodes: rewardReasonCodes,
+      missingEvidenceReasonCodes: row.poolAssociation.status === "explicit" ? [] : row.poolAssociation.reasonCodes,
     },
+    linkedContexts,
     coverageNotes: {
       coverageState: row.coverageState,
       confidence: row.confidence,
-      affectsTotals: row.coverageState !== "excluded" && row.coverageState !== "unsupported",
-      reasonCodes: [],
+      affectsTotals: row.affectsTotals,
+      reasonCodes: rewardReasonCodes,
     },
+    sourceEvidenceRefs: row.sourceEvidenceRefs,
   };
 }
 
 function selectedDetailFromEvent(row: GovernanceRepositoryEventRow, chainId: number): GovernanceSelectedDetail {
+  const context = resolveEventMetadataContext(row);
+  const linkedContexts: GovernanceSelectedDetail["linkedContexts"] = [];
+  const activityParams = new URLSearchParams({
+    chainId: String(chainId),
+    governanceEventId: row.governanceEventId,
+    surface: "governance",
+  });
+  linkedContexts.push({
+    kind: "activity",
+    entityId: row.governanceEventId,
+    route: `/activity?${activityParams.toString()}`,
+  });
+  if (context.poolId) {
+    linkedContexts.push({
+      kind: "pool",
+      entityId: context.poolId,
+      route: `/pools/${context.poolId}?chainId=${chainId}`,
+    });
+  }
+
   return {
     ...emptySelectedDetail(),
     selectionKind: "event",
@@ -299,18 +438,90 @@ function selectedDetailFromEvent(row: GovernanceRepositoryEventRow, chainId: num
       externalTxUrl: getExplorerTxUrl(chainId, row.txHash),
     },
     protocolSurface: row.protocolSurface,
-    classificationEvidence: {
-      basis: ["persistedGovernanceEvent"],
-      reasonCodes: row.reasonCodes,
-      missingEvidenceReasonCodes: row.coverageState === "full" ? [] : row.reasonCodes,
+    tokenMovements: context.tokenMovements,
+    valueEffect: {
+      valueUsd: context.valueUsd,
+      coverageState: row.coverageState,
     },
+    epochContext: context.epochId ? {
+      epochId: context.epochId,
+      label: `Epoch ${context.epochId}`,
+      coverageState: row.coverageState,
+    } : null,
+    poolContext: context.poolId ? {
+      poolId: context.poolId,
+      label: context.poolLabel ?? context.poolId,
+      coverageState: row.coverageState,
+    } : null,
+    classificationEvidence: {
+      basis: context.evidenceBasis.length > 0 ? context.evidenceBasis : ["persistedGovernanceEvent"],
+      reasonCodes: context.reasonCodes,
+      missingEvidenceReasonCodes: row.coverageState === "full" ? [] : context.reasonCodes,
+    },
+    linkedContexts,
     coverageNotes: {
       coverageState: row.coverageState,
       confidence: row.confidence,
       affectsTotals: row.coverageState !== "excluded" && row.coverageState !== "unsupported",
       reasonCodes: row.reasonCodes,
     },
-    sourceEvidenceRefs: row.evidenceRefs,
+    sourceEvidenceRefs: context.sourceEvidenceRefs,
+  };
+}
+
+function selectedDetailFromEpoch(row: GovernanceEpochSummary, chainId: number): GovernanceSelectedDetail {
+  const rewardValues = [row.feesUsd, row.bribesUsd, row.rebasesUsd]
+    .map(asNumber)
+    .filter((value): value is number => value !== null);
+  const valueUsd = rewardValues.length > 0 ? fixed(rewardValues.reduce((sum, value) => sum + value, 0)) : null;
+  const linkedContexts = row.votedPools.map((pool) => ({
+    kind: "pool" as const,
+    entityId: pool.poolId,
+    route: `/pools/${pool.poolId}?chainId=${chainId}`,
+  }));
+  const reasonCodes = row.coverageState === "full" ? [] : ["partialEpochContext"];
+
+  return {
+    ...emptySelectedDetail(),
+    selectionKind: "epoch",
+    selectionId: row.epochId,
+    actionSummary: {
+      labelKey: "governance:detail.epochSummary",
+      contextLabel: row.epochLabel,
+    },
+    protocolSurface: "voter",
+    valueEffect: {
+      valueUsd,
+      coverageState: row.coverageState,
+    },
+    epochContext: {
+      epochId: row.epochId,
+      label: row.epochLabel,
+      epochStartAt: row.epochStartAt,
+      epochEndAt: row.epochEndAt,
+      voteMode: row.voteMode,
+      resetState: row.resetState,
+      rewardState: row.rewardState,
+      votedPools: row.votedPools,
+    },
+    poolContext: row.votedPools.length === 1 ? {
+      poolId: row.votedPools[0]!.poolId,
+      label: row.votedPools[0]!.label,
+      weightPercent: row.votedPools[0]!.weightPercent,
+    } : null,
+    classificationEvidence: {
+      basis: ["persistedGovernanceEpochSummary"],
+      reasonCodes,
+      missingEvidenceReasonCodes: reasonCodes,
+    },
+    linkedContexts,
+    coverageNotes: {
+      coverageState: row.coverageState,
+      confidence: row.confidence,
+      affectsTotals: false,
+      reasonCodes,
+    },
+    sourceEvidenceRefs: [],
   };
 }
 
@@ -320,20 +531,10 @@ function buildSelectedDetail(input: {
 }) {
   const explicitSnapshot = input.repository.metricSnapshot?.selectedDetail;
   if (explicitSnapshot) return explicitSnapshot;
-
-  if (input.request.selectedKind === "reward" && input.request.selectedGovernanceId) {
-    const reward = input.repository.allRewardRows.find((row) => row.governanceRewardId === input.request.selectedGovernanceId);
-    if (reward) return selectedDetailFromReward(reward);
-  }
-  if (input.request.selectedKind === "event" && input.request.selectedGovernanceId) {
-    const event = input.repository.events.find((row) => row.governanceEventId === input.request.selectedGovernanceId);
-    if (event) return selectedDetailFromEvent(event, input.request.chainId);
-  }
-
-  const firstReward = input.repository.rewardRows[0] ?? input.repository.allRewardRows[0];
-  if (firstReward) return selectedDetailFromReward(firstReward);
-  const firstEvent = input.repository.events[0];
-  if (firstEvent) return selectedDetailFromEvent(firstEvent, input.request.chainId);
+  const target: GovernanceSelectedDetailTarget | null = input.repository.selectedDetailTarget;
+  if (target?.kind === "reward") return selectedDetailFromReward(target.reward, input.request.chainId);
+  if (target?.kind === "event") return selectedDetailFromEvent(target.event, input.request.chainId);
+  if (target?.kind === "epoch") return selectedDetailFromEpoch(target.epoch, input.request.chainId);
   return emptySelectedDetail();
 }
 

@@ -126,6 +126,14 @@ test("resolvePoolRewardTargetPoolId prefers explicit resolved pool ownership and
     depositToPoolId: new Map([["deposit-1", "pool-1"]]),
     strategyToPoolId: new Map([["strategy-1", "pool-2"]]),
   }), null);
+
+  assert.equal(resolvePoolRewardTargetPoolId({
+    resolvedPoolId: null,
+    relatedId: "deposit-1",
+    isGovernanceReward: true,
+    depositToPoolId: new Map([["deposit-1", "pool-1"]]),
+    strategyToPoolId: new Map([["strategy-1", "pool-2"]]),
+  }), null);
 });
 
 test("aggregateResolvedPoolRewardTotals adds resolved deposit and strategy exposure rewards without unresolved rows", () => {
@@ -169,6 +177,36 @@ test("aggregateResolvedPoolRewardTotals adds resolved deposit and strategy expos
 
   assert.equal(totals.get("pool-1")?.rewardsUsd, 35);
   assert.equal(totals.get("pool-1")?.feesUsd, 3);
+});
+
+test("aggregateResolvedPoolRewardTotals only counts governance rewards with explicit pool association", () => {
+  const totals = aggregateResolvedPoolRewardTotals({
+    rewards: [
+      {
+        resolvedPoolId: null,
+        relatedId: "deposit-1",
+        resolutionStatus: "resolved",
+        rewardType: "governance_bribe_claim",
+        resolutionBasis: "governance_reward",
+        amountUsd: 50,
+        metadataJson: { sourceSurface: "governance_bribe_claim" },
+      },
+      {
+        resolvedPoolId: "pool-1",
+        relatedId: null,
+        resolutionStatus: "resolved",
+        rewardType: "governance_bribe_claim",
+        resolutionBasis: "governance_reward",
+        amountUsd: 25,
+        metadataJson: { sourceSurface: "governance_bribe_claim" },
+      },
+    ],
+    depositToPoolId: new Map([["deposit-1", "pool-1"]]),
+    strategyToPoolId: new Map(),
+    strategyExposureToPoolId: new Map(),
+  });
+
+  assert.equal(totals.get("pool-1")?.rewardsUsd, 25);
 });
 
 test("buildSyntheticGaugeClaimCandidates keeps unmatched gauge claims for known pools", () => {

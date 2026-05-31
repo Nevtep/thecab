@@ -87,6 +87,36 @@ test("mapActivityLedgerRow preserves explicit metadata links and spam exclusion"
   assert.equal(row.linkedEntities[0]?.href, "/pools/33333333-3333-4333-8333-333333333333?chainId=8453");
 });
 
+test("mapActivityLedgerRow links governance entities and governance filters match explicit evidence", () => {
+  const governanceEventId = "77777777-7777-4777-8777-777777777777";
+  const row = mapActivityLedgerRow({
+    activityId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    chainId: 8453,
+    walletAddress,
+    txHash: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    logIndex: 0,
+    eventType: "governance_vote",
+    occurredAt: new Date("2026-05-16T14:32:18.000Z"),
+    classification: "governance_vote",
+    confidence: "high",
+    metadataJson: {
+      governanceEventId,
+      governanceLabel: "Epoch 170 vote",
+      sourceSurface: "governance",
+      coverageStatus: "full",
+    },
+  }, []);
+
+  const governanceEntity = row.linkedEntities.find((entity) => entity.kind === "governance");
+  assert.equal(governanceEntity?.entityId, governanceEventId);
+  assert.equal(
+    governanceEntity?.href,
+    `/governance?chainId=8453&kind=event&selected=${governanceEventId}&governanceEventId=${governanceEventId}`,
+  );
+  assert.equal(matchesActivityRequest(row, request({ governanceEventId })), true);
+  assert.equal(matchesActivityRequest(row, request({ governanceEventId: "88888888-8888-4888-8888-888888888888" })), false);
+});
+
 test("matchesActivityRequest and sortActivityRows compose filters without mutating rows", () => {
   const poolId = "33333333-3333-4333-8333-333333333333";
   const full = activity({

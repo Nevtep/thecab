@@ -87,6 +87,9 @@ export function PoolDetailComponent(input: PoolDetailComponentProps) {
     t(`coverage:reasons.${reasonCode}`, { defaultValue: reasonCode }),
   );
   const hasManualDeposits = input.viewModel.positions.manualDeposits.length > 0;
+  const hasRelatedLinks = input.viewModel.related.deposits.length > 0
+    || input.viewModel.related.strategies.length > 0
+    || input.viewModel.related.governanceRewards.length > 0;
   const rangeStatusLabel = header.isInRange === null
     ? null
     : header.isInRange
@@ -236,13 +239,14 @@ export function PoolDetailComponent(input: PoolDetailComponentProps) {
           },
         ]}
       />
-      {input.viewModel.related.strategies.length > 0 ? (
+      {hasRelatedLinks ? (
         <PoolRelatedLinks
           title={t("pools:sections.related")}
           labels={{
             deposit: t("pools:values.deposit"),
             strategy: t("pools:values.strategy"),
             rewards: t("navigation:items.rewards"),
+            governanceRewards: t("navigation:items.governance"),
           }}
           rewardsHref={buildPoolRewardsHref(viewModel.header.poolId)}
           deposits={viewModel.related.deposits}
@@ -254,6 +258,7 @@ export function PoolDetailComponent(input: PoolDetailComponentProps) {
               selectedStrategyId: strategy.id,
             }),
           }))}
+          governanceRewards={viewModel.related.governanceRewards}
         />
       ) : null}
       <PoolHistoryChart data={input.viewModel.chart} title={t("pools:sections.performance")} />

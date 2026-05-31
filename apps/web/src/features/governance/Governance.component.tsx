@@ -244,6 +244,7 @@ export function GovernanceComponent(input: Props) {
 
         <SelectedGovernanceRail
           selectedDetail={input.viewModel.selectedDetail}
+          chainId={input.viewModel.chainId}
           loading={selectedDetailIsLoading}
           labels={{
             title: t("governance:detail.title"),
@@ -252,22 +253,33 @@ export function GovernanceComponent(input: Props) {
             actionSummary: t("governance:detail.actionSummary"),
             transaction: t("governance:detail.transaction"),
             protocolSurface: t("governance:detail.protocolSurface"),
+            tokenMovements: t("governance:detail.tokenMovements"),
             valueEffect: t("governance:detail.valueEffect"),
             epochContext: t("governance:detail.epochContext"),
             poolContext: t("governance:detail.poolContext"),
             classificationEvidence: t("governance:detail.classificationEvidence"),
+            linkedContexts: t("governance:detail.linkedContexts"),
             coverageNotes: t("governance:detail.coverageNotes"),
+            evidenceSources: t("governance:detail.evidenceSources"),
             txHash: t("governance:detail.txHash"),
             occurredAt: t("governance:detail.occurredAt"),
             coverage: t("governance:detail.coverage"),
             confidence: t("governance:detail.confidence"),
             affectsTotals: t("governance:detail.affectsTotals"),
+            reasonCodes: t("governance:detail.reasonCodes"),
+            noMovements: t("governance:detail.noMovements"),
+            noLinkedContexts: t("governance:detail.noLinkedContexts"),
+            noEvidenceSources: t("governance:detail.noEvidenceSources"),
+            amount: t("governance:detail.amount"),
+            valueUsd: t("governance:detail.valueUsd"),
+            open: t("common:openExternalLink"),
             yes: t("common:yes"),
             no: t("common:no"),
             getActionLabel: (key) => t(key, { defaultValue: key }),
             getSurface: (value) => t(`governance:surfaces.${value}`, { defaultValue: value }),
             getCoverage: (value) => t(`coverage:level.${value}`, { defaultValue: value }),
             getConfidence: (value) => t(`governance:confidence.${value}`, { defaultValue: value }),
+            getReason: (value) => t(value, { defaultValue: t(`coverage:reasons.${value}`, { defaultValue: value }) }),
             formatDateTime: (value) => formatDate(value, i18n.language),
             formatUsd: (value) => formatCurrency(value, i18n.language),
           }}

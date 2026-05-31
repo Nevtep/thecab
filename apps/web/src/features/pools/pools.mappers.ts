@@ -1,4 +1,5 @@
 import { getExplorerBaseUrl } from "@/chains/chains";
+import { getGovernanceHref } from "@/features/governance/governance.navigation";
 import { formatCompactNumber, formatDateTime, formatDayRange, formatNumber, formatPercent, formatUnit, formatUsd } from "@/i18n/formatters";
 
 import type { PoolDetailResponse, PoolsListResponse } from "@/features/pools/pools.types";
@@ -323,6 +324,19 @@ export function mapPoolDetailResponseToViewModel(response: PoolDetailResponse, l
           position.annualizedReturnPct === null
             ? null
             : formatPercent(position.annualizedReturnPct / 100, locale),
+      })),
+    },
+    related: {
+      ...response.related,
+      governanceRewards: response.related.governanceRewards.map((reward) => ({
+        ...reward,
+        href: getGovernanceHref({
+          chainId: response.chainId,
+          selectedKind: "reward",
+          selectedGovernanceId: reward.id,
+          rewardEventId: reward.id,
+          poolId: response.header.poolId,
+        }),
       })),
     },
   };

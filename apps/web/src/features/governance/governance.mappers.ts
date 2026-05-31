@@ -4,6 +4,33 @@ function dedupe<TValue>(values: TValue[]) {
   return Array.from(new Set(values));
 }
 
+function stableRecordKey(value: Record<string, unknown>) {
+  return JSON.stringify(Object.keys(value).sort().reduce<Record<string, unknown>>((acc, key) => {
+    acc[key] = value[key];
+    return acc;
+  }, {}));
+}
+
+function dedupeRecords<TValue extends Record<string, unknown>>(values: TValue[]) {
+  const seen = new Set<string>();
+  return values.filter((value) => {
+    const key = stableRecordKey(value);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function dedupeLinkedContexts<TValue extends { kind: string; entityId: string; route: string }>(values: TValue[]) {
+  const seen = new Set<string>();
+  return values.filter((value) => {
+    const key = `${value.kind}:${value.entityId}:${value.route}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function normalizeReasonCodes<TValue extends { reasonCodes: string[] }>(value: TValue): TValue {
   return {
     ...value,
@@ -58,6 +85,8 @@ export function mapGovernanceResponseToViewModel(response: GovernanceResponse): 
         ...response.selectedDetail.coverageNotes,
         reasonCodes: dedupe(response.selectedDetail.coverageNotes.reasonCodes),
       },
+      linkedContexts: dedupeLinkedContexts(response.selectedDetail.linkedContexts),
+      sourceEvidenceRefs: dedupeRecords(response.selectedDetail.sourceEvidenceRefs),
     },
   };
 }

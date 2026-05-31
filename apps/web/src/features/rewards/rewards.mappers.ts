@@ -1,4 +1,4 @@
-import type { RewardsResponse, RewardsViewModel } from "@/features/rewards/rewards.types";
+import type { RewardEventRow, RewardsResponse, RewardsViewModel } from "@/features/rewards/rewards.types";
 
 export function mapRewardsResponseToViewModel(response: RewardsResponse): RewardsViewModel {
   if (response.analysis.status === "locked") {
@@ -20,4 +20,14 @@ export function getCoverageLabelKey(coverage: string) {
 
 export function getConfidenceLabelKey(confidence: string) {
   return `rewards:confidence.${confidence}`;
+}
+
+export function getRewardPrimaryContextHref(row: RewardEventRow) {
+  if (row.owner.status === "governance") {
+    return row.owner.route;
+  }
+  if (row.poolContribution.status === "contributes") {
+    return row.poolContribution.route;
+  }
+  return row.owner.route;
 }

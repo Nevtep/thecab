@@ -133,7 +133,7 @@ test("detail view model preserves coverage metadata across header, segments, and
     },
     history: { points: [], coverageStatus: "share_level", coverageReasonCodes: ["share_level_strategy"] },
     timeline: { items: [], nextCursor: null, hasMore: false },
-    related: { deposits: [], strategies: [] },
+    related: { deposits: [], strategies: [], governanceRewards: [] },
   };
   const vm = mapPoolDetailResponseToViewModel(detail, "en-US");
   assert.equal(vm.header.coverageStatus, "share_level");

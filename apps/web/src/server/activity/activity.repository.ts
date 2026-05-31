@@ -233,7 +233,7 @@ function buildLinkedEntities(metadata: Record<string, unknown>, chainId: number)
       kind: "governance",
       entityId: governanceEventId,
       label: asString(metadata.governanceLabel) ?? shortEntity(governanceEventId, "Gov"),
-      href: null,
+      href: `/governance?chainId=${chainId}&kind=event&selected=${governanceEventId}&governanceEventId=${governanceEventId}`,
       reasonCode: "explicitGovernanceEvidence",
     });
   }

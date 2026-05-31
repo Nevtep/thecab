@@ -116,6 +116,7 @@ test("handleGovernanceGet returns ready route response from service payload", as
         lockPanel: null,
         epochs: [],
         events: [],
+        selectedDetailTarget: null,
         metricSnapshot: null,
         availableFilters: { rewardTypes: [], tokens: [], epochs: [], protocolSurfaces: [] },
       },

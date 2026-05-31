@@ -1,12 +1,14 @@
 "use client";
 
-import { CabBadge, CabCard, CabIcon, CabKeyValueList, CabLoadingPanel, CabStack, CabText, cabColors } from "@/design-system";
+import { CabBadge, CabCard, CabIcon, CabKeyValueList, CabLoadingPanel, CabSeparator, CabStack, CabText, CabTokenIcon, CabTxHash, cabColors } from "@/design-system";
+import { GovernanceCoverageNotes } from "@/features/governance/components/GovernanceCoverageNotes";
 import type { GovernanceViewModel } from "@/features/governance/governance.types";
 
 import styles from "@/features/governance/GovernanceWorkspace.module.css";
 
 type Props = {
   selectedDetail: GovernanceViewModel["selectedDetail"];
+  chainId: number;
   loading?: boolean;
   labels: {
     title: string;
@@ -15,22 +17,33 @@ type Props = {
     actionSummary: string;
     transaction: string;
     protocolSurface: string;
+    tokenMovements: string;
     valueEffect: string;
     epochContext: string;
     poolContext: string;
     classificationEvidence: string;
+    linkedContexts: string;
     coverageNotes: string;
+    evidenceSources: string;
     txHash: string;
     occurredAt: string;
     coverage: string;
     confidence: string;
     affectsTotals: string;
+    reasonCodes: string;
+    noMovements: string;
+    noLinkedContexts: string;
+    noEvidenceSources: string;
+    amount: string;
+    valueUsd: string;
+    open: string;
     yes: string;
     no: string;
     getActionLabel: (key: string) => string;
     getSurface: (value: string) => string;
     getCoverage: (value: string) => string;
     getConfidence: (value: string) => string;
+    getReason: (value: string) => string;
     formatDateTime: (value: string | null) => string;
     formatUsd: (value: string | null) => string;
   };
@@ -47,6 +60,10 @@ function shortHash(value: string | null) {
   return value ? `${value.slice(0, 6)}...${value.slice(-4)}` : "n/a";
 }
 
+function asString(value: unknown) {
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
 function recordLabel(record: Record<string, unknown> | null) {
   if (!record) return "n/a";
   const explicit = record.label;
@@ -55,7 +72,26 @@ function recordLabel(record: Record<string, unknown> | null) {
   return typeof id === "string" ? id : "n/a";
 }
 
-export function SelectedGovernanceRail({ selectedDetail, loading = false, labels }: Props) {
+function sourceEvidenceLabel(record: Record<string, unknown>) {
+  return asString(record.provider) ??
+    asString(record.recordKind) ??
+    asString(record.endpoint) ??
+    asString(record.referenceId) ??
+    "evidence";
+}
+
+function movementKey(record: Record<string, unknown>, index: number) {
+  return [
+    asString(record.id),
+    asString(record.tokenAddress),
+    asString(record.tokenSymbol),
+    asString(record.amount),
+    asString(record.amountRaw),
+    index,
+  ].filter(Boolean).join(":");
+}
+
+export function SelectedGovernanceRail({ selectedDetail, chainId, loading = false, labels }: Props) {
   if (loading) {
     return <CabLoadingPanel label={labels.loading} />;
   }
@@ -90,16 +126,64 @@ export function SelectedGovernanceRail({ selectedDetail, loading = false, labels
                 ) : null}
               </CabStack>
 
+              <CabSeparator />
+              <CabText variant="heading" fontSize={13}>{labels.transaction}</CabText>
               <CabKeyValueList
                 items={[
-                  { key: "tx", label: labels.txHash, value: shortHash(selectedDetail.transaction.txHash), valueVariant: "mono" },
+                  {
+                    key: "tx",
+                    label: labels.txHash,
+                    value: selectedDetail.transaction.txHash ? (
+                      <CabTxHash hash={selectedDetail.transaction.txHash} href={selectedDetail.transaction.externalTxUrl} />
+                    ) : shortHash(null),
+                  },
                   { key: "time", label: labels.occurredAt, value: labels.formatDateTime(selectedDetail.transaction.occurredAt), valueVariant: "mono" },
                   { key: "surface", label: labels.protocolSurface, value: labels.getSurface(selectedDetail.protocolSurface), valueVariant: "mono" },
+                ]}
+              />
+
+              <CabSeparator />
+              <CabText variant="heading" fontSize={13}>{labels.tokenMovements}</CabText>
+              {selectedDetail.tokenMovements.length > 0 ? (
+                <CabStack gap="$2">
+                  {selectedDetail.tokenMovements.map((movement, index) => {
+                    const tokenAddress = asString(movement.tokenAddress);
+                    const tokenSymbol = asString(movement.tokenSymbol) ?? asString(movement.symbol);
+                    const amount = asString(movement.amount) ?? asString(movement.amountRaw);
+                    const amountUsd = asString(movement.amountUsd) ?? asString(movement.valueUsd);
+                    return (
+                      <CabStack key={movementKey(movement, index)} row alignItems="center" justifyContent="space-between" gap="$3">
+                        <CabStack row alignItems="center" gap="$2" minWidth={0}>
+                          <CabTokenIcon
+                            chainId={chainId}
+                            tokenAddress={tokenAddress}
+                            symbol={tokenSymbol}
+                            size="sm"
+                            decorative
+                          />
+                          <CabStack gap="$1" minWidth={0}>
+                            <CabText variant="body" fontSize={12}>{tokenSymbol ?? tokenAddress ?? "n/a"}</CabText>
+                            <CabText variant="caption" color={cabColors.text.secondary}>{labels.amount}: {amount ?? "n/a"}</CabText>
+                          </CabStack>
+                        </CabStack>
+                        <CabText variant="data" fontSize={12}>{labels.formatUsd(amountUsd)}</CabText>
+                      </CabStack>
+                    );
+                  })}
+                </CabStack>
+              ) : (
+                <CabText variant="caption" color={cabColors.text.secondary}>{labels.noMovements}</CabText>
+              )}
+
+              <CabSeparator />
+              <CabText variant="heading" fontSize={13}>{labels.valueEffect}</CabText>
+              <CabKeyValueList
+                items={[
                   { key: "value", label: labels.valueEffect, value: labels.formatUsd(selectedDetail.valueEffect.valueUsd), valueVariant: "mono" },
+                  { key: "valueCoverage", label: labels.coverage, value: labels.getCoverage(selectedDetail.valueEffect.coverageState), valueVariant: "mono" },
                   { key: "epoch", label: labels.epochContext, value: recordLabel(selectedDetail.epochContext), valueVariant: "mono" },
                   { key: "pool", label: labels.poolContext, value: recordLabel(selectedDetail.poolContext), valueVariant: "mono" },
                   { key: "confidence", label: labels.confidence, value: labels.getConfidence(selectedDetail.coverageNotes.confidence), valueVariant: "mono" },
-                  { key: "affectsTotals", label: labels.affectsTotals, value: selectedDetail.coverageNotes.affectsTotals ? labels.yes : labels.no, valueVariant: "mono" },
                 ]}
               />
             </>
@@ -116,28 +200,80 @@ export function SelectedGovernanceRail({ selectedDetail, loading = false, labels
           ).slice(0, 5).map((entry) => (
             <CabStack key={entry} row alignItems="center" gap="$2">
               <CabIcon name="activity" width={12} height={12} color={cabColors.semantic.success} />
-              <CabText variant="caption" color={cabColors.text.secondary}>{entry}</CabText>
+              <CabText variant="caption" color={cabColors.text.secondary}>{labels.getReason(entry)}</CabText>
             </CabStack>
           ))}
+          {selectedDetail.classificationEvidence.missingEvidenceReasonCodes.length > 0 ? (
+            <CabStack gap="$1">
+              {selectedDetail.classificationEvidence.missingEvidenceReasonCodes.map((entry) => (
+                <CabStack key={entry} row alignItems="center" gap="$2">
+                  <CabIcon name="warning" width={12} height={12} color={cabColors.semantic.warning} />
+                  <CabText variant="caption" color={cabColors.text.secondary}>{labels.getReason(entry)}</CabText>
+                </CabStack>
+              ))}
+            </CabStack>
+          ) : null}
+        </CabStack>
+      </CabCard>
+
+      <CabCard density="compact">
+        <CabStack gap="$2">
+          <CabText variant="label">{labels.linkedContexts}</CabText>
+          {selectedDetail.linkedContexts.length > 0 ? (
+            <CabStack gap="$2">
+              {selectedDetail.linkedContexts.map((link) => (
+                <a key={`${link.kind}:${link.entityId}`} href={link.route} style={{ textDecoration: "none" }}>
+                  <CabStack row alignItems="center" justifyContent="space-between" gap="$2">
+                    <CabStack gap="$1">
+                      <CabText variant="body" fontSize={12}>{link.kind}</CabText>
+                      <CabText variant="mono" fontSize={11} color={cabColors.text.secondary}>{shortHash(link.entityId)}</CabText>
+                    </CabStack>
+                    <CabIcon name="externalLink" size="sm" tone="signal" />
+                  </CabStack>
+                </a>
+              ))}
+            </CabStack>
+          ) : (
+            <CabText variant="caption" color={cabColors.text.secondary}>{labels.noLinkedContexts}</CabText>
+          )}
         </CabStack>
       </CabCard>
 
       <CabCard density="compact">
         <CabStack gap="$2">
           <CabText variant="label">{labels.coverageNotes}</CabText>
-          <CabStack row gap="$2" flexWrap="wrap">
-            <CabBadge tone={toneForCoverage(selectedDetail.coverageNotes.coverageState)} size="sm">
-              {labels.getCoverage(selectedDetail.coverageNotes.coverageState)}
-            </CabBadge>
-            <CabBadge tone="info" size="sm" variant="emphasis">
-              {labels.getConfidence(selectedDetail.coverageNotes.confidence)}
-            </CabBadge>
-          </CabStack>
-          {selectedDetail.coverageNotes.reasonCodes.length > 0 ? (
-            <CabText variant="caption" color={cabColors.text.secondary}>
-              {selectedDetail.coverageNotes.reasonCodes.join(" · ")}
-            </CabText>
-          ) : null}
+          <GovernanceCoverageNotes
+            coverageNotes={selectedDetail.coverageNotes}
+            labels={{
+              coverage: labels.coverage,
+              confidence: labels.confidence,
+              affectsTotals: labels.affectsTotals,
+              reasonCodes: labels.reasonCodes,
+              yes: labels.yes,
+              no: labels.no,
+              getCoverage: labels.getCoverage,
+              getConfidence: labels.getConfidence,
+              getReason: labels.getReason,
+            }}
+          />
+        </CabStack>
+      </CabCard>
+
+      <CabCard density="compact">
+        <CabStack gap="$2">
+          <CabText variant="label">{labels.evidenceSources}</CabText>
+          {selectedDetail.sourceEvidenceRefs.length > 0 ? (
+            <CabStack gap="$2">
+              {selectedDetail.sourceEvidenceRefs.map((source, index) => (
+                <CabStack key={`${sourceEvidenceLabel(source)}:${index}`} row alignItems="center" justifyContent="space-between" gap="$2">
+                  <CabText variant="caption" color={cabColors.text.secondary}>{sourceEvidenceLabel(source)}</CabText>
+                  <CabBadge tone="success" size="sm">{labels.getCoverage("full")}</CabBadge>
+                </CabStack>
+              ))}
+            </CabStack>
+          ) : (
+            <CabText variant="caption" color={cabColors.text.secondary}>{labels.noEvidenceSources}</CabText>
+          )}
         </CabStack>
       </CabCard>
     </CabStack>

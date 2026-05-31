@@ -839,12 +839,17 @@ export function resolvePoolRewardTargetPoolId(input: {
   resolvedPoolId?: string | null;
   relatedId: string | null;
   strategyExposureId?: string | null;
+  isGovernanceReward?: boolean;
   depositToPoolId: Map<string, string>;
   strategyToPoolId: Map<string, string>;
   strategyExposureToPoolId?: Map<string, string>;
 }) {
   if (input.resolvedPoolId) {
     return input.resolvedPoolId;
+  }
+
+  if (input.isGovernanceReward) {
+    return null;
   }
 
   if (input.strategyExposureId) {
@@ -863,6 +868,35 @@ export function resolvePoolRewardTargetPoolId(input: {
     ?? null;
 }
 
+function isGovernanceRewardLike(input: {
+  rewardType: string | null;
+  resolutionBasis?: string | null;
+  metadataJson?: Record<string, unknown> | null;
+}) {
+  const metadata = input.metadataJson ?? {};
+  const metadataSignal = [
+    metadata.sourceSurface,
+    metadata.surfaceKind,
+    metadata.rewardSurface,
+    metadata.protocolSurface,
+    metadata.governanceSurface,
+  ]
+    .filter((value): value is string => typeof value === "string")
+    .join(" ")
+    .toLowerCase();
+  const rewardType = input.rewardType?.toLowerCase() ?? "";
+  const resolutionBasis = input.resolutionBasis?.toLowerCase() ?? "";
+
+  return metadataSignal.includes("governance")
+    || metadataSignal.includes("briber")
+    || metadataSignal.includes("fee_distributor")
+    || resolutionBasis.includes("governance")
+    || rewardType.includes("governance")
+    || rewardType.includes("bribe")
+    || rewardType.includes("rebase")
+    || rewardType.includes("relay");
+}
+
 export function aggregateResolvedPoolRewardTotals(input: {
   rewards: Array<{
     resolvedPoolId?: string | null;
@@ -871,6 +905,8 @@ export function aggregateResolvedPoolRewardTotals(input: {
     resolutionStatus: string | null;
     rewardType: string;
     amountUsd: number;
+    resolutionBasis?: string | null;
+    metadataJson?: Record<string, unknown> | null;
   }>;
   depositToPoolId: Map<string, string>;
   strategyToPoolId: Map<string, string>;
@@ -887,6 +923,7 @@ export function aggregateResolvedPoolRewardTotals(input: {
       resolvedPoolId: reward.resolvedPoolId,
       relatedId: reward.relatedId,
       strategyExposureId: reward.strategyExposureId,
+      isGovernanceReward: isGovernanceRewardLike(reward),
       depositToPoolId: input.depositToPoolId,
       strategyToPoolId: input.strategyToPoolId,
       strategyExposureToPoolId: input.strategyExposureToPoolId,
@@ -2034,11 +2071,16 @@ export async function materializePoolReadModels(input: MaterializePoolReadModels
 
       const relatedId = reward.depositOrStrategyId;
       const rewardMetadata = reward.metadataJson ?? {};
+      const isGovernanceReward = isGovernanceRewardLike({
+        rewardType: reward.rewardType,
+        metadataJson: rewardMetadata,
+      });
       const rewardTokenAddress = normalizeTokenAddress(reward.tokenAddress);
       const poolId = resolvePoolRewardTargetPoolId({
         resolvedPoolId: reward.resolvedPoolId,
         relatedId,
         strategyExposureId: reward.strategyExposureId,
+        isGovernanceReward,
         depositToPoolId,
         strategyToPoolId,
         strategyExposureToPoolId,
@@ -2097,6 +2139,14 @@ export async function materializePoolReadModels(input: MaterializePoolReadModels
         metadataJson: {
           rewardType: reward.rewardType,
           txHash: reward.txHash,
+          rewardEventId: reward.id,
+          ...(isGovernanceReward
+            ? {
+                governanceReward: true,
+                poolAssociationRule: "persisted_explicit_pool_association",
+                doubleCountingNoteKey: "governance:notes.explicitPoolContributionNoDoubleCount",
+              }
+            : {}),
           ...(reward.metadataJson ?? {}),
         },
       });

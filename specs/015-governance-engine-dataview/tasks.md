@@ -127,20 +127,20 @@
 
 ### Tests for User Story 3
 
-- [ ] T063 [P] [US3] Add governance reward reconciliation tests in apps/web/src/server/governance/governance.service.test.ts
-- [ ] T064 [P] [US3] Add Rewards source/link regression tests in apps/web/src/server/rewards/rewards.service.test.ts
-- [ ] T065 [P] [US3] Add Pools governance reward contribution tests in apps/web/src/server/analysis/pool-read-models.test.ts
-- [ ] T066 [P] [US3] Add Governance reward row mapper tests in apps/web/src/features/governance/governance.mappers.test.ts
+- [X] T063 [P] [US3] Add governance reward reconciliation tests in apps/web/src/server/governance/governance.service.test.ts
+- [X] T064 [P] [US3] Add Rewards source/link regression tests in apps/web/src/server/rewards/rewards.service.test.ts
+- [X] T065 [P] [US3] Add Pools governance reward contribution tests in apps/web/src/server/analysis/pool-read-models.test.ts
+- [X] T066 [P] [US3] Add Governance reward row mapper tests in apps/web/src/features/governance/governance.mappers.test.ts
 
 ### Implementation for User Story 3
 
-- [ ] T067 [US3] Materialize GovernanceReward rows with rewardEventId identity in apps/web/src/server/analysis/governance-read-models.ts
-- [ ] T068 [US3] Implement explicit pool association rules for governance rewards in apps/web/src/server/analysis/governance-read-models.ts
-- [ ] T069 [US3] Exclude unassociated governance rewards from pool contribution totals in apps/web/src/server/analysis/pool-read-models.ts
-- [ ] T070 [US3] Add Governance links and source filters to Rewards server responses in apps/web/src/server/rewards/rewards.repository.ts
-- [ ] T071 [US3] Add Governance cross-link behavior to Rewards UI mappers/navigation in apps/web/src/features/rewards/rewards.mappers.ts and apps/web/src/features/rewards/rewards.navigation.ts
-- [ ] T072 [US3] Add explicit governance reward links from Pools when pool association exists in apps/web/src/features/pools/PoolDetail.component.tsx and apps/web/src/features/pools/pools.mappers.ts
-- [ ] T073 [US3] Surface reward double-counting notes in Governance selected detail in apps/web/src/features/governance/components/SelectedGovernanceRail.tsx
+- [X] T067 [US3] Materialize GovernanceReward rows with rewardEventId identity in apps/web/src/server/analysis/governance-read-models.ts
+- [X] T068 [US3] Implement explicit pool association rules for governance rewards in apps/web/src/server/analysis/governance-read-models.ts
+- [X] T069 [US3] Exclude unassociated governance rewards from pool contribution totals in apps/web/src/server/analysis/pool-read-models.ts
+- [X] T070 [US3] Add Governance links and source filters to Rewards server responses in apps/web/src/server/rewards/rewards.repository.ts
+- [X] T071 [US3] Add Governance cross-link behavior to Rewards UI mappers/navigation in apps/web/src/features/rewards/rewards.mappers.ts and apps/web/src/features/rewards/rewards.navigation.ts
+- [X] T072 [US3] Add explicit governance reward links from Pools when pool association exists in apps/web/src/features/pools/PoolDetail.component.tsx and apps/web/src/features/pools/pools.mappers.ts
+- [X] T073 [US3] Surface reward double-counting notes in Governance selected detail in apps/web/src/features/governance/components/SelectedGovernanceRail.tsx
 
 **Checkpoint**: User Story 3 reconciles Governance rewards with Rewards/Pools without double counting.
 
@@ -154,23 +154,23 @@
 
 ### Tests for User Story 4
 
-- [ ] T074 [P] [US4] Add selected Governance detail service tests in apps/web/src/server/governance/governance.service.test.ts
-- [ ] T075 [P] [US4] Add selected Governance detail mapper tests in apps/web/src/features/governance/governance.mappers.test.ts
-- [ ] T076 [P] [US4] Add Activity linked Governance entity tests in apps/web/src/server/activity/activity.repository.test.ts
-- [ ] T077 [P] [US4] Add partial/unsupported/excluded detail regression cases in apps/web/src/server/scripts/analysis-governance-regression.ts
+- [X] T074 [P] [US4] Add selected Governance detail service tests in apps/web/src/server/governance/governance.service.test.ts
+- [X] T075 [P] [US4] Add selected Governance detail mapper tests in apps/web/src/features/governance/governance.mappers.test.ts
+- [X] T076 [P] [US4] Add Activity linked Governance entity tests in apps/web/src/server/activity/activity.repository.test.ts
+- [X] T077 [P] [US4] Add partial/unsupported/excluded detail regression cases in apps/web/src/server/scripts/analysis-governance-regression.ts
 
 ### Implementation for User Story 4
 
-- [ ] T078 [US4] Materialize GovernanceSelectedDetail payloads in apps/web/src/server/analysis/governance-read-models.ts
-- [ ] T079 [US4] Add selected detail retrieval to Governance repository in apps/web/src/server/governance/governance.repository.ts
-- [ ] T080 [US4] Map evidence refs, missing evidence, and coverage notes in Governance service in apps/web/src/server/governance/governance.service.ts
-- [ ] T081 [US4] Implement selected-detail action summary and transaction sections in apps/web/src/features/governance/components/SelectedGovernanceRail.tsx
-- [ ] T082 [US4] Implement selected-detail token movement and value effect sections in apps/web/src/features/governance/components/SelectedGovernanceRail.tsx
-- [ ] T083 [US4] Implement selected-detail epoch/vote/pool context sections in apps/web/src/features/governance/components/SelectedGovernanceRail.tsx
-- [ ] T084 [US4] Implement selected-detail classification evidence and source evidence sections in apps/web/src/features/governance/components/SelectedGovernanceRail.tsx
-- [ ] T085 [US4] Implement Governance coverage notes component in apps/web/src/features/governance/components/GovernanceCoverageNotes.tsx
-- [ ] T086 [US4] Add Governance linked entity support to Activity repository/service responses in apps/web/src/server/activity/activity.repository.ts
-- [ ] T087 [US4] Add Activity navigation links for Governance context in apps/web/src/features/activity/activity.navigation.ts
+- [X] T078 [US4] Materialize GovernanceSelectedDetail payloads in apps/web/src/server/analysis/governance-read-models.ts
+- [X] T079 [US4] Add selected detail retrieval to Governance repository in apps/web/src/server/governance/governance.repository.ts
+- [X] T080 [US4] Map evidence refs, missing evidence, and coverage notes in Governance service in apps/web/src/server/governance/governance.service.ts
+- [X] T081 [US4] Implement selected-detail action summary and transaction sections in apps/web/src/features/governance/components/SelectedGovernanceRail.tsx
+- [X] T082 [US4] Implement selected-detail token movement and value effect sections in apps/web/src/features/governance/components/SelectedGovernanceRail.tsx
+- [X] T083 [US4] Implement selected-detail epoch/vote/pool context sections in apps/web/src/features/governance/components/SelectedGovernanceRail.tsx
+- [X] T084 [US4] Implement selected-detail classification evidence and source evidence sections in apps/web/src/features/governance/components/SelectedGovernanceRail.tsx
+- [X] T085 [US4] Implement Governance coverage notes component in apps/web/src/features/governance/components/GovernanceCoverageNotes.tsx
+- [X] T086 [US4] Add Governance linked entity support to Activity repository/service responses in apps/web/src/server/activity/activity.repository.ts
+- [X] T087 [US4] Add Activity navigation links for Governance context in apps/web/src/features/activity/activity.navigation.ts
 
 **Checkpoint**: User Story 4 exposes evidence and uncertainty without hiding partial/unresolved rows.
 

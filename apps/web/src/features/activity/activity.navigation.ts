@@ -23,3 +23,16 @@ export function getActivityHref(input: {
   if (input.governanceEventId) params.set("governanceEventId", input.governanceEventId);
   return `/activity?${params.toString()}`;
 }
+
+export function getActivityGovernanceHref(input: {
+  chainId?: number;
+  governanceEventId: string;
+  selectedActivityId?: string | null;
+}) {
+  return getActivityHref({
+    chainId: input.chainId,
+    selectedActivityId: input.selectedActivityId,
+    surface: "governance",
+    governanceEventId: input.governanceEventId,
+  });
+}

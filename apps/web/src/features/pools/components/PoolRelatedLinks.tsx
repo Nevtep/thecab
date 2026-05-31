@@ -10,10 +10,12 @@ export function PoolRelatedLinks(input: {
     deposit: string;
     strategy: string;
     rewards?: string;
+    governanceRewards?: string;
   };
   rewardsHref?: string | null;
   deposits: Array<{ id: string; label: string; href?: string | null }>;
   strategies: Array<{ id: string; label: string; href?: string | null }>;
+  governanceRewards?: Array<{ id: string; label: string; href?: string | null }>;
 }) {
   const router = useRouter();
 
@@ -26,6 +28,16 @@ export function PoolRelatedLinks(input: {
             {input.labels.rewards}
           </CabButton>
         ) : null}
+        {input.labels.governanceRewards ? input.governanceRewards?.map((reward) => (
+          <CabButton
+            key={`governance-reward-${reward.id}`}
+            tone="technical"
+            disabled={!reward.href}
+            onPress={reward.href ? () => router.push(reward.href!) : undefined}
+          >
+            {input.labels.governanceRewards}: {reward.label}
+          </CabButton>
+        )) : null}
         {input.deposits.map((deposit) => (
           <CabButton
             key={`deposit-${deposit.id}`}

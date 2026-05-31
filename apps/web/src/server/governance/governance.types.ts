@@ -98,6 +98,8 @@ export type GovernanceEpochSummary = {
 export type GovernanceRewardRow = {
   governanceRewardId: string;
   rewardEventId: string | null;
+  governanceEventId: string | null;
+  txHash: string | null;
   claimedAt: string | null;
   rewardType: GovernanceRewardType;
   token: {
@@ -114,10 +116,18 @@ export type GovernanceRewardRow = {
   } | null;
   coverageState: GovernanceCoverageState;
   confidence: GovernanceConfidence;
+  affectsTotals: boolean;
+  poolAssociation: {
+    status: "explicit" | "unassociated";
+    rule: string;
+    reasonCodes: string[];
+  };
+  doubleCountingNoteKey: string | null;
   context: {
     kind: "epoch" | "pool" | "reward" | "unknown";
     label: string;
   };
+  sourceEvidenceRefs: Array<Record<string, unknown>>;
 };
 
 export type GovernanceSelectedDetail = {

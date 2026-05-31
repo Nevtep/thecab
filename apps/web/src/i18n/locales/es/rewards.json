@@ -125,6 +125,8 @@
   "countingRules": {
     "owner_resolved_pool": "Contado una vez a nivel pool.",
     "wallet_pool_aggregate": "Contado una vez por agregado wallet-pool.",
+    "governance_explicit_pool": "Contado una vez con evidencia explícita gobernanza-pool.",
+    "governance_unassociated_no_pool": "Reward de gobernanza visible; no se cuenta a nivel pool sin evidencia explícita.",
     "no_pool_contribution": "Sin contribución al pool.",
     "unresolved_owner": "No se cuenta hasta resolver dueño.",
     "excluded_activity": "Excluido de totales económicos."

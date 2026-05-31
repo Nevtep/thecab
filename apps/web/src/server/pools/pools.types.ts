@@ -209,5 +209,6 @@ export type PoolDetailResponse = {
   related: {
     deposits: Array<{ id: string; label: string }>;
     strategies: Array<{ id: string; label: string }>;
+    governanceRewards: Array<{ id: string; label: string }>;
   };
 };

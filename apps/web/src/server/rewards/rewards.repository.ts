@@ -81,6 +81,16 @@ function getExternalTxUrl(chainId: number, txHash: string | null) {
   return getSupportedChain(chainId) ? getExplorerTxUrl(chainId, txHash) : null;
 }
 
+function getGovernanceRewardRoute(row: RewardEventDbRow) {
+  const params = new URLSearchParams({
+    chainId: String(row.chainId),
+    kind: "reward",
+    selected: row.rewardEventId,
+    rewardEventId: row.rewardEventId,
+  });
+  return `/governance?${params.toString()}`;
+}
+
 function normalizeResolutionStatus(value: string): RewardsResolutionStatus {
   if (value === "resolved" || value === "unresolved" || value === "excluded" || value === "unavailable") {
     return value;
@@ -134,9 +144,9 @@ function resolveOwner(row: RewardEventDbRow): RewardEventRow["owner"] {
     return {
       status: "governance",
       labelKey: "rewards:sources.governance",
-      entityId: null,
-      entityLabel: null,
-      route: null,
+      entityId: row.rewardEventId,
+      entityLabel: shortId(row.rewardEventId, "Gov"),
+      route: getGovernanceRewardRoute(row),
     };
   }
 
@@ -209,14 +219,18 @@ export function mapRewardEventRow(row: RewardEventDbRow): RewardEventRow {
       route: row.resolvedPoolId ? `/pools/${row.resolvedPoolId}` : null,
       countingRule:
         poolContributionStatus === "contributes"
-          ? row.resolutionBasis === "wallet_pool_aggregate"
+          ? owner.status === "governance"
+            ? "governance_explicit_pool"
+            : row.resolutionBasis === "wallet_pool_aggregate"
             ? "wallet_pool_aggregate"
             : "owner_resolved_pool"
           : poolContributionStatus === "excluded"
             ? "excluded_activity"
             : poolContributionStatus === "unresolved"
               ? "unresolved_owner"
-              : "no_pool_contribution",
+              : owner.status === "governance"
+                ? "governance_unassociated_no_pool"
+                : "no_pool_contribution",
     },
     rewardType: row.rewardType,
     coverageState,

@@ -164,6 +164,17 @@
     "evidenceSources": "Fuentes de evidencia",
     "coverage": "Cobertura",
     "confidence": "Confianza",
-    "affectsTotals": "Afecta totales"
+    "affectsTotals": "Afecta totales",
+    "reasonCodes": "Códigos de razón",
+    "noMovements": "No se materializaron movimientos de token para esta selección.",
+    "noLinkedContexts": "No se materializaron links explícitos de producto para esta selección.",
+    "noEvidenceSources": "No se materializaron referencias de evidencia fuente para esta selección.",
+    "amount": "Monto",
+    "valueUsd": "Valor USD",
+    "epochSummary": "Resumen de epoch"
+  },
+  "notes": {
+    "explicitPoolContributionNoDoubleCount": "La misma identidad de reward se cuenta una vez y se vincula a este pool con evidencia explícita.",
+    "unassociatedRewardNoPoolContribution": "El reward queda visible en Gobernanza, pero no se asigna a un pool sin evidencia explícita."
   }
 }

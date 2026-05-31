@@ -194,7 +194,7 @@ function createDetailResponse(): PoolDetailResponse {
         },
       ],
     },
-    related: { deposits: [], strategies: [] },
+    related: { deposits: [], strategies: [], governanceRewards: [] },
   };
 }
 
@@ -256,6 +256,16 @@ test("mapPoolDetailResponseToViewModel formats header, segments, chart, and time
   assert.equal(vm.timeline.length, 1);
   assert.ok(vm.timeline[0]?.formattedOccurredAt);
   assert.match(vm.timeline[0]?.formattedAttributedValueUsd ?? "", /\$1,000/);
+});
+
+test("mapPoolDetailResponseToViewModel adds governance reward cross-links only from explicit related rewards", () => {
+  const response = createDetailResponse();
+  response.related.governanceRewards = [{ id: "reward-1", label: "governance_bribe_claim" }];
+  const vm = mapPoolDetailResponseToViewModel(response, "en-US");
+
+  assert.equal(vm.related.governanceRewards[0]?.id, "reward-1");
+  assert.match(vm.related.governanceRewards[0]?.href ?? "", /^\/governance\?/);
+  assert.match(vm.related.governanceRewards[0]?.href ?? "", /poolId=pool-1/);
 });
 
 test("mapPoolDetailResponseToViewModel de-dupes token symbols case-insensitively", () => {

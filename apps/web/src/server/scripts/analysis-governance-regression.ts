@@ -91,6 +91,37 @@ async function main() {
        where wallet_address = $1 and chain_id = $2 and tx_hash = $3`,
       [walletAddress, chainId, AIRDROP_PHISHING_TX],
     );
+    const governanceGapEvents = await client.query<{
+      id: string;
+      event_type: string;
+      metadata_json: Record<string, unknown>;
+    }>(
+      `select id, event_type, metadata_json
+       from governance_events
+       where wallet_address = $1
+         and chain_id = $2
+         and (
+           metadata_json->>'coverageStatus' in ('partial','unresolved','unsupported','excluded','unavailable')
+           or event_type in ('unsupported_governance','excluded_governance')
+         )
+       order by occurred_at desc
+       limit 50`,
+      [walletAddress, chainId],
+    );
+    const governanceGapRewards = await client.query<{
+      id: string;
+      coverage_status: string;
+      evidence_json: Record<string, unknown>;
+    }>(
+      `select id, coverage_status, evidence_json
+       from governance_reward_rows
+       where wallet_address = $1
+         and chain_id = $2
+         and coverage_status in ('partial','unresolved','unsupported','excluded','unavailable')
+       order by claimed_at desc
+       limit 50`,
+      [walletAddress, chainId],
+    );
 
     for (const row of phishingReward.rows) {
       if (row.resolution_status !== "excluded") {
@@ -103,6 +134,16 @@ async function main() {
         throw new Error("AIRDROP_PHISHING_TX_MISSING_EXCLUSION_REASON");
       }
     }
+    for (const row of governanceGapEvents.rows) {
+      if (!row.metadata_json?.selectedDetail) {
+        throw new Error(`GOVERNANCE_GAP_EVENT_MISSING_SELECTED_DETAIL:${row.id}:${row.event_type}`);
+      }
+    }
+    for (const row of governanceGapRewards.rows) {
+      if (!row.evidence_json?.selectedDetail) {
+        throw new Error(`GOVERNANCE_GAP_REWARD_MISSING_SELECTED_DETAIL:${row.id}:${row.coverage_status}`);
+      }
+    }
 
     console.log(JSON.stringify({
       ok: true,
@@ -110,6 +151,8 @@ async function main() {
       chainId,
       governanceEventCount: Number(governance.rows[0]?.count ?? 0),
       phishingAirdropRowsChecked: phishingReward.rows.length,
+      governanceGapEventDetailsChecked: governanceGapEvents.rows.length,
+      governanceGapRewardDetailsChecked: governanceGapRewards.rows.length,
     }, null, 2));
   } finally {
     await client.end();
