@@ -2,6 +2,7 @@ import { task, tasks } from "@trigger.dev/sdk/v3";
 
 import { updateAnalysisRunProgress } from "@/server/analysis/analysis-run.repository";
 import {
+  dedupeDecodedTransactions,
   parseMoralisDecodedHistoryPage,
   sortDecodedTransactionsChronologically,
 } from "@/server/analysis/engine-v2/collection";
@@ -14,69 +15,110 @@ import {
 import { engineV2CollectionPagePayloadSchema } from "@/server/analysis/engine-v2/payloads";
 import { getDb } from "@/server/db/client";
 
-export const engineV2CanonicalizeHistoryTask = task({
-  id: "engine-v2-canonicalize-history",
-  run: async (rawPayload: unknown) => {
-    const payload = engineV2CollectionPagePayloadSchema.parse(rawPayload);
-    if (!payload.collectionRunId) {
-      throw new Error("ENGINE_V2_COLLECTION_RUN_ID_REQUIRED");
-    }
-    if (payload.analysisRunId) {
-      await updateAnalysisRunProgress(payload.analysisRunId, {
-        status: "running",
-        stage: "engine_v2_canonicalization",
-        progressPct: 24,
-      });
-    }
+type EngineV2Db = ReturnType<typeof getDb>;
 
-    const db = getDb();
-    const pages = await db.query.engineV2ProviderPages.findMany({
-      where: (table, { eq }) => eq(table.collectionRunId, payload.collectionRunId as string),
-      orderBy: (table, { asc }) => [asc(table.pageIndex)],
+type ProviderPageRow = {
+  rawJson: unknown;
+};
+
+export type EngineV2CanonicalizeTaskDeps = {
+  db?: EngineV2Db;
+  loadProviderPages?: (input: { db: EngineV2Db; collectionRunId: string }) => Promise<ProviderPageRow[]>;
+  upsertCanonicalTransaction?: typeof upsertCanonicalTransaction;
+  persistCanonicalEvidence?: typeof persistCanonicalEvidence;
+  persistCanonicalMovements?: typeof persistCanonicalMovements;
+  persistRootCanonicalCall?: typeof persistRootCanonicalCall;
+  updateRunProgress?: typeof updateAnalysisRunProgress;
+  trigger?: (
+    taskId: string,
+    payload: Record<string, unknown>,
+    options: { idempotencyKey: string },
+  ) => Promise<unknown>;
+};
+
+async function defaultLoadProviderPages(input: { db: EngineV2Db; collectionRunId: string }) {
+  return input.db.query.engineV2ProviderPages.findMany({
+    where: (table, { eq }) => eq(table.collectionRunId, input.collectionRunId),
+    orderBy: (table, { asc }) => [asc(table.pageIndex)],
+  });
+}
+
+export async function runEngineV2CanonicalizeHistory(
+  rawPayload: unknown,
+  deps: EngineV2CanonicalizeTaskDeps = {},
+) {
+  const payload = engineV2CollectionPagePayloadSchema.parse(rawPayload);
+  if (!payload.collectionRunId) {
+    throw new Error("ENGINE_V2_COLLECTION_RUN_ID_REQUIRED");
+  }
+  const updateRun = deps.updateRunProgress ?? updateAnalysisRunProgress;
+  if (payload.analysisRunId) {
+    await updateRun(payload.analysisRunId, {
+      status: "running",
+      stage: "engine_v2_canonicalization",
+      progressPct: 24,
     });
+  }
 
-    let canonicalized = 0;
-    for (const transaction of sortDecodedTransactionsChronologically(
+  const db = deps.db ?? getDb();
+  const loadProviderPages = deps.loadProviderPages ?? defaultLoadProviderPages;
+  const upsertCanonical = deps.upsertCanonicalTransaction ?? upsertCanonicalTransaction;
+  const persistEvidence = deps.persistCanonicalEvidence ?? persistCanonicalEvidence;
+  const persistMovements = deps.persistCanonicalMovements ?? persistCanonicalMovements;
+  const persistCall = deps.persistRootCanonicalCall ?? persistRootCanonicalCall;
+  const triggerTask = deps.trigger ?? ((taskId, taskPayload, options) => tasks.trigger(taskId, taskPayload, options));
+
+  const pages = await loadProviderPages({ db, collectionRunId: payload.collectionRunId });
+  const normalizedTransactions = sortDecodedTransactionsChronologically(
+    dedupeDecodedTransactions(
       pages.flatMap((page) => parseMoralisDecodedHistoryPage(page.rawJson).transactions),
-    )) {
-      const canonical = await upsertCanonicalTransaction({
-        db,
-        chainId: payload.chainId,
-        walletAddress: payload.walletAddress,
-        transaction,
-        sourceEndpoint: `/${payload.walletAddress}/verbose`,
-        collectionRunId: payload.collectionRunId,
-      });
-      await persistCanonicalEvidence({
-        db,
-        canonicalTransactionId: canonical.id,
-        chainId: payload.chainId,
-        transaction,
-      });
-      await persistCanonicalMovements({
-        db,
-        canonicalTransactionId: canonical.id,
-        chainId: payload.chainId,
-        walletAddress: payload.walletAddress,
-        transaction,
-      });
-      await persistRootCanonicalCall({
-        db,
-        canonicalTransactionId: canonical.id,
-        chainId: payload.chainId,
-        transaction,
-      });
-      canonicalized += 1;
-    }
+    ),
+  );
 
-    await tasks.trigger("engine-v2-protocol-bootstrap", {
-      ...payload,
+  let canonicalized = 0;
+  for (const transaction of normalizedTransactions) {
+    const canonical = await upsertCanonical({
+      db,
       chainId: payload.chainId,
       walletAddress: payload.walletAddress,
-    }, {
-      idempotencyKey: `engine-v2-protocol-bootstrap:${payload.chainId}:${payload.walletAddress}:${payload.collectionRunId}`,
+      transaction,
+      sourceEndpoint: `/${payload.walletAddress}/verbose`,
+      collectionRunId: payload.collectionRunId,
     });
+    await persistEvidence({
+      db,
+      canonicalTransactionId: canonical.id,
+      chainId: payload.chainId,
+      transaction,
+    });
+    await persistMovements({
+      db,
+      canonicalTransactionId: canonical.id,
+      chainId: payload.chainId,
+      walletAddress: payload.walletAddress,
+      transaction,
+    });
+    await persistCall({
+      db,
+      canonicalTransactionId: canonical.id,
+      chainId: payload.chainId,
+      transaction,
+    });
+    canonicalized += 1;
+  }
 
-    return { canonicalized };
-  },
+  await triggerTask("engine-v2-protocol-bootstrap", {
+    ...payload,
+    chainId: payload.chainId,
+    walletAddress: payload.walletAddress,
+  }, {
+    idempotencyKey: `engine-v2-protocol-bootstrap:${payload.chainId}:${payload.walletAddress}:${payload.collectionRunId}`,
+  });
+
+  return { canonicalized };
+}
+
+export const engineV2CanonicalizeHistoryTask = task({
+  id: "engine-v2-canonicalize-history",
+  run: async (rawPayload: unknown) => runEngineV2CanonicalizeHistory(rawPayload),
 });

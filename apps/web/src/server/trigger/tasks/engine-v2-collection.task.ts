@@ -2,6 +2,7 @@ import { task, tasks } from "@trigger.dev/sdk/v3";
 
 import { updateAnalysisRunProgress } from "@/server/analysis/analysis-run.repository";
 import {
+  dedupeDecodedTransactions,
   createCollectionRun,
   fetchMoralisDecodedHistoryPage,
   findLatestCanonicalTransactionBoundary,
@@ -153,7 +154,12 @@ export async function runEngineV2FinalizeCollection(
   const triggerTask = deps.trigger ?? ((taskId, taskPayload, options) => tasks.trigger(taskId, taskPayload, options));
   const pages = await loadProviderPages({ db, collectionRunId: payload.collectionRunId });
   const transactions = pages.flatMap((page) => parseMoralisDecodedHistoryPage(page.rawJson).transactions);
-  const summary = summarizeCanonicalTransactions(transactions);
+  const dedupedTransactions = dedupeDecodedTransactions(transactions);
+  const summary = {
+    providerRowCount: transactions.length,
+    distinctTxCount: dedupedTransactions.length,
+    duplicateTxCount: transactions.length - dedupedTransactions.length,
+  };
   await markComplete({
     db,
     collectionRunId: payload.collectionRunId,
