@@ -2,6 +2,10 @@
 
 Fecha: 2026-05-31
 
+Brief consolidado para bajar este refactor a Spec Kit:
+
+- `docs/brief-spec-engine-v2-refactor.md`
+
 ## Decision De Arquitectura
 
 El engine actual debe reemplazarse como modelo conceptual. No conviene seguir agregando fases separadas por pantalla o por resultado (`phase-deposits`, `phase-rewards`, `phase-governance`, etc.) sobre datos ya interpretados por Moralis. El nuevo engine debe ser un procesador cronologico de transacciones decodificadas:
