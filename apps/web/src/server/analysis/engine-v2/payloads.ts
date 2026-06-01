@@ -13,6 +13,7 @@ export const engineV2WalletPayloadSchema = z.object({
 export const engineV2CollectionPagePayloadSchema = engineV2WalletPayloadSchema.extend({
   collectionRunId: z.string().uuid().optional(),
   cursor: z.string().nullish(),
+  fromBlock: z.string().regex(/^\d+$/).nullish(),
   pageIndex: z.number().int().nonnegative().default(0),
 });
 

@@ -18,12 +18,14 @@ test("Moralis decoded history request uses verbose ASC internal transaction quer
       chainId: 8453,
       walletAddress: "0x0000000000000000000000000000000000000001",
       cursor: "next",
+      fromBlock: "46571258",
     }),
     {
       order: "ASC",
       include: "internal_transactions",
       limit: 100,
       cursor: "next",
+      from_block: "46571258",
     },
   );
 });
@@ -50,4 +52,19 @@ test("hashMoralisDecodedHistoryRequest is wallet-case insensitive", () => {
   });
 
   assert.equal(lower, mixed);
+});
+
+test("hashMoralisDecodedHistoryRequest changes when fromBlock changes", () => {
+  const older = hashMoralisDecodedHistoryRequest({
+    chainId: 8453,
+    walletAddress: "0x0ecd939b7fca4dc4a0675d8d28bad12cefae0954",
+    fromBlock: "100",
+  });
+  const newer = hashMoralisDecodedHistoryRequest({
+    chainId: 8453,
+    walletAddress: "0x0ecd939b7fca4dc4a0675d8d28bad12cefae0954",
+    fromBlock: "101",
+  });
+
+  assert.notEqual(older, newer);
 });

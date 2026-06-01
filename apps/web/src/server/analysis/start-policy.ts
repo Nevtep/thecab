@@ -4,14 +4,20 @@ export function shouldEnforceCompletedRunDailyGate(nodeEnv: string | undefined =
 
 export function shouldReuseCompletedSameDayRun(input: {
   sameDayRunStatus: string | null | undefined;
+  requestedMode?: "full_history" | "incremental";
   nodeEnv?: string;
 }) {
-  return input.sameDayRunStatus === "complete" && shouldEnforceCompletedRunDailyGate(input.nodeEnv);
+  return input.requestedMode !== "incremental"
+    && input.sameDayRunStatus === "complete"
+    && shouldEnforceCompletedRunDailyGate(input.nodeEnv);
 }
 
 export function shouldSupersedeCompletedSameDayRunForDevelopment(input: {
   sameDayRunStatus: string | null | undefined;
+  requestedMode?: "full_history" | "incremental";
   nodeEnv?: string;
 }) {
-  return input.sameDayRunStatus === "complete" && !shouldEnforceCompletedRunDailyGate(input.nodeEnv);
+  return input.requestedMode !== "incremental"
+    && input.sameDayRunStatus === "complete"
+    && !shouldEnforceCompletedRunDailyGate(input.nodeEnv);
 }

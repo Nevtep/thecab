@@ -4,6 +4,7 @@ import { updateAnalysisRunProgress } from "@/server/analysis/analysis-run.reposi
 import {
   createCollectionRun,
   fetchMoralisDecodedHistoryPage,
+  findLatestCanonicalTransactionBoundary,
   hashMoralisDecodedHistoryRequest,
   markCollectionRunComplete,
   parseMoralisDecodedHistoryPage,
@@ -29,6 +30,9 @@ type TriggerFn = (
 export type EngineV2CollectionTaskDeps = {
   db?: EngineV2Db;
   createCollectionRun?: (input: Parameters<typeof createCollectionRun>[0]) => Promise<{ id: string }>;
+  findLatestCanonicalBoundary?: (
+    input: Parameters<typeof findLatestCanonicalTransactionBoundary>[0]
+  ) => Promise<Awaited<ReturnType<typeof findLatestCanonicalTransactionBoundary>>>;
   fetchMoralisDecodedHistoryPage?: typeof fetchMoralisDecodedHistoryPage;
   upsertProviderPage?: (input: Parameters<typeof upsertProviderPage>[0]) => Promise<unknown>;
   markCollectionRunComplete?: (input: Parameters<typeof markCollectionRunComplete>[0]) => Promise<unknown>;
@@ -78,8 +82,10 @@ export async function runEngineV2CollectDecodedHistoryPage(
       walletAddress: payload.walletAddress,
       sourceEndpoint,
       sourceQueryJson: {
+        mode: payload.mode,
         order: "ASC",
         include: "internal_transactions",
+        ...(payload.fromBlock ? { from_block: payload.fromBlock } : {}),
       },
     });
 
@@ -178,16 +184,46 @@ export const engineV2FinalizeCollectionTask = task({
 
 export async function runEngineV2StartCollection(
   rawPayload: unknown,
-  deps: Pick<EngineV2CollectionTaskDeps, "trigger"> = {},
+  deps: Pick<EngineV2CollectionTaskDeps, "db" | "findLatestCanonicalBoundary" | "trigger"> = {},
 ) {
   const payload = engineV2WalletPayloadSchema.parse(rawPayload);
   const triggerTask = deps.trigger ?? ((taskId, taskPayload, options) => tasks.trigger(taskId, taskPayload, options));
+
+  if (payload.mode === "reanalysis") {
+    if (!payload.collectionRunId) {
+      throw new Error("ENGINE_V2_REANALYSIS_COLLECTION_RUN_ID_REQUIRED");
+    }
+    await triggerTask("engine-v2-canonicalize-history", {
+      ...payload,
+      pageIndex: 0,
+      cursor: null,
+    }, {
+      idempotencyKey: `engine-v2-reanalysis:${payload.chainId}:${payload.walletAddress}:${payload.collectionRunId}`,
+    });
+
+    return { queued: true };
+  }
+
+  const db = deps.db ?? getDb();
+  const loadLatestBoundary = deps.findLatestCanonicalBoundary ?? findLatestCanonicalTransactionBoundary;
+  const latestBoundary = payload.mode === "incremental"
+    ? await loadLatestBoundary({
+      db,
+      chainId: payload.chainId,
+      walletAddress: payload.walletAddress,
+    })
+    : null;
+  const fromBlock = latestBoundary?.blockNumber ?? null;
+
   await triggerTask("engine-v2-collect-decoded-history-page", {
     ...payload,
     pageIndex: 0,
     cursor: null,
+    fromBlock,
   }, {
-    idempotencyKey: `engine-v2-collection:${payload.chainId}:${payload.walletAddress}:start`,
+    idempotencyKey: payload.mode === "incremental" && fromBlock
+      ? `engine-v2-collection:${payload.chainId}:${payload.walletAddress}:incremental:from-block-${fromBlock}`
+      : `engine-v2-collection:${payload.chainId}:${payload.walletAddress}:${payload.mode}:start`,
   });
 
   return { queued: true };

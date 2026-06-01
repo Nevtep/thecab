@@ -12,6 +12,7 @@ export type MoralisDecodedHistoryRequest = {
   walletAddress: string;
   cursor?: string | null;
   limit?: number;
+  fromBlock?: string | null;
 };
 
 export type MoralisDecodedHistoryPage = {
@@ -31,7 +32,8 @@ export function buildMoralisDecodedHistoryQuery(input: MoralisDecodedHistoryRequ
     include: "internal_transactions",
     limit: input.limit ?? MORALIS_DECODED_HISTORY_LIMIT,
     cursor: input.cursor ?? undefined,
-  } as const;
+    from_block: input.fromBlock ?? undefined,
+  };
 }
 
 export function hashMoralisDecodedHistoryRequest(input: MoralisDecodedHistoryRequest) {
@@ -42,6 +44,7 @@ export function hashMoralisDecodedHistoryRequest(input: MoralisDecodedHistoryReq
       walletAddress: input.walletAddress.toLowerCase(),
       cursor: input.cursor ?? null,
       limit: input.limit ?? MORALIS_DECODED_HISTORY_LIMIT,
+      fromBlock: input.fromBlock ?? null,
       order: "ASC",
       include: "internal_transactions",
     }))

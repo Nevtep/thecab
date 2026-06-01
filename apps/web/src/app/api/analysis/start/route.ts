@@ -25,7 +25,46 @@ const RESPONSE_HEADERS = {
 const startAnalysisSchema = z.object({
   walletAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/).transform((value) => value.toLowerCase()),
   chainId: z.number().int().positive().default(SUPPORTED_CHAIN_ID),
+  mode: z.enum(["full_history", "incremental"]).default("full_history"),
 });
+
+export type StartAnalysisPayload = z.infer<typeof startAnalysisSchema>;
+
+type StartAnalysisDeps = {
+  assertSupportedChain: typeof assertSupportedChain;
+  assertAuthenticatedWallet: typeof assertAuthenticatedWallet;
+  findActiveAnalysisRun: typeof findActiveAnalysisRun;
+  findLatestSameDayAnalysisRun: typeof findLatestSameDayAnalysisRun;
+  findLatestCompletedAnalysisRun: typeof findLatestCompletedAnalysisRun;
+  shouldReuseCompletedSameDayRun: typeof shouldReuseCompletedSameDayRun;
+  shouldSupersedeCompletedSameDayRunForDevelopment: typeof shouldSupersedeCompletedSameDayRunForDevelopment;
+  supersedeCompletedRunForDevelopmentRerun: typeof supersedeCompletedRunForDevelopmentRerun;
+  createAnalysisRun: typeof createAnalysisRun;
+  triggerAnalysisRunTask: typeof triggerAnalysisRunTask;
+  mergeAnalysisRunMetadata: typeof mergeAnalysisRunMetadata;
+  updateAnalysisRunProgress: typeof updateAnalysisRunProgress;
+  now: () => Date;
+  todayUtcBucket: () => string;
+};
+
+function getStartAnalysisDeps(): StartAnalysisDeps {
+  return {
+    assertSupportedChain,
+    assertAuthenticatedWallet,
+    findActiveAnalysisRun,
+    findLatestSameDayAnalysisRun,
+    findLatestCompletedAnalysisRun,
+    shouldReuseCompletedSameDayRun,
+    shouldSupersedeCompletedSameDayRunForDevelopment,
+    supersedeCompletedRunForDevelopmentRerun,
+    createAnalysisRun,
+    triggerAnalysisRunTask,
+    mergeAnalysisRunMetadata,
+    updateAnalysisRunProgress,
+    now: () => new Date(),
+    todayUtcBucket,
+  };
+}
 
 function serializeRunResponse(run: {
   id: string;
@@ -76,74 +115,87 @@ function todayUtcBucket() {
   return new Date().toISOString().slice(0, 10);
 }
 
-export async function POST(request: Request) {
+export async function runStartAnalysis(
+  payload: StartAnalysisPayload,
+  deps: StartAnalysisDeps = getStartAnalysisDeps(),
+) {
+  deps.assertSupportedChain(payload.chainId);
+  await deps.assertAuthenticatedWallet(payload.walletAddress);
+
+  const [activeRun, sameDayRun, latestCompletedRun] = await Promise.all([
+    deps.findActiveAnalysisRun(payload.walletAddress, payload.chainId),
+    deps.findLatestSameDayAnalysisRun(payload.walletAddress, payload.chainId, deps.todayUtcBucket()),
+    deps.findLatestCompletedAnalysisRun(payload.walletAddress, payload.chainId),
+  ]);
+
+  if (activeRun) {
+    return errorResponse("run_already_in_progress", 409, {
+      run: serializeRunResponse(activeRun, true),
+    });
+  }
+
+  if (deps.shouldReuseCompletedSameDayRun({
+    sameDayRunStatus: sameDayRun?.status,
+    requestedMode: payload.mode,
+  })) {
+    return NextResponse.json(serializeRunResponse(sameDayRun, true), {
+      status: 200,
+      headers: RESPONSE_HEADERS,
+    });
+  }
+
+  if (sameDayRun && deps.shouldSupersedeCompletedSameDayRunForDevelopment({
+    sameDayRunStatus: sameDayRun.status,
+    requestedMode: payload.mode,
+  })) {
+    await deps.supersedeCompletedRunForDevelopmentRerun(sameDayRun.id);
+  }
+  const triggeredAtUtc = deps.now();
+  const resolvedMode = payload.mode;
+
+  const run = await deps.createAnalysisRun({
+    walletAddress: payload.walletAddress,
+    chainId: payload.chainId,
+    mode: resolvedMode,
+    triggeredAtUtc,
+  });
+
   try {
-    const payload = startAnalysisSchema.parse(await request.json());
-    assertSupportedChain(payload.chainId);
-    await assertAuthenticatedWallet(payload.walletAddress);
-
-    const [activeRun, sameDayRun, latestCompletedRun] = await Promise.all([
-      findActiveAnalysisRun(payload.walletAddress, payload.chainId),
-      findLatestSameDayAnalysisRun(payload.walletAddress, payload.chainId, todayUtcBucket()),
-      findLatestCompletedAnalysisRun(payload.walletAddress, payload.chainId),
-    ]);
-
-    if (activeRun) {
-      return errorResponse("run_already_in_progress", 409, {
-        run: serializeRunResponse(activeRun, true),
-      });
-    }
-
-    if (shouldReuseCompletedSameDayRun({ sameDayRunStatus: sameDayRun?.status })) {
-      return NextResponse.json(serializeRunResponse(sameDayRun, true), {
-        status: 200,
-        headers: RESPONSE_HEADERS,
-      });
-    }
-
-    if (sameDayRun && shouldSupersedeCompletedSameDayRunForDevelopment({ sameDayRunStatus: sameDayRun.status })) {
-      await supersedeCompletedRunForDevelopmentRerun(sameDayRun.id);
-    }
-    const triggeredAtUtc = new Date();
-    const resolvedMode = "full_history" as const;
-
-    const run = await createAnalysisRun({
+    const handle = await deps.triggerAnalysisRunTask({
+      runId: run.id,
       walletAddress: payload.walletAddress,
       chainId: payload.chainId,
       mode: resolvedMode,
-      triggeredAtUtc,
     });
-
-    try {
-      const handle = await triggerAnalysisRunTask({
-        runId: run.id,
-        walletAddress: payload.walletAddress,
-        chainId: payload.chainId,
-        mode: resolvedMode,
-      });
-      await mergeAnalysisRunMetadata(run.id, {
-        triggerRunId: handle.id,
-        plannedSliceCount: 1,
-        resolvedMode,
-        latestCompletedRunId: latestCompletedRun?.id ?? null,
-      });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      await updateAnalysisRunProgress(run.id, {
-        status: "failed",
-        stage: "failed",
-        progressPct: 100,
-        coverage: "partial",
-        coverageReasonsJson: ["unknownError"],
-        lastError: message,
-      });
-      throw error;
-    }
-
-    return NextResponse.json(serializeRunResponse(run, false), {
-      status: 202,
-      headers: RESPONSE_HEADERS,
+    await deps.mergeAnalysisRunMetadata(run.id, {
+      triggerRunId: handle.id,
+      plannedSliceCount: 1,
+      resolvedMode,
+      latestCompletedRunId: latestCompletedRun?.id ?? null,
     });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    await deps.updateAnalysisRunProgress(run.id, {
+      status: "failed",
+      stage: "failed",
+      progressPct: 100,
+      coverage: "partial",
+      coverageReasonsJson: ["unknownError"],
+      lastError: message,
+    });
+    throw error;
+  }
+
+  return NextResponse.json(serializeRunResponse(run, false), {
+    status: 202,
+    headers: RESPONSE_HEADERS,
+  });
+}
+
+export async function POST(request: Request) {
+  try {
+    const payload = startAnalysisSchema.parse(await request.json());
+    return runStartAnalysis(payload);
   } catch (error) {
     if (error instanceof z.ZodError) {
       return errorResponse("invalid_payload", 400, error.issues);

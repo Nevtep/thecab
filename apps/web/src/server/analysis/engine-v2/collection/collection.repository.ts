@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
 
-import { eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 
 import {
+  canonicalTransactions,
   engineV2CollectionRuns,
   engineV2ProviderPages,
 } from "@/server/db/schema";
@@ -121,4 +122,36 @@ export async function markCollectionRunComplete(input: {
     .returning();
 
   return row;
+}
+
+export async function findLatestCanonicalTransactionBoundary(input: {
+  db: EngineV2Db;
+  chainId: number;
+  walletAddress: string;
+}) {
+  const [row] = await input.db
+    .select({
+      blockNumber: canonicalTransactions.blockNumber,
+      txHash: canonicalTransactions.txHash,
+      transactionIndex: canonicalTransactions.transactionIndex,
+    })
+    .from(canonicalTransactions)
+    .where(and(
+      eq(canonicalTransactions.chainId, input.chainId),
+      eq(canonicalTransactions.walletAddress, input.walletAddress.toLowerCase()),
+    ))
+    .orderBy(
+      desc(canonicalTransactions.blockNumber),
+      desc(canonicalTransactions.transactionIndex),
+      desc(canonicalTransactions.txHash),
+    )
+    .limit(1);
+
+  if (!row) return null;
+
+  return {
+    blockNumber: typeof row.blockNumber === "string" ? row.blockNumber : String(row.blockNumber),
+    txHash: row.txHash,
+    transactionIndex: row.transactionIndex,
+  };
 }

@@ -23,6 +23,7 @@ function createDeps(overrides: Partial<EngineV2CollectionTaskDeps> = {}) {
   const deps: EngineV2CollectionTaskDeps = {
     db: {} as NonNullable<EngineV2CollectionTaskDeps["db"]>,
     createCollectionRun: async () => ({ id: collectionRunId }),
+    findLatestCanonicalBoundary: async () => null,
     fetchMoralisDecodedHistoryPage: async () => ({
       cursor: null,
       result: [{ hash: "0xaaa" }],
@@ -64,7 +65,71 @@ test("runEngineV2StartCollection queues the first decoded history page", async (
   assert.equal(triggered[0]?.taskId, "engine-v2-collect-decoded-history-page");
   assert.equal(triggered[0]?.payload.pageIndex, 0);
   assert.equal(triggered[0]?.payload.cursor, null);
-  assert.equal(triggered[0]?.options.idempotencyKey, `engine-v2-collection:8453:${walletAddress}:start`);
+  assert.equal(triggered[0]?.payload.fromBlock, null);
+  assert.equal(triggered[0]?.options.idempotencyKey, `engine-v2-collection:8453:${walletAddress}:fresh:start`);
+});
+
+test("runEngineV2StartCollection carries latest canonical block into incremental collection", async () => {
+  const { triggered } = createDeps();
+
+  const result = await runEngineV2StartCollection({
+    chainId: 8453,
+    walletAddress,
+    mode: "incremental",
+  }, {
+    db: {} as NonNullable<EngineV2CollectionTaskDeps["db"]>,
+    findLatestCanonicalBoundary: async () => ({
+      blockNumber: "46571258",
+      txHash: "0xabc",
+      transactionIndex: 130,
+    }),
+    trigger: async (taskId, payload, options) => {
+      triggered.push({ taskId, payload, options });
+    },
+  });
+
+  assert.deepEqual(result, { queued: true });
+  assert.equal(triggered[0]?.taskId, "engine-v2-collect-decoded-history-page");
+  assert.equal(triggered[0]?.payload.fromBlock, "46571258");
+  assert.equal(
+    triggered[0]?.options.idempotencyKey,
+    `engine-v2-collection:8453:${walletAddress}:incremental:from-block-46571258`,
+  );
+});
+
+test("runEngineV2StartCollection skips recollection for explicit reanalysis", async () => {
+  const { triggered } = createDeps();
+
+  const result = await runEngineV2StartCollection({
+    chainId: 8453,
+    walletAddress,
+    mode: "reanalysis",
+    collectionRunId,
+  }, {
+    trigger: async (taskId, payload, options) => {
+      triggered.push({ taskId, payload, options });
+    },
+  });
+
+  assert.deepEqual(result, { queued: true });
+  assert.equal(triggered[0]?.taskId, "engine-v2-canonicalize-history");
+  assert.equal(triggered[0]?.payload.collectionRunId, collectionRunId);
+  assert.equal(triggered[0]?.payload.pageIndex, 0);
+  assert.equal(
+    triggered[0]?.options.idempotencyKey,
+    `engine-v2-reanalysis:8453:${walletAddress}:${collectionRunId}`,
+  );
+});
+
+test("runEngineV2StartCollection requires a collection run id for reanalysis", async () => {
+  await assert.rejects(
+    () => runEngineV2StartCollection({
+      chainId: 8453,
+      walletAddress,
+      mode: "reanalysis",
+    }),
+    /ENGINE_V2_REANALYSIS_COLLECTION_RUN_ID_REQUIRED/,
+  );
 });
 
 test("runEngineV2CollectDecodedHistoryPage persists a page and queues the next cursor once", async () => {
@@ -85,6 +150,7 @@ test("runEngineV2CollectDecodedHistoryPage persists a page and queues the next c
   assert.equal(result.providerRowCount, 2);
   assert.equal(upsertedPages.length, 1);
   assert.equal(upsertedPages[0]?.cursorOut, "cursor-2");
+  assert.deepEqual(upsertedPages[0]?.requestHash, upsertedPages[0]?.requestHash);
   assert.equal(triggered.length, 1);
   assert.equal(triggered[0]?.taskId, "engine-v2-collect-decoded-history-page");
   assert.equal(triggered[0]?.payload.collectionRunId, collectionRunId);
@@ -111,6 +177,33 @@ test("runEngineV2CollectDecodedHistoryPage queues finalization when no cursor re
     triggered[0]?.options.idempotencyKey,
     `engine-v2-finalize-collection:8453:${walletAddress}:${collectionRunId}`,
   );
+});
+
+test("runEngineV2CollectDecodedHistoryPage persists incremental query metadata on first page", async () => {
+  const { deps, upsertedPages } = createDeps();
+  const createdRuns: Array<Record<string, unknown>> = [];
+
+  await runEngineV2CollectDecodedHistoryPage({
+    chainId: 8453,
+    walletAddress,
+    mode: "incremental",
+    fromBlock: "46571258",
+    pageIndex: 0,
+  }, {
+    ...deps,
+    createCollectionRun: async (input) => {
+      createdRuns.push(input.sourceQueryJson ?? {});
+      return { id: collectionRunId };
+    },
+  });
+
+  assert.deepEqual(createdRuns[0], {
+    mode: "incremental",
+    order: "ASC",
+    include: "internal_transactions",
+    from_block: "46571258",
+  });
+  assert.equal(upsertedPages[0]?.cursorIn, null);
 });
 
 test("runEngineV2FinalizeCollection records provider versus distinct tx counts and queues canonicalization", async () => {
