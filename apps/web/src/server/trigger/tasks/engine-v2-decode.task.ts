@@ -8,17 +8,30 @@ import {
   protocolKnownAddressRowsForSeeds,
 } from "@/server/analysis/engine-v2/abi-registry";
 import { decodeCanonicalTransactionCalls } from "@/server/analysis/engine-v2/classification";
-import { approvalLogs } from "@/server/analysis/decoded-history";
+import { approvalLogs, transferLogs } from "@/server/analysis/decoded-history";
 import type { AbiRegistryEntry, Address, ContractSeed, MoralisDecodedTransaction } from "@/server/analysis/decoded-history";
+import { ERC20_APPROVAL_TOPIC, ERC20_TRANSFER_TOPIC } from "@/server/analysis/decoded-history/constants";
 import { normalizeAddress } from "@/server/analysis/decoded-history/address";
 import { parseMoralisDecodedHistoryPage } from "@/server/analysis/engine-v2/collection";
 import { engineV2WalletPayloadSchema } from "@/server/analysis/engine-v2/payloads";
 import { getDb } from "@/server/db/client";
 import { canonicalCalls, canonicalTransactions, contractAbis } from "@/server/db/schema";
 
+type AbiRegistryRepositoryLike = {
+  getContractAbi(input: { chainId: number; address: string }): Promise<AbiRegistryEntry | null>;
+  putFetchedAbi(input: {
+    chainId: number;
+    seed: ContractSeed;
+    source: Record<string, unknown>;
+    sourceUrl: string;
+    sourceProvider?: string;
+  }): Promise<AbiRegistryEntry | null>;
+};
+
 export type EngineV2DecodeDeps = {
   putKnownAddresses?: (rows: ReturnType<typeof protocolKnownAddressRowsForSeeds>) => Promise<void>;
   ensureAbi?: typeof ensureAbiForSeed;
+  abiRegistryRepository?: AbiRegistryRepositoryLike;
   loadTransactions?: (input: { chainId: number; walletAddress: string }) => Promise<MoralisDecodedTransaction[]>;
   loadRegistry?: (input: { chainId: number; walletAddress: string }) => Promise<Map<Address, AbiRegistryEntry>>;
   persistDecodedCalls?: (calls: ReturnType<typeof decodeCanonicalTransactionCalls>) => Promise<void>;
@@ -171,12 +184,37 @@ function observedContractSeeds(input: {
     });
   };
 
+  const logSourceHint = (log: NonNullable<MoralisDecodedTransaction["logs"]>[number]) => {
+    const signature = typeof log.decoded_event?.signature === "string" ? log.decoded_event.signature : null;
+    if (signature) return `Observed log emitter ${signature}`;
+    const label = typeof log.decoded_event?.label === "string" ? log.decoded_event.label : null;
+    if (label) return `Observed log emitter ${label}`;
+    const topic0 = typeof log.topic0 === "string" ? log.topic0.toLowerCase() : null;
+    return topic0 ? `Observed log emitter topic0 ${topic0}` : "Observed log emitter";
+  };
+
+  const isTransferOrApprovalLog = (log: NonNullable<MoralisDecodedTransaction["logs"]>[number]) => {
+    const signature = typeof log.decoded_event?.signature === "string" ? log.decoded_event.signature : null;
+    if (signature === "Transfer(address,address,uint256)" || signature === "Approval(address,address,uint256)") {
+      return true;
+    }
+    const topic0 = typeof log.topic0 === "string" ? log.topic0.toLowerCase() : null;
+    return topic0 === ERC20_TRANSFER_TOPIC || topic0 === ERC20_APPROVAL_TOPIC;
+  };
+
   for (const tx of input.transactions) {
     if (tx.input && tx.input !== "0x") {
       const selector = tx.input.slice(0, 10).toLowerCase();
       if (selector !== "0xa9059cbb" && selector !== "0x095ea7b3") {
         append(tx.to_address, `Observed transaction target selector ${selector}`);
       }
+    }
+    for (const log of tx.logs ?? []) {
+      if (isTransferOrApprovalLog(log)) continue;
+      append(log.address, logSourceHint(log));
+    }
+    for (const transfer of transferLogs(tx)) {
+      append(transfer.token, "Observed transfer token contract");
     }
     for (const approval of approvalLogs(tx)) {
       append(approval.spender, "Observed approval spender");
@@ -224,7 +262,7 @@ export async function runEngineV2EnsureAbiRegistry(rawPayload: unknown, deps: En
   const results = [];
   if (apiKey) {
     const { createEngineV2AbiRegistryRepository } = await import("@/server/analysis/engine-v2/abi-registry");
-    const registryRepository = createEngineV2AbiRegistryRepository(getDb());
+    const registryRepository = deps.abiRegistryRepository ?? createEngineV2AbiRegistryRepository(getDb());
     for (const seed of baseSeeds) {
       results.push(await (deps.ensureAbi ?? ensureAbiForSeed)({ chainId: payload.chainId, seed, apiKey, repository: registryRepository }));
     }
