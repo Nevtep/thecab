@@ -919,7 +919,7 @@ async function backfillGaugeRewardCandidateTokenIds(input: {
  * "token receive" entries, never as "claim"/"collect", so they are not picked
  * up by `extractLifecycleAction`. They must NOT be added to the deposit
  * lifecycle (which would create spurious deposit rows under the gauge address),
- * only emitted as reward candidates so phase-rewards can attribute them.
+ * only emitted as reward candidates so the historical classifier can attribute them.
  */
 function buildGaugeRewardCandidates(input: {
   walletAddress: string;
@@ -1135,7 +1135,7 @@ export async function decodeAerodromeDepositLifecycle(input: {
         // tx input or a same-tx lifecycle record, the surface is the
         // per-LP-address `getReward(address)` (v2) flow which the current
         // taxonomy does not own. Mark it `gauge_reward_unknown_surface` so
-        // phase-rewards can short-circuit to `unknownRewardSurface` instead
+        // the historical classifier can short-circuit to `unknownRewardSurface` instead
         // of falling through to `missingTokenId`. See
         // docs/spec/the-cab-aerodrome-claim-surfaces-research.md §2.4 + §6.
         const surfaceKind: SurfaceKind = resolvedTokenId

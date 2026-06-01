@@ -1,14 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { runEngineV2AnalysisOrchestration, shouldUseEngineV2AnalysisRun } from "./analysis-run.task";
+import { runEngineV2AnalysisOrchestration } from "./analysis-run.task";
 import { ENGINE_V2_TRIGGER_TASK_IDS } from "./engine-v2-index.task";
-
-test("shouldUseEngineV2AnalysisRun is opt-in and preserves legacy fallback by default", () => {
-  assert.equal(shouldUseEngineV2AnalysisRun({ mode: "full_history" }, {}), false);
-  assert.equal(shouldUseEngineV2AnalysisRun({ mode: "full_history" }, { ANALYSIS_ENGINE_V2_TRIGGER: "1" }), true);
-  assert.equal(shouldUseEngineV2AnalysisRun({ mode: "full_history" }, { ANALYSIS_ENGINE_VERSION: "v2" }), true);
-});
 
 test("runEngineV2AnalysisOrchestration starts the frontend-triggered Engine V2 chain", async () => {
   const calls: string[] = [];

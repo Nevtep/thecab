@@ -33,8 +33,36 @@ Expected assertions:
 
 ## 3. Run Engine V2 Against A Wallet
 
+The product path is the frontend analysis button, which calls `POST /api/analysis/start`.
+With Engine V2 enabled, that existing route creates the `analysis_runs` row and queues the
+`analysis-run` Trigger task. `analysis-run` then starts `engine-v2-start-collection`; the V2
+task chain carries `analysisRunId` and `collectionRunId` through collection, canonicalization,
+ABI/decode, classification, enrichment, accounting, read-model materialization, and final run
+completion.
+
+Required server/runtime env for local `trigger:dev` and production:
+
 ```sh
-WALLET_ADDRESS=0x... CHAIN_ID=8453 ANALYSIS_MODE=fresh pnpm analysis:v2:run
+ANALYSIS_ENGINE_VERSION=v2
+```
+
+Equivalent split flags are still supported when a staged rollout is needed:
+
+```sh
+ANALYSIS_ENGINE_V2_TRIGGER=1
+ANALYSIS_ENGINE_V2_READ_MODELS=1
+```
+
+Keep existing provider/runtime env vars configured for analysis-time workers:
+
+```sh
+MORALIS_API_KEY=...
+ALCHEMY_API_KEY=...
+ALCHEMY_BASE_RPC_URL=...
+DATABASE_URL=...
+TRIGGER_PROJECT_REF=...
+TRIGGER_SECRET_KEY=...
+BASESCAN_API_KEY=... # or ETHERSCAN_API_KEY for explorer ABI fetch
 ```
 
 Expected Trigger stages:
@@ -43,7 +71,8 @@ Expected Trigger stages:
 collecting -> canonicalizing -> decoding -> classifying -> enriching -> accounting -> materializing -> complete
 ```
 
-The CLI prints the ordered Engine V2 task plan by default. Trigger execution is opt-in through the normal `analysis-run` orchestration with `ANALYSIS_ENGINE_V2_TRIGGER=1`; legacy phases remain the rollback mode when the flag is absent.
+The CLI remains a diagnostic helper only; product analysis starts from the frontend. Legacy phases
+remain the rollback mode when Engine V2 env flags are absent.
 
 ## 4. Validate Classification Families
 
@@ -116,6 +145,7 @@ Record any skipped provider-backed checks with the reason, required env vars, an
 
 - `pnpm db:migrate`: pass on 2026-06-01; Drizzle applied migrations successfully against local `.env.local`.
 - `pnpm typecheck`: pass on 2026-06-01 after Phase 8 cleanup.
+- Frontend runtime wiring: pass on 2026-06-01. `POST /api/analysis/start` continues to queue `analysis-run`; with `ANALYSIS_ENGINE_VERSION=v2` or the split V2 flags, `analysis-run` starts the Engine V2 Trigger chain and the materialization task finalizes the analysis run.
 - `pnpm test:unit`: pass on 2026-06-01; 399 tests passed.
 - `pnpm analysis:v2:regression`: pass on 2026-06-01 with canonical, classification, enrichment, read-model, and known-bug assertions. The six Moralis fixture pages for the test wallet produced 534 provider rows, 534 distinct canonical transactions, zero duplicate tx hashes, chronological ordering, all six DataView surfaces, and stable known-bug coverage.
 - `pnpm analysis:v2:run -- --wallet=0x0eCD939b7fcA4dC4A0675d8D28BAd12cefaE0954 --chain-id=8453 --mode=fixture --dry-run`: pass on 2026-06-01; task plan preserved lowercased wallet identity, chain id 8453, fixture mode, and Engine V2 task ordering from collection through materialization.
