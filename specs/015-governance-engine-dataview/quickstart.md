@@ -36,7 +36,7 @@ Executed against the current local workspace and the ready local DB after the fr
 - `pnpm --dir apps/web i18n:check`: passed.
 - `pnpm --dir apps/web ds:check`: passed. The remaining hardcoded-hex advisory is outside Governance (`src/app/design-system/page.tsx`, `src/app/globals.css`).
 - `pnpm --dir apps/web analysis:governance-regression`: passed.
-  - Wallet: `0x0ecd939b7fca4dc4a0675d8d28bad12cefae0954`.
+  - Wallet: representative connected wallet fixture.
   - Chain: Base `8453`.
   - `governanceEventCount`: `0`.
   - `phishingAirdropRowsChecked`: `1`.

@@ -52,8 +52,55 @@ El esquema actual tiene buena base para consumir desde la UI:
 - `governance_events`, `governance_lock_exposures`, `governance_epoch_summaries`, `governance_reward_rows`, `governance_metric_snapshots`: Governance DataView.
 - `raw_provider_records`: evidencia cruda de providers.
 - `protocol_contracts`: registro basico de contratos de protocolo.
+- `protocol_reward_distributor_pool_links`: relacion canonica entre
+  bribe/fee distributors, gauges y pools cuando existe evidencia explicita.
 
 Conclusion: no conviene tirar los read models. Conviene alimentar esos read models desde una capa canonica nueva y mas fuerte.
+
+### 0. Protocol Reward Distributor Pool Links
+
+Tabla protocol-level, reutilizable por cualquier wallet, para no inferir pool
+desde tokens o ventanas temporales.
+
+Campos sugeridos:
+
+- `id`
+- `chain_id`
+- `voter_address`
+- `pool_address`
+- `gauge_address`
+- `distributor_address`
+- `distributor_kind` (`bribe`, `fee`)
+- `pool_factory_address`
+- `voting_rewards_factory_address`
+- `gauge_factory_address`
+- `created_tx_hash`
+- `created_log_index`
+- `created_block_number`
+- `source_event_signature`
+- `validated_by_call`
+- `validation_block_number`
+- `coverage_status`
+- `confidence`
+- `evidence_json`
+- `created_at`
+- `updated_at`
+
+Fuente primaria:
+
+- `Voter.GaugeCreated(poolFactory, votingRewardsFactory, gaugeFactory, pool, bribeVotingReward, feeVotingReward, gauge, creator)`.
+
+Reglas:
+
+- persistir dos filas por `GaugeCreated`: una para `bribeVotingReward` y otra
+  para `feeVotingReward`;
+- validar opcionalmente con `Voter.gaugeToBribe`, `Voter.gaugeToFees` y
+  `Voter.poolForGauge` durante enrichment, nunca request-time;
+- `governance_reward_claim_items.pool_id` solo se rellena desde esta tabla o
+  una fuente equivalente con evidencia contractual;
+- si el link no existe, el claim item queda visible con `pool_id=null` y
+  `coverage_status=partial_pool_unresolved`;
+- no usar token pair, ultimo voto, epoch o timestamp como sustituto del link.
 
 ## Gaps Del Modelo Actual
 
@@ -218,6 +265,37 @@ Uso:
 - decodificar VotingEscrow `Transfer`, `Deposit`, `Supply`, `DepositManaged`.
 - decodificar Voter `Voted`, claim events y gauge/bribe internals.
 - reconstruir token movements y NFT ownership.
+
+### B.1. `canonical_calls`
+
+Call tree decodificado por transaccion.
+
+Necesario para no perder subacciones dentro de `multicall(bytes[])`, routers o batch calls. El selector externo de una tx no siempre representa todos los efectos semanticos.
+
+Campos sugeridos:
+
+- `id`
+- `canonical_transaction_id`
+- `chain_id`
+- `tx_hash`
+- `call_path`
+- `parent_call_id`
+- `target_address`
+- `selector`
+- `function_name`
+- `decoded_args_json`
+- `raw_call_data`
+- `abi_id`
+- `decode_status`
+- `decode_confidence`
+- `created_at`
+
+Reglas:
+
+- `multicall(bytes[])` crea un parent call y N child calls.
+- Si el multicall ejecuta en el mismo contrato, los children se decodifican con el ABI del parent target.
+- Si el batch/router incluye targets por subcall, cada child se decodifica con el ABI del target indicado.
+- Domain events pueden linkear a `canonical_calls.id` para distinguir `claimFees`, `claimBribes`, `collect`, `burn`, etc. dentro de la misma tx.
 
 ### C. `canonical_internal_transactions`
 
@@ -412,6 +490,49 @@ Uso:
 - separar lock normal vs managed/relay.
 - alimentar Governance lock panel.
 
+### I.1. `governance_lock_managed_links`
+
+Relacion normalizada entre un lock de usuario y un managed/relay token.
+
+Esta tabla es necesaria porque `depositManaged(userTokenId, managedTokenId)` y los helpers/sugar de Aerodrome devuelven una relacion entre dos identidades distintas. No debe guardarse solo como `metadata_json` del lock ni interpretarse como ownership directo del managed token.
+
+Campos sugeridos:
+
+- `id`
+- `chain_id`
+- `wallet_address`
+- `voting_escrow_address`
+- `lock_token_id`
+- `managed_token_id`
+- `managed_contract_address`
+- `relay_address`
+- `relation_status` (`active`, `withdrawn`, `unknown_current`)
+- `source_event_id`
+- `source_tx_hash`
+- `source_block_number`
+- `source_contract_address`
+- `source_selector`
+- `source_snapshot_id`
+- `coverage_status`
+- `confidence`
+- `reason_codes`
+- `metadata_json`
+- `created_at`
+- `updated_at`
+
+Fuentes validas:
+
+- `Voter.depositManaged(userTokenId, managedTokenId)` / `VotingEscrow.DepositManaged`.
+- `VotingEscrow.idToManaged(userTokenId)` current-state enrichment.
+- Aerodrome locks helper/sugar wallet-scoped, por ejemplo `0x4c5d3925fe65dfeb5a079485136e4de09cb664a5` selector `0x47f7e06f(address)`, siempre ejecutado durante analysis enrichment y cacheado/persistido.
+
+Reglas:
+
+- `managed_token_id` no crea un lock wallet-owned.
+- El link no reemplaza el lifecycle historico del user lock.
+- Request-time APIs consumen esta relacion desde DB/read models; no llaman helper/sugar.
+- Si el helper devuelve una relacion que contradice el historial, conservar ambas evidencias y marcar conflicto para revision en vez de sobrescribir silenciosamente.
+
 ### J. `governance_lock_events`
 
 Lifecycle normalizado por lock.
@@ -462,10 +583,18 @@ Campos sugeridos:
 - `amount_raw`
 - `amount_decimal`
 - `value_usd_at_claim`
+- `liquid`
+- `value_effect`
+- `cash_flow_kind`
 - `epoch_id`
 - `pool_id`
+- `lock_token_id`
+- `bribe_contract_address`
+- `source_log_index`
 - `source_contract_address`
 - `source_contract_kind`
+- `parent_call_id`
+- `dedupe_key`
 - `affects_totals`
 - `coverage_status`
 - `confidence`
@@ -475,7 +604,16 @@ Uso:
 
 - una tx `claim all` puede tener N items.
 - Rewards y Governance pueden mostrar cada item sin doble conteo.
+- `claimBribes` materializa un item por transfer validado desde bribe contract hacia wallet, usando `(tx_hash, log_index)` como dedupe.
+- `pool_id` y `epoch_id` pueden quedar parciales sin degradar accion/token/amount.
 - Activity puede mostrar un parent con children.
+- `RewardsDistributor.claim` materializa items `reward_type=rebase`,
+  `liquid=false`, `value_effect=locked_aero_increase` y
+  `cash_flow_kind=none` cuando el input `claim(tokenId)`, el evento
+  `Claimed`, la transferencia AERO al `VotingEscrow` y el evento
+  `VotingEscrow.Deposit` coinciden en `tokenId` y `amount`.
+- Un rebase re-lock aumenta el lifecycle del lock, pero no es cash-in ni
+  recompensa liquida disponible para la wallet.
 
 ### L. `enrichment_needs`
 
@@ -509,12 +647,21 @@ Tipos:
 - `eth_call_strategy_state`
 - `eth_call_lock_state`
 - `lp_sugar_position_snapshot`
+- `nft_transfer_backfill`
+- `transaction_decoded_backfill`
+- `lock_identity_backfill`
 
 Uso:
 
 - serverless safe.
 - retry/debounce.
 - no hardcodear pools/strategies actuales.
+- `nft_transfer_backfill` debe deduplicar por
+  `(chain_id, token_address, token_id)`.
+- `transaction_decoded_backfill` debe deduplicar por `(chain_id, tx_hash)`.
+- `lock_identity_backfill` solo se encola cuando un metodo soportado de
+  governance/lock referencia un tokenId ausente del canonical store; no corre
+  para transfers nativos, ERC20/NFT genericos ni Activity rows comunes.
 
 ## Composite, Multicall Y Claim All
 
@@ -542,39 +689,27 @@ Reglas:
 
 Este punto es obligatorio para no esconder `claimFees` y bribes dentro de calls compuestas.
 
-## Locks, Relay Y Lo Observado En Las 533 Tx
+## Locks, Relay Y Reglas Genericas De Identidad
 
-Sobre los seis archivos de historial Moralis ASC:
+El modelo debe soportar multiples locks por wallet y distinguir, sin hardcodeos:
 
-- Se detectaron 534 filas de transacciones en los archivos locales.
-- Selectores governance observados:
-  - `0xb52c05fe` una vez: `VotingEscrow.createLock`.
-  - `0x7ac09bf7` quince veces: `Voter.vote`.
-  - `0x7715ee75` ocho veces: `Voter.claimBribes`.
-  - `0xe0c11f9a` una vez: `Voter.depositManaged`.
-  - `0x32145f90` siete veces: `Voter.poke`.
+- locks directos creados o recibidos por la wallet;
+- locks de usuario depositados en managed/relay;
+- managed/relay token ids agregadores;
+- eventos de vote, poke, claimBribes, claimFees, rebase claim y depositManaged asociados a cada identidad.
 
-Eventos de lock decodificables por topics:
+Reglas de clasificacion:
 
-- `tokenId=110971` aparece creado por `VotingEscrow.Transfer` desde zero a la wallet en tx `0xe1132344...`.
-- `tokenId=110971` tambien aparece en eventos `VotingEscrow.Deposit` de rebases/relocks posteriores.
-- `depositManaged` aparece en tx `0xc220cbbd...` con:
-  - `tokenId=113464`
-  - `mTokenId=10298`
-  - provider wallet
+- Un lock directo se crea o actualiza solo cuando hay evidencia explicita de `VotingEscrow`, como `Transfer` desde zero hacia la wallet o un flujo ABI/log verificado de creacion de lock.
+- `depositManaged(userTokenId, managedTokenId)` no es creacion de lock. Es una relacion entre un user lock existente y un managed/relay token. Ambos IDs deben quedar separados.
+- Si una accion governance referencia un `userTokenId` que no fue creado ni recibido en el wallet-centric history, el engine crea una identidad parcial y dispara `lock_identity_backfill`.
+- El backfill se aplica solamente a metodos governance con identidad fuerte de lock ausente, como `depositManaged`, `vote`, `poke`, `claimBribes`, `claimFees` o `RewardsDistributor.claim`; no se aplica a transfers nativos, ERC20 ni NFTs genericos.
+- El backfill debe ser minimo y cacheado: primero DB, luego una consulta de NFT transfer history por `(chainId, votingEscrowAddress, tokenId)` y, solo si aparece una tx candidata, una consulta decoded transaction por `(chainId, txHash)`.
+- Un lock recibido por grant, transfer o mecanismo externo queda registrado por el origen probado. No se marca como creado por la wallet ni por la accion posterior que lo consume.
+- La etiqueta `relay` solo se usa cuando metadata/eventos/estado del managed token o contrato lo prueban. En caso contrario, se muestra como managed con cobertura parcial.
+- Nunca fusionar locks por cercania temporal, wallet, pool, epoch o similitud de accion.
 
-Lectura:
-
-- El engine v2 puede identificar con confianza alta una accion managed/relay por ABI/log evidence.
-- La falta de origen para `tokenId=113464` no debe aceptarse como estado final. Queda documentada como `BUG-EV2-002` en `docs/informe-engine-v2-bugs-gaps.md`.
-- En el historial wallet-centric local no aparece un `Transfer` de VotingEscrow mint/transfer para `tokenId=113464`, pero si aparece usado en `DepositManaged`.
-- No se debe inventar el ownership del lock 113464. En UI puede verse como `managed_lock_detected_partial_identity`, pero internamente debe disparar un backfill/bug concreto hasta resolver:
-  - `ownerOf(tokenId)` o metodo equivalente si sigue existiendo;
-  - estado VotingEscrow/managed relation;
-  - logs globales del VotingEscrow para ese tokenId si la wallet history no los trajo;
-  - eventos de Voter/VotingEscrow `DepositManaged`.
-
-Esto responde al punto "tengo 2 locks y uno depositado en relay": el modelo debe soportarlo y el engine debe reconstruirlo. La prueba actual confirma una lock creada y una accion `depositManaged` asociada a otro tokenId. Para afirmar "dos locks propios" con confianza alta necesitamos el enrichment de identidad del lock 113464; si ese enrichment falla, debe quedar como bug trazable, no como silencio.
+Esto responde al caso general de wallets con mas de un lock: el modelo debe reconstruir cada lifecycle por token id y relacionar depositos managed/relay sin mezclar identidades. Los detalles de fixtures reales y bugs de lock identity backfill quedan en `docs/informe-engine-v2-bugs-gaps.md`.
 
 ## Datos Por DataView Que Debe Poder Producir El Modelo
 
@@ -772,13 +907,14 @@ Este flujo esta listo para bajarse a `speckit-specify` como feature de refactor 
 No veo blockers duros para crear el spec. Si queres maxima precision antes de especificar, conviene confirmar estos puntos:
 
 1. **Semantica visible de `depositManaged`**
-   - Recomendacion: mostrarlo como `Managed lock / relay deposit` con coverage parcial si no se resuelve la identidad completa del lock.
-   - Falta decidir si en UI se etiqueta siempre como relay o como managed lock hasta confirmar relay metadata.
+   - Resolucion: mostrarlo como `Managed lock deposit` con coverage parcial si no se resuelve la identidad completa del lock o del managed token.
+   - Etiquetar como `relay` solo cuando el managed token/contract metadata lo pruebe. Hasta entonces, `managed` es la semantica segura.
 
-2. **Segundo lock `tokenId=113464`**
-   - La tx `depositManaged` lo usa, pero la wallet history local no trae su mint/transfer.
-   - Necesitamos definir si el engine debe hacer backfill global por `VotingEscrow` logs para tokenId cuando una wallet tx referencia un lock no visto en wallet history.
-   - Recomendacion: si, crear enrichment `lock_identity_backfill`.
+2. **Lock referenciado sin origen en wallet history**
+   - Una tx governance puede usar un lock token id cuyo mint/transfer no aparece en el historial wallet-centric.
+   - Resolucion: el engine debe hacer backfill por historial NFT del contrato/token id y, si hace falta, decoded tx de la transferencia candidata.
+   - Si el backfill prueba un grant/transfer-in, clasificar el origen como recibido por esa fuente y no como creacion de la wallet.
+   - No marcar el lock como creado en la tx que lo consume, por ejemplo `depositManaged`. Crear shell si falta origen y luego actualizar a `origin_status=resolved_from_nft_transfer_history` cuando el backfill encuentre evidencia.
 
 3. **Claim all en Activity**
    - Recomendacion: Activity muestra una fila parent `governance_claim_batch` y el detail rail muestra child items. Rewards/Governance muestran los child reward rows.

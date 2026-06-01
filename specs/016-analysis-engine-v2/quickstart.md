@@ -1,0 +1,111 @@
+# Quickstart: Analysis Engine V2
+
+This quickstart describes the expected implementation and validation flow. It is not a request to run destructive database commands automatically.
+
+## 1. Prepare Local Database
+
+For local/dev validation, start from a clean analysis state when possible.
+
+Expected safe flow:
+
+```sh
+pnpm db:migrate
+pnpm db:purge -- --scope engine-v2 --confirm-local-dev
+```
+
+If a full local database drop/recreate is used, it must be developer-confirmed and never target production.
+
+## 2. Run Engine V2 Against Fixtures
+
+Use deterministic Moralis decoded-history fixtures first:
+
+```sh
+pnpm analysis:v2:regression
+```
+
+Expected assertions:
+
+- provider rows are persisted and canonical tx hashes are deduped;
+- transactions are sorted oldest to newest;
+- logs, internal transactions, movements, and calls are persisted;
+- unsupported/excluded/failed rows remain visible but do not affect totals;
+- no request-time provider calls are needed to inspect read models.
+
+## 3. Run Engine V2 Against A Wallet
+
+```sh
+WALLET_ADDRESS=0x... CHAIN_ID=8453 ANALYSIS_MODE=fresh pnpm analysis:v2:run
+```
+
+Expected Trigger stages:
+
+```text
+collecting -> canonicalizing -> decoding -> classifying -> enriching -> accounting -> materializing -> complete
+```
+
+## 4. Validate Classification Families
+
+Regression must cover:
+
+- native cash-in/out and transfer rows;
+- approvals;
+- swaps;
+- failed transactions;
+- manual Aerodrome deposits;
+- Mellow strategy deposits/withdrawals/reward claims;
+- governance create/increase/extend/withdraw;
+- votes and pokes;
+- `depositManaged(userTokenId, managedTokenId)`;
+- `claimBribes` child items;
+- `claimFees` direct and nested multicall items;
+- RewardsDistributor rebase relock;
+- spam/phishing/airdrop exclusions;
+- unresolved ABI gaps.
+
+## 5. Validate Enrichment And Edge Cases
+
+Required checks:
+
+- ABI fetch is DB-first and persisted.
+- Token metadata is batched and persisted.
+- Historical prices are event-time values; current prices are separate.
+- Pool definitions are keyed by pool address and include token0/token1/tick spacing/fee tier when explicit.
+- Distributor-to-pool links are built from `Voter.GaugeCreated` or equivalent registry evidence.
+- Lock origin backfill runs only for governance methods referencing a strong unseen lock token id.
+- NFT transfer backfill and transaction decoded backfill are deduped and persisted.
+- Managed/relay helper/sugar state is analysis-time only and stored before UI consumption.
+
+## 6. Validate Accounting
+
+Required checks:
+
+- cash-in/out separated from swaps, deposits, rewards, gas, and internal protocol movements;
+- manual deposits and strategy exposures remain separated;
+- residual inventory is chronological and does not expire by time;
+- rewards count once across Rewards, Governance, Pools, Deposits, Strategies, and Activity;
+- rebase relock is non-liquid and not cash-in;
+- missing historical prices produce partial valuation, not current-price substitution.
+
+## 7. Validate DataViews
+
+Request-time route checks:
+
+- Activity reads every canonical transaction row from DB-backed read models.
+- Deposits show only manual deposit-owned lifecycle and rewards.
+- Strategies show only strategy-owned exposures and rewards.
+- Pools aggregate only explicit links.
+- Rewards includes supported, unresolved, and excluded reward-like rows with affectsTotals rules.
+- Governance shows separate direct locks, deposited user locks, managed token ids, epochs, votes, claims, and relocks.
+- Overview remains out of scope.
+
+## 8. Final Checks
+
+```sh
+pnpm typecheck
+pnpm test:unit
+pnpm analysis:v2:regression
+pnpm i18n:check
+pnpm ds:check
+```
+
+Record any skipped provider-backed checks with the reason, required env vars, and residual risk.

@@ -199,7 +199,7 @@ auth-gated UI behavior instead.
 
 2026-05-30 UTC validation run:
 
-- Rebuilt read models for run `121584d7-4cae-4c70-be95-76afda940575` and wallet `0x0ecd939b7fca4dc4a0675d8d28bad12cefae0954`.
+- Rebuilt read models for a representative local analysis run and connected wallet fixture.
 - `rebuild-pool-read-models.ts`: 5 pool summaries, 1,830 history rows, 73 timeline rows.
 - `rebuild-deposit-read-models.ts`: 26 deposit summaries, 85 lifecycle rows, 26 decomposition rows.
 - `rebuild-strategy-read-models.ts`: 4 strategy summaries, 4 history rows, 11 lifecycle rows.

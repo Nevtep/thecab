@@ -677,7 +677,7 @@ Responsabilidades nuevas:
 - `abi-registry.ts`: normaliza `ContractAbiRecord`, infiere kind por `contractName`, expone `AbiRegistryRepository` para storage DB-first.
 - `explorer-abi-client.ts`: consulta Etherscan v2/Base `getsourcecode` y devuelve un record persistible sin acoplarse a filesystem.
 - `discovery.ts`: detecta candidatos nuevos desde tx decoded: `to_address`, spenders aprobados y contratos/token emitentes.
-- `classifier.ts`: clasifica tx-by-tx con la misma logica validada en el informe de 534 filas.
+- `classifier.ts`: clasifica tx-by-tx con la misma logica validada contra fixtures de investigacion capturados desde Moralis decoded address transaction endpoint.
 - `log-evidence.ts`: extrae `Transfer`, `Approval`, swap logs e internal error evidence.
 - `history-pages.ts`: carga/deduplica/ordena paginas Moralis decoded ASC antes de clasificar.
 - `selector-index.ts`: matchea selectors/topics contra el ABI registry para auditoria.

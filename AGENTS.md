@@ -1,7 +1,7 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read
-`specs/015-governance-engine-dataview/plan.md`.
+`specs/016-analysis-engine-v2/plan.md`.
 <!-- SPECKIT END -->
 
 # The Cab Codex Agent Rules

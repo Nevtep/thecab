@@ -762,7 +762,7 @@ Decision:
 
 Fixtures/regresiones minimas:
 
-1. wallet completa de 533 tx procesada ASC con 533 economic tx + excluded/noop segun corresponda.
+1. fixture wallet completa procesada ASC, con provider rows deduplicadas por tx hash y cada canonical tx clasificada como economic, excluded, unsupported, failed o noop segun corresponda.
 2. cash-in native inicial valorado con ETH historical price.
 3. approval no genera capital/reward.
 4. failed tx visible en Activity, no afecta accounting.

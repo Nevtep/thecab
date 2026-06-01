@@ -300,11 +300,12 @@ Separar identidades:
 
 Nunca fusionar locks por cercania temporal o por wallet. Si una tx referencia un lock que no vimos nacer, crear shell parcial + backfill.
 
-Caso fixture:
+Regla generica:
 
-- `110971`: lock creado via `createLock`, lifecycle directo.
-- `113464`: aparece en `depositManaged`, requiere identity backfill.
-- `10298`: managed token relacionado, no wallet-owned directo.
+- un lock creado por un flujo verificado de `VotingEscrow` se persiste como identidad directa de governance;
+- un user lock referenciado por `depositManaged` conserva su propia identidad y se relaciona con el managed/relay token correspondiente;
+- un managed/relay token conserva identidad separada y no debe tratarse como lock directo de la wallet;
+- si una accion governance referencia un lock que no aparece creado o recibido en el historial wallet-centric, crear una identidad parcial y disparar `lock_identity_backfill` con el minimo de llamadas externas necesarias.
 
 ### Governance Rewards
 
@@ -398,14 +399,14 @@ Debe poder mostrar:
 
 ## Regressions Obligatorias
 
-Fixture real: six Moralis pages from `docs/api-research/moralis/address-transactions-decoded-page*.json`.
+Fixtures deterministas capturados desde Moralis decoded address transactions endpoint y enriquecimientos puntuales cacheados.
 
 Must cover:
 
 1. Canonical tx count equals distinct tx hash count.
-2. `0xe1132344...` creates lock `110971`.
-3. `0xc220cbbd...` creates managed lock event `113464 -> 10298` and enqueues identity backfill.
-4. Votes for `110971` do not merge with `113464`.
+2. A verified `VotingEscrow` lock-creation flow creates a direct governance lock identity.
+3. A `depositManaged` flow records a user-lock to managed-token relationship, does not mark the user lock as newly created, and uses identity backfill when the user-lock origin is absent from wallet-centric history.
+4. Votes for one lock identity do not merge with other direct, deposited, or managed lock identities.
 5. `claimBribes` creates parent + child reward items.
 6. `RewardsDistributor.claim` creates non-liquid rebase reward linked to lock.
 7. Claim-all/multicall fixture decodes child `claimFees` when present.
