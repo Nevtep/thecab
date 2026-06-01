@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { classifyBaseTransaction } from "./base-classifiers";
+import { classificationFromSnapshot, classifyBaseTransaction } from "./base-classifiers";
 
 const walletAddress = "0x0000000000000000000000000000000000000001";
 
@@ -92,4 +92,97 @@ test("classifyBaseTransaction excludes explicit spam and airdrop flags without g
   assert.equal(spam.eventType, "excluded_spam");
   assert.equal(airdrop.coverageStatus, "excluded");
   assert.equal(airdrop.eventType, "excluded_airdrop");
+});
+
+test("classificationFromSnapshot maps the shared research snapshot into Engine V2 event fields", () => {
+  const result = classificationFromSnapshot({
+    hash: "0x1",
+    timestamp: "2026-01-01T00:00:00.000Z",
+    blockNumber: 123,
+    transactionIndex: 4,
+    fromAddress: "0x0000000000000000000000000000000000000002",
+    toAddress: walletAddress,
+    selector: "0xa9059cbb",
+    contractLabel: "USDC",
+    contractName: "USD Coin",
+    decodedFunction: "transfer",
+    decodedArgs: [],
+    transferCount: 1,
+    inboundTransferCount: 1,
+    outboundTransferCount: 0,
+    approvalCount: 0,
+    classification: "cash_in_native",
+    confidence: "high",
+    reason: "native transfer into wallet",
+    needsResolution: false,
+  });
+
+  assert.equal(result.eventType, "cash_in_native");
+  assert.equal(result.eventFamily, "cashflow");
+  assert.equal(result.evidence.sourceClassifier, "decoded-history-snapshot");
+  assert.equal(result.evidence.selector, "0xa9059cbb");
+  assert.equal(result.evidence.decodedFunction, "transfer");
+  assert.equal(result.evidence.transferCount, 1);
+  assert.equal(result.metadataJson?.contractLabel, "USDC");
+  assert.equal(result.metadataJson?.decodedFunction, "transfer");
+});
+
+test("classifyBaseTransaction carries snapshot-derived evidence for decoded protocol calls", () => {
+  const result = classifyBaseTransaction({
+    walletAddress,
+    registry: new Map([
+      [
+        "0x0000000000000000000000000000000000000010",
+        {
+          chainId: 8453,
+          address: "0x0000000000000000000000000000000000000010",
+          label: "Test Router",
+          protocol: "test",
+          expectedKind: "router",
+          fetchedAt: "2026-01-01T00:00:00.000Z",
+          sources: {
+            basescanApi: "",
+            basescanCode: "",
+          },
+          source: {
+            contractName: "Router",
+            compilerVersion: null,
+            optimizationUsed: null,
+            runs: null,
+            constructorArguments: null,
+            evmVersion: null,
+            library: null,
+            licenseType: null,
+            proxy: false,
+            implementation: null,
+            swarmSource: null,
+          },
+          abi: [
+            {
+              type: "function",
+              name: "execute",
+              stateMutability: "nonpayable",
+              inputs: [],
+              outputs: [],
+            },
+          ],
+          warnings: [],
+        },
+      ],
+    ]),
+    tx: {
+      hash: "0x1",
+      from_address: walletAddress,
+      to_address: "0x0000000000000000000000000000000000000010",
+      receipt_status: "1",
+      input: "0x61461954",
+      logs: [],
+    },
+  });
+
+  assert.equal(result.eventType, "router_execute");
+  assert.equal(result.evidence.selector, "0x61461954");
+  assert.equal(result.evidence.contractLabel, "Test Router");
+  assert.equal(result.evidence.contractName, "Router");
+  assert.equal(result.evidence.decodedFunction, "execute");
 });

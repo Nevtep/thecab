@@ -1,5 +1,10 @@
-import type { AbiRegistryEntry, Address, MoralisDecodedTransaction } from "@/server/analysis/decoded-history";
-import { classifyDecodedTransaction } from "@/server/analysis/decoded-history";
+import {
+  buildClassifiedDecodedTransaction,
+  type AbiRegistryEntry,
+  type Address,
+  type ClassifiedDecodedTransaction,
+  type MoralisDecodedTransaction,
+} from "@/server/analysis/decoded-history";
 
 export type EngineV2Classification = {
   eventType: string;
@@ -40,6 +45,40 @@ export function confidenceForClassification(confidence: string): EngineV2Classif
   return "none";
 }
 
+export function classificationFromSnapshot(snapshot: ClassifiedDecodedTransaction): EngineV2Classification {
+  return {
+    eventType: snapshot.classification,
+    eventFamily: eventFamilyForClassification(snapshot.classification),
+    coverageStatus: coverageForClassification(snapshot),
+    confidence: confidenceForClassification(snapshot.confidence),
+    reasonCodes: snapshot.needsResolution ? ["missing_explicit_evidence"] : [],
+    evidence: {
+      reason: snapshot.reason,
+      sourceClassifier: "decoded-history-snapshot",
+      rawConfidence: snapshot.confidence,
+      needsResolution: snapshot.needsResolution,
+      selector: snapshot.selector,
+      contractLabel: snapshot.contractLabel,
+      contractName: snapshot.contractName,
+      decodedFunction: snapshot.decodedFunction,
+      transferCount: snapshot.transferCount,
+      inboundTransferCount: snapshot.inboundTransferCount,
+      outboundTransferCount: snapshot.outboundTransferCount,
+      approvalCount: snapshot.approvalCount,
+    },
+    metadataJson: {
+      selector: snapshot.selector,
+      contractLabel: snapshot.contractLabel,
+      contractName: snapshot.contractName,
+      decodedFunction: snapshot.decodedFunction,
+      transferCount: snapshot.transferCount,
+      inboundTransferCount: snapshot.inboundTransferCount,
+      outboundTransferCount: snapshot.outboundTransferCount,
+      approvalCount: snapshot.approvalCount,
+    },
+  };
+}
+
 export function classifyBaseTransaction(input: {
   tx: MoralisDecodedTransaction;
   walletAddress: Address;
@@ -71,23 +110,11 @@ export function classifyBaseTransaction(input: {
     };
   }
 
-  const result = classifyDecodedTransaction({
+  const snapshot = buildClassifiedDecodedTransaction({
     tx: input.tx,
     walletAddress: input.walletAddress,
     registry: input.registry ?? new Map(),
   });
 
-  return {
-    eventType: result.classification,
-    eventFamily: eventFamilyForClassification(result.classification),
-    coverageStatus: coverageForClassification(result),
-    confidence: confidenceForClassification(result.confidence),
-    reasonCodes: result.needsResolution ? ["missing_explicit_evidence"] : [],
-    evidence: {
-      reason: result.reason,
-      sourceClassifier: "decoded-history",
-      rawConfidence: result.confidence,
-      needsResolution: result.needsResolution,
-    },
-  };
+  return classificationFromSnapshot(snapshot);
 }
