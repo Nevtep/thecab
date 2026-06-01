@@ -1,7 +1,7 @@
 import { and, eq, gte, ilike, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 
 import { readAnalysisStatusContext } from "@/server/analysis/analysis-run.repository";
-import { readEngineV2SurfaceRows } from "@/server/analysis/engine-v2/materializers";
+import { engineV2ReadModelsEnabled, readEngineV2SurfaceRows } from "@/server/analysis/engine-v2/materializers";
 import { getDb } from "@/server/db/client";
 import { performanceSnapshots, pools, rewardEvents } from "@/server/db/schema";
 import { getExplorerTxUrl, getSupportedChain } from "@/server/chains";
@@ -51,6 +51,12 @@ export type HistoricalCapitalPoint = {
   coverageStatus: string;
 };
 
+type EngineV2PoolHistoryReadModelRow = {
+  history?: {
+    points?: unknown[];
+  };
+};
+
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
@@ -70,6 +76,10 @@ function asNumber(value: unknown) {
 
 function toIso(value: Date | string) {
   return value instanceof Date ? value.toISOString() : value;
+}
+
+function stringifyNumber(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2);
 }
 
 function shortId(id: string | null, prefix: string) {
@@ -243,6 +253,52 @@ export function mapRewardEventRow(row: RewardEventDbRow): RewardEventRow {
   };
 }
 
+export function normalizeEngineV2RewardRow(row: Partial<RewardEventRow> & Record<string, unknown>): RewardEventRow {
+  if (row.token && row.owner && row.poolContribution && row.coverageState) {
+    return row as RewardEventRow;
+  }
+
+  const ownerStatus = asString(row.ownerStatus);
+  const linkedEntityId = asString(row.linkedEntityId);
+  const poolContribution = asString(row.poolContribution);
+  const coverageStatus = asString(row.coverageStatus);
+  const confidence = asString(row.confidence);
+  const rewardDbRow: RewardEventDbRow = {
+    rewardEventId: asString(row.rewardId) ?? asString(row.rewardEventId) ?? asString(row.txHash) ?? "engine-v2-reward",
+    chainId: typeof row.chainId === "number" ? row.chainId : Number(row.chainId ?? 0),
+    walletAddress: asString(row.walletAddress) ?? "",
+    txHash: asString(row.txHash) ?? "",
+    logIndex: 0,
+    rewardType: asString(row.rewardType) ?? "unknown",
+    depositOrStrategyId: ownerStatus === "manual_deposit" ? linkedEntityId : null,
+    strategyExposureId: ownerStatus === "strategy" ? linkedEntityId : null,
+    resolvedPoolId: asString(row.poolId),
+    poolLabel: asString(row.poolLabel),
+    resolutionBasis: ownerStatus && ownerStatus !== "unresolved" ? "engine_v2_explicit_owner" : null,
+    resolutionReasonCodes: Array.isArray(row.reasonCodes) ? row.reasonCodes.filter((item): item is string => typeof item === "string") : null,
+    tokenAddress: asString(row.tokenAddress),
+    amountRaw: asString(row.amountRaw),
+    amountUsd: asString(row.amountUsd),
+    occurredAt: asString(row.occurredAt) ?? new Date(0).toISOString(),
+    resolutionStatus:
+      ownerStatus === "excluded" || coverageStatus === "excluded"
+        ? "excluded"
+        : ownerStatus === "unresolved" || poolContribution === "unresolved"
+          ? "unresolved"
+          : coverageStatus === "unavailable"
+            ? "unavailable"
+            : "resolved",
+    metadataJson: {
+      tokenSymbol: asString(row.tokenSymbol),
+      sourceSurface: ownerStatus === "governance" ? "governance" : "engine_v2_reward",
+      confidence,
+      affectsTotals: row.affectsTotals,
+    },
+  };
+
+  return mapRewardEventRow(rewardDbRow);
+}
+
 export function getRewardsDateRange(input: RewardsRequest) {
   if (input.datePreset === "all") return { start: null, end: null };
   if (input.datePreset === "custom") {
@@ -395,6 +451,103 @@ function buildRewardEventWhere(input: RewardsRequest, includeComposedFilters: bo
   return clauses;
 }
 
+export function aggregateHistoricalCapitalFromEngineV2Pools(input: {
+  rows: EngineV2PoolHistoryReadModelRow[];
+  range: { start: number | null; end: number | null };
+}) {
+  const buckets = new Map<string, number>();
+
+  for (const row of input.rows) {
+    const points = Array.isArray(row.history?.points) ? row.history.points : [];
+    for (const point of points) {
+      const record = asRecord(point);
+      const dayUtc = asString(record.dayUtc);
+      const totalValueUsd = asNumber(record.totalValueUsd);
+      if (!dayUtc || totalValueUsd === null) {
+        continue;
+      }
+
+      const dayStart = Date.parse(`${dayUtc}T00:00:00.000Z`);
+      if (Number.isNaN(dayStart)) {
+        continue;
+      }
+      if (input.range.start !== null && dayStart < input.range.start) {
+        continue;
+      }
+      if (input.range.end !== null && dayStart > input.range.end) {
+        continue;
+      }
+
+      buckets.set(dayUtc, (buckets.get(dayUtc) ?? 0) + totalValueUsd);
+    }
+  }
+
+  return [...buckets.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([dayUtc, valueUsd]) => ({
+      dayUtc,
+      valueUsd: stringifyNumber(valueUsd),
+      coverageStatus: "time_weighted_estimated",
+    } satisfies HistoricalCapitalPoint));
+}
+
+async function readHistoricalCapitalFromEngineV2Pools(input: {
+  walletAddress: string;
+  chainId: number;
+  range: { start: number | null; end: number | null };
+}) {
+  const poolRows = await readEngineV2SurfaceRows<EngineV2PoolHistoryReadModelRow>({
+    chainId: input.chainId,
+    walletAddress: input.walletAddress,
+    surface: "pools",
+  });
+
+  if (!poolRows || poolRows.length === 0) {
+    return [];
+  }
+
+  return aggregateHistoricalCapitalFromEngineV2Pools({
+    rows: poolRows,
+    range: input.range,
+  });
+}
+
+async function readHistoricalCapitalPoints(input: {
+  walletAddress: string;
+  chainId: number;
+  range: { start: number | null; end: number | null };
+}) {
+  const rows = await getDb()
+    .select({
+      dayUtc: performanceSnapshots.dayUtc,
+      valueUsd: performanceSnapshots.valueUsd,
+      coverageStatus: performanceSnapshots.coverageStatus,
+    })
+    .from(performanceSnapshots)
+    .where(and(
+      eq(performanceSnapshots.walletAddress, input.walletAddress),
+      eq(performanceSnapshots.chainId, input.chainId),
+      eq(performanceSnapshots.scope, "portfolio"),
+      eq(performanceSnapshots.resolution, "daily"),
+      ...(input.range.start !== null ? [gte(performanceSnapshots.capturedAt, new Date(input.range.start))] : []),
+      ...(input.range.end !== null ? [lte(performanceSnapshots.capturedAt, new Date(input.range.end))] : []),
+    ));
+
+  const snapshotPoints = rows
+    .filter((row): row is { dayUtc: string; valueUsd: string; coverageStatus: string } => Boolean(row.dayUtc))
+    .map((row) => ({
+      dayUtc: row.dayUtc,
+      valueUsd: row.valueUsd,
+      coverageStatus: row.coverageStatus,
+    }));
+
+  if (snapshotPoints.length > 0) {
+    return snapshotPoints;
+  }
+
+  return readHistoricalCapitalFromEngineV2Pools(input);
+}
+
 export function applyRewardsFilters(rows: RewardEventRow[], input: RewardsRequest) {
   return sortRewardRows(rows.filter((row) => matchesRewardsRequest(row, input)), input);
 }
@@ -429,14 +582,33 @@ export async function findRewards(input: RewardsRequest): Promise<RewardsReposit
     surface: "rewards",
   });
   if (engineV2Rows) {
-    const filtered = applyRewardsFilters(engineV2Rows, input);
+    const normalizedRows = engineV2Rows.map((row) => normalizeEngineV2RewardRow(row as Partial<RewardEventRow> & Record<string, unknown>));
+    const filtered = applyRewardsFilters(normalizedRows, input);
     const startIndex = (input.page - 1) * input.pageSize;
+    const historicalCapital = await readHistoricalCapitalPoints({
+      walletAddress: input.walletAddress,
+      chainId: input.chainId,
+      range: getRewardsDateRange(input),
+    });
     return {
       allRows: filtered,
       rows: filtered.slice(startIndex, startIndex + input.pageSize),
       totalRows: filtered.length,
+      historicalCapital,
+      availableFilters: calculateAvailableRewardFilters(normalizedRows),
+    };
+  }
+  if (engineV2ReadModelsEnabled()) {
+    return {
+      allRows: [],
+      rows: [],
+      totalRows: 0,
       historicalCapital: [],
-      availableFilters: calculateAvailableRewardFilters(engineV2Rows),
+      availableFilters: {
+        tokens: [],
+        pools: [],
+        rewardTypes: [],
+      },
     };
   }
 
@@ -474,21 +646,11 @@ export async function findRewards(input: RewardsRequest): Promise<RewardsReposit
       .from(rewardEvents)
       .leftJoin(pools, eq(rewardEvents.resolvedPoolId, pools.id))
       .where(and(...buildRewardEventWhere(input, true))),
-    db
-      .select({
-        dayUtc: performanceSnapshots.dayUtc,
-        valueUsd: performanceSnapshots.valueUsd,
-        coverageStatus: performanceSnapshots.coverageStatus,
-      })
-      .from(performanceSnapshots)
-      .where(and(
-        eq(performanceSnapshots.walletAddress, input.walletAddress),
-        eq(performanceSnapshots.chainId, input.chainId),
-        eq(performanceSnapshots.scope, "portfolio"),
-        eq(performanceSnapshots.resolution, "daily"),
-        ...(range.start !== null ? [gte(performanceSnapshots.capturedAt, new Date(range.start))] : []),
-        ...(range.end !== null ? [lte(performanceSnapshots.capturedAt, new Date(range.end))] : []),
-      )),
+    readHistoricalCapitalPoints({
+      walletAddress: input.walletAddress,
+      chainId: input.chainId,
+      range,
+    }),
   ]);
 
   const baseRows = (baseDbRows as RewardEventDbRow[]).map(mapRewardEventRow);
@@ -500,13 +662,7 @@ export async function findRewards(input: RewardsRequest): Promise<RewardsReposit
     allRows: filtered,
     rows,
     totalRows: filtered.length,
-    historicalCapital: historicalCapitalRows
-      .filter((row): row is { dayUtc: string; valueUsd: string; coverageStatus: string } => Boolean(row.dayUtc))
-      .map((row) => ({
-        dayUtc: row.dayUtc,
-        valueUsd: row.valueUsd,
-        coverageStatus: row.coverageStatus,
-      })),
+    historicalCapital: historicalCapitalRows,
     availableFilters: calculateAvailableRewardFilters(baseRows),
   };
 }

@@ -43,6 +43,7 @@ test("protocolKnownAddressRowsForSeeds bootstraps protocol provenance without us
   const rows = protocolKnownAddressRowsForSeeds(8453);
 
   assert.ok(rows.some((row) => row.label === "Voter" && row.addressKind === "governance-voter"));
+  assert.ok(rows.some((row) => row.address === "0x51e171d2fde9b37bbbb624a53ef54959422388e4" && row.addressKind === "protocol-grants"));
   assert.equal(rows.some((row) => row.addressKind === "pool"), false);
 });
 

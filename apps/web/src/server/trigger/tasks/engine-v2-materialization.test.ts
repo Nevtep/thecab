@@ -41,14 +41,76 @@ const events = [
 ];
 
 test("runEngineV2AccountChronological accounts loaded events in chronological order", async () => {
+  const persisted: unknown[] = [];
+  let accountingPayload: Record<string, unknown> | null = null;
   const result = await runEngineV2AccountChronological(payload, {
-    loadAccountingInput: async () => ({ events }),
-    persistAccounting: async () => undefined,
+    loadAccountingInput: async () => ({
+      events: [
+        ...events,
+        {
+          id: "gov-managed",
+          chainId: 8453,
+          walletAddress: payload.walletAddress,
+          eventType: "governance_deposit_managed",
+          eventFamily: "governance",
+          occurredAt: new Date("2026-01-03T00:00:00.000Z"),
+          txHash: "0x3",
+          sequenceIndex: 2,
+          coverageStatus: "full",
+          confidence: "high",
+          reasonCodes: [],
+          metadataJson: {
+            votingEscrowAddress: "0x00000000000000000000000000000000000000aa",
+            lockTokenId: "113464",
+            managedTokenId: "10298",
+          },
+        },
+        {
+          id: "gov-claim",
+          chainId: 8453,
+          walletAddress: payload.walletAddress,
+          eventType: "governance_fee_claim",
+          eventFamily: "governance",
+          occurredAt: new Date("2026-01-04T00:00:00.000Z"),
+          txHash: "0x4",
+          sequenceIndex: 3,
+          coverageStatus: "partial",
+          confidence: "medium",
+          reasonCodes: ["missing_distributor_pool_link"],
+          metadataJson: {
+            rewardId: "claim:0",
+            rewardType: "governance_fee",
+            lockTokenId: "113464",
+            amountRaw: "100",
+            amountUsd: "5",
+            itemIndex: 0,
+          },
+        },
+      ],
+      links: [
+        { domainEventId: "gov-managed", entityType: "governance_lock", entityId: "lock-113464" },
+        { domainEventId: "gov-claim", entityType: "governance_lock", entityId: "lock-113464" },
+      ],
+    }),
+    persistAccounting: async (input) => {
+      accountingPayload = input as unknown as Record<string, unknown>;
+    },
+    persistRows: async ({ rows }) => {
+      persisted.push(...rows);
+    },
     trigger: async () => undefined,
   });
+  const persistedAccounting = accountingPayload as {
+    governance?: { locks?: unknown[]; managedLinks?: unknown[] };
+    rewards?: unknown[];
+  } | null;
 
-  assert.equal(result.eventCount, 2);
+  assert.equal(result.eventCount, 4);
   assert.equal(result.cashFlowCount, 2);
+  assert.ok(Array.isArray(persistedAccounting?.governance?.locks));
+  assert.equal(persistedAccounting?.governance?.managedLinks?.length, 1);
+  assert.equal(persistedAccounting?.rewards?.length, 1);
+  assert.ok(persisted.length > 0);
 });
 
 test("runEngineV2MaterializeReadModels persists rows and reports surface counts", async () => {
@@ -63,4 +125,33 @@ test("runEngineV2MaterializeReadModels persists rows and reports surface counts"
 
   assert.equal(result.bySurface.activity, 2);
   assert.equal(persisted.length, result.rowCount);
+});
+
+test("runEngineV2MaterializeReadModels can finalize from already-persisted rows without reloading accounting", async () => {
+  const finalizeCalls: Array<Record<string, unknown>> = [];
+
+  const result = await runEngineV2MaterializeReadModels({
+    ...payload,
+    analysisRunId: "00000000-0000-4000-8000-000000000001",
+    rowsAlreadyPersisted: true,
+  }, {
+    updateRunProgress: async () => ({ } as never),
+    loadAccountingInput: async () => {
+      throw new Error("should not reload accounting");
+    },
+    loadMaterializedRowStats: async () => ({
+      rowCount: 2,
+      bySurface: { activity: 2 },
+      coverage: "full",
+      coverageReasonsJson: [],
+    }),
+    finalizeRun: async (input) => {
+      finalizeCalls.push(input as unknown as Record<string, unknown>);
+      return undefined as never;
+    },
+  });
+
+  assert.equal(result.rowCount, 2);
+  assert.equal(result.bySurface.activity, 2);
+  assert.equal(finalizeCalls.length, 1);
 });

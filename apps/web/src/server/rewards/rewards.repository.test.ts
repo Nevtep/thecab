@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  aggregateHistoricalCapitalFromEngineV2Pools,
   applyRewardsFilters,
   calculateAvailableRewardFilters,
   mapRewardEventRow,
@@ -162,4 +163,36 @@ test("calculateAvailableRewardFilters derives option lists from persisted reward
   assert.deepEqual(filters.rewardTypes, ["fee_claim", "reward_claim"]);
   assert.equal(filters.pools[0]?.poolId, poolId);
   assert.deepEqual(filters.tokens.map((item) => item.symbol).sort(), ["AERO", "WETH"]);
+});
+
+test("aggregateHistoricalCapitalFromEngineV2Pools sums persisted pool history points by day", () => {
+  const historicalCapital = aggregateHistoricalCapitalFromEngineV2Pools({
+    rows: [
+      {
+        history: {
+          points: [
+            { dayUtc: "2026-05-01", totalValueUsd: 100 },
+            { dayUtc: "2026-05-02", totalValueUsd: 80 },
+          ],
+        },
+      },
+      {
+        history: {
+          points: [
+            { dayUtc: "2026-05-01", totalValueUsd: 40 },
+            { dayUtc: "2026-05-03", totalValueUsd: 25.5 },
+          ],
+        },
+      },
+    ],
+    range: {
+      start: Date.parse("2026-05-01T00:00:00.000Z"),
+      end: Date.parse("2026-05-02T23:59:59.999Z"),
+    },
+  });
+
+  assert.deepEqual(historicalCapital, [
+    { dayUtc: "2026-05-01", valueUsd: "140", coverageStatus: "time_weighted_estimated" },
+    { dayUtc: "2026-05-02", valueUsd: "80", coverageStatus: "time_weighted_estimated" },
+  ]);
 });

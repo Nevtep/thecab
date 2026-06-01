@@ -1,7 +1,7 @@
 import { and, eq, ilike, inArray, or, sql } from "drizzle-orm";
 
 import { readAnalysisStatusContext } from "@/server/analysis/analysis-run.repository";
-import { readEngineV2SurfaceRows } from "@/server/analysis/engine-v2/materializers";
+import { engineV2ReadModelsEnabled, readEngineV2SurfaceRows } from "@/server/analysis/engine-v2/materializers";
 import { getExplorerTxUrl, getSupportedChain } from "@/server/chains";
 import { getDb } from "@/server/db/client";
 import { assetMovements, ledgerEvents } from "@/server/db/schema";
@@ -276,6 +276,56 @@ export function mapActivityLedgerRow(row: LedgerDbRow, movements: ActivityMoveme
   };
 }
 
+function movementFromEngineV2(value: unknown, index: number): ActivityMovement | null {
+  const record = asRecord(value);
+  const direction = asString(record.direction);
+  if (direction !== "in" && direction !== "out") return null;
+  return {
+    id: asString(record.id) ?? `engine-v2-movement:${index}`,
+    tokenAddress: asString(record.tokenAddress),
+    tokenSymbol: resolveTokenSymbol(record, asString(record.tokenAddress)),
+    direction,
+    amountRaw: asString(record.amountRaw),
+    amountUsd: asString(record.amountUsd) ?? asString(record.valueUsdAtEvent),
+  };
+}
+
+export function normalizeEngineV2ActivityRow(row: Partial<ActivityEventRow> & Record<string, unknown>): ActivityEventRow {
+  if (Array.isArray(row.linkedEntities) && Array.isArray(row.movements) && row.actionLabelKey && row.surfaceLabelKey) {
+    return row as ActivityEventRow;
+  }
+
+  const selectedDetail = asRecord(row.selectedDetail);
+  const rawMovements = Array.isArray(selectedDetail.tokenMovements)
+    ? selectedDetail.tokenMovements
+    : Array.isArray(row.movements)
+      ? row.movements
+      : [];
+  const movements = rawMovements
+    .map((movement, index) => movementFromEngineV2(movement, index))
+    .filter((movement): movement is ActivityMovement => Boolean(movement));
+  const ledgerRow: LedgerDbRow = {
+    activityId: asString(row.activityId) ?? asString(row.id) ?? asString(row.txHash) ?? "engine-v2-activity",
+    chainId: typeof row.chainId === "number" ? row.chainId : Number(row.chainId ?? 0),
+    walletAddress: asString(row.walletAddress) ?? "",
+    txHash: asString(row.txHash) ?? "",
+    logIndex: 0,
+    eventType: asString(row.action) ?? asString(row.eventType) ?? "unclassified_transaction",
+    occurredAt: asString(row.occurredAt) ?? new Date(0).toISOString(),
+    classification: asString(row.action) ?? asString(row.eventType),
+    confidence: asString(row.confidence) ?? "none",
+    metadataJson: {
+      ...asRecord(row.metadata),
+      ...asRecord(row.selectedDetail),
+      sourceSurface: asString(row.surface) ?? asString(row.eventFamily),
+      coverageStatus: asString(row.coverage) ?? asString(row.coverageStatus),
+      reasonCodes: Array.isArray(row.reasonCodes) ? row.reasonCodes : [],
+    },
+  };
+
+  return mapActivityLedgerRow(ledgerRow, movements);
+}
+
 export function matchesActivityRequest(row: ActivityEventRow, input: ActivityRequest) {
   if (input.surface !== "all" && row.surface !== input.surface) return false;
   if (input.action !== "all" && row.action !== input.action) return false;
@@ -378,13 +428,22 @@ export async function findActivity(input: ActivityRequest): Promise<ActivityRepo
     surface: "activity",
   });
   if (engineV2Rows) {
-    const filtered = sortActivityRows(engineV2Rows.filter((row) => matchesActivityRequest(row, input)), input);
+    const normalizedRows = engineV2Rows.map((row) => normalizeEngineV2ActivityRow(row as Partial<ActivityEventRow> & Record<string, unknown>));
+    const filtered = sortActivityRows(normalizedRows.filter((row) => matchesActivityRequest(row, input)), input);
     const startIndex = (input.page - 1) * input.pageSize;
     return {
       allRows: filtered,
       rows: filtered.slice(startIndex, startIndex + input.pageSize),
       totalRows: filtered.length,
-      availableFilters: calculateAvailableActivityFilters(engineV2Rows),
+      availableFilters: calculateAvailableActivityFilters(normalizedRows),
+    };
+  }
+  if (engineV2ReadModelsEnabled()) {
+    return {
+      allRows: [],
+      rows: [],
+      totalRows: 0,
+      availableFilters: calculateAvailableActivityFilters([]),
     };
   }
 

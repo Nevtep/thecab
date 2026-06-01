@@ -454,11 +454,12 @@ Must cover:
 
 Engine V2 now has the server module boundary, DB schema/migration, Trigger task skeletons, canonical collection, ABI registry, chronological classification, enrichment planning/workers, chronological accounting, read-model materializers, route-side DB-only adapters, CLI scripts, regression runner, i18n reason-code keys, and guarded Engine V2 purge support.
 
-The request-time DataView repositories are wired behind `ANALYSIS_ENGINE_V2_READ_MODELS`; when the flag is absent, existing v1 DB read paths remain the rollback mode. Provider calls remain confined to collection/enrichment worker boundaries.
+The request-time DataView repositories now read from Engine V2 DB-only adapters unconditionally on the active product path. Provider calls remain confined to collection/enrichment worker boundaries.
 
 Remaining limitations are explicit:
 
 - The regression fixture classification still has unresolved rows until persisted ABIs and enriched protocol state are available in a live Engine V2 run.
-- Engine V2 Trigger orchestration is opt-in behind `ANALYSIS_ENGINE_V2_TRIGGER`; legacy phase orchestration remains default rollback behavior.
+- The public analysis start route now always enqueues Engine V2 full-history orchestration; rollout flags are no longer part of the active path.
+- Provider-backed enrichment resolvers still need fuller wiring so queued needs can be resolved instead of staying persisted as explicit gaps.
 - Current-state helpers may validate relations but do not create historical ownership.
 - Missing evidence remains partial/unresolved/excluded/unsupported with reason codes instead of invented totals.

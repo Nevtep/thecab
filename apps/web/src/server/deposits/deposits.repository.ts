@@ -1,6 +1,6 @@
 import { and, asc, eq } from "drizzle-orm";
 
-import { readEngineV2SurfaceRows } from "@/server/analysis/engine-v2/materializers";
+import { engineV2ReadModelsEnabled, readEngineV2SurfaceRows } from "@/server/analysis/engine-v2/materializers";
 import { getDb } from "@/server/db/client";
 import {
   depositLifecycleEvents,
@@ -16,6 +16,21 @@ import type {
   DepositPerformanceDecompositionView,
   DepositSummaryView,
 } from "@/server/deposits/deposits.types";
+
+function hasRichEngineV2DepositRow(row: Partial<DepositDetailView>) {
+  return Boolean(
+    (row.poolLabel && row.poolId && row.poolLabel !== row.poolId)
+      || row.token0Symbol
+      || row.token1Symbol
+      || row.coveredStartDayUtc
+      || row.coveredEndDayUtc
+      || row.tickLower !== null
+      || row.tickUpper !== null
+      || row.rangeLowerPrice !== null
+      || row.rangeUpperPrice !== null
+      || (Array.isArray(row.lifecycle) && row.lifecycle.length > 0),
+  );
+}
 
 function asNumber(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -329,7 +344,7 @@ export async function findDepositSummaries(input: {
     walletAddress: input.walletAddress,
     surface: "deposits",
   });
-  if (engineV2Rows) return engineV2Rows;
+  if (engineV2Rows?.some((row) => hasRichEngineV2DepositRow(row))) return engineV2Rows;
 
   const db = await getDb();
   const rows = await db
@@ -390,7 +405,7 @@ export async function findDepositDetail(input: {
     surface: "deposits",
   });
   const engineV2Detail = engineV2Rows?.find((row) => row.depositId === input.depositId);
-  if (engineV2Detail) return engineV2Detail;
+  if (engineV2Detail && hasRichEngineV2DepositRow(engineV2Detail)) return engineV2Detail;
 
   const db = await getDb();
   const rows = await db

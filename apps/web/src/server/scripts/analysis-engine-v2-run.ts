@@ -66,7 +66,7 @@ async function main() {
     taskPlan,
     startNote: args.dryRun
       ? "Dry-run only. Pass --start from an environment with Trigger credentials to enqueue externally."
-      : "Validated Engine V2 task plan. Use analysis-run orchestration with ANALYSIS_ENGINE_V2_TRIGGER=1 for Trigger execution.",
+      : "Validated Engine V2 task plan. Use analysis-run orchestration to enqueue the always-on Engine V2 pipeline.",
   }, null, 2));
 }
 

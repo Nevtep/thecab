@@ -1,7 +1,8 @@
 import { task, tasks } from "@trigger.dev/sdk/v3";
 import { and, asc, eq, inArray } from "drizzle-orm";
 
-import { finalizeAnalysisRun, updateAnalysisRunProgress } from "@/server/analysis/analysis-run.repository";
+import { finalizeAnalysisRun, updateAnalysisRunProgress, type AnalysisRunCoverage } from "@/server/analysis/analysis-run.repository";
+import { materializeDepositReadModels } from "@/server/analysis/deposit-read-models";
 import {
   persistAccountingOutputs,
   runChronologicalAccounting,
@@ -12,13 +13,20 @@ import {
   type EngineV2DomainEventLike,
   type EngineV2EntityLinkLike,
 } from "@/server/analysis/engine-v2/accounting";
-import { materializeAllDataViewRows, persistReadModelRows } from "@/server/analysis/engine-v2/materializers";
-import { engineV2WalletPayloadSchema } from "@/server/analysis/engine-v2/payloads";
+import { loadMaterializationContext, materializeAllDataViewRows, persistReadModelRows } from "@/server/analysis/engine-v2/materializers";
+import { engineV2MaterializationPayloadSchema, engineV2WalletPayloadSchema } from "@/server/analysis/engine-v2/payloads";
+import { materializePoolReadModels } from "@/server/analysis/pool-read-models";
+import { materializeStrategyReadModels } from "@/server/analysis/strategy-read-models";
 import { getDb } from "@/server/db/client";
-import { engineV2DomainEventLinks, engineV2DomainEvents } from "@/server/db/schema";
+import { engineV2DomainEventLinks, engineV2DomainEvents, engineV2ReadModelRows } from "@/server/db/schema";
 
 export type EngineV2MaterializationDeps = {
   loadAccountingInput?: (input: { chainId: number; walletAddress: string }) => Promise<EngineV2AccountingInput>;
+  loadMaterializationContext?: typeof loadMaterializationContext;
+  loadMaterializedRowStats?: typeof loadMaterializedRowStatsFromDb;
+  materializeDeposits?: typeof materializeDepositReadModels;
+  materializeStrategies?: typeof materializeStrategyReadModels;
+  materializePools?: typeof materializePoolReadModels;
   persistAccounting?: typeof persistAccountingOutputs;
   persistRows?: typeof persistReadModelRows;
   trigger?: (taskId: string, payload: Record<string, unknown>, options: { idempotencyKey: string }) => Promise<unknown>;
@@ -68,6 +76,98 @@ async function loadAccountingInputFromDb(input: { chainId: number; walletAddress
   };
 }
 
+async function loadMaterializedRowStatsFromDb(input: { chainId: number; walletAddress: string }) {
+  const rows = await getDb().select({
+    surface: engineV2ReadModelRows.surface,
+    coverageStatus: engineV2ReadModelRows.coverageStatus,
+    evidenceJson: engineV2ReadModelRows.evidenceJson,
+  }).from(engineV2ReadModelRows).where(and(
+    eq(engineV2ReadModelRows.chainId, input.chainId),
+    eq(engineV2ReadModelRows.walletAddress, input.walletAddress.toLowerCase()),
+  ));
+
+  return {
+    rowCount: rows.length,
+    bySurface: rows.reduce<Record<string, number>>((acc, row) => {
+      acc[row.surface] = (acc[row.surface] ?? 0) + 1;
+      return acc;
+    }, {}),
+    coverage: rows.some((row) => row.coverageStatus === "partial" || row.coverageStatus === "unresolved") ? "partial" : "full",
+    coverageReasonsJson: Array.from(new Set(rows.flatMap((row) => {
+      const reasonCodes = row.evidenceJson.reasonCodes;
+      return Array.isArray(reasonCodes) ? reasonCodes.filter((item): item is string => typeof item === "string") : [];
+    }))),
+  };
+}
+
+function deriveReadModelWindow(events: EngineV2AccountingInput["events"]) {
+  const occurredAtValues = events
+    .map((event) => event.occurredAt)
+    .filter((value): value is Date => value instanceof Date && Number.isFinite(value.getTime()));
+
+  if (occurredAtValues.length === 0) {
+    const todayUtc = new Date().toISOString().slice(0, 10);
+    return {
+      startDayUtc: todayUtc,
+      endDayUtc: todayUtc,
+      capturedAt: new Date(),
+    };
+  }
+
+  const minTime = Math.min(...occurredAtValues.map((value) => value.getTime()));
+  const maxTime = Math.max(...occurredAtValues.map((value) => value.getTime()));
+
+  return {
+    startDayUtc: new Date(minTime).toISOString().slice(0, 10),
+    endDayUtc: new Date(maxTime).toISOString().slice(0, 10),
+    capturedAt: new Date(),
+  };
+}
+
+async function materializeLegacySummaryTables(input: {
+  analysisRunId: string | null | undefined;
+  chainId: number;
+  walletAddress: string;
+  accountingInput: EngineV2AccountingInput;
+  deps: EngineV2MaterializationDeps;
+}) {
+  if (!input.analysisRunId) {
+    return;
+  }
+
+  const window = deriveReadModelWindow(input.accountingInput.events);
+  const materializeDeposits = input.deps.materializeDeposits ?? materializeDepositReadModels;
+  const materializeStrategies = input.deps.materializeStrategies ?? materializeStrategyReadModels;
+  const materializePools = input.deps.materializePools ?? materializePoolReadModels;
+
+  await Promise.all([
+    materializeDeposits({
+      runId: input.analysisRunId,
+      walletAddress: input.walletAddress,
+      chainId: input.chainId,
+      startDayUtc: window.startDayUtc,
+      endDayUtc: window.endDayUtc,
+      capturedAt: window.capturedAt,
+    }),
+    materializeStrategies({
+      runId: input.analysisRunId,
+      walletAddress: input.walletAddress,
+      chainId: input.chainId,
+      startDayUtc: window.startDayUtc,
+      endDayUtc: window.endDayUtc,
+      capturedAt: window.capturedAt,
+    }),
+    materializePools({
+      runId: input.analysisRunId,
+      walletAddress: input.walletAddress,
+      chainId: input.chainId,
+      startDayUtc: window.startDayUtc,
+      endDayUtc: window.endDayUtc,
+      capturedAt: window.capturedAt,
+    }),
+  ]);
+}
+
 export async function runEngineV2AccountChronological(rawPayload: unknown, deps: EngineV2MaterializationDeps = {}) {
   const payload = engineV2WalletPayloadSchema.parse(rawPayload);
   const updateRun = deps.updateRunProgress ?? updateAnalysisRunProgress;
@@ -79,8 +179,17 @@ export async function runEngineV2AccountChronological(rawPayload: unknown, deps:
     });
   }
   const accountingInput = await (deps.loadAccountingInput?.(payload) ?? loadAccountingInputFromDb(payload));
+  await materializeLegacySummaryTables({
+    analysisRunId: payload.analysisRunId,
+    chainId: payload.chainId,
+    walletAddress: payload.walletAddress,
+    accountingInput,
+    deps,
+  });
   const accounting = runChronologicalAccounting(accountingInput);
   const accountingPayload = {
+    chainId: payload.chainId,
+    walletAddress: payload.walletAddress,
     db: deps.persistAccounting ? undefined as never : getDb(),
     lots: accounting.deposits.flatMap((deposit) => deposit.lifecycle.map((event) => toAccountingLotValues({
       event: eventToDomainLike(payload, event, deposit.depositId),
@@ -108,14 +217,32 @@ export async function runEngineV2AccountChronological(rawPayload: unknown, deps:
       coverageStatus: item.coverageStatus,
       reasonCodes: item.reasonCodes,
     })),
+    governance: accounting.governance,
+    rewards: accounting.rewards,
   };
   if (deps.persistAccounting) {
     await deps.persistAccounting(accountingPayload);
   } else {
     await persistAccountingOutputs(accountingPayload);
   }
+  const materializationContext = await (deps.loadMaterializationContext?.({
+    chainId: payload.chainId,
+    accounting,
+  }) ?? loadMaterializationContext({
+    chainId: payload.chainId,
+    accounting,
+  }));
+  const rows = materializeAllDataViewRows(accounting, materializationContext);
+  if (deps.persistRows) {
+    await deps.persistRows({ db: undefined as never, rows });
+  } else {
+    await persistReadModelRows({ db: getDb(), rows });
+  }
   const triggerTask = deps.trigger ?? ((taskId, taskPayload, options) => tasks.trigger(taskId, taskPayload, options));
-  await triggerTask("engine-v2-materialize-read-models", payload, {
+  await triggerTask("engine-v2-materialize-read-models", {
+    ...payload,
+    rowsAlreadyPersisted: true,
+  }, {
     idempotencyKey: `engine-v2-materialize:${payload.chainId}:${payload.walletAddress}:${payload.collectionRunId ?? "latest"}`,
   });
 
@@ -132,7 +259,7 @@ export async function runEngineV2AccountChronological(rawPayload: unknown, deps:
 }
 
 export async function runEngineV2MaterializeReadModels(rawPayload: unknown, deps: EngineV2MaterializationDeps = {}) {
-  const payload = engineV2WalletPayloadSchema.parse(rawPayload);
+  const payload = engineV2MaterializationPayloadSchema.parse(rawPayload);
   const updateRun = deps.updateRunProgress ?? updateAnalysisRunProgress;
   if (payload.analysisRunId) {
     await updateRun(payload.analysisRunId, {
@@ -141,32 +268,48 @@ export async function runEngineV2MaterializeReadModels(rawPayload: unknown, deps
       progressPct: 96,
     });
   }
-  const accountingInput = await (deps.loadAccountingInput?.(payload) ?? loadAccountingInputFromDb(payload));
-  const accounting = runChronologicalAccounting(accountingInput);
-  const rows = materializeAllDataViewRows(accounting);
-  if (deps.persistRows) {
-    await deps.persistRows({ db: undefined as never, rows });
-  } else {
-    await persistReadModelRows({ db: getDb(), rows });
-  }
-  const bySurface = rows.reduce<Record<string, number>>((acc, row) => {
-    acc[row.surface] = (acc[row.surface] ?? 0) + 1;
-    return acc;
-  }, {});
+  const stats = payload.rowsAlreadyPersisted
+    ? await (deps.loadMaterializedRowStats?.(payload) ?? loadMaterializedRowStatsFromDb(payload))
+    : await (async () => {
+      const accountingInput = await (deps.loadAccountingInput?.(payload) ?? loadAccountingInputFromDb(payload));
+      await materializeLegacySummaryTables({
+        analysisRunId: payload.analysisRunId,
+        chainId: payload.chainId,
+        walletAddress: payload.walletAddress,
+        accountingInput,
+        deps,
+      });
+      const accounting = runChronologicalAccounting(accountingInput);
+      const rows = materializeAllDataViewRows(accounting);
+      if (deps.persistRows) {
+        await deps.persistRows({ db: undefined as never, rows });
+      } else {
+        await persistReadModelRows({ db: getDb(), rows });
+      }
+      return {
+        rowCount: rows.length,
+        bySurface: rows.reduce<Record<string, number>>((acc, row) => {
+          acc[row.surface] = (acc[row.surface] ?? 0) + 1;
+          return acc;
+        }, {}),
+        coverage: rows.some((row) => row.coverageStatus === "partial" || row.coverageStatus === "unresolved") ? "partial" : "full",
+        coverageReasonsJson: Array.from(new Set(rows.flatMap((row) => {
+          const reasonCodes = row.evidenceJson.reasonCodes;
+          return Array.isArray(reasonCodes) ? reasonCodes.filter((item): item is string => typeof item === "string") : [];
+        }))),
+      };
+    })();
   if (payload.analysisRunId) {
     const finalizeRun = deps.finalizeRun ?? finalizeAnalysisRun;
     await finalizeRun({
       runId: payload.analysisRunId,
       status: "complete",
-      coverage: rows.some((row) => row.coverageStatus === "partial" || row.coverageStatus === "unresolved") ? "partial" : "full",
-      coverageReasonsJson: Array.from(new Set(rows.flatMap((row) => {
-        const reasonCodes = row.evidenceJson.reasonCodes;
-        return Array.isArray(reasonCodes) ? reasonCodes.filter((item): item is string => typeof item === "string") : [];
-      }))),
+      coverage: stats.coverage as AnalysisRunCoverage,
+      coverageReasonsJson: stats.coverageReasonsJson,
       lastError: null,
     });
   }
-  return { rowCount: rows.length, bySurface };
+  return { rowCount: stats.rowCount, bySurface: stats.bySurface };
 }
 
 function eventToDomainLike(

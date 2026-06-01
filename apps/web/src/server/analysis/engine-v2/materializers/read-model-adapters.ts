@@ -5,12 +5,8 @@ import { engineV2ReadModelRows } from "@/server/db/schema";
 
 import type { EngineV2ReadModelRowInput } from "./activity-materializer";
 
-export const ENGINE_V2_READ_MODELS_FLAG = "ANALYSIS_ENGINE_V2_READ_MODELS";
-
-export function engineV2ReadModelsEnabled(env: Pick<NodeJS.ProcessEnv, string> = process.env) {
-  return env.ANALYSIS_ENGINE_VERSION === "v2" ||
-    env[ENGINE_V2_READ_MODELS_FLAG] === "1" ||
-    env[ENGINE_V2_READ_MODELS_FLAG] === "true";
+export function engineV2ReadModelsEnabled() {
+  return true;
 }
 
 export function toReadModelRowValues(input: EngineV2ReadModelRowInput): typeof engineV2ReadModelRows.$inferInsert {
@@ -40,6 +36,7 @@ export async function persistReadModelRows(input: {
   rows: EngineV2ReadModelRowInput[];
 }) {
   if (input.rows.length === 0) return;
+
   await input.db.insert(engineV2ReadModelRows)
     .values(input.rows.map(toReadModelRowValues))
     .onConflictDoUpdate({
@@ -76,5 +73,6 @@ export async function readEngineV2SurfaceRows<T>(input: {
       eq(engineV2ReadModelRows.walletAddress, input.walletAddress.toLowerCase()),
       eq(engineV2ReadModelRows.surface, input.surface),
     ));
+  if (rows.length === 0) return null;
   return rows.map((item) => item.rowJson as T);
 }

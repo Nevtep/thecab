@@ -1,7 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
 
 import { readAnalysisStatusContext } from "@/server/analysis/analysis-run.repository";
-import { readEngineV2SurfaceRows } from "@/server/analysis/engine-v2/materializers";
+import { engineV2ReadModelsEnabled, readEngineV2SurfaceRows } from "@/server/analysis/engine-v2/materializers";
 import { getDb } from "@/server/db/client";
 import {
   governanceEpochSummaries,
@@ -304,6 +304,61 @@ function mapEvent(row: typeof governanceEvents.$inferSelect): GovernanceReposito
   };
 }
 
+function normalizeEngineV2GovernanceEvent(row: Record<string, unknown>): GovernanceRepositoryEventRow | null {
+  const nested = asRecord(row.event);
+  const source = Object.keys(nested).length > 0 ? nested : row;
+  const txHash = asString(source.txHash);
+  const eventId = asString(source.governanceEventId) ?? asString(source.eventId) ?? txHash;
+  if (!eventId || !txHash) return null;
+  const eventType = asString(source.eventType) ?? "unsupported_governance";
+  const metadata = {
+    ...asRecord(source.metadata),
+    tokenId: asString(source.tokenId),
+    reasonCodes: asStringArray(source.reasonCodes),
+  };
+  return {
+    governanceEventId: eventId,
+    txHash,
+    logIndex: typeof source.logIndex === "number" ? source.logIndex : 0,
+    eventType: normalizeEventType(eventType),
+    occurredAt: asString(source.occurredAt) ?? new Date(0).toISOString(),
+    protocolSurface: normalizeProtocolSurface(asString(source.protocolSurface) ?? (
+      eventType.includes("vote") || eventType.includes("poke") || eventType.includes("deposit_managed") ? "voter" :
+      eventType.includes("lock") ? "voting_escrow" :
+      eventType.includes("bribe") ? "briber" :
+      eventType.includes("fee") ? "fee_distributor" :
+      eventType.includes("rebase") ? "reward_distributor" :
+      "unknown"
+    )),
+    coverageState: normalizeCoverage(asString(source.coverageState) ?? asString(source.coverageStatus)),
+    confidence: normalizeConfidence(asString(source.confidence)),
+    reasonCodes: asStringArray(source.reasonCodes),
+    evidenceRefs: asObjectArray(source.evidenceRefs),
+    metadata,
+  };
+}
+
+function normalizeEngineV2LockPanel(row: Record<string, unknown>): GovernanceLockPanel | null {
+  const nested = asRecord(row.lockPanel);
+  if (Object.keys(nested).length > 0) return nested as GovernanceLockPanel;
+  if (asString(row.kind) !== "lock") return null;
+  const lockId = asString(row.tokenId) ?? asString(row.lockId);
+  return {
+    lockExposureId: asString(row.lockKey),
+    lockId,
+    status: asString(row.status) === "deposited_managed" ? "active" : "unknown",
+    createdAt: null,
+    expiresAt: null,
+    lockedAeroAmount: null,
+    lockedAeroValueUsd: null,
+    veAeroExposure: null,
+    coverageState: normalizeCoverage(asString(row.coverageStatus)),
+    confidence: normalizeConfidence(asString(row.confidence)),
+    reasonCodes: asStringArray(row.reasonCodes),
+    lifecycle: [],
+  };
+}
+
 function sortRewards(rows: GovernanceRewardRow[], input: GovernanceRequest) {
   const direction = input.sort.direction === "asc" ? 1 : -1;
   return [...rows].sort((left, right) => {
@@ -461,10 +516,15 @@ export async function findGovernanceDataView(input: GovernanceRequest): Promise<
   });
   if (engineV2Rows) {
     const rewardRows = engineV2Rows.map((row) => row.reward).filter((row): row is GovernanceRewardRow => Boolean(row));
-    const eventRows = engineV2Rows.map((row) => row.event).filter((row): row is GovernanceRepositoryEventRow => Boolean(row));
+    const eventRows = engineV2Rows
+      .map((row) => normalizeEngineV2GovernanceEvent(row as Record<string, unknown>))
+      .filter((row): row is GovernanceRepositoryEventRow => Boolean(row));
     const epochRows = engineV2Rows.map((row) => row.epoch).filter((row): row is GovernanceEpochSummary => Boolean(row));
-    const lockPanel = engineV2Rows.find((row) => row.lockPanel)?.lockPanel ?? null;
+    const lockPanel = engineV2Rows
+      .map((row) => normalizeEngineV2LockPanel(row as Record<string, unknown>))
+      .find((row): row is GovernanceLockPanel => Boolean(row)) ?? null;
     const filteredRewards = sortRewards(filterGovernanceRewards(rewardRows, input), input);
+    const events = filterGovernanceEvents(eventRows, input);
     const startIndex = (input.page - 1) * input.pageSize;
     return {
       allRewardRows: rewardRows,
@@ -472,10 +532,30 @@ export async function findGovernanceDataView(input: GovernanceRequest): Promise<
       totalRewardRows: filteredRewards.length,
       lockPanel,
       epochs: epochRows,
-      events: filterGovernanceEvents(eventRows, input),
-      selectedDetailTarget: null,
+      events,
+      selectedDetailTarget: resolveSelectedDetailTarget({
+        request: input,
+        allRewards: rewardRows,
+        visibleRewards: filteredRewards,
+        allEvents: eventRows,
+        visibleEvents: events,
+        epochs: epochRows,
+      }),
       metricSnapshot: engineV2Rows.find((row) => row.metricSnapshot)?.metricSnapshot ?? null,
       availableFilters: buildAvailableFilters({ rewardRows, epochs: epochRows, events: eventRows }),
+    };
+  }
+  if (engineV2ReadModelsEnabled()) {
+    return {
+      allRewardRows: [],
+      rewardRows: [],
+      totalRewardRows: 0,
+      lockPanel: null,
+      epochs: [],
+      events: [],
+      selectedDetailTarget: null,
+      metricSnapshot: null,
+      availableFilters: buildAvailableFilters({ rewardRows: [], epochs: [], events: [] }),
     };
   }
 

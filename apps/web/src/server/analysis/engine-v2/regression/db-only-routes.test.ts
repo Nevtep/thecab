@@ -20,3 +20,10 @@ test("request-time DataView repositories do not import Engine V2 provider bounda
     assert.match(source, /readEngineV2SurfaceRows|getDb|readAnalysisStatusContext/, file);
   }
 });
+
+test("request-time DataView repositories do not fall back to legacy tables when Engine V2 read models are enabled", () => {
+  for (const file of requestTimeFiles) {
+    const source = readFileSync(resolve(process.cwd(), file), "utf8");
+    assert.match(source, /engineV2ReadModelsEnabled\(/, file);
+  }
+});

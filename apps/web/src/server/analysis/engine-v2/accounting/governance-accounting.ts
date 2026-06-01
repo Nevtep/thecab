@@ -25,6 +25,8 @@ export type EngineV2ManagedLockProjection = {
   managerAddress: string | null;
   depositedAt: Date;
   txHash: string;
+  sourceEventId: string | null;
+  votingEscrowAddress: string | null;
 };
 
 export type EngineV2GovernanceEpochProjection = {
@@ -37,8 +39,11 @@ export type EngineV2GovernanceEventProjection = {
   eventId: string | null;
   eventType: string;
   tokenId: string | null;
+  votingEscrowAddress: string | null;
   txHash: string;
   occurredAt: Date;
+  amountRaw: string | null;
+  lockEnd: Date | null;
   coverageStatus: string;
   confidence: string;
   reasonCodes: string[];
@@ -50,6 +55,13 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 function asString(value: unknown) {
   return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function asDate(value: unknown) {
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (typeof value !== "string" || value.length === 0) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 function linkForEvent(links: EngineV2EntityLinkLike[], event: EngineV2DomainEventLike, entityType: string) {
@@ -105,6 +117,8 @@ export function accountGovernance(input: { events: EngineV2DomainEventLike[]; li
         managerAddress: asString(metadata.managerAddress),
         depositedAt: event.occurredAt,
         txHash: event.txHash,
+        sourceEventId: event.id ?? null,
+        votingEscrowAddress,
       });
     }
 
@@ -119,8 +133,11 @@ export function accountGovernance(input: { events: EngineV2DomainEventLike[]; li
       eventId: event.id ?? null,
       eventType: event.eventType,
       tokenId,
+      votingEscrowAddress,
       txHash: event.txHash,
       occurredAt: event.occurredAt,
+      amountRaw: asString(metadata.amountRaw) ?? asString(evidence.amountRaw),
+      lockEnd: asDate(metadata.lockEnd) ?? asDate(evidence.lockEnd),
       coverageStatus: event.coverageStatus,
       confidence: event.confidence,
       reasonCodes: event.reasonCodes,

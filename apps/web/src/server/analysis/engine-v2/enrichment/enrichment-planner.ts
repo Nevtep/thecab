@@ -31,8 +31,35 @@ export function planEnrichmentNeedsForClassification(input: {
     : ["missing_explicit_evidence"];
 
   const needs = new Map<string, EngineV2EnrichmentNeedInput>();
+  const metadata = input.classification.metadataJson ?? {};
+  const distributorAddresses = Array.from(new Set([
+    typeof metadata.distributorAddress === "string" ? metadata.distributorAddress.toLowerCase() : null,
+    ...(Array.isArray(metadata.distributorAddresses)
+      ? metadata.distributorAddresses.filter((value): value is string => typeof value === "string").map((value) => value.toLowerCase())
+      : []),
+  ].filter((value): value is string => Boolean(value))));
   for (const reasonCode of reasonCodes) {
     const needType = REASON_TO_NEED[reasonCode] ?? "manual_review";
+    if (needType === "distributor_pool_link" && distributorAddresses.length > 0) {
+      for (const distributorAddress of distributorAddresses) {
+        needs.set(`${needType}:distributor:${distributorAddress}`, {
+          chainId: input.chainId,
+          walletAddress: input.walletAddress,
+          sourceDomainEventId: input.sourceDomainEventId ?? null,
+          needType,
+          targetType: "distributor",
+          targetId: distributorAddress,
+          reasonCodes: [reasonCode],
+          requestJson: {
+            eventType: input.classification.eventType,
+            coverageStatus: input.classification.coverageStatus,
+            txHash: input.txHash.toLowerCase(),
+            distributorAddress,
+          },
+        });
+      }
+      continue;
+    }
     const targetType = needType === "transaction_decoded_backfill" ? "transaction" : input.classification.eventFamily;
     needs.set(`${needType}:${targetType}:${input.txHash}`, {
       chainId: input.chainId,

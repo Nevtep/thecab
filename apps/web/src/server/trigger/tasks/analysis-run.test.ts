@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { runAnalysisRunTask, type AnalysisRunTaskPayload } from "@/server/trigger/tasks/analysis-run.task";
+import {
+  runAnalysisRunTask,
+  type AnalysisRunTaskPayload,
+} from "@/server/trigger/tasks/analysis-run.task";
 
 function createPayload(): AnalysisRunTaskPayload {
   return {
@@ -112,4 +115,18 @@ test("runAnalysisRunTask finalizes when Engine V2 collection startup fails", asy
   assert.equal(finalizeCalls.length, 1);
   assert.equal(finalizeCalls[0]?.coverage, "partial");
   assert.deepEqual(finalizeCalls[0]?.coverageReasonsJson, ["engineV2TaskFailed", "engine-v2-start-collection"]);
+});
+
+test("runAnalysisRunTask always queues the Engine V2 orchestration path", async () => {
+  const { deps, triggeredTasks, finalizeCalls } = createDeps();
+
+  const result = await runAnalysisRunTask(createPayload(), deps);
+
+  assert.deepEqual(result, {
+    engine: "v2",
+    queued: true,
+    mode: "full_history",
+  });
+  assert.equal(triggeredTasks.length, 1);
+  assert.equal(finalizeCalls.length, 0);
 });

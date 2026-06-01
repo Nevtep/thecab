@@ -1,6 +1,6 @@
 import { and, asc, eq } from "drizzle-orm";
 
-import { readEngineV2SurfaceRows } from "@/server/analysis/engine-v2/materializers";
+import { engineV2ReadModelsEnabled, readEngineV2SurfaceRows } from "@/server/analysis/engine-v2/materializers";
 import { getDb } from "@/server/db/client";
 import {
   pools,
@@ -16,6 +16,20 @@ import type {
   StrategyDetailView,
   StrategySummaryView,
 } from "@/server/strategies/strategies.types";
+
+function hasRichEngineV2StrategyRow(row: Partial<StrategyDetailView | StrategySummaryView>) {
+  const detailRow = row as Partial<StrategyDetailView>;
+  return Boolean(
+    row.shareSymbol
+      || row.totalReturnPct !== null
+      || row.estimatedAnnualizedReturnPct !== null
+      || row.realizedPnlUsd !== null
+      || row.unrealizedPnlUsd !== null
+      || (row.poolLabel && row.primaryPoolId && row.poolLabel !== row.primaryPoolId)
+      || (Array.isArray(detailRow.history) && detailRow.history.length > 0)
+      || (Array.isArray(detailRow.lifecycle) && detailRow.lifecycle.length > 0),
+  );
+}
 
 function asNumber(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -491,7 +505,7 @@ export async function findStrategySummaries(input: StrategiesListRequest) {
     walletAddress: input.walletAddress,
     surface: "strategies",
   });
-  if (engineV2Rows) {
+  if (engineV2Rows?.some((row) => hasRichEngineV2StrategyRow(row))) {
     return applyStrategiesListRequest({ request: input, rows: engineV2Rows });
   }
 
@@ -510,7 +524,7 @@ export async function findStrategyDetail(input: {
     surface: "strategies",
   });
   const engineV2Detail = engineV2Rows?.find((row) => row.strategyExposureId === input.strategyId || row.strategyId === input.strategyId);
-  if (engineV2Detail) return engineV2Detail;
+  if (engineV2Detail && hasRichEngineV2StrategyRow(engineV2Detail)) return engineV2Detail;
 
   const rows = await readSummaryRows(input);
   const row = rows.find((item) => item.strategyExposureId === input.strategyId || item.strategyId === input.strategyId);

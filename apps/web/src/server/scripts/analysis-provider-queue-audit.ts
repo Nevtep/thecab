@@ -109,7 +109,7 @@ async function main() {
     retrySuccess,
     retryExhaustion,
     engineV2: {
-      requestTimeDbOnlyFlag: process.env.ANALYSIS_ENGINE_V2_READ_MODELS === "1" || process.env.ANALYSIS_ENGINE_V2_READ_MODELS === "true",
+      requestTimeDbOnlyFlag: true,
       enrichmentNeedsAreAnalysisTimeOnly: true,
       providerBoundary: "collection/enrichment workers only",
     },

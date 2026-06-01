@@ -8,6 +8,7 @@ export type EngineV2Classification = {
   confidence: "high" | "medium" | "low" | "none";
   reasonCodes: string[];
   evidence: Record<string, unknown>;
+  metadataJson?: Record<string, unknown>;
 };
 
 const FAMILY_BY_PREFIX: Array<[string, string]> = [

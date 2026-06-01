@@ -23,3 +23,27 @@ test("planEnrichmentNeedsForClassification maps missing evidence to deduped need
   assert.equal(enrichmentNeedNaturalKey(needs[0]!), enrichmentNeedNaturalKey({ ...needs[0]! }));
 });
 
+test("planEnrichmentNeedsForClassification targets explicit distributor addresses when governance metadata provides them", () => {
+  const needs = planEnrichmentNeedsForClassification({
+    chainId: 8453,
+    walletAddress: "0x0000000000000000000000000000000000000001",
+    txHash: "0xdef",
+    classification: {
+      eventType: "governance_fee_claim",
+      eventFamily: "governance",
+      coverageStatus: "partial",
+      confidence: "high",
+      reasonCodes: ["missing_distributor_pool_link"],
+      evidence: {},
+      metadataJson: {
+        distributorAddress: "0x0000000000000000000000000000000000000002",
+        distributorAddresses: ["0x0000000000000000000000000000000000000002"],
+      },
+    },
+  });
+
+  assert.equal(needs.length, 1);
+  assert.equal(needs[0]?.targetType, "distributor");
+  assert.equal(needs[0]?.targetId, "0x0000000000000000000000000000000000000002");
+});
+

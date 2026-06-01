@@ -11,7 +11,6 @@ import {
   supersedeCompletedRunForDevelopmentRerun,
   updateAnalysisRunProgress,
 } from "@/server/analysis/analysis-run.repository";
-import { prepareAnalysisRunContext } from "@/server/analysis/orchestrator";
 import {
   shouldReuseCompletedSameDayRun,
   shouldSupersedeCompletedSameDayRunForDevelopment,
@@ -26,7 +25,6 @@ const RESPONSE_HEADERS = {
 const startAnalysisSchema = z.object({
   walletAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/).transform((value) => value.toLowerCase()),
   chainId: z.number().int().positive().default(SUPPORTED_CHAIN_ID),
-  mode: z.enum(["full_history", "incremental"]).optional(),
 });
 
 function serializeRunResponse(run: {
@@ -106,18 +104,14 @@ export async function POST(request: Request) {
     if (sameDayRun && shouldSupersedeCompletedSameDayRunForDevelopment({ sameDayRunStatus: sameDayRun.status })) {
       await supersedeCompletedRunForDevelopmentRerun(sameDayRun.id);
     }
-
-    const context = await prepareAnalysisRunContext({
-      walletAddress: payload.walletAddress,
-      chainId: payload.chainId,
-      requestedMode: payload.mode ?? (latestCompletedRun ? "incremental" : null),
-    });
+    const triggeredAtUtc = new Date();
+    const resolvedMode = "full_history" as const;
 
     const run = await createAnalysisRun({
       walletAddress: payload.walletAddress,
       chainId: payload.chainId,
-      mode: context.mode,
-      triggeredAtUtc: context.triggeredAtUtc,
+      mode: resolvedMode,
+      triggeredAtUtc,
     });
 
     try {
@@ -125,12 +119,12 @@ export async function POST(request: Request) {
         runId: run.id,
         walletAddress: payload.walletAddress,
         chainId: payload.chainId,
-        mode: context.mode,
+        mode: resolvedMode,
       });
       await mergeAnalysisRunMetadata(run.id, {
         triggerRunId: handle.id,
-        plannedSliceCount: context.slices.length,
-        resolvedMode: context.mode,
+        plannedSliceCount: 1,
+        resolvedMode,
         latestCompletedRunId: latestCompletedRun?.id ?? null,
       });
     } catch (error) {

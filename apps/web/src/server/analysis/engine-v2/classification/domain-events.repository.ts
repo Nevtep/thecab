@@ -40,7 +40,7 @@ export function toDomainEventValues(input: EngineV2DomainEventInput): typeof eng
     confidence: input.classification.confidence,
     reasonCodes: input.classification.reasonCodes,
     evidenceJson: input.classification.evidence,
-    metadataJson: {},
+    metadataJson: input.classification.metadataJson ?? {},
   };
 }
 

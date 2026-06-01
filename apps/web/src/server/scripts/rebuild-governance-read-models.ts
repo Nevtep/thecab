@@ -1,9 +1,13 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-import pg from "pg";
+import { and, asc, eq, inArray } from "drizzle-orm";
 
 import { SUPPORTED_CHAIN_ID } from "@/server/chains";
+import { runChronologicalAccounting } from "@/server/analysis/engine-v2/accounting";
+import { materializeAllDataViewRows, persistReadModelRows } from "@/server/analysis/engine-v2/materializers";
+import { closeDb, getDb } from "@/server/db/client";
+import { engineV2DomainEventLinks, engineV2DomainEvents } from "@/server/db/schema";
 
 function loadLocalEnvFile() {
   const envFilePath = resolve(process.cwd(), ".env.local");
@@ -21,78 +25,78 @@ function loadLocalEnvFile() {
 }
 
 function getRequiredAddress() {
-  const value = (process.env.WALLET_ADDRESS ?? process.env.TEST_ADDRESS ?? "").trim();
+  const value = (process.env.WALLET_ADDRESS ?? "").trim();
   if (!/^0x[a-fA-F0-9]{40}$/.test(value)) {
-    throw new Error("WALLET_ADDRESS_OR_TEST_ADDRESS_MISSING");
+    throw new Error("WALLET_ADDRESS_MISSING");
   }
   return value.toLowerCase();
 }
 
-function getRequiredDatabaseUrl() {
-  const value = process.env.DATABASE_URL?.trim() ?? "";
-  if (!value) throw new Error("DATABASE_URL_MISSING");
-  return value;
+async function loadAccountingInput(input: { chainId: number; walletAddress: string }) {
+  const db = getDb();
+  const events = await db.select().from(engineV2DomainEvents).where(and(
+    eq(engineV2DomainEvents.chainId, input.chainId),
+    eq(engineV2DomainEvents.walletAddress, input.walletAddress.toLowerCase()),
+  )).orderBy(asc(engineV2DomainEvents.occurredAt), asc(engineV2DomainEvents.sequenceIndex));
+  const eventIds = events.map((event) => event.id);
+  const links = eventIds.length > 0
+    ? await db.select().from(engineV2DomainEventLinks).where(and(
+      eq(engineV2DomainEventLinks.chainId, input.chainId),
+      inArray(engineV2DomainEventLinks.domainEventId, eventIds),
+    ))
+    : [];
+
+  return {
+    events: events.map((event) => ({
+      id: event.id,
+      chainId: event.chainId,
+      walletAddress: event.walletAddress,
+      canonicalTransactionId: event.canonicalTransactionId,
+      eventType: event.eventType,
+      eventFamily: event.eventFamily,
+      occurredAt: event.occurredAt,
+      txHash: event.txHash,
+      sequenceIndex: event.sequenceIndex,
+      coverageStatus: event.coverageStatus,
+      confidence: event.confidence,
+      reasonCodes: event.reasonCodes,
+      valueEffectJson: event.valueEffectJson,
+      evidenceJson: event.evidenceJson,
+      metadataJson: event.metadataJson,
+    })),
+    links: links.map((link) => ({
+      domainEventId: link.domainEventId,
+      entityType: link.entityType,
+      entityId: link.entityId,
+      linkKind: link.linkKind,
+      confidence: link.confidence,
+      evidenceJson: link.evidenceJson,
+    })),
+  };
 }
 
 async function main() {
   loadLocalEnvFile();
   const walletAddress = getRequiredAddress();
   const chainId = Number(process.env.CHAIN_ID ?? SUPPORTED_CHAIN_ID);
-  const client = new pg.Client({ connectionString: getRequiredDatabaseUrl() });
-  await client.connect();
+  const accounting = runChronologicalAccounting(await loadAccountingInput({ chainId, walletAddress }));
+  const rows = materializeAllDataViewRows(accounting).filter((row) => row.surface === "governance");
+  await persistReadModelRows({ db: getDb(), rows });
 
-  try {
-    const run = await client.query<{ id: string }>(
-      `select id from analysis_runs
-       where wallet_address = $1 and chain_id = $2
-       order by created_at desc
-       limit 1`,
-      [walletAddress, chainId],
-    );
-    const runId = run.rows[0]?.id ?? null;
-    if (!runId) throw new Error("ANALYSIS_RUN_NOT_FOUND");
-
-    const result = await client.query(
-      `insert into governance_metric_snapshots
-        (run_id, chain_id, wallet_address, summary_json, selected_detail_json, coverage_status, confidence)
-       select
-        $3::uuid,
-        $2::integer,
-        $1::varchar,
-        jsonb_build_object(
-          'totalEvents', count(*),
-          'eventTypes', coalesce(jsonb_object_agg(event_type, event_count), '{}'::jsonb),
-          'lockedAero', null,
-          'veAeroExposure', null,
-          'governanceRewardsClaimedUsd', null,
-          'estimatedGovernanceReturn', null
-        ),
-        null,
-        case when count(*) = 0 then 'unavailable' else 'partial' end,
-        case when count(*) = 0 then 'none' else 'medium' end
-       from (
-         select event_type, count(*) as event_count
-         from governance_events
-         where wallet_address = $1 and chain_id = $2
-         group by event_type
-       ) grouped`,
-      [walletAddress, chainId, runId],
-    );
-
-    console.log(JSON.stringify({
-      ok: true,
-      walletAddress,
-      chainId,
-      runId,
-      insertedMetricSnapshots: result.rowCount ?? 0,
-    }, null, 2));
-  } finally {
-    await client.end();
-  }
+  console.log(JSON.stringify({
+    ok: true,
+    walletAddress,
+    chainId,
+    surface: "governance",
+    rowCount: rows.length,
+    rowKeys: rows.map((row) => row.rowKey),
+  }, null, 2));
 }
 
 main().catch((error) => {
   const message = error instanceof Error ? error.message : String(error);
   console.error(message);
   process.exit(1);
+}).finally(async () => {
+  await closeDb();
 });

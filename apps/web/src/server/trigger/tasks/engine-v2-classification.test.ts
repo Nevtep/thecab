@@ -53,6 +53,7 @@ test("runEngineV2DecodeCanonicalCalls decodes then queues chronological classifi
   }, {
     loadTransactions: async () => [{ hash: "0x1", to_address: walletAddress, input: "0x" }],
     loadRegistry: async () => new Map(),
+    persistDecodedCalls: async () => undefined,
     trigger: async (taskId) => {
       triggered.push(taskId);
     },
@@ -60,4 +61,15 @@ test("runEngineV2DecodeCanonicalCalls decodes then queues chronological classifi
 
   assert.equal(result.transactionCount, 1);
   assert.equal(triggered[0], "engine-v2-classify-chronological");
+});
+
+test("Engine V2 decode and classification require a collection run id when reading provider pages", async () => {
+  await assert.rejects(
+    () => runEngineV2DecodeCanonicalCalls({ chainId: 8453, walletAddress }),
+    /ENGINE_V2_COLLECTION_RUN_ID_REQUIRED/,
+  );
+  await assert.rejects(
+    () => runEngineV2ClassifyChronological({ chainId: 8453, walletAddress }),
+    /ENGINE_V2_COLLECTION_RUN_ID_REQUIRED/,
+  );
 });

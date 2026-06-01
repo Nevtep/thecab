@@ -700,4 +700,4 @@ Implicacion para engine V2:
 - Canonical transactions, logs, internal transactions, movements, and canonical calls are persisted before classification.
 - ABI, selector, protocol known-address, token metadata, price, state snapshot, and provider request evidence are persisted/cached in DB so serverless workers can resume without hardcoded wallet-specific contracts.
 - BaseScan/Etherscan/Sourcify/GitHub ABI fetches, Alchemy pricing/RPC backfills, Moralis decoded tx/NFT transfer backfills, and LpSugar/current-state reads are analysis-time only.
-- Route repositories use `engine_v2_read_model_rows` only when `ANALYSIS_ENGINE_V2_READ_MODELS` is enabled; no request-time provider clients are imported by DataView repositories.
+- Route repositories now use `engine_v2_read_model_rows` as the active DB-only analysis source; no request-time provider clients are imported by DataView repositories.

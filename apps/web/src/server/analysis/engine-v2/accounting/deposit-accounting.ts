@@ -41,6 +41,30 @@ function asNumberString(value: unknown) {
   return asString(value);
 }
 
+function movementRecords(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item))
+    : [];
+}
+
+function explicitNftIdentityFromMovements(input: {
+  event: EngineV2DomainEventLike;
+  metadata: Record<string, unknown>;
+  evidence: Record<string, unknown>;
+}) {
+  const direction = input.event.eventType.includes("withdraw") || input.event.eventType.includes("close") ? "out" : "in";
+  const candidates = [
+    ...movementRecords(input.evidence.movements),
+    ...movementRecords(input.metadata.movements),
+  ];
+  const movement = candidates.find((item) => item.assetType === "erc721" && item.direction === direction) ??
+    candidates.find((item) => item.assetType === "erc721");
+  return {
+    positionManagerAddress: asString(movement?.tokenAddress),
+    tokenId: asString(movement?.tokenId),
+  };
+}
+
 function addDecimal(left: string, right: string | null) {
   if (!right) return left;
   const total = Number(left) + Number(right);
@@ -55,9 +79,10 @@ function linkForEvent(links: EngineV2EntityLinkLike[], event: EngineV2DomainEven
 function depositIdentity(event: EngineV2DomainEventLike, links: EngineV2EntityLinkLike[]) {
   const metadata = asRecord(event.metadataJson);
   const evidence = asRecord(event.evidenceJson);
+  const movementIdentity = explicitNftIdentityFromMovements({ event, metadata, evidence });
   const depositLink = linkForEvent(links, event, "deposit");
-  const positionManager = asString(metadata.positionManagerAddress) ?? asString(evidence.positionManagerAddress);
-  const tokenId = asString(metadata.tokenId) ?? asString(evidence.tokenId);
+  const positionManager = asString(metadata.positionManagerAddress) ?? asString(evidence.positionManagerAddress) ?? movementIdentity.positionManagerAddress;
+  const tokenId = asString(metadata.tokenId) ?? asString(evidence.tokenId) ?? movementIdentity.tokenId;
   const depositId = depositLink?.entityId ?? asString(metadata.depositId) ?? (positionManager && tokenId ? `${event.chainId}:${positionManager.toLowerCase()}:${tokenId}` : null);
   const poolLink = linkForEvent(links, event, "pool");
   return {
@@ -108,7 +133,7 @@ export function accountManualDeposits(input: {
     existing.reasonCodes = [...new Set([...existing.reasonCodes, ...event.reasonCodes])];
     if (!existing.poolId && identity.poolId) existing.poolId = identity.poolId;
 
-    if (event.eventType.includes("open") || event.eventType.includes("deposit") || event.eventType.includes("increase")) {
+    if (event.eventType.includes("open") || event.eventType.includes("created") || event.eventType.includes("mint") || event.eventType.includes("deposit") || event.eventType.includes("increase") || event.eventType.includes("stake")) {
       existing.status = existing.status === "closed" ? "closed" : "open";
       existing.openedAt ??= event.occurredAt;
       existing.openedValueUsd ??= valueUsd;

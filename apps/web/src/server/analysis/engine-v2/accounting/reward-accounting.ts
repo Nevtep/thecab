@@ -2,10 +2,14 @@ import type { EngineV2DomainEventLike, EngineV2EntityLinkLike } from "./chronolo
 
 export type EngineV2RewardProjection = {
   rewardId: string;
+  sourceDomainEventId?: string | null;
+  itemIndex?: number | null;
   rewardType: string;
   tokenAddress: string | null;
   amountRaw: string | null;
   amountUsd: string | null;
+  lockTokenId?: string | null;
+  sourceContract?: string | null;
   ownerStatus: "manual_deposit" | "strategy" | "governance" | "unresolved" | "excluded";
   linkedEntityId: string | null;
   poolId: string | null;
@@ -28,6 +32,13 @@ function asString(value: unknown) {
 
 function asBoolean(value: unknown) {
   return typeof value === "boolean" ? value : null;
+}
+
+function asInteger(value: unknown) {
+  if (typeof value === "number" && Number.isInteger(value)) return value;
+  if (typeof value !== "string" || value.length === 0) return null;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isInteger(parsed) ? parsed : null;
 }
 
 function linksForEvent(links: EngineV2EntityLinkLike[], event: EngineV2DomainEventLike) {
@@ -61,28 +72,38 @@ export function accountRewards(input: { events: EngineV2DomainEventLike[]; links
       event.eventType.includes("bribe") ? "governance_bribe" :
       event.eventType.includes("fee") ? "governance_fee" :
       event.eventType.includes("rebase") ? "rebase" :
+      event.eventFamily === "strategy" ? "strategy_reward" :
       "unknown"
     );
     const isExcluded = event.coverageStatus === "excluded";
+    const metadataStrategyExposureId = asString(metadata.strategyExposureId);
+    const metadataDepositId = asString(metadata.depositId);
     const ownerStatus = isExcluded ? "excluded" :
       strategyLink ? "strategy" :
+      metadataStrategyExposureId ? "strategy" :
       depositLink ? "manual_deposit" :
+      metadataDepositId ? "manual_deposit" :
       governanceLink || event.eventFamily === "governance" ? "governance" :
       "unresolved";
     const affectsTotals = asBoolean(metadata.affectsTotals) ?? (!isExcluded && rewardType !== "rebase" && ownerStatus !== "unresolved");
     const poolContribution = isExcluded ? "excluded" :
       poolLink ? "contributes" :
+      asString(metadata.poolId) ? "contributes" :
       rewardType === "rebase" ? "none" :
       "unresolved";
 
     rewards.push({
       rewardId,
+      sourceDomainEventId: event.id ?? null,
+      itemIndex: asInteger(metadata.itemIndex),
       rewardType,
       tokenAddress: asString(metadata.tokenAddress),
       amountRaw: asString(metadata.amountRaw),
       amountUsd: asString(metadata.amountUsd) ?? asString(metadata.valueUsd) ?? asString(metadata.valueUsdAtEvent),
+      lockTokenId: asString(metadata.lockTokenId),
+      sourceContract: asString(metadata.sourceContract) ?? asString(metadata.distributorAddress) ?? asString(metadata.claimContract),
       ownerStatus,
-      linkedEntityId: strategyLink?.entityId ?? depositLink?.entityId ?? governanceLink?.entityId ?? null,
+      linkedEntityId: strategyLink?.entityId ?? metadataStrategyExposureId ?? depositLink?.entityId ?? metadataDepositId ?? governanceLink?.entityId ?? null,
       poolId: poolLink?.entityId ?? asString(metadata.poolId),
       affectsTotals,
       poolContribution,
