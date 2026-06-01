@@ -211,6 +211,11 @@ export function classifyGovernanceTransaction(input: {
   walletAddress: Address;
   registry: Map<Address, AbiRegistryEntry>;
 }): EngineV2Classification | null {
+  const baseClassification = classifyBaseTransaction(input);
+  if (baseClassification.eventType === "failed_transaction" || baseClassification.coverageStatus === "excluded") {
+    return null;
+  }
+
   const decodedCalls = decodeCanonicalTransactionCalls({
     tx: input.tx,
     registry: input.registry,
@@ -222,14 +227,13 @@ export function classifyGovernanceTransaction(input: {
     return nativeClassification;
   }
 
-  const classification = classifyBaseTransaction(input);
-  if (!classification.eventType.startsWith("governance_")) return null;
+  if (!baseClassification.eventType.startsWith("governance_")) return null;
 
   return {
-    ...classification,
+    ...baseClassification,
     eventFamily: "governance",
     evidence: {
-      ...classification.evidence,
+      ...baseClassification.evidence,
       identityRule: "explicit_lock_token_id_or_governance_abi",
       noTimeWindowOwnershipInference: true,
     },

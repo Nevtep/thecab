@@ -199,3 +199,45 @@ test("classifyGovernanceTransaction identifies RewardsDistributor.claim without 
   assert.equal(result?.metadataJson?.lockTokenId, "113464");
 });
 
+test("classifyGovernanceTransaction does not override failed RewardsDistributor claims", () => {
+  const result = classifyGovernanceTransaction({
+    walletAddress,
+    registry: new Map([[
+      rewardsDistributor,
+      {
+        chainId: 8453,
+        address: rewardsDistributor,
+        label: "RewardsDistributor",
+        protocol: "aerodrome",
+        expectedKind: "governance-rebase",
+        fetchedAt: "2026-01-01T00:00:00.000Z",
+        sources: { basescanApi: "", basescanCode: "" },
+        source: {
+          contractName: "RewardsDistributor",
+          compilerVersion: null,
+          optimizationUsed: null,
+          runs: null,
+          constructorArguments: null,
+          evmVersion: null,
+          library: null,
+          licenseType: null,
+          proxy: false,
+          implementation: null,
+          swarmSource: null,
+        },
+        abi: rewardsDistributorAbi,
+        warnings: [],
+      },
+    ]]),
+    tx: {
+      hash: "0x4",
+      from_address: walletAddress,
+      to_address: rewardsDistributor,
+      receipt_status: "0",
+      input: encodeFunctionData({ abi: rewardsDistributorAbi, functionName: "claim", args: [113464n] }),
+    },
+  });
+
+  assert.equal(result, null);
+});
+
