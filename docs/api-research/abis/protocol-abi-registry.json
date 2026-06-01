@@ -1,0 +1,619 @@
+{
+  "generatedAt": "2026-06-01T00:26:10.984Z",
+  "chainId": 8453,
+  "sourcePolicy": {
+    "primary": "Etherscan v2 getsourcecode for deployed Base contracts",
+    "verificationRule": "Address + chainId + verified ABI + proxy implementation metadata must match before classifier decodes confidently."
+  },
+  "entries": [
+    {
+      "chainId": 8453,
+      "address": "0x940181a94a35a4569e4529a3cdfb74e38fd98631",
+      "label": "AERO",
+      "protocol": "aerodrome",
+      "expectedKind": "token",
+      "fetchedAt": "2026-06-01T00:26:13.002Z",
+      "sources": {
+        "basescanApi": "https://api.etherscan.io/v2/api?chainid=8453&module=contract&action=getsourcecode&address=0x940181a94A35A4569E4529A3CDfB74e38FD98631",
+        "basescanCode": "https://basescan.org/address/0x940181a94a35a4569e4529a3cdfb74e38fd98631#code",
+        "sourceHint": "https://github.com/aerodrome-finance/contracts"
+      },
+      "source": {
+        "contractName": "Aero",
+        "compilerVersion": "v0.8.19+commit.7dd6d404",
+        "optimizationUsed": "1",
+        "runs": "200",
+        "constructorArguments": null,
+        "evmVersion": "Default",
+        "library": null,
+        "licenseType": "GNU GPLv3",
+        "proxy": false,
+        "implementation": null,
+        "swarmSource": "ipfs://a692786301f8fc5753982d52f4f683566b0e99f55fb78794411a18a8b3b09cb5"
+      },
+      "warnings": [],
+      "artifact": "docs/api-research/abis/base-8453/0x940181a94a35a4569e4529a3cdfb74e38fd98631.json",
+      "abiEntryCount": 25
+    },
+    {
+      "chainId": 8453,
+      "address": "0xcf77a3ba9a5ca399b7c97c74d54e5b1beb874e43",
+      "label": "Router",
+      "protocol": "aerodrome",
+      "expectedKind": "router",
+      "fetchedAt": "2026-06-01T00:26:13.787Z",
+      "sources": {
+        "basescanApi": "https://api.etherscan.io/v2/api?chainid=8453&module=contract&action=getsourcecode&address=0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43",
+        "basescanCode": "https://basescan.org/address/0xcf77a3ba9a5ca399b7c97c74d54e5b1beb874e43#code",
+        "sourceHint": "https://github.com/aerodrome-finance/contracts/blob/main/contracts/Router.sol"
+      },
+      "source": {
+        "contractName": "Router",
+        "compilerVersion": "v0.8.19+commit.7dd6d404",
+        "optimizationUsed": "1",
+        "runs": "200",
+        "constructorArguments": "00000000000000000000000015e62707fca7352fbe35f51a8d6b0f8066a05dcc0000000000000000000000005c3f18f06cc09ca1910767a34a20f771039e37c0000000000000000000000000420dd381b31aef6683db6b902084cb0ffece40da00000000000000000000000016613524e02ad97edfef371bc883f2f5d6c480a50000000000000000000000004200000000000000000000000000000000000006",
+        "evmVersion": "Default",
+        "library": null,
+        "licenseType": "BSL 1.1",
+        "proxy": false,
+        "implementation": null,
+        "swarmSource": "ipfs://b68b2dd239bbcf1a487caca8c68abd0aa1b05af6b08469ed0ff93d5dde3bd1e6"
+      },
+      "warnings": [],
+      "artifact": "docs/api-research/abis/base-8453/0xcf77a3ba9a5ca399b7c97c74d54e5b1beb874e43.json",
+      "abiEntryCount": 51
+    },
+    {
+      "chainId": 8453,
+      "address": "0x16613524e02ad97edfef371bc883f2f5d6c480a5",
+      "label": "Voter",
+      "protocol": "aerodrome",
+      "expectedKind": "governance-voter",
+      "fetchedAt": "2026-06-01T00:26:14.554Z",
+      "sources": {
+        "basescanApi": "https://api.etherscan.io/v2/api?chainid=8453&module=contract&action=getsourcecode&address=0x16613524e02ad97eDfeF371bC883F2F5d6C480A5",
+        "basescanCode": "https://basescan.org/address/0x16613524e02ad97edfef371bc883f2f5d6c480a5#code",
+        "sourceHint": "https://github.com/aerodrome-finance/contracts/blob/main/contracts/Voter.sol"
+      },
+      "source": {
+        "contractName": "Voter",
+        "compilerVersion": "v0.8.19+commit.7dd6d404",
+        "optimizationUsed": "1",
+        "runs": "200",
+        "constructorArguments": "00000000000000000000000015e62707fca7352fbe35f51a8d6b0f8066a05dcc000000000000000000000000ebf418fe2512e7e6bd9b87a8f0f294acdc67e6b40000000000000000000000005c3f18f06cc09ca1910767a34a20f771039e37c0",
+        "evmVersion": "Default",
+        "library": null,
+        "licenseType": "BSL 1.1",
+        "proxy": false,
+        "implementation": null,
+        "swarmSource": "ipfs://b639315ef2a9685c97e94a70f1d3bbe93e456de19695c0b83815f397fbe1fef8"
+      },
+      "warnings": [],
+      "artifact": "docs/api-research/abis/base-8453/0x16613524e02ad97edfef371bc883f2f5d6c480a5.json",
+      "abiEntryCount": 88
+    },
+    {
+      "chainId": 8453,
+      "address": "0xebf418fe2512e7e6bd9b87a8f0f294acdc67e6b4",
+      "label": "VotingEscrow",
+      "protocol": "aerodrome",
+      "expectedKind": "governance-lock",
+      "fetchedAt": "2026-06-01T00:26:15.332Z",
+      "sources": {
+        "basescanApi": "https://api.etherscan.io/v2/api?chainid=8453&module=contract&action=getsourcecode&address=0xeBf418Fe2512e7E6bd9b87a8F0f294aCDC67e6B4",
+        "basescanCode": "https://basescan.org/address/0xebf418fe2512e7e6bd9b87a8f0f294acdc67e6b4#code",
+        "sourceHint": "https://github.com/aerodrome-finance/contracts/blob/main/contracts/VotingEscrow.sol"
+      },
+      "source": {
+        "contractName": "VotingEscrow",
+        "compilerVersion": "v0.8.19+commit.7dd6d404",
+        "optimizationUsed": "1",
+        "runs": "200",
+        "constructorArguments": "00000000000000000000000015e62707fca7352fbe35f51a8d6b0f8066a05dcc000000000000000000000000940181a94a35a4569e4529a3cdfb74e38fd986310000000000000000000000005c3f18f06cc09ca1910767a34a20f771039e37c0",
+        "evmVersion": "Default",
+        "library": "BalanceLogicLibrary:8e634181dafb102213fad46b71ba1a4b6153b648;DelegationLogicLibrary:d6e6d57d0627aae127743c79bc795f836431d59f",
+        "licenseType": "BSL 1.1",
+        "proxy": false,
+        "implementation": null,
+        "swarmSource": "ipfs://b3b1b41a766901a8b8f6fa1e5e3839da187c0861202c702ea1956c8cfd7971e8"
+      },
+      "warnings": [],
+      "artifact": "docs/api-research/abis/base-8453/0xebf418fe2512e7e6bd9b87a8f0f294acdc67e6b4.json",
+      "abiEntryCount": 140
+    },
+    {
+      "chainId": 8453,
+      "address": "0x227f65131a261548b057215bb1d5ab2997964c7d",
+      "label": "RewardsDistributor",
+      "protocol": "aerodrome",
+      "expectedKind": "governance-rebase",
+      "fetchedAt": "2026-06-01T00:26:16.102Z",
+      "sources": {
+        "basescanApi": "https://api.etherscan.io/v2/api?chainid=8453&module=contract&action=getsourcecode&address=0x227f65131A261548b057215bB1D5Ab2997964C7d",
+        "basescanCode": "https://basescan.org/address/0x227f65131a261548b057215bb1d5ab2997964c7d#code",
+        "sourceHint": "https://github.com/aerodrome-finance/contracts/blob/main/contracts/RewardsDistributor.sol"
+      },
+      "source": {
+        "contractName": "RewardsDistributor",
+        "compilerVersion": "v0.8.19+commit.7dd6d404",
+        "optimizationUsed": "1",
+        "runs": "200",
+        "constructorArguments": "000000000000000000000000ebf418fe2512e7e6bd9b87a8f0f294acdc67e6b4",
+        "evmVersion": "Default",
+        "library": null,
+        "licenseType": "GNU GPLv3",
+        "proxy": false,
+        "implementation": null,
+        "swarmSource": "ipfs://7bee9047e73e4f6ed6d131dbb7caaeb52c5f351d8f11989c96694c9e8a75efc2"
+      },
+      "warnings": [],
+      "artifact": "docs/api-research/abis/base-8453/0x227f65131a261548b057215bb1d5ab2997964c7d.json",
+      "abiEntryCount": 20
+    },
+    {
+      "chainId": 8453,
+      "address": "0x69dd9db6d8f8e7d83887a704f447b1a584b599a1",
+      "label": "LpSugar",
+      "protocol": "aerodrome",
+      "expectedKind": "read-helper",
+      "fetchedAt": "2026-06-01T00:26:16.717Z",
+      "sources": {
+        "basescanApi": "https://api.etherscan.io/v2/api?chainid=8453&module=contract&action=getsourcecode&address=0x69dD9db6d8f8E7d83887A704f447b1a584b599A1",
+        "basescanCode": "https://basescan.org/address/0x69dd9db6d8f8e7d83887a704f447b1a584b599a1#code",
+        "sourceHint": "https://basescan.org/address/0x69dD9db6d8f8E7d83887A704f447b1a584b599A1#code"
+      },
+      "source": {
+        "contractName": "LpSugar",
+        "compilerVersion": "vyper:0.4.0",
+        "optimizationUsed": "1",
+        "runs": "0",
+        "constructorArguments": null,
+        "evmVersion": "Default",
+        "library": null,
+        "licenseType": "BSL 1.1",
+        "proxy": false,
+        "implementation": null,
+        "swarmSource": null
+      },
+      "warnings": [],
+      "artifact": "docs/api-research/abis/base-8453/0x69dd9db6d8f8e7d83887a704f447b1a584b599a1.json",
+      "abiEntryCount": 25
+    },
+    {
+      "chainId": 8453,
+      "address": "0x01d40099fcd87c018969b0e8d4ab1633fb34763c",
+      "label": "Aerodrome Slipstream Router",
+      "protocol": "aerodrome",
+      "expectedKind": "router",
+      "fetchedAt": "2026-06-01T00:26:17.648Z",
+      "sources": {
+        "basescanApi": "https://api.etherscan.io/v2/api?chainid=8453&module=contract&action=getsourcecode&address=0x01d40099fcd87c018969b0e8d4ab1633fb34763c",
+        "basescanCode": "https://basescan.org/address/0x01d40099fcd87c018969b0e8d4ab1633fb34763c#code",
+        "sourceHint": "https://basescan.org/address/0x01d40099fcd87c018969b0e8d4ab1633fb34763c#code"
+      },
+      "source": {
+        "contractName": "UniversalRouter",
+        "compilerVersion": "v0.8.29+commit.ab55807c",
+        "optimizationUsed": "1",
+        "runs": "20000",
+        "constructorArguments": "000000000000000000000000494bbd8a3302aca833d307d11838f18dbada9c2500000000000000000000000042000000000000000000000000000000000000060000000000000000000000008909dc15e40173ff4699343b6eb8132c65e18ec600000000000000000000000033128a8fc17869897dce68ed026d694621f6fdfd96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845fe34f199b19b2b4f47f68442619d555527d244f78a3297ea89325f843f87b8b54000000000000000000000000498581ff718922c3f8e6a244956af099b2652b2b000000000000000000000000420dd381b31aef6683db6b902084cb0ffece40da0000000000000000000000005e7bb104d84c7cb9b682aac2f3d509f5f406809a6f178972b07752b522a4da1c5b71af6524e8b0bd6027ccb29e5312b0e5bcdc3cffb9af9ea6d9e39da47392ecc7055277b9915b8bfc9f83f105821b7791a6ae30",
+        "evmVersion": "cancun",
+        "library": null,
+        "licenseType": null,
+        "proxy": false,
+        "implementation": null,
+        "swarmSource": null
+      },
+      "warnings": [],
+      "artifact": "docs/api-research/abis/base-8453/0x01d40099fcd87c018969b0e8d4ab1633fb34763c.json",
+      "abiEntryCount": 58
+    },
+    {
+      "chainId": 8453,
+      "address": "0x6df1c91424f79e40e33b1a48f0687b666be71075",
+      "label": "Aerodrome Router Candidate",
+      "protocol": "aerodrome",
+      "expectedKind": "router",
+      "fetchedAt": "2026-06-01T00:26:18.428Z",
+      "sources": {
+        "basescanApi": "https://api.etherscan.io/v2/api?chainid=8453&module=contract&action=getsourcecode&address=0x6df1c91424f79e40e33b1a48f0687b666be71075",
+        "basescanCode": "https://basescan.org/address/0x6df1c91424f79e40e33b1a48f0687b666be71075#code",
+        "sourceHint": "https://basescan.org/address/0x6df1c91424f79e40e33b1a48f0687b666be71075#code"
+      },
+      "source": {
+        "contractName": "UniversalRouter",
+        "compilerVersion": "v0.8.29+commit.ab55807c",
+        "optimizationUsed": "1",
+        "runs": "10000",
+        "constructorArguments": "000000000000000000000000494bbd8a3302aca833d307d11838f18dbada9c2500000000000000000000000042000000000000000000000000000000000000060000000000000000000000008909dc15e40173ff4699343b6eb8132c65e18ec600000000000000000000000033128a8fc17869897dce68ed026d694621f6fdfd96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845fe34f199b19b2b4f47f68442619d555527d244f78a3297ea89325f843f87b8b54000000000000000000000000498581ff718922c3f8e6a244956af099b2652b2b000000000000000000000000420dd381b31aef6683db6b902084cb0ffece40da0000000000000000000000005e7bb104d84c7cb9b682aac2f3d509f5f406809a6f178972b07752b522a4da1c5b71af6524e8b0bd6027ccb29e5312b0e5bcdc3cffb9af9ea6d9e39da47392ecc7055277b9915b8bfc9f83f105821b7791a6ae30000000000000000000000000ade65c38cd4849adba595a4323a8c7ddfe89716ae524afc4d53c767ee9df4e3b4e1937f621368ef156aeffac97f1518b2b556f9d",
+        "evmVersion": "cancun",
+        "library": null,
+        "licenseType": null,
+        "proxy": false,
+        "implementation": null,
+        "swarmSource": null
+      },
+      "warnings": [],
+      "artifact": "docs/api-research/abis/base-8453/0x6df1c91424f79e40e33b1a48f0687b666be71075.json",
+      "abiEntryCount": 60
+    },
+    {
+      "chainId": 8453,
+      "address": "0xcd975e6a5f55137755487f0918b8ca74acce7925",
+      "label": "Mellow WETH-USDC Strategy Wrapper",
+      "protocol": "mellow",
+      "expectedKind": "strategy-wrapper",
+      "fetchedAt": "2026-06-01T00:26:19.204Z",
+      "sources": {
+        "basescanApi": "https://api.etherscan.io/v2/api?chainid=8453&module=contract&action=getsourcecode&address=0xcd975e6a5F55137755487F0918b8ca74aCCe7925",
+        "basescanCode": "https://basescan.org/address/0xcd975e6a5f55137755487f0918b8ca74acce7925#code",
+        "sourceHint": "https://basescan.org/address/0xcd975e6a5F55137755487F0918b8ca74aCCe7925#code"
+      },
+      "source": {
+        "contractName": "LpWrapper",
+        "compilerVersion": "v0.8.25+commit.b61c2a91",
+        "optimizationUsed": "1",
+        "runs": "200",
+        "constructorArguments": "0000000000000000000000000000000ce42d4981513060ab7e50b9e5e2d19af1",
+        "evmVersion": "shanghai",
+        "library": null,
+        "licenseType": "BSL 1.1",
+        "proxy": false,
+        "implementation": null,
+        "swarmSource": "ipfs://5463657b37359f7dfd780ee6f5c39c288735c3928b4b761b0bf03e74037208c5"
+      },
+      "warnings": [],
+      "artifact": "docs/api-research/abis/base-8453/0xcd975e6a5f55137755487f0918b8ca74acce7925.json",
+      "abiEntryCount": 95
+    },
+    {
+      "chainId": 8453,
+      "address": "0x55f54b1f63125fce3c90f30856ce9d928ff47c26",
+      "label": "Mellow Strategy Wrapper",
+      "protocol": "mellow",
+      "expectedKind": "strategy-wrapper",
+      "fetchedAt": "2026-06-01T00:26:19.979Z",
+      "sources": {
+        "basescanApi": "https://api.etherscan.io/v2/api?chainid=8453&module=contract&action=getsourcecode&address=0x55F54B1f63125Fce3c90F30856CE9d928FF47C26",
+        "basescanCode": "https://basescan.org/address/0x55f54b1f63125fce3c90f30856ce9d928ff47c26#code",
+        "sourceHint": "https://basescan.org/address/0x55F54B1f63125Fce3c90F30856CE9d928FF47C26#code"
+      },
+      "source": {
+        "contractName": "LpWrapper",
+        "compilerVersion": "v0.8.25+commit.b61c2a91",
+        "optimizationUsed": "1",
+        "runs": "200",
+        "constructorArguments": "0000000000000000000000000000000ce42d4981513060ab7e50b9e5e2d19af1",
+        "evmVersion": "shanghai",
+        "library": null,
+        "licenseType": "BSL 1.1",
+        "proxy": false,
+        "implementation": null,
+        "swarmSource": "ipfs://5463657b37359f7dfd780ee6f5c39c288735c3928b4b761b0bf03e74037208c5"
+      },
+      "warnings": [],
+      "artifact": "docs/api-research/abis/base-8453/0x55f54b1f63125fce3c90f30856ce9d928ff47c26.json",
+      "abiEntryCount": 95
+    },
+    {
+      "chainId": 8453,
+      "address": "0xb9db6804e84d960e139a2bdc33bfc30f8fb689fe",
+      "label": "Mellow Strategy Wrapper",
+      "protocol": "mellow",
+      "expectedKind": "strategy-wrapper",
+      "fetchedAt": "2026-06-01T00:26:20.751Z",
+      "sources": {
+        "basescanApi": "https://api.etherscan.io/v2/api?chainid=8453&module=contract&action=getsourcecode&address=0xB9DB6804e84D960E139A2BdC33bfC30f8fb689Fe",
+        "basescanCode": "https://basescan.org/address/0xb9db6804e84d960e139a2bdc33bfc30f8fb689fe#code",
+        "sourceHint": "https://basescan.org/address/0xB9DB6804e84D960E139A2BdC33bfC30f8fb689Fe#code"
+      },
+      "source": {
+        "contractName": "LpWrapper",
+        "compilerVersion": "v0.8.25+commit.b61c2a91",
+        "optimizationUsed": "1",
+        "runs": "200",
+        "constructorArguments": "0000000000000000000000000000000ce42d4981513060ab7e50b9e5e2d19af1",
+        "evmVersion": "shanghai",
+        "library": null,
+        "licenseType": "BSL 1.1",
+        "proxy": false,
+        "implementation": null,
+        "swarmSource": "ipfs://5463657b37359f7dfd780ee6f5c39c288735c3928b4b761b0bf03e74037208c5"
+      },
+      "warnings": [],
+      "artifact": "docs/api-research/abis/base-8453/0xb9db6804e84d960e139a2bdc33bfc30f8fb689fe.json",
+      "abiEntryCount": 95
+    },
+    {
+      "chainId": 8453,
+      "address": "0x0df5f2662e4a8c801c04d83df717476509816250",
+      "label": "Mellow Strategy Wrapper",
+      "protocol": "mellow",
+      "expectedKind": "strategy-wrapper",
+      "fetchedAt": "2026-06-01T00:26:21.526Z",
+      "sources": {
+        "basescanApi": "https://api.etherscan.io/v2/api?chainid=8453&module=contract&action=getsourcecode&address=0x0Df5f2662e4a8C801c04D83Df717476509816250",
+        "basescanCode": "https://basescan.org/address/0x0df5f2662e4a8c801c04d83df717476509816250#code",
+        "sourceHint": "https://basescan.org/address/0x0Df5f2662e4a8C801c04D83Df717476509816250#code"
+      },
+      "source": {
+        "contractName": "LpWrapper",
+        "compilerVersion": "v0.8.25+commit.b61c2a91",
+        "optimizationUsed": "1",
+        "runs": "200",
+        "constructorArguments": "0000000000000000000000000000000ce42d4981513060ab7e50b9e5e2d19af1",
+        "evmVersion": "shanghai",
+        "library": null,
+        "licenseType": "BSL 1.1",
+        "proxy": false,
+        "implementation": null,
+        "swarmSource": "ipfs://5463657b37359f7dfd780ee6f5c39c288735c3928b4b761b0bf03e74037208c5"
+      },
+      "warnings": [],
+      "artifact": "docs/api-research/abis/base-8453/0x0df5f2662e4a8c801c04d83df717476509816250.json",
+      "abiEntryCount": 95
+    },
+    {
+      "chainId": 8453,
+      "address": "0x827922686190790b37229fd06084350e74485b72",
+      "label": "Slipstream Nonfungible Position Manager",
+      "protocol": "aerodrome",
+      "expectedKind": "position-manager",
+      "fetchedAt": "2026-06-01T00:26:22.149Z",
+      "sources": {
+        "basescanApi": "https://api.etherscan.io/v2/api?chainid=8453&module=contract&action=getsourcecode&address=0x827922686190790b37229fd06084350E74485b72",
+        "basescanCode": "https://basescan.org/address/0x827922686190790b37229fd06084350e74485b72#code",
+        "sourceHint": "https://basescan.org/address/0x827922686190790b37229fd06084350E74485b72#code"
+      },
+      "source": {
+        "contractName": "NonfungiblePositionManager",
+        "compilerVersion": "v0.7.6+commit.7338295f",
+        "optimizationUsed": "1",
+        "runs": "200",
+        "constructorArguments": null,
+        "evmVersion": "istanbul",
+        "library": null,
+        "licenseType": null,
+        "proxy": true,
+        "implementation": "0x827922686190790b37229fd06084350e74485b72",
+        "swarmSource": null
+      },
+      "warnings": [],
+      "artifact": "docs/api-research/abis/base-8453/0x827922686190790b37229fd06084350e74485b72.json",
+      "abiEntryCount": 53
+    },
+    {
+      "chainId": 8453,
+      "address": "0xc5b6786d7b64767d775877b0b6a319ad946b11b5",
+      "label": "Observed Router",
+      "protocol": "aerodrome",
+      "expectedKind": "router",
+      "fetchedAt": "2026-06-01T00:26:22.931Z",
+      "sources": {
+        "basescanApi": "https://api.etherscan.io/v2/api?chainid=8453&module=contract&action=getsourcecode&address=0xc5b6786d7b64767d775877b0b6a319ad946b11b5",
+        "basescanCode": "https://basescan.org/address/0xc5b6786d7b64767d775877b0b6a319ad946b11b5#code",
+        "sourceHint": "https://basescan.org/address/0xc5b6786d7b64767d775877b0b6a319ad946b11b5#code"
+      },
+      "source": {
+        "contractName": "UniversalRouter",
+        "compilerVersion": "v0.8.29+commit.ab55807c",
+        "optimizationUsed": "1",
+        "runs": "10000",
+        "constructorArguments": "000000000000000000000000494bbd8a3302aca833d307d11838f18dbada9c2500000000000000000000000042000000000000000000000000000000000000060000000000000000000000008909dc15e40173ff4699343b6eb8132c65e18ec600000000000000000000000033128a8fc17869897dce68ed026d694621f6fdfd96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845fe34f199b19b2b4f47f68442619d555527d244f78a3297ea89325f843f87b8b54000000000000000000000000498581ff718922c3f8e6a244956af099b2652b2b000000000000000000000000420dd381b31aef6683db6b902084cb0ffece40da000000000000000000000000ade65c38cd4849adba595a4323a8c7ddfe89716a6f178972b07752b522a4da1c5b71af6524e8b0bd6027ccb29e5312b0e5bcdc3ce524afc4d53c767ee9df4e3b4e1937f621368ef156aeffac97f1518b2b556f9d0000000000000000000000005e7bb104d84c7cb9b682aac2f3d509f5f406809affb9af9ea6d9e39da47392ecc7055277b9915b8bfc9f83f105821b7791a6ae30000000000000000000000000f8f2eb4940cfe7d13603dddd87f123820fc061ef280c936e3b6ea93b298f009706b8938823a03421b225ef9f81250beba561f05c",
+        "evmVersion": "cancun",
+        "library": null,
+        "licenseType": null,
+        "proxy": false,
+        "implementation": null,
+        "swarmSource": null
+      },
+      "warnings": [],
+      "artifact": "docs/api-research/abis/base-8453/0xc5b6786d7b64767d775877b0b6a319ad946b11b5.json",
+      "abiEntryCount": 62
+    },
+    {
+      "chainId": 8453,
+      "address": "0xcaf22ce31298cf2bf1d152862f80216478ad7c67",
+      "label": "Observed Router",
+      "protocol": "aerodrome",
+      "expectedKind": "router",
+      "fetchedAt": "2026-06-01T00:26:23.707Z",
+      "sources": {
+        "basescanApi": "https://api.etherscan.io/v2/api?chainid=8453&module=contract&action=getsourcecode&address=0xcaf22ce31298cf2bf1d152862f80216478ad7c67",
+        "basescanCode": "https://basescan.org/address/0xcaf22ce31298cf2bf1d152862f80216478ad7c67#code",
+        "sourceHint": "https://basescan.org/address/0xcaf22ce31298cf2bf1d152862f80216478ad7c67#code"
+      },
+      "source": {
+        "contractName": "UniversalRouter",
+        "compilerVersion": "v0.8.29+commit.ab55807c",
+        "optimizationUsed": "1",
+        "runs": "10000",
+        "constructorArguments": "000000000000000000000000494bbd8a3302aca833d307d11838f18dbada9c2500000000000000000000000042000000000000000000000000000000000000060000000000000000000000008909dc15e40173ff4699343b6eb8132c65e18ec600000000000000000000000033128a8fc17869897dce68ed026d694621f6fdfd96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845fe34f199b19b2b4f47f68442619d555527d244f78a3297ea89325f843f87b8b54000000000000000000000000498581ff718922c3f8e6a244956af099b2652b2b000000000000000000000000420dd381b31aef6683db6b902084cb0ffece40da000000000000000000000000ade65c38cd4849adba595a4323a8c7ddfe89716a6f178972b07752b522a4da1c5b71af6524e8b0bd6027ccb29e5312b0e5bcdc3ce524afc4d53c767ee9df4e3b4e1937f621368ef156aeffac97f1518b2b556f9d0000000000000000000000005e7bb104d84c7cb9b682aac2f3d509f5f406809affb9af9ea6d9e39da47392ecc7055277b9915b8bfc9f83f105821b7791a6ae30000000000000000000000000f8f2eb4940cfe7d13603dddd87f123820fc061ef280c936e3b6ea93b298f009706b8938823a03421b225ef9f81250beba561f05c",
+        "evmVersion": "cancun",
+        "library": null,
+        "licenseType": null,
+        "proxy": false,
+        "implementation": null,
+        "swarmSource": null
+      },
+      "warnings": [],
+      "artifact": "docs/api-research/abis/base-8453/0xcaf22ce31298cf2bf1d152862f80216478ad7c67.json",
+      "abiEntryCount": 51
+    },
+    {
+      "chainId": 8453,
+      "address": "0x6399ed6725cc163d019aa64ff55b22149d7179a8",
+      "label": "Observed CLGauge",
+      "protocol": "aerodrome",
+      "expectedKind": "gauge",
+      "fetchedAt": "2026-06-01T00:26:24.326Z",
+      "sources": {
+        "basescanApi": "https://api.etherscan.io/v2/api?chainid=8453&module=contract&action=getsourcecode&address=0x6399ed6725cc163d019aa64ff55b22149d7179a8",
+        "basescanCode": "https://basescan.org/address/0x6399ed6725cc163d019aa64ff55b22149d7179a8#code",
+        "sourceHint": "https://basescan.org/address/0x6399ed6725cc163d019aa64ff55b22149d7179a8#code"
+      },
+      "source": {
+        "contractName": "CLGauge",
+        "compilerVersion": "v0.7.6+commit.7338295f",
+        "optimizationUsed": "1",
+        "runs": "200",
+        "constructorArguments": null,
+        "evmVersion": "istanbul",
+        "library": null,
+        "licenseType": null,
+        "proxy": false,
+        "implementation": null,
+        "swarmSource": null
+      },
+      "warnings": [],
+      "artifact": "docs/api-research/abis/base-8453/0x6399ed6725cc163d019aa64ff55b22149d7179a8.json",
+      "abiEntryCount": 40
+    },
+    {
+      "chainId": 8453,
+      "address": "0x41b2126661c673c2bedd208cc72e85dc51a5320a",
+      "label": "Observed CLGauge",
+      "protocol": "aerodrome",
+      "expectedKind": "gauge",
+      "fetchedAt": "2026-06-01T00:26:24.944Z",
+      "sources": {
+        "basescanApi": "https://api.etherscan.io/v2/api?chainid=8453&module=contract&action=getsourcecode&address=0x41b2126661c673c2bedd208cc72e85dc51a5320a",
+        "basescanCode": "https://basescan.org/address/0x41b2126661c673c2bedd208cc72e85dc51a5320a#code",
+        "sourceHint": "https://basescan.org/address/0x41b2126661c673c2bedd208cc72e85dc51a5320a#code"
+      },
+      "source": {
+        "contractName": "CLGauge",
+        "compilerVersion": "v0.7.6+commit.7338295f",
+        "optimizationUsed": "1",
+        "runs": "200",
+        "constructorArguments": null,
+        "evmVersion": "istanbul",
+        "library": null,
+        "licenseType": null,
+        "proxy": false,
+        "implementation": null,
+        "swarmSource": null
+      },
+      "warnings": [],
+      "artifact": "docs/api-research/abis/base-8453/0x41b2126661c673c2bedd208cc72e85dc51a5320a.json",
+      "abiEntryCount": 40
+    },
+    {
+      "chainId": 8453,
+      "address": "0xf33a96b5932d9e9b9a0eda447abd8c9d48d2e0c8",
+      "label": "Observed CLGauge",
+      "protocol": "aerodrome",
+      "expectedKind": "gauge",
+      "fetchedAt": "2026-06-01T00:26:25.570Z",
+      "sources": {
+        "basescanApi": "https://api.etherscan.io/v2/api?chainid=8453&module=contract&action=getsourcecode&address=0xf33a96b5932d9e9b9a0eda447abd8c9d48d2e0c8",
+        "basescanCode": "https://basescan.org/address/0xf33a96b5932d9e9b9a0eda447abd8c9d48d2e0c8#code",
+        "sourceHint": "https://basescan.org/address/0xf33a96b5932d9e9b9a0eda447abd8c9d48d2e0c8#code"
+      },
+      "source": {
+        "contractName": "CLGauge",
+        "compilerVersion": "v0.7.6+commit.7338295f",
+        "optimizationUsed": "1",
+        "runs": "200",
+        "constructorArguments": null,
+        "evmVersion": "istanbul",
+        "library": null,
+        "licenseType": null,
+        "proxy": false,
+        "implementation": null,
+        "swarmSource": null
+      },
+      "warnings": [],
+      "artifact": "docs/api-research/abis/base-8453/0xf33a96b5932d9e9b9a0eda447abd8c9d48d2e0c8.json",
+      "abiEntryCount": 40
+    },
+    {
+      "chainId": 8453,
+      "address": "0x519bbd1dd8c6a94c46080e24f316c14ee758c025",
+      "label": "Observed Gauge",
+      "protocol": "aerodrome",
+      "expectedKind": "gauge",
+      "fetchedAt": "2026-06-01T00:26:26.199Z",
+      "sources": {
+        "basescanApi": "https://api.etherscan.io/v2/api?chainid=8453&module=contract&action=getsourcecode&address=0x519bbd1dd8c6a94c46080e24f316c14ee758c025",
+        "basescanCode": "https://basescan.org/address/0x519bbd1dd8c6a94c46080e24f316c14ee758c025#code",
+        "sourceHint": "https://basescan.org/address/0x519bbd1dd8c6a94c46080e24f316c14ee758c025#code"
+      },
+      "source": {
+        "contractName": "Gauge",
+        "compilerVersion": "v0.8.19+commit.7dd6d404",
+        "optimizationUsed": "1",
+        "runs": "200",
+        "constructorArguments": null,
+        "evmVersion": "paris",
+        "library": null,
+        "licenseType": null,
+        "proxy": false,
+        "implementation": null,
+        "swarmSource": null
+      },
+      "warnings": [],
+      "artifact": "docs/api-research/abis/base-8453/0x519bbd1dd8c6a94c46080e24f316c14ee758c025.json",
+      "abiEntryCount": 41
+    },
+    {
+      "chainId": 8453,
+      "address": "0xcdac0d6c6c59727a65f871236188350531885c43",
+      "label": "Observed Pool",
+      "protocol": "aerodrome",
+      "expectedKind": "pool",
+      "fetchedAt": "2026-06-01T00:26:26.967Z",
+      "sources": {
+        "basescanApi": "https://api.etherscan.io/v2/api?chainid=8453&module=contract&action=getsourcecode&address=0xcdac0d6c6c59727a65f871236188350531885c43",
+        "basescanCode": "https://basescan.org/address/0xcdac0d6c6c59727a65f871236188350531885c43#code",
+        "sourceHint": "https://basescan.org/address/0xcdac0d6c6c59727a65f871236188350531885c43#code"
+      },
+      "source": {
+        "contractName": "Pool",
+        "compilerVersion": "v0.8.19+commit.7dd6d404",
+        "optimizationUsed": "1",
+        "runs": "200",
+        "constructorArguments": null,
+        "evmVersion": "Default",
+        "library": null,
+        "licenseType": "BSL 1.1",
+        "proxy": false,
+        "implementation": null,
+        "swarmSource": "ipfs://c07dfc7f33168ee9ed70224f07e30193416994e9ede62c1f4c6f34515fb5181b"
+      },
+      "warnings": [],
+      "artifact": "docs/api-research/abis/base-8453/0xcdac0d6c6c59727a65f871236188350531885c43.json",
+      "abiEntryCount": 76
+    },
+    {
+      "chainId": 8453,
+      "address": "0x765cca7f70e6f02619a6b0a339b01845d1a5fd72",
+      "label": "Observed Mellow Strategy Wrapper",
+      "protocol": "mellow",
+      "expectedKind": "strategy-wrapper",
+      "fetchedAt": "2026-06-01T00:26:27.741Z",
+      "sources": {
+        "basescanApi": "https://api.etherscan.io/v2/api?chainid=8453&module=contract&action=getsourcecode&address=0x765cca7f70e6f02619a6b0a339b01845d1a5fd72",
+        "basescanCode": "https://basescan.org/address/0x765cca7f70e6f02619a6b0a339b01845d1a5fd72#code",
+        "sourceHint": "https://basescan.org/address/0x765cca7f70e6f02619a6b0a339b01845d1a5fd72#code"
+      },
+      "source": {
+        "contractName": "LpWrapper",
+        "compilerVersion": "v0.8.25+commit.b61c2a91",
+        "optimizationUsed": "1",
+        "runs": "200",
+        "constructorArguments": "0000000000000000000000000000000ce42d4981513060ab7e50b9e5e2d19af1",
+        "evmVersion": "shanghai",
+        "library": null,
+        "licenseType": "BSL 1.1",
+        "proxy": false,
+        "implementation": null,
+        "swarmSource": "ipfs://5463657b37359f7dfd780ee6f5c39c288735c3928b4b761b0bf03e74037208c5"
+      },
+      "warnings": [],
+      "artifact": "docs/api-research/abis/base-8453/0x765cca7f70e6f02619a6b0a339b01845d1a5fd72.json",
+      "abiEntryCount": 95
+    }
+  ]
+}

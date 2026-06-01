@@ -1,0 +1,188 @@
+[
+    {
+        "address": "0x4200000000000000000000000000000000000006",
+        "address_label": null,
+        "name": "Wrapped Ether",
+        "symbol": "WETH",
+        "decimals": "18",
+        "logo": "https://logo.moralis.io/0x2105_0x4200000000000000000000000000000000000006_cb6c2780a91d4a94bea1b38e463bf677.webp",
+        "logo_hash": null,
+        "thumbnail": "https://logo.moralis.io/0x2105_0x4200000000000000000000000000000000000006_cb6c2780a91d4a94bea1b38e463bf677.webp",
+        "total_supply": "286125622370858748911231",
+        "total_supply_formatted": "286125.622370858748911231",
+        "fully_diluted_valuation": "571543180.18",
+        "block_number": "0",
+        "validated": 1,
+        "created_at": null,
+        "possible_spam": false,
+        "verified_contract": true,
+        "categories": [
+            "Wrapped-Tokens"
+        ],
+        "links": {
+            "moralis": "https://moralis.com/chain/base/token/price/0x4200000000000000000000000000000000000006"
+        },
+        "security_score": 98,
+        "description": null,
+        "circulating_supply": "290554.7873322042",
+        "market_cap": "580390549.41",
+        "implementations": []
+    },
+    {
+        "address": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+        "address_label": null,
+        "name": "USD Coin",
+        "symbol": "USDC",
+        "decimals": "6",
+        "logo": "https://logo.moralis.io/0x2105_0x833589fcd6edb6e08f4c7c32d4f71b54bda02913_6e1c1bea4c42c78478df79f3b885e93a.webp",
+        "logo_hash": null,
+        "thumbnail": "https://logo.moralis.io/0x2105_0x833589fcd6edb6e08f4c7c32d4f71b54bda02913_6e1c1bea4c42c78478df79f3b885e93a.webp",
+        "total_supply": "4264202820504492",
+        "total_supply_formatted": "4264202820.504492",
+        "fully_diluted_valuation": "4264202820.50",
+        "block_number": "2797221",
+        "validated": 1,
+        "created_at": "2023-08-18T18:36:29.000Z",
+        "possible_spam": false,
+        "verified_contract": true,
+        "categories": [
+            "Stablecoins"
+        ],
+        "links": {
+            "discord": "https://discord.com/invite/buildoncircle",
+            "reddit": "https://www.reddit.com",
+            "twitter": "https://twitter.com/circle",
+            "website": "https://www.circle.com/en/usdc",
+            "github": "https://github.com/centrehq/centre-tokens",
+            "medium": "https://medium.com/centre-blog",
+            "email": "support@circle.com",
+            "moralis": "https://moralis.com/chain/base/token/price/0x833589fcd6edb6e08f4c7c32d4f71b54bda02913"
+        },
+        "security_score": 100,
+        "description": "USDC is a regulated digital currency fully backed by US dollars, designed for rapid global payments and 24/7 financial markets. It offers instant settlement, near-zero cost transactions, and open, global access, making it a stable, transparent, and efficient option for businesses and individuals worldwide.",
+        "circulating_supply": "75850798493.19511",
+        "market_cap": "75850798493.20",
+        "implementations": [
+            {
+                "chainId": "0x8f",
+                "chain": "monad",
+                "chainName": "Monad",
+                "address": "0x754704bc059f8c67012fed69bc8a327a5aafb603"
+            },
+            {
+                "chainId": "0x505",
+                "chain": "moonriver",
+                "chainName": "Moonriver",
+                "address": "0xffffffff7d2b0b761af01ca8e25242976ac0ad7d"
+            },
+            {
+                "chainId": "0x92",
+                "chain": "sonic",
+                "chainName": "Sonic",
+                "address": "0x29219dd400f2bf60e5a23d13be72b486d4038894"
+            },
+            {
+                "chainId": "0x144",
+                "chain": "zksync",
+                "chainName": "zkSync",
+                "address": "0x1d17cbcf0d6d143135ae902365d2e5e2a16538d4"
+            },
+            {
+                "chainId": "0x1",
+                "chain": "eth",
+                "chainName": "Ethereum",
+                "address": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+            },
+            {
+                "chainId": "0x89",
+                "chain": "polygon",
+                "chainName": "Polygon POS",
+                "address": "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359"
+            },
+            {
+                "chainId": "0x32",
+                "chain": "xdc network",
+                "chainName": "XDC Network",
+                "address": "0xfa2958cb79b0491cc627c1557f441ef849ca8eb1"
+            },
+            {
+                "chainId": "0x18232",
+                "chain": "plume network",
+                "chainName": "Plume Network",
+                "address": "0x222365ef19f7947e5484218551b56bb3965aa7af"
+            },
+            {
+                "chainId": "0x3e7",
+                "chain": "hyperevm",
+                "chainName": "HyperEVM",
+                "address": "0xb88339cb7199b77e23db6e890353e22632ba630f"
+            },
+            {
+                "chainId": "0x531",
+                "chain": "sei",
+                "chainName": "Sei Network",
+                "address": "0xe15fc38f6d8c56af07bbcbe3baf5708a2bf42392"
+            },
+            {
+                "chainId": "0x82",
+                "chain": "unichain",
+                "chainName": "Unichain",
+                "address": "0x078d782b760474a361dda0af3839290b0ef57ad6"
+            },
+            {
+                "chainId": "0x1e0",
+                "chain": "world chain",
+                "chainName": "World Chain",
+                "address": "0x79a02482a880bce3f13e09da970dc34db4cd24d1"
+            },
+            {
+                "chainId": "0xa4b1",
+                "chain": "arbitrum",
+                "chainName": "Arbitrum One",
+                "address": "0xaf88d065e77c8cc2239327c5edb3a432268e5831"
+            },
+            {
+                "chainId": "0xa",
+                "chain": "optimism",
+                "chainName": "Optimism",
+                "address": "0x0b2c639c533813f4aa9d7837caf62653d097ff85"
+            },
+            {
+                "chainId": "0xa4ec",
+                "chain": "celo",
+                "chainName": "Celo",
+                "address": "0xceba9300f2b948710d2653dd7b07f33a8b32118c"
+            },
+            {
+                "chainId": "0xa86a",
+                "chain": "avalanche",
+                "chainName": "Avalanche",
+                "address": "0xb97ef9ef8734c71904d8002f8b6bc66dd9c48a6e"
+            },
+            {
+                "chainId": "0xdef1",
+                "chain": "ink",
+                "chainName": "Ink",
+                "address": "0x2d270e6886d130d724215a266106e6832161eaed"
+            },
+            {
+                "chainId": "0xb02",
+                "chain": "morph l2",
+                "chainName": "Morph L2",
+                "address": "0xcfb1186f4e93d60e60a8bdd997427d1f33bc372b"
+            },
+            {
+                "chainId": "solana-mainnet",
+                "chain": "solana-mainnet",
+                "chainName": "Solana",
+                "address": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+            },
+            {
+                "chainId": "0x127",
+                "chain": "hedera hashgraph",
+                "chainName": "Hedera Hashgraph",
+                "address": "0.0.456858"
+            }
+        ]
+    }
+]

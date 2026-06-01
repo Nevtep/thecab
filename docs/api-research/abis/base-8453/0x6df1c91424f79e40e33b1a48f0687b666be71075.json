@@ -1,0 +1,719 @@
+{
+  "chainId": 8453,
+  "address": "0x6df1c91424f79e40e33b1a48f0687b666be71075",
+  "label": "Aerodrome Router Candidate",
+  "protocol": "aerodrome",
+  "expectedKind": "router",
+  "fetchedAt": "2026-06-01T00:26:18.428Z",
+  "sources": {
+    "basescanApi": "https://api.etherscan.io/v2/api?chainid=8453&module=contract&action=getsourcecode&address=0x6df1c91424f79e40e33b1a48f0687b666be71075",
+    "basescanCode": "https://basescan.org/address/0x6df1c91424f79e40e33b1a48f0687b666be71075#code",
+    "sourceHint": "https://basescan.org/address/0x6df1c91424f79e40e33b1a48f0687b666be71075#code"
+  },
+  "source": {
+    "contractName": "UniversalRouter",
+    "compilerVersion": "v0.8.29+commit.ab55807c",
+    "optimizationUsed": "1",
+    "runs": "10000",
+    "constructorArguments": "000000000000000000000000494bbd8a3302aca833d307d11838f18dbada9c2500000000000000000000000042000000000000000000000000000000000000060000000000000000000000008909dc15e40173ff4699343b6eb8132c65e18ec600000000000000000000000033128a8fc17869897dce68ed026d694621f6fdfd96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845fe34f199b19b2b4f47f68442619d555527d244f78a3297ea89325f843f87b8b54000000000000000000000000498581ff718922c3f8e6a244956af099b2652b2b000000000000000000000000420dd381b31aef6683db6b902084cb0ffece40da0000000000000000000000005e7bb104d84c7cb9b682aac2f3d509f5f406809a6f178972b07752b522a4da1c5b71af6524e8b0bd6027ccb29e5312b0e5bcdc3cffb9af9ea6d9e39da47392ecc7055277b9915b8bfc9f83f105821b7791a6ae30000000000000000000000000ade65c38cd4849adba595a4323a8c7ddfe89716ae524afc4d53c767ee9df4e3b4e1937f621368ef156aeffac97f1518b2b556f9d",
+    "evmVersion": "cancun",
+    "library": null,
+    "licenseType": null,
+    "proxy": false,
+    "implementation": null,
+    "swarmSource": null
+  },
+  "abi": [
+    {
+      "inputs": [
+        {
+          "components": [
+            {
+              "internalType": "address",
+              "name": "permit2",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "weth9",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "v2Factory",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "v3Factory",
+              "type": "address"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "pairInitCodeHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "poolInitCodeHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "address",
+              "name": "v4PoolManager",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "veloV2Factory",
+              "type": "address"
+            },
+            {
+              "internalType": "address",
+              "name": "veloCLFactory",
+              "type": "address"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "veloV2InitCodeHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "veloCLInitCodeHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "address",
+              "name": "veloCLFactory2",
+              "type": "address"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "veloCLInitCodeHash2",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct RouterDeployParameters",
+          "name": "params",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [],
+      "name": "BalanceTooLow",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ContractLocked",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "Currency",
+          "name": "currency",
+          "type": "address"
+        }
+      ],
+      "name": "DeltaNotNegative",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "Currency",
+          "name": "currency",
+          "type": "address"
+        }
+      ],
+      "name": "DeltaNotPositive",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ETHNotAccepted",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "commandIndex",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes",
+          "name": "message",
+          "type": "bytes"
+        }
+      ],
+      "name": "ExecutionFailed",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "FromAddressIsNotOwner",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InputLengthMismatch",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InsufficientBalance",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InsufficientETH",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InsufficientToken",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidBips",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint8",
+          "name": "bridgeType",
+          "type": "uint8"
+        }
+      ],
+      "name": "InvalidBridgeType",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "commandType",
+          "type": "uint256"
+        }
+      ],
+      "name": "InvalidCommandType",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidEthSender",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidPath",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidRecipient",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidReserves",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidTokenAddress",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "LengthMismatch",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NotPoolManager",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "SliceOutOfBounds",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "StableExactOutputUnsupported",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "TransactionDeadlinePassed",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "UnsafeCast",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "action",
+          "type": "uint256"
+        }
+      ],
+      "name": "UnsupportedAction",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "V2InvalidPath",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "V2TooLittleReceived",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "V2TooMuchRequested",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "V3InvalidAmountOut",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "V3InvalidCaller",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "V3InvalidSwap",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "V3TooLittleReceived",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "V3TooMuchRequested",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "minAmountOutReceived",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amountReceived",
+          "type": "uint256"
+        }
+      ],
+      "name": "V4TooLittleReceived",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "maxAmountInRequested",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amountRequested",
+          "type": "uint256"
+        }
+      ],
+      "name": "V4TooMuchRequested",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "caller",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "localRouter",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "uint32",
+          "name": "destinationDomain",
+          "type": "uint32"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes32",
+          "name": "commitment",
+          "type": "bytes32"
+        }
+      ],
+      "name": "CrossChainSwap",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "sender",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "recipient",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint32",
+          "name": "domain",
+          "type": "uint32"
+        }
+      ],
+      "name": "UniversalRouterBridge",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "sender",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "recipient",
+          "type": "address"
+        }
+      ],
+      "name": "UniversalRouterSwap",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "OPTIMISM_CHAIN_ID",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "PERMIT2",
+      "outputs": [
+        {
+          "internalType": "contract IPermit2",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "UNISWAP_V2_FACTORY",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "UNISWAP_V2_PAIR_INIT_CODE_HASH",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "UNISWAP_V3_FACTORY",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "UNISWAP_V3_POOL_INIT_CODE_HASH",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "VELODROME_CL_FACTORY",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "VELODROME_CL_FACTORY_2",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "VELODROME_CL_POOL_INIT_CODE_HASH",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "VELODROME_CL_POOL_INIT_CODE_HASH_2",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "VELODROME_V2_FACTORY",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "VELODROME_V2_INIT_CODE_HASH",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "WETH9",
+      "outputs": [
+        {
+          "internalType": "contract IWETH9",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes",
+          "name": "commands",
+          "type": "bytes"
+        },
+        {
+          "internalType": "bytes[]",
+          "name": "inputs",
+          "type": "bytes[]"
+        }
+      ],
+      "name": "execute",
+      "outputs": [],
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes",
+          "name": "commands",
+          "type": "bytes"
+        },
+        {
+          "internalType": "bytes[]",
+          "name": "inputs",
+          "type": "bytes[]"
+        },
+        {
+          "internalType": "uint256",
+          "name": "deadline",
+          "type": "uint256"
+        }
+      ],
+      "name": "execute",
+      "outputs": [],
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "msgSender",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "poolManager",
+      "outputs": [
+        {
+          "internalType": "contract IPoolManager",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "int256",
+          "name": "amount0Delta",
+          "type": "int256"
+        },
+        {
+          "internalType": "int256",
+          "name": "amount1Delta",
+          "type": "int256"
+        },
+        {
+          "internalType": "bytes",
+          "name": "data",
+          "type": "bytes"
+        }
+      ],
+      "name": "uniswapV3SwapCallback",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes",
+          "name": "data",
+          "type": "bytes"
+        }
+      ],
+      "name": "unlockCallback",
+      "outputs": [
+        {
+          "internalType": "bytes",
+          "name": "",
+          "type": "bytes"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "stateMutability": "payable",
+      "type": "receive"
+    }
+  ],
+  "warnings": []
+}
