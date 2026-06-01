@@ -1,5 +1,7 @@
-import { task } from "@trigger.dev/sdk/v3";
+import { task, tasks } from "@trigger.dev/sdk/v3";
+import { and, asc, eq, inArray } from "drizzle-orm";
 
+import { finalizeAnalysisRun, updateAnalysisRunProgress } from "@/server/analysis/analysis-run.repository";
 import {
   persistAccountingOutputs,
   runChronologicalAccounting,
@@ -13,16 +15,70 @@ import {
 import { materializeAllDataViewRows, persistReadModelRows } from "@/server/analysis/engine-v2/materializers";
 import { engineV2WalletPayloadSchema } from "@/server/analysis/engine-v2/payloads";
 import { getDb } from "@/server/db/client";
+import { engineV2DomainEventLinks, engineV2DomainEvents } from "@/server/db/schema";
 
 export type EngineV2MaterializationDeps = {
   loadAccountingInput?: (input: { chainId: number; walletAddress: string }) => Promise<EngineV2AccountingInput>;
   persistAccounting?: typeof persistAccountingOutputs;
   persistRows?: typeof persistReadModelRows;
+  trigger?: (taskId: string, payload: Record<string, unknown>, options: { idempotencyKey: string }) => Promise<unknown>;
+  updateRunProgress?: typeof updateAnalysisRunProgress;
+  finalizeRun?: typeof finalizeAnalysisRun;
 };
+
+async function loadAccountingInputFromDb(input: { chainId: number; walletAddress: string }): Promise<EngineV2AccountingInput> {
+  const db = getDb();
+  const events = await db.select().from(engineV2DomainEvents).where(and(
+    eq(engineV2DomainEvents.chainId, input.chainId),
+    eq(engineV2DomainEvents.walletAddress, input.walletAddress.toLowerCase()),
+  )).orderBy(asc(engineV2DomainEvents.occurredAt), asc(engineV2DomainEvents.sequenceIndex));
+  const eventIds = events.map((event) => event.id);
+  const links = eventIds.length > 0
+    ? await db.select().from(engineV2DomainEventLinks).where(and(
+      eq(engineV2DomainEventLinks.chainId, input.chainId),
+      inArray(engineV2DomainEventLinks.domainEventId, eventIds),
+    ))
+    : [];
+  return {
+    events: events.map((event) => ({
+      id: event.id,
+      chainId: event.chainId,
+      walletAddress: event.walletAddress,
+      canonicalTransactionId: event.canonicalTransactionId,
+      eventType: event.eventType,
+      eventFamily: event.eventFamily,
+      occurredAt: event.occurredAt,
+      txHash: event.txHash,
+      sequenceIndex: event.sequenceIndex,
+      coverageStatus: event.coverageStatus,
+      confidence: event.confidence,
+      reasonCodes: event.reasonCodes,
+      valueEffectJson: event.valueEffectJson,
+      evidenceJson: event.evidenceJson,
+      metadataJson: event.metadataJson,
+    })),
+    links: links.map((link) => ({
+      domainEventId: link.domainEventId,
+      entityType: link.entityType,
+      entityId: link.entityId,
+      linkKind: link.linkKind,
+      confidence: link.confidence,
+      evidenceJson: link.evidenceJson,
+    })),
+  };
+}
 
 export async function runEngineV2AccountChronological(rawPayload: unknown, deps: EngineV2MaterializationDeps = {}) {
   const payload = engineV2WalletPayloadSchema.parse(rawPayload);
-  const accountingInput = await (deps.loadAccountingInput?.(payload) ?? Promise.resolve({ events: [], links: [] }));
+  const updateRun = deps.updateRunProgress ?? updateAnalysisRunProgress;
+  if (payload.analysisRunId) {
+    await updateRun(payload.analysisRunId, {
+      status: "running",
+      stage: "engine_v2_accounting",
+      progressPct: 86,
+    });
+  }
+  const accountingInput = await (deps.loadAccountingInput?.(payload) ?? loadAccountingInputFromDb(payload));
   const accounting = runChronologicalAccounting(accountingInput);
   const accountingPayload = {
     db: deps.persistAccounting ? undefined as never : getDb(),
@@ -58,6 +114,10 @@ export async function runEngineV2AccountChronological(rawPayload: unknown, deps:
   } else {
     await persistAccountingOutputs(accountingPayload);
   }
+  const triggerTask = deps.trigger ?? ((taskId, taskPayload, options) => tasks.trigger(taskId, taskPayload, options));
+  await triggerTask("engine-v2-materialize-read-models", payload, {
+    idempotencyKey: `engine-v2-materialize:${payload.chainId}:${payload.walletAddress}:${payload.collectionRunId ?? "latest"}`,
+  });
 
   return {
     eventCount: accounting.events.length,
@@ -73,7 +133,15 @@ export async function runEngineV2AccountChronological(rawPayload: unknown, deps:
 
 export async function runEngineV2MaterializeReadModels(rawPayload: unknown, deps: EngineV2MaterializationDeps = {}) {
   const payload = engineV2WalletPayloadSchema.parse(rawPayload);
-  const accountingInput = await (deps.loadAccountingInput?.(payload) ?? Promise.resolve({ events: [], links: [] }));
+  const updateRun = deps.updateRunProgress ?? updateAnalysisRunProgress;
+  if (payload.analysisRunId) {
+    await updateRun(payload.analysisRunId, {
+      status: "running",
+      stage: "engine_v2_materialization",
+      progressPct: 96,
+    });
+  }
+  const accountingInput = await (deps.loadAccountingInput?.(payload) ?? loadAccountingInputFromDb(payload));
   const accounting = runChronologicalAccounting(accountingInput);
   const rows = materializeAllDataViewRows(accounting);
   if (deps.persistRows) {
@@ -85,6 +153,19 @@ export async function runEngineV2MaterializeReadModels(rawPayload: unknown, deps
     acc[row.surface] = (acc[row.surface] ?? 0) + 1;
     return acc;
   }, {});
+  if (payload.analysisRunId) {
+    const finalizeRun = deps.finalizeRun ?? finalizeAnalysisRun;
+    await finalizeRun({
+      runId: payload.analysisRunId,
+      status: "complete",
+      coverage: rows.some((row) => row.coverageStatus === "partial" || row.coverageStatus === "unresolved") ? "partial" : "full",
+      coverageReasonsJson: Array.from(new Set(rows.flatMap((row) => {
+        const reasonCodes = row.evidenceJson.reasonCodes;
+        return Array.isArray(reasonCodes) ? reasonCodes.filter((item): item is string => typeof item === "string") : [];
+      }))),
+      lastError: null,
+    });
+  }
   return { rowCount: rows.length, bySurface };
 }
 

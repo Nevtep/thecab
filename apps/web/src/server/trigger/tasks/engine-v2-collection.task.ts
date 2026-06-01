@@ -1,5 +1,6 @@
 import { task, tasks } from "@trigger.dev/sdk/v3";
 
+import { updateAnalysisRunProgress } from "@/server/analysis/analysis-run.repository";
 import {
   createCollectionRun,
   fetchMoralisDecodedHistoryPage,
@@ -33,6 +34,7 @@ export type EngineV2CollectionTaskDeps = {
   markCollectionRunComplete?: (input: Parameters<typeof markCollectionRunComplete>[0]) => Promise<unknown>;
   loadProviderPages?: (input: { db: EngineV2Db; collectionRunId: string }) => Promise<ProviderPageRow[]>;
   trigger?: TriggerFn;
+  updateRunProgress?: typeof updateAnalysisRunProgress;
 };
 
 async function defaultLoadProviderPages({
@@ -57,8 +59,16 @@ export async function runEngineV2CollectDecodedHistoryPage(
   const createRun = deps.createCollectionRun ?? createCollectionRun;
   const fetchPage = deps.fetchMoralisDecodedHistoryPage ?? fetchMoralisDecodedHistoryPage;
   const upsertPage = deps.upsertProviderPage ?? upsertProviderPage;
+  const updateRun = deps.updateRunProgress ?? updateAnalysisRunProgress;
   const triggerTask = deps.trigger ?? ((taskId, taskPayload, options) => tasks.trigger(taskId, taskPayload, options));
   const sourceEndpoint = `/${payload.walletAddress}/verbose`;
+  if (payload.analysisRunId) {
+    await updateRun(payload.analysisRunId, {
+      status: "running",
+      stage: "engine_v2_collection",
+      progressPct: Math.min(14, 6 + payload.pageIndex),
+    });
+  }
   const collectionRun = payload.collectionRunId
     ? { id: payload.collectionRunId }
     : await createRun({
@@ -133,6 +143,7 @@ export async function runEngineV2FinalizeCollection(
   const db = deps.db ?? getDb();
   const loadProviderPages = deps.loadProviderPages ?? defaultLoadProviderPages;
   const markComplete = deps.markCollectionRunComplete ?? markCollectionRunComplete;
+  const updateRun = deps.updateRunProgress ?? updateAnalysisRunProgress;
   const triggerTask = deps.trigger ?? ((taskId, taskPayload, options) => tasks.trigger(taskId, taskPayload, options));
   const pages = await loadProviderPages({ db, collectionRunId: payload.collectionRunId });
   const transactions = pages.flatMap((page) => parseMoralisDecodedHistoryPage(page.rawJson).transactions);
@@ -143,6 +154,13 @@ export async function runEngineV2FinalizeCollection(
     ...summary,
     lastCursor: pages.at(-1)?.cursorOut ?? null,
   });
+  if (payload.analysisRunId) {
+    await updateRun(payload.analysisRunId, {
+      status: "running",
+      stage: "engine_v2_canonicalization",
+      progressPct: 18,
+    });
+  }
   await triggerTask("engine-v2-canonicalize-history", {
     ...payload,
     collectionRunId: payload.collectionRunId,

@@ -34,9 +34,11 @@ test("runEngineV2ClassifyChronological classifies oldest transaction first", asy
         logs: [],
       },
     ],
+    loadRegistry: async () => new Map(),
     persistClassifications: async (items) => {
       persisted.push(...items.map((item) => item.tx.hash));
     },
+    trigger: async () => undefined,
   });
 
   assert.deepEqual(persisted, ["0xold", "0xnew"]);
@@ -50,6 +52,7 @@ test("runEngineV2DecodeCanonicalCalls decodes then queues chronological classifi
     walletAddress,
   }, {
     loadTransactions: async () => [{ hash: "0x1", to_address: walletAddress, input: "0x" }],
+    loadRegistry: async () => new Map(),
     trigger: async (taskId) => {
       triggered.push(taskId);
     },
@@ -58,4 +61,3 @@ test("runEngineV2DecodeCanonicalCalls decodes then queues chronological classifi
   assert.equal(result.transactionCount, 1);
   assert.equal(triggered[0], "engine-v2-classify-chronological");
 });
-

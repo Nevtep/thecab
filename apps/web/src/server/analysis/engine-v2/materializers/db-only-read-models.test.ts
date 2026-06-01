@@ -30,4 +30,5 @@ test("read model values carry chain, wallet, coverage, confidence, and evidence"
 test("engineV2ReadModelsEnabled is explicitly gated", () => {
   assert.equal(engineV2ReadModelsEnabled({ ANALYSIS_ENGINE_V2_READ_MODELS: "0" }), false);
   assert.equal(engineV2ReadModelsEnabled({ ANALYSIS_ENGINE_V2_READ_MODELS: "1" }), true);
+  assert.equal(engineV2ReadModelsEnabled({ ANALYSIS_ENGINE_VERSION: "v2" }), true);
 });

@@ -1,10 +1,15 @@
 import { task, tasks } from "@trigger.dev/sdk/v3";
+import { eq } from "drizzle-orm";
 
+import { updateAnalysisRunProgress } from "@/server/analysis/analysis-run.repository";
 import { ensureAbiForSeed, protocolBootstrapSeedsForChain, protocolKnownAddressRowsForSeeds } from "@/server/analysis/engine-v2/abi-registry";
 import { decodeCanonicalTransactionCalls } from "@/server/analysis/engine-v2/classification";
 import type { AbiRegistryEntry, Address, MoralisDecodedTransaction } from "@/server/analysis/decoded-history";
+import { normalizeAddress } from "@/server/analysis/decoded-history/address";
+import { parseMoralisDecodedHistoryPage } from "@/server/analysis/engine-v2/collection";
 import { engineV2WalletPayloadSchema } from "@/server/analysis/engine-v2/payloads";
 import { getDb } from "@/server/db/client";
+import { contractAbis } from "@/server/db/schema";
 
 export type EngineV2DecodeDeps = {
   putKnownAddresses?: (rows: ReturnType<typeof protocolKnownAddressRowsForSeeds>) => Promise<void>;
@@ -16,8 +21,63 @@ export type EngineV2DecodeDeps = {
   apiKey?: string | null;
 };
 
+async function loadTransactionsFromProviderPages(input: {
+  collectionRunId?: string | null;
+}): Promise<MoralisDecodedTransaction[]> {
+  if (!input.collectionRunId) return [];
+  const pages = await getDb().query.engineV2ProviderPages.findMany({
+    where: (table, { eq }) => eq(table.collectionRunId, input.collectionRunId as string),
+    orderBy: (table, { asc }) => [asc(table.pageIndex)],
+  });
+  return pages.flatMap((page) => parseMoralisDecodedHistoryPage(page.rawJson).transactions);
+}
+
+async function loadAbiRegistryFromDb(input: { chainId: number }): Promise<Map<Address, AbiRegistryEntry>> {
+  const rows = await getDb().select().from(contractAbis).where(eq(contractAbis.chainId, input.chainId));
+  const registry = new Map<Address, AbiRegistryEntry>();
+  for (const row of rows) {
+    const address = normalizeAddress(row.address);
+    if (!address || !Array.isArray(row.abiJson) || row.abiJson.length === 0) continue;
+    registry.set(address, {
+      chainId: row.chainId,
+      address,
+      label: row.contractName ?? row.address,
+      protocol: row.protocol ?? "observed",
+      expectedKind: row.contractKind as AbiRegistryEntry["expectedKind"],
+      fetchedAt: row.fetchedAt.toISOString(),
+      sources: {
+        basescanApi: row.sourceUrl ?? "",
+        basescanCode: row.sourceReference ?? `https://basescan.org/address/${address}#code`,
+      },
+      source: {
+        contractName: row.contractName,
+        compilerVersion: null,
+        optimizationUsed: null,
+        runs: null,
+        constructorArguments: null,
+        evmVersion: null,
+        library: null,
+        licenseType: null,
+        proxy: row.isProxy,
+        implementation: row.implementationAddress,
+        swarmSource: null,
+      },
+      abi: row.abiJson,
+      warnings: [],
+    });
+  }
+  return registry;
+}
+
 export async function runEngineV2ProtocolBootstrap(rawPayload: unknown, deps: EngineV2DecodeDeps = {}) {
   const payload = engineV2WalletPayloadSchema.parse(rawPayload);
+  if (payload.analysisRunId) {
+    await updateAnalysisRunProgress(payload.analysisRunId, {
+      status: "running",
+      stage: "engine_v2_abi_registry",
+      progressPct: 32,
+    });
+  }
   const rows = protocolKnownAddressRowsForSeeds(payload.chainId);
   if (deps.putKnownAddresses) {
     await deps.putKnownAddresses(rows);
@@ -35,6 +95,13 @@ export async function runEngineV2ProtocolBootstrap(rawPayload: unknown, deps: En
 
 export async function runEngineV2EnsureAbiRegistry(rawPayload: unknown, deps: EngineV2DecodeDeps = {}) {
   const payload = engineV2WalletPayloadSchema.parse(rawPayload);
+  if (payload.analysisRunId) {
+    await updateAnalysisRunProgress(payload.analysisRunId, {
+      status: "running",
+      stage: "engine_v2_abi_registry",
+      progressPct: 38,
+    });
+  }
   const seeds = protocolBootstrapSeedsForChain(payload.chainId);
   const apiKey = deps.apiKey ?? process.env.ETHERSCAN_API_KEY ?? process.env.BASESCAN_API_KEY ?? null;
   const results = [];
@@ -55,8 +122,15 @@ export async function runEngineV2EnsureAbiRegistry(rawPayload: unknown, deps: En
 
 export async function runEngineV2DecodeCanonicalCalls(rawPayload: unknown, deps: EngineV2DecodeDeps = {}) {
   const payload = engineV2WalletPayloadSchema.parse(rawPayload);
-  const transactions = await (deps.loadTransactions?.(payload) ?? Promise.resolve([]));
-  const registry = await (deps.loadRegistry?.(payload) ?? Promise.resolve(new Map<Address, AbiRegistryEntry>()));
+  if (payload.analysisRunId) {
+    await updateAnalysisRunProgress(payload.analysisRunId, {
+      status: "running",
+      stage: "engine_v2_decoding",
+      progressPct: 46,
+    });
+  }
+  const transactions = await (deps.loadTransactions?.(payload) ?? loadTransactionsFromProviderPages(payload));
+  const registry = await (deps.loadRegistry?.(payload) ?? loadAbiRegistryFromDb(payload));
   let decodedCallCount = 0;
   for (const tx of transactions) {
     const calls = decodeCanonicalTransactionCalls({ tx, registry });

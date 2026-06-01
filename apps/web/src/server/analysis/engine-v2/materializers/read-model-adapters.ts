@@ -8,7 +8,9 @@ import type { EngineV2ReadModelRowInput } from "./activity-materializer";
 export const ENGINE_V2_READ_MODELS_FLAG = "ANALYSIS_ENGINE_V2_READ_MODELS";
 
 export function engineV2ReadModelsEnabled(env: Pick<NodeJS.ProcessEnv, string> = process.env) {
-  return env[ENGINE_V2_READ_MODELS_FLAG] === "1" || env[ENGINE_V2_READ_MODELS_FLAG] === "true";
+  return env.ANALYSIS_ENGINE_VERSION === "v2" ||
+    env[ENGINE_V2_READ_MODELS_FLAG] === "1" ||
+    env[ENGINE_V2_READ_MODELS_FLAG] === "true";
 }
 
 export function toReadModelRowValues(input: EngineV2ReadModelRowInput): typeof engineV2ReadModelRows.$inferInsert {

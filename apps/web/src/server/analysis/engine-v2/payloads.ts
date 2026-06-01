@@ -4,7 +4,10 @@ export const engineV2WalletPayloadSchema = z.object({
   analysisRunId: z.string().uuid().optional(),
   chainId: z.number().int().positive(),
   walletAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/).transform((value) => value.toLowerCase()),
-  mode: z.enum(["fresh", "incremental", "reanalysis", "fixture"]).default("fresh"),
+  mode: z.enum(["fresh", "incremental", "reanalysis", "fixture", "full_history"])
+    .default("fresh")
+    .transform((value) => value === "full_history" ? "fresh" : value),
+  collectionRunId: z.string().uuid().optional(),
 });
 
 export const engineV2CollectionPagePayloadSchema = engineV2WalletPayloadSchema.extend({

@@ -44,6 +44,7 @@ test("runEngineV2AccountChronological accounts loaded events in chronological or
   const result = await runEngineV2AccountChronological(payload, {
     loadAccountingInput: async () => ({ events }),
     persistAccounting: async () => undefined,
+    trigger: async () => undefined,
   });
 
   assert.equal(result.eventCount, 2);
@@ -57,6 +58,7 @@ test("runEngineV2MaterializeReadModels persists rows and reports surface counts"
     persistRows: async ({ rows }) => {
       persisted.push(...rows);
     },
+    finalizeRun: async () => undefined as never,
   });
 
   assert.equal(result.bySurface.activity, 2);

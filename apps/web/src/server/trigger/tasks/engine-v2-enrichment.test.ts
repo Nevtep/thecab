@@ -28,6 +28,7 @@ test("runEngineV2RunEnrichmentBatch respects bounded batches and unresolved outc
       },
     ],
     resolveNeed: async () => "unresolved",
+    trigger: async () => undefined,
   });
 
   assert.deepEqual(result, {
@@ -37,4 +38,3 @@ test("runEngineV2RunEnrichmentBatch respects bounded batches and unresolved outc
     failedCount: 0,
   });
 });
-

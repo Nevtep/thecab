@@ -37,11 +37,7 @@ type AnalysisRunTaskDeps = {
   }>) => Promise<{
     runs: Array<{ ok: boolean; error?: unknown }>;
   }>;
-  triggerAndWait: (taskId: string, payload: {
-    runId: string;
-    walletAddress: string;
-    chainId: number;
-  }, options?: {
+  triggerAndWait: (taskId: string, payload: Record<string, unknown>, options?: {
     idempotencyKey?: string;
   }) => Promise<{
     ok: boolean;
@@ -137,63 +133,45 @@ export function shouldUseEngineV2AnalysisRun(
   payload: Pick<AnalysisRunTaskPayload, "mode">,
   env: Pick<NodeJS.ProcessEnv, string> = process.env,
 ) {
-  return env.ANALYSIS_ENGINE_V2_TRIGGER === "1" || env.ANALYSIS_ENGINE_V2_TRIGGER === "true" || String(payload.mode) === "engine_v2";
+  return env.ANALYSIS_ENGINE_VERSION === "v2" ||
+    env.ANALYSIS_ENGINE_V2_TRIGGER === "1" ||
+    env.ANALYSIS_ENGINE_V2_TRIGGER === "true" ||
+    String(payload.mode) === "engine_v2";
 }
-
-const ENGINE_V2_ORCHESTRATION_STEPS = [
-  { taskId: "engine-v2-collect-decoded-history-page", stage: "collection", progressPct: 8 },
-  { taskId: "engine-v2-finalize-collection", stage: "collection", progressPct: 15 },
-  { taskId: "engine-v2-canonicalize-history", stage: "canonicalization", progressPct: 24 },
-  { taskId: "engine-v2-protocol-bootstrap", stage: "abi_registry", progressPct: 32 },
-  { taskId: "engine-v2-ensure-abi-registry", stage: "abi_registry", progressPct: 38 },
-  { taskId: "engine-v2-decode-canonical-calls", stage: "classification", progressPct: 46 },
-  { taskId: "engine-v2-classify-chronological", stage: "classification", progressPct: 56 },
-  { taskId: "engine-v2-plan-enrichment", stage: "enrichment", progressPct: 66 },
-  { taskId: "engine-v2-run-enrichment-batch", stage: "enrichment", progressPct: 74 },
-  { taskId: "engine-v2-account-chronological", stage: "accounting", progressPct: 86 },
-  { taskId: "engine-v2-materialize-read-models", stage: "materialization", progressPct: 96 },
-] as const;
 
 export async function runEngineV2AnalysisOrchestration(
   payload: AnalysisRunTaskPayload,
   deps: Pick<AnalysisRunTaskDeps, "triggerAndWait" | "updateAnalysisRunProgress" | "finalizeAnalysisRun">,
 ) {
-  const basePayload = {
-    runId: payload.runId,
+  const enginePayload = {
+    analysisRunId: payload.runId,
     walletAddress: payload.walletAddress,
     chainId: payload.chainId,
+    mode: payload.mode,
   };
-
-  for (const step of ENGINE_V2_ORCHESTRATION_STEPS) {
-    await deps.updateAnalysisRunProgress(payload.runId, {
-      status: "running",
-      stage: step.stage,
-      progressPct: step.progressPct,
-    });
-    const result = await deps.triggerAndWait(step.taskId, basePayload, {
-      idempotencyKey: `${payload.runId}:engine-v2:${step.taskId}`,
-    });
-    if (!result.ok) {
-      await deps.finalizeAnalysisRun({
-        runId: payload.runId,
-        status: "failed",
-        coverage: "partial",
-        coverageReasonsJson: ["engineV2TaskFailed", step.taskId],
-        lastError: result.error instanceof Error ? result.error.message : `${step.taskId} failed`,
-      });
-      throw result.error ?? new Error(`${step.taskId} failed`);
-    }
-  }
 
   await deps.updateAnalysisRunProgress(payload.runId, {
     status: "running",
-    stage: "complete",
-    progressPct: 99,
+    stage: "engine_v2_collection",
+    progressPct: 5,
   });
+  const result = await deps.triggerAndWait("engine-v2-start-collection", enginePayload, {
+    idempotencyKey: `${payload.runId}:engine-v2:start`,
+  });
+  if (!result.ok) {
+    await deps.finalizeAnalysisRun({
+      runId: payload.runId,
+      status: "failed",
+      coverage: "partial",
+      coverageReasonsJson: ["engineV2TaskFailed", "engine-v2-start-collection"],
+      lastError: result.error instanceof Error ? result.error.message : "engine-v2-start-collection failed",
+    });
+    throw result.error ?? new Error("engine-v2-start-collection failed");
+  }
 
   return {
     engine: "v2",
-    stepCount: ENGINE_V2_ORCHESTRATION_STEPS.length,
+    queued: true,
     mode: payload.mode,
   };
 }

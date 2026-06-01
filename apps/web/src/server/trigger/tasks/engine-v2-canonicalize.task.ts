@@ -1,5 +1,6 @@
 import { task, tasks } from "@trigger.dev/sdk/v3";
 
+import { updateAnalysisRunProgress } from "@/server/analysis/analysis-run.repository";
 import {
   parseMoralisDecodedHistoryPage,
   sortDecodedTransactionsChronologically,
@@ -19,6 +20,13 @@ export const engineV2CanonicalizeHistoryTask = task({
     const payload = engineV2CollectionPagePayloadSchema.parse(rawPayload);
     if (!payload.collectionRunId) {
       throw new Error("ENGINE_V2_COLLECTION_RUN_ID_REQUIRED");
+    }
+    if (payload.analysisRunId) {
+      await updateAnalysisRunProgress(payload.analysisRunId, {
+        status: "running",
+        stage: "engine_v2_canonicalization",
+        progressPct: 24,
+      });
     }
 
     const db = getDb();
@@ -62,9 +70,9 @@ export const engineV2CanonicalizeHistoryTask = task({
     }
 
     await tasks.trigger("engine-v2-protocol-bootstrap", {
+      ...payload,
       chainId: payload.chainId,
       walletAddress: payload.walletAddress,
-      mode: payload.mode,
     }, {
       idempotencyKey: `engine-v2-protocol-bootstrap:${payload.chainId}:${payload.walletAddress}:${payload.collectionRunId}`,
     });
