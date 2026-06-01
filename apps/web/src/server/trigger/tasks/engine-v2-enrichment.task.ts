@@ -65,6 +65,18 @@ const PROTOCOL_GRANT_ADDRESS_KINDS = new Set([
   "protocol-airdrop",
 ]);
 
+const ACCOUNTING_BLOCKING_NEED_TYPES = new Set([
+  "abi",
+  "selector",
+  "log_decode",
+  "historical_price",
+  "pool_definition",
+  "lock_identity",
+  "distributor_pool_link",
+  "strategy_state",
+  "transaction_decoded_backfill",
+]);
+
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
@@ -156,6 +168,12 @@ function appendNeed(
 ) {
   const key = `${input.needType}:${input.targetType}:${input.targetId}:${(input.reasonCodes ?? []).join(",")}`;
   needs.set(key, input);
+}
+
+function accountingBlockingNeedTypes(needTypes?: string[]) {
+  const effective = needTypes?.filter((needType) => ACCOUNTING_BLOCKING_NEED_TYPES.has(needType))
+    ?? [...ACCOUNTING_BLOCKING_NEED_TYPES];
+  return effective.length > 0 ? effective : undefined;
 }
 
 async function planNeedsFromDomainEvents(input: { chainId: number; walletAddress: string }) {
@@ -700,9 +718,31 @@ export async function runEngineV2RunEnrichmentBatch(rawPayload: unknown, deps: E
   }
 
   const triggerTask = deps.trigger ?? ((taskId, taskPayload, options) => tasks.trigger(taskId, taskPayload, options));
-  await triggerTask("engine-v2-account-chronological", payload, {
-    idempotencyKey: `engine-v2-account:${payload.chainId}:${payload.walletAddress}:${payload.collectionRunId ?? "latest"}`,
-  });
+  const remainingBlockingNeedTypes = accountingBlockingNeedTypes(payload.needTypes);
+  const remainingBlockingNeeds = remainingBlockingNeedTypes
+    ? await (deps.loadQueuedNeeds?.({
+      chainId: payload.chainId,
+      walletAddress: payload.walletAddress,
+      needTypes: remainingBlockingNeedTypes,
+      limit: 1,
+    }) ?? loadQueuedNeedsFromDb({
+      chainId: payload.chainId,
+      walletAddress: payload.walletAddress,
+      needTypes: remainingBlockingNeedTypes,
+      limit: 1,
+    }))
+    : [];
+
+  if (remainingBlockingNeeds.length > 0) {
+    const nextNeedKey = remainingBlockingNeeds[0]?.id ?? `${remainingBlockingNeeds[0]?.needType ?? "queued"}:${remainingBlockingNeeds[0]?.targetId ?? "unknown"}`;
+    await triggerTask("engine-v2-run-enrichment-batch", payload, {
+      idempotencyKey: `engine-v2-run-enrichment:${payload.chainId}:${payload.walletAddress}:${payload.collectionRunId ?? "latest"}:${nextNeedKey}`,
+    });
+  } else {
+    await triggerTask("engine-v2-account-chronological", payload, {
+      idempotencyKey: `engine-v2-account:${payload.chainId}:${payload.walletAddress}:${payload.collectionRunId ?? "latest"}`,
+    });
+  }
 
   return {
     attemptedCount: boundedNeeds.length,
