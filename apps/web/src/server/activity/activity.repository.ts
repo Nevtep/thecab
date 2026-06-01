@@ -1,6 +1,7 @@
 import { and, eq, ilike, inArray, or, sql } from "drizzle-orm";
 
 import { readAnalysisStatusContext } from "@/server/analysis/analysis-run.repository";
+import { readEngineV2SurfaceRows } from "@/server/analysis/engine-v2/materializers";
 import { getExplorerTxUrl, getSupportedChain } from "@/server/chains";
 import { getDb } from "@/server/db/client";
 import { assetMovements, ledgerEvents } from "@/server/db/schema";
@@ -371,6 +372,22 @@ export async function readActivityAnalysisContext(input: { walletAddress: string
 }
 
 export async function findActivity(input: ActivityRequest): Promise<ActivityRepositoryResult> {
+  const engineV2Rows = await readEngineV2SurfaceRows<ActivityEventRow>({
+    chainId: input.chainId,
+    walletAddress: input.walletAddress,
+    surface: "activity",
+  });
+  if (engineV2Rows) {
+    const filtered = sortActivityRows(engineV2Rows.filter((row) => matchesActivityRequest(row, input)), input);
+    const startIndex = (input.page - 1) * input.pageSize;
+    return {
+      allRows: filtered,
+      rows: filtered.slice(startIndex, startIndex + input.pageSize),
+      totalRows: filtered.length,
+      availableFilters: calculateAvailableActivityFilters(engineV2Rows),
+    };
+  }
+
   const db = getDb();
   const ledgerSelect = {
     activityId: ledgerEvents.id,

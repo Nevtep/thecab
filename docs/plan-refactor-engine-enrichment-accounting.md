@@ -792,3 +792,15 @@ El siguiente spec tecnico deberia ser "Analysis Engine V2 Enrichment And Account
 7. read model materialization for existing dataviews.
 
 No conviene seguir corrigiendo `phase-deposits`, `phase-rewards`, `phase-governance` y `phase-activity` como fuentes principales. Pueden quedar como adapters temporales o read-model rebuilders mientras se migra, pero el comportamiento canonico debe moverse al procesador cronologico de transacciones + enrichment/accounting.
+
+## Implementation Notes - 2026-06-01
+
+Implemented Engine V2 accounting/materialization keeps the model intentionally conservative:
+
+- Domain events are sorted oldest-to-newest before accounting.
+- Cash-in/out, swaps, and residual inventory are projected from explicit movement evidence.
+- Manual deposits require explicit tokenId/position identity; strategy events remain share-level unless stronger lifecycle evidence exists.
+- Pools aggregate manual, strategy, governance reward, and residual contributions only from explicit links.
+- Rewards carry `affectsTotals`, `poolContribution`, owner status, coverage, confidence, and reason codes so they can appear in multiple views without double counting.
+- Governance accounting separates direct locks, user locks deposited into managed relays, managed token ids, epochs, and claim/rebase events.
+- DataView rows are materialized into `engine_v2_read_model_rows` with selected-detail evidence and coverage notes; Overview remains out of scope.

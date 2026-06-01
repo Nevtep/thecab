@@ -10,7 +10,7 @@ Expected safe flow:
 
 ```sh
 pnpm db:migrate
-pnpm db:purge -- --scope engine-v2 --confirm-local-dev
+pnpm db:purge -- --scope engine-v2 --confirm-engine-v2-purge
 ```
 
 If a full local database drop/recreate is used, it must be developer-confirmed and never target production.
@@ -42,6 +42,8 @@ Expected Trigger stages:
 ```text
 collecting -> canonicalizing -> decoding -> classifying -> enriching -> accounting -> materializing -> complete
 ```
+
+The CLI prints the ordered Engine V2 task plan by default. Trigger execution is opt-in through the normal `analysis-run` orchestration with `ANALYSIS_ENGINE_V2_TRIGGER=1`; legacy phases remain the rollback mode when the flag is absent.
 
 ## 4. Validate Classification Families
 
@@ -109,3 +111,15 @@ pnpm ds:check
 ```
 
 Record any skipped provider-backed checks with the reason, required env vars, and residual risk.
+
+## Validation Notes
+
+- `pnpm db:migrate`: pass on 2026-06-01; Drizzle applied migrations successfully against local `.env.local`.
+- `pnpm typecheck`: pass on 2026-06-01 after Phase 8 cleanup.
+- `pnpm test:unit`: pass on 2026-06-01; 399 tests passed.
+- `pnpm analysis:v2:regression`: pass on 2026-06-01 with canonical, classification, enrichment, read-model, and known-bug assertions. The six Moralis fixture pages for the test wallet produced 534 provider rows, 534 distinct canonical transactions, zero duplicate tx hashes, chronological ordering, all six DataView surfaces, and stable known-bug coverage.
+- `pnpm analysis:v2:run -- --wallet=0x0eCD939b7fcA4dC4A0675d8D28BAd12cefaE0954 --chain-id=8453 --mode=fixture --dry-run`: pass on 2026-06-01; task plan preserved lowercased wallet identity, chain id 8453, fixture mode, and Engine V2 task ordering from collection through materialization.
+- `pnpm i18n:check`: pass on 2026-06-01.
+- `pnpm ds:check`: pass on 2026-06-01; design-system checks passed. Existing advisory hardcoded-hex inventory remains outside Engine V2 scope.
+- No Playwright, browser E2E, or automated a11y checks were added as Engine V2 release gates. The project already has an unrelated `test:a11y` script, but this feature remains covered by unit, repository, Trigger task, static DB-only, and deterministic regression checks.
+- Request-time DataView verification: pass on 2026-06-01 through `db-only-read-models.test.ts`, `db-only-routes.test.ts`, repository import checks, and manual source scan. Activity, Deposits, Strategies, Pools, Rewards, and Governance consume materialized DB rows when `ANALYSIS_ENGINE_V2_READ_MODELS` is enabled and do not import provider-boundary clients on request paths.

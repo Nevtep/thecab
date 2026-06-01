@@ -54,11 +54,24 @@ type DeleteStep = {
   values?: unknown[];
 };
 
+function getPurgeScope() {
+  const scopeArg = process.argv.find((arg) => arg.startsWith("--scope="));
+  return scopeArg?.slice("--scope=".length) ?? "analysis";
+}
+
+function assertEngineV2PurgeConfirmed(scope: string) {
+  if (scope !== "engine-v2") return;
+  if (process.argv.includes("--confirm-engine-v2-purge")) return;
+  throw new Error("ENGINE_V2_PURGE_REQUIRES_CONFIRM_FLAG");
+}
+
 loadLocalEnvFile();
 
 async function main() {
   const walletAddress = getRequiredAddress("TEST_ADDRESS");
   const chainId = SUPPORTED_CHAIN_ID;
+  const scope = getPurgeScope();
+  assertEngineV2PurgeConfirmed(scope);
   const client = new pg.Client({ connectionString: getRequiredDatabaseUrl() });
 
   await client.connect();
@@ -76,7 +89,129 @@ async function main() {
       [walletAddress, chainId],
     )).rows.map((row) => row.id);
 
-    const steps: DeleteStep[] = [
+    const engineV2Steps: DeleteStep[] = [
+      {
+        label: "engine_v2_read_model_rows",
+        query: `delete from engine_v2_read_model_rows where wallet_address = $1 and chain_id = $2`,
+      },
+      {
+        label: "engine_v2_residual_inventory",
+        query: `delete from engine_v2_residual_inventory where wallet_address = $1 and chain_id = $2`,
+      },
+      {
+        label: "engine_v2_valuations",
+        query: `delete from engine_v2_valuations where wallet_address = $1 and chain_id = $2`,
+      },
+      {
+        label: "engine_v2_cash_flows",
+        query: `delete from engine_v2_cash_flows where wallet_address = $1 and chain_id = $2`,
+      },
+      {
+        label: "engine_v2_accounting_lots",
+        query: `delete from engine_v2_accounting_lots where wallet_address = $1 and chain_id = $2`,
+      },
+      {
+        label: "engine_v2_governance_claim_items",
+        query: `delete from engine_v2_governance_claim_items where wallet_address = $1 and chain_id = $2`,
+      },
+      {
+        label: "engine_v2_governance_claim_batches",
+        query: `delete from engine_v2_governance_claim_batches where wallet_address = $1 and chain_id = $2`,
+      },
+      {
+        label: "engine_v2_managed_lock_links",
+        query: `delete from engine_v2_managed_lock_links where wallet_address = $1 and chain_id = $2`,
+      },
+      {
+        label: "engine_v2_governance_lock_events",
+        query: `
+          delete from engine_v2_governance_lock_events
+          where governance_lock_id in (
+            select id from engine_v2_governance_locks where wallet_address = $1 and chain_id = $2
+          )
+        `,
+      },
+      {
+        label: "engine_v2_governance_locks",
+        query: `delete from engine_v2_governance_locks where wallet_address = $1 and chain_id = $2`,
+      },
+      {
+        label: "engine_v2_governance_epochs",
+        query: `delete from engine_v2_governance_epochs where wallet_address = $1 and chain_id = $2`,
+      },
+      {
+        label: "engine_v2_enrichment_needs",
+        query: `delete from engine_v2_enrichment_needs where wallet_address = $1 and chain_id = $2`,
+      },
+      {
+        label: "engine_v2_classification_traces",
+        query: `
+          delete from engine_v2_classification_traces
+          where tx_hash in (
+            select tx_hash from canonical_transactions where wallet_address = $1 and chain_id = $2
+          )
+            and chain_id = $2
+        `,
+      },
+      {
+        label: "engine_v2_domain_event_links",
+        query: `
+          delete from engine_v2_domain_event_links
+          where domain_event_id in (
+            select id from engine_v2_domain_events where wallet_address = $1 and chain_id = $2
+          )
+        `,
+      },
+      {
+        label: "engine_v2_domain_events",
+        query: `delete from engine_v2_domain_events where wallet_address = $1 and chain_id = $2`,
+      },
+      {
+        label: "canonical_calls",
+        query: `
+          delete from canonical_calls
+          where canonical_transaction_id in (
+            select id from canonical_transactions where wallet_address = $1 and chain_id = $2
+          )
+        `,
+      },
+      {
+        label: "canonical_asset_movements",
+        query: `delete from canonical_asset_movements where wallet_address = $1 and chain_id = $2`,
+      },
+      {
+        label: "canonical_internal_transactions",
+        query: `
+          delete from canonical_internal_transactions
+          where canonical_transaction_id in (
+            select id from canonical_transactions where wallet_address = $1 and chain_id = $2
+          )
+        `,
+      },
+      {
+        label: "canonical_transaction_logs",
+        query: `
+          delete from canonical_transaction_logs
+          where canonical_transaction_id in (
+            select id from canonical_transactions where wallet_address = $1 and chain_id = $2
+          )
+        `,
+      },
+      {
+        label: "canonical_transactions",
+        query: `delete from canonical_transactions where wallet_address = $1 and chain_id = $2`,
+      },
+      {
+        label: "engine_v2_provider_pages",
+        query: `delete from engine_v2_provider_pages where wallet_address = $1 and chain_id = $2`,
+      },
+      {
+        label: "engine_v2_collection_runs",
+        query: `delete from engine_v2_collection_runs where wallet_address = $1 and chain_id = $2`,
+      },
+    ];
+
+    const legacySteps: DeleteStep[] = [
       {
         label: "raw_provider_records",
         query: `
@@ -216,6 +351,7 @@ async function main() {
         query: `delete from analysis_runs where wallet_address = $1 and chain_id = $2`,
       },
     ];
+    const steps = scope === "engine-v2" ? engineV2Steps : [...engineV2Steps, ...legacySteps];
 
     const deleted: Record<string, number> = {};
     for (const step of steps) {
@@ -227,6 +363,7 @@ async function main() {
 
     console.log(JSON.stringify({
       ok: true,
+      scope,
       walletAddress,
       chainId,
       deleted,

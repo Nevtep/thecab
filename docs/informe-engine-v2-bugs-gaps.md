@@ -1260,3 +1260,12 @@ Este documento complementa:
 - `docs/plan-refactor-engine-enrichment-accounting.md`
 
 El spec de engine v2 debe incluir estos bugs como casos de aceptacion/regresion, no como notas opcionales.
+
+## Implementation Closure Notes - 2026-06-01
+
+- Unknown governance lock origins are handled as a narrow enrichment path only when a governance method references a strong unseen lock token id. The path records a need/backfill using cached NFT transfer history and decoded transfer tx evidence, and can mark protocol-grant provenance when the transfer tx is tied to a known protocol grants contract.
+- Managed relay deposits persist `userTokenId -> managedTokenId` as a relation and do not merge the managed token id into wallet-owned direct lock identity.
+- Claim-like multicalls are represented as parent/child domain events when decoded call data is available; missing distributor-to-pool evidence leaves reward pool contribution unresolved.
+- Rebase relocks remain non-liquid reward/accounting events and do not become cash-in.
+- Provider row count vs canonical transaction count is reported generically by the collection/canonical regression; fixture-specific row numbers are regression output only, not product requirements.
+- Request-time DataViews have static DB-only import guards and consume materialized rows behind an explicit Engine V2 read-model flag.

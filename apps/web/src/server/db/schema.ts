@@ -1180,4 +1180,754 @@ export const depositPerformanceDecompositions = pgTable(
   ],
 );
 
+export const engineV2CollectionRuns = pgTable(
+  "engine_v2_collection_runs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    analysisRunId: uuid("analysis_run_id").references(() => analysisRuns.id, { onDelete: "cascade" }),
+    chainId: integer("chain_id").notNull(),
+    walletAddress: varchar("wallet_address", { length: 42 }).notNull(),
+    sourceProvider: varchar("source_provider", { length: 32 }).notNull().default("moralis"),
+    sourceEndpoint: text("source_endpoint").notNull(),
+    sourceQueryJson: jsonb("source_query_json").$type<Record<string, unknown>>().notNull().default({}),
+    status: varchar("status", { length: 24 }).notNull().default("queued"),
+    providerRowCount: integer("provider_row_count").notNull().default(0),
+    distinctTxCount: integer("distinct_tx_count").notNull().default(0),
+    duplicateTxCount: integer("duplicate_tx_count").notNull().default(0),
+    collectionVersion: varchar("collection_version", { length: 32 }).notNull().default("engine-v2.0"),
+    lastCursor: text("last_cursor"),
+    coverageStatus: varchar("coverage_status", { length: 24 }).notNull().default("unknown"),
+    reasonCodes: text("reason_codes").array().notNull().default(sql`'{}'::text[]`),
+    startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).$defaultFn(now).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).$defaultFn(now).notNull(),
+  },
+  (table) => [
+    index("engine_v2_collection_runs_wallet_idx").on(table.chainId, table.walletAddress, table.status),
+    index("engine_v2_collection_runs_analysis_run_idx").on(table.analysisRunId),
+  ],
+);
+
+export const engineV2ProviderPages = pgTable(
+  "engine_v2_provider_pages",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    collectionRunId: uuid("collection_run_id")
+      .notNull()
+      .references(() => engineV2CollectionRuns.id, { onDelete: "cascade" }),
+    chainId: integer("chain_id").notNull(),
+    walletAddress: varchar("wallet_address", { length: 42 }).notNull(),
+    sourceProvider: varchar("source_provider", { length: 32 }).notNull(),
+    sourceEndpoint: text("source_endpoint").notNull(),
+    requestHash: varchar("request_hash", { length: 64 }).notNull(),
+    responseHash: varchar("response_hash", { length: 64 }).notNull(),
+    cursorIn: text("cursor_in"),
+    cursorOut: text("cursor_out"),
+    pageIndex: integer("page_index").notNull(),
+    rawJson: jsonb("raw_json").$type<Record<string, unknown>>().notNull(),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("engine_v2_provider_pages_request_uidx").on(
+      table.chainId,
+      table.walletAddress,
+      table.sourceProvider,
+      table.requestHash,
+    ),
+    index("engine_v2_provider_pages_run_idx").on(table.collectionRunId, table.pageIndex),
+  ],
+);
+
+export const canonicalTransactions = pgTable(
+  "canonical_transactions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    chainId: integer("chain_id").notNull(),
+    walletAddress: varchar("wallet_address", { length: 42 }).notNull(),
+    txHash: varchar("tx_hash", { length: 66 }).notNull(),
+    blockNumber: numeric("block_number", { precision: 38, scale: 0 }).notNull(),
+    blockTimestamp: timestamp("block_timestamp", { withTimezone: true }).notNull(),
+    transactionIndex: integer("transaction_index").notNull().default(0),
+    fromAddress: varchar("from_address", { length: 42 }),
+    toAddress: varchar("to_address", { length: 42 }),
+    valueNativeRaw: numeric("value_native_raw", { precision: 78, scale: 0 }).notNull().default("0"),
+    input: text("input"),
+    receiptStatus: varchar("receipt_status", { length: 16 }).notNull().default("unknown"),
+    gasUsed: numeric("gas_used", { precision: 38, scale: 0 }),
+    transactionFeeNative: numeric("transaction_fee_native", { precision: 38, scale: 18 }),
+    decodedCallJson: jsonb("decoded_call_json").$type<Record<string, unknown> | null>(),
+    sourceProvider: varchar("source_provider", { length: 32 }).notNull().default("moralis"),
+    sourceEndpoint: text("source_endpoint").notNull(),
+    sourceCursor: text("source_cursor"),
+    providerPageId: uuid("provider_page_id").references(() => engineV2ProviderPages.id, { onDelete: "set null" }),
+    rawProviderRecordId: text("raw_provider_record_id"),
+    collectionRunId: uuid("collection_run_id").references(() => engineV2CollectionRuns.id, { onDelete: "set null" }),
+    canonicalizedAt: timestamp("canonicalized_at", { withTimezone: true }).defaultNow().notNull(),
+    metadataJson: jsonb("metadata_json").$type<Record<string, unknown>>().notNull().default({}),
+  },
+  (table) => [
+    uniqueIndex("canonical_transactions_identity_uidx").on(table.chainId, table.walletAddress, table.txHash),
+    index("canonical_transactions_order_idx").on(table.chainId, table.walletAddress, table.blockNumber, table.transactionIndex),
+    index("canonical_transactions_tx_idx").on(table.chainId, table.txHash),
+  ],
+);
+
+export const canonicalTransactionLogs = pgTable(
+  "canonical_transaction_logs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    canonicalTransactionId: uuid("canonical_transaction_id")
+      .notNull()
+      .references(() => canonicalTransactions.id, { onDelete: "cascade" }),
+    chainId: integer("chain_id").notNull(),
+    txHash: varchar("tx_hash", { length: 66 }).notNull(),
+    logIndex: integer("log_index").notNull(),
+    address: varchar("address", { length: 42 }).notNull(),
+    topic0: varchar("topic0", { length: 66 }),
+    topic1: varchar("topic1", { length: 66 }),
+    topic2: varchar("topic2", { length: 66 }),
+    topic3: varchar("topic3", { length: 66 }),
+    data: text("data"),
+    decodedEventJson: jsonb("decoded_event_json").$type<Record<string, unknown> | null>(),
+    abiId: uuid("abi_id"),
+    decodeStatus: varchar("decode_status", { length: 24 }).notNull().default("provider_hint"),
+    decodeConfidence: varchar("decode_confidence", { length: 16 }).notNull().default("unknown"),
+    sourceKind: varchar("source_kind", { length: 48 }).notNull().default("wallet_history"),
+    rawJson: jsonb("raw_json").$type<Record<string, unknown>>().notNull().default({}),
+  },
+  (table) => [
+    uniqueIndex("canonical_transaction_logs_identity_uidx").on(table.chainId, table.txHash, table.logIndex),
+    index("canonical_transaction_logs_topic_idx").on(table.chainId, table.address, table.topic0),
+    index("canonical_transaction_logs_tx_idx").on(table.canonicalTransactionId, table.logIndex),
+  ],
+);
+
+export const canonicalInternalTransactions = pgTable(
+  "canonical_internal_transactions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    canonicalTransactionId: uuid("canonical_transaction_id")
+      .notNull()
+      .references(() => canonicalTransactions.id, { onDelete: "cascade" }),
+    chainId: integer("chain_id").notNull(),
+    txHash: varchar("tx_hash", { length: 66 }).notNull(),
+    traceIndex: integer("trace_index").notNull(),
+    fromAddress: varchar("from_address", { length: 42 }),
+    toAddress: varchar("to_address", { length: 42 }),
+    valueNativeRaw: numeric("value_native_raw", { precision: 78, scale: 0 }).notNull().default("0"),
+    callType: varchar("call_type", { length: 32 }),
+    gas: numeric("gas", { precision: 38, scale: 0 }),
+    error: text("error"),
+    rawJson: jsonb("raw_json").$type<Record<string, unknown>>().notNull().default({}),
+  },
+  (table) => [
+    uniqueIndex("canonical_internal_txs_identity_uidx").on(table.chainId, table.txHash, table.traceIndex),
+    index("canonical_internal_txs_tx_idx").on(table.canonicalTransactionId, table.traceIndex),
+  ],
+);
+
+export const canonicalAssetMovements = pgTable(
+  "canonical_asset_movements",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    canonicalTransactionId: uuid("canonical_transaction_id")
+      .notNull()
+      .references(() => canonicalTransactions.id, { onDelete: "cascade" }),
+    canonicalLogId: uuid("canonical_log_id").references(() => canonicalTransactionLogs.id, { onDelete: "set null" }),
+    canonicalInternalTransactionId: uuid("canonical_internal_transaction_id").references(() => canonicalInternalTransactions.id, { onDelete: "set null" }),
+    chainId: integer("chain_id").notNull(),
+    walletAddress: varchar("wallet_address", { length: 42 }).notNull(),
+    txHash: varchar("tx_hash", { length: 66 }).notNull(),
+    movementIndex: integer("movement_index").notNull(),
+    assetType: varchar("asset_type", { length: 24 }).notNull(),
+    tokenAddress: varchar("token_address", { length: 42 }),
+    tokenId: text("token_id"),
+    fromAddress: varchar("from_address", { length: 42 }),
+    toAddress: varchar("to_address", { length: 42 }),
+    amountRaw: numeric("amount_raw", { precision: 78, scale: 0 }),
+    direction: varchar("direction", { length: 16 }).notNull().default("unknown"),
+    movementKind: varchar("movement_kind", { length: 48 }).notNull().default("unknown"),
+    metadataStatus: varchar("metadata_status", { length: 24 }).notNull().default("missing"),
+    priceStatus: varchar("price_status", { length: 24 }).notNull().default("missing"),
+    valueUsdAtEvent: numeric("value_usd_at_event", { precision: 38, scale: 18 }),
+    evidenceJson: jsonb("evidence_json").$type<Record<string, unknown>>().notNull().default({}),
+  },
+  (table) => [
+    uniqueIndex("canonical_asset_movements_identity_uidx").on(table.chainId, table.txHash, table.movementIndex),
+    index("canonical_asset_movements_wallet_idx").on(table.chainId, table.walletAddress, table.txHash),
+    index("canonical_asset_movements_token_idx").on(table.chainId, table.tokenAddress, table.tokenId),
+  ],
+);
+
+export const contractAbis = pgTable(
+  "contract_abis",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    chainId: integer("chain_id").notNull(),
+    address: varchar("address", { length: 42 }).notNull(),
+    implementationAddress: varchar("implementation_address", { length: 42 }),
+    contractName: text("contract_name"),
+    protocol: varchar("protocol", { length: 32 }),
+    contractKind: varchar("contract_kind", { length: 64 }).notNull().default("unknown"),
+    abiJson: jsonb("abi_json").$type<unknown[]>().notNull().default([]),
+    sourceProvider: varchar("source_provider", { length: 32 }).notNull(),
+    sourceUrl: text("source_url"),
+    sourceReference: text("source_reference"),
+    bytecodeHash: varchar("bytecode_hash", { length: 66 }),
+    isProxy: boolean("is_proxy").notNull().default(false),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).$defaultFn(now).notNull(),
+    metadataJson: jsonb("metadata_json").$type<Record<string, unknown>>().notNull().default({}),
+  },
+  (table) => [
+    uniqueIndex("contract_abis_identity_uidx").on(table.chainId, table.address, table.implementationAddress),
+    index("contract_abis_protocol_idx").on(table.chainId, table.protocol, table.contractKind),
+  ],
+);
+
+export const contractAbiSelectors = pgTable(
+  "contract_abi_selectors",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    contractAbiId: uuid("contract_abi_id")
+      .notNull()
+      .references(() => contractAbis.id, { onDelete: "cascade" }),
+    chainId: integer("chain_id").notNull(),
+    address: varchar("address", { length: 42 }).notNull(),
+    selectorOrTopic: varchar("selector_or_topic", { length: 66 }).notNull(),
+    signature: text("signature").notNull(),
+    fragmentType: varchar("fragment_type", { length: 16 }).notNull(),
+    fragmentJson: jsonb("fragment_json").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).$defaultFn(now).notNull(),
+  },
+  (table) => [
+    uniqueIndex("contract_abi_selectors_identity_uidx").on(table.chainId, table.address, table.selectorOrTopic, table.fragmentType),
+    index("contract_abi_selectors_lookup_idx").on(table.chainId, table.selectorOrTopic, table.fragmentType),
+  ],
+);
+
+export const canonicalCalls = pgTable(
+  "canonical_calls",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    canonicalTransactionId: uuid("canonical_transaction_id")
+      .notNull()
+      .references(() => canonicalTransactions.id, { onDelete: "cascade" }),
+    parentCallId: uuid("parent_call_id"),
+    chainId: integer("chain_id").notNull(),
+    txHash: varchar("tx_hash", { length: 66 }).notNull(),
+    callPath: text("call_path").notNull(),
+    targetAddress: varchar("target_address", { length: 42 }),
+    selector: varchar("selector", { length: 10 }),
+    functionName: text("function_name"),
+    decodedArgsJson: jsonb("decoded_args_json").$type<Record<string, unknown> | null>(),
+    rawCallData: text("raw_call_data"),
+    abiId: uuid("abi_id").references(() => contractAbis.id, { onDelete: "set null" }),
+    decodeStatus: varchar("decode_status", { length: 24 }).notNull().default("missing_abi"),
+    decodeConfidence: varchar("decode_confidence", { length: 16 }).notNull().default("unknown"),
+    createdAt: timestamp("created_at", { withTimezone: true }).$defaultFn(now).notNull(),
+  },
+  (table) => [
+    uniqueIndex("canonical_calls_identity_uidx").on(table.chainId, table.txHash, table.callPath),
+    index("canonical_calls_tx_idx").on(table.canonicalTransactionId, table.callPath),
+    index("canonical_calls_selector_idx").on(table.chainId, table.targetAddress, table.selector),
+  ],
+);
+
+export const engineV2ProtocolKnownAddresses = pgTable(
+  "engine_v2_protocol_known_addresses",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    chainId: integer("chain_id").notNull(),
+    address: varchar("address", { length: 42 }).notNull(),
+    protocol: varchar("protocol", { length: 32 }).notNull(),
+    addressKind: varchar("address_kind", { length: 64 }).notNull(),
+    label: text("label"),
+    sourceProvider: varchar("source_provider", { length: 32 }).notNull(),
+    sourceReference: text("source_reference"),
+    confidence: varchar("confidence", { length: 16 }).notNull().default("high"),
+    metadataJson: jsonb("metadata_json").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).$defaultFn(now).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).$defaultFn(now).notNull(),
+  },
+  (table) => [
+    uniqueIndex("engine_v2_protocol_known_addresses_uidx").on(table.chainId, table.address, table.addressKind),
+    index("engine_v2_protocol_known_addresses_protocol_idx").on(table.chainId, table.protocol, table.addressKind),
+  ],
+);
+
+export const engineV2TokenMetadata = pgTable(
+  "engine_v2_token_metadata",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    chainId: integer("chain_id").notNull(),
+    tokenAddress: varchar("token_address", { length: 42 }).notNull(),
+    symbol: varchar("symbol", { length: 64 }),
+    name: text("name"),
+    decimals: integer("decimals"),
+    category: varchar("category", { length: 64 }),
+    verified: boolean("verified").notNull().default(false),
+    possibleSpam: boolean("possible_spam").notNull().default(false),
+    sourceProvider: varchar("source_provider", { length: 32 }).notNull(),
+    rawJson: jsonb("raw_json").$type<Record<string, unknown>>().notNull().default({}),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).$defaultFn(now).notNull(),
+  },
+  (table) => [uniqueIndex("engine_v2_token_metadata_uidx").on(table.chainId, table.tokenAddress)],
+);
+
+export const engineV2PricePoints = pgTable(
+  "engine_v2_price_points",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    chainId: integer("chain_id").notNull(),
+    tokenAddress: varchar("token_address", { length: 42 }).notNull(),
+    pricedAt: timestamp("priced_at", { withTimezone: true }),
+    blockNumber: numeric("block_number", { precision: 38, scale: 0 }),
+    priceUsd: numeric("price_usd", { precision: 38, scale: 18 }),
+    sourceProvider: varchar("source_provider", { length: 32 }).notNull(),
+    resolution: varchar("resolution", { length: 32 }).notNull().default("historical"),
+    status: varchar("status", { length: 24 }).notNull().default("resolved"),
+    metadataJson: jsonb("metadata_json").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).$defaultFn(now).notNull(),
+  },
+  (table) => [
+    uniqueIndex("engine_v2_price_points_uidx").on(table.chainId, table.tokenAddress, table.blockNumber, table.sourceProvider, table.resolution),
+    index("engine_v2_price_points_time_idx").on(table.chainId, table.tokenAddress, table.pricedAt),
+  ],
+);
+
+export const engineV2ProviderRequests = pgTable(
+  "engine_v2_provider_requests",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    chainId: integer("chain_id").notNull(),
+    naturalKey: text("natural_key").notNull(),
+    provider: varchar("provider", { length: 32 }).notNull(),
+    endpoint: text("endpoint").notNull(),
+    requestJson: jsonb("request_json").$type<Record<string, unknown>>().notNull().default({}),
+    responseReference: text("response_reference"),
+    status: varchar("status", { length: 24 }).notNull().default("queued"),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    lastError: text("last_error"),
+    nextRetryAt: timestamp("next_retry_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).$defaultFn(now).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).$defaultFn(now).notNull(),
+  },
+  (table) => [
+    uniqueIndex("engine_v2_provider_requests_natural_uidx").on(table.chainId, table.naturalKey),
+    index("engine_v2_provider_requests_status_idx").on(table.status, table.nextRetryAt),
+  ],
+);
+
+export const engineV2ProtocolStateSnapshots = pgTable(
+  "engine_v2_protocol_state_snapshots",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    chainId: integer("chain_id").notNull(),
+    protocol: varchar("protocol", { length: 32 }).notNull(),
+    subjectType: varchar("subject_type", { length: 48 }).notNull(),
+    subjectAddress: varchar("subject_address", { length: 42 }).notNull(),
+    subjectId: text("subject_id"),
+    blockNumber: numeric("block_number", { precision: 38, scale: 0 }),
+    observedAt: timestamp("observed_at", { withTimezone: true }).defaultNow().notNull(),
+    sourceProvider: varchar("source_provider", { length: 32 }).notNull(),
+    stateJson: jsonb("state_json").$type<Record<string, unknown>>().notNull().default({}),
+    evidenceJson: jsonb("evidence_json").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).$defaultFn(now).notNull(),
+  },
+  (table) => [
+    uniqueIndex("engine_v2_protocol_state_snapshots_uidx").on(
+      table.chainId,
+      table.protocol,
+      table.subjectType,
+      table.subjectAddress,
+      table.subjectId,
+      table.blockNumber,
+    ),
+    index("engine_v2_protocol_state_snapshots_subject_idx").on(table.chainId, table.subjectType, table.subjectAddress),
+  ],
+);
+
+export const engineV2DomainEvents = pgTable(
+  "engine_v2_domain_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    chainId: integer("chain_id").notNull(),
+    walletAddress: varchar("wallet_address", { length: 42 }).notNull(),
+    canonicalTransactionId: uuid("canonical_transaction_id").references(() => canonicalTransactions.id, { onDelete: "set null" }),
+    canonicalCallId: uuid("canonical_call_id").references(() => canonicalCalls.id, { onDelete: "set null" }),
+    parentEventId: uuid("parent_event_id"),
+    eventType: varchar("event_type", { length: 64 }).notNull(),
+    eventFamily: varchar("event_family", { length: 32 }).notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+    txHash: varchar("tx_hash", { length: 66 }).notNull(),
+    sequenceIndex: integer("sequence_index").notNull(),
+    coverageStatus: varchar("coverage_status", { length: 24 }).notNull().default("unknown"),
+    confidence: varchar("confidence", { length: 16 }).notNull().default("unknown"),
+    reasonCodes: text("reason_codes").array().notNull().default(sql`'{}'::text[]`),
+    valueEffectJson: jsonb("value_effect_json").$type<Record<string, unknown>>().notNull().default({}),
+    evidenceJson: jsonb("evidence_json").$type<Record<string, unknown>>().notNull().default({}),
+    metadataJson: jsonb("metadata_json").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).$defaultFn(now).notNull(),
+  },
+  (table) => [
+    uniqueIndex("engine_v2_domain_events_identity_uidx").on(table.chainId, table.walletAddress, table.txHash, table.sequenceIndex),
+    index("engine_v2_domain_events_wallet_idx").on(table.chainId, table.walletAddress, table.occurredAt),
+    index("engine_v2_domain_events_parent_idx").on(table.parentEventId),
+  ],
+);
+
+export const engineV2DomainEventLinks = pgTable(
+  "engine_v2_domain_event_links",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    domainEventId: uuid("domain_event_id")
+      .notNull()
+      .references(() => engineV2DomainEvents.id, { onDelete: "cascade" }),
+    chainId: integer("chain_id").notNull(),
+    entityType: varchar("entity_type", { length: 48 }).notNull(),
+    entityId: text("entity_id").notNull(),
+    linkKind: varchar("link_kind", { length: 48 }).notNull().default("explicit"),
+    confidence: varchar("confidence", { length: 16 }).notNull().default("high"),
+    evidenceJson: jsonb("evidence_json").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).$defaultFn(now).notNull(),
+  },
+  (table) => [
+    uniqueIndex("engine_v2_domain_event_links_uidx").on(table.domainEventId, table.entityType, table.entityId, table.linkKind),
+    index("engine_v2_domain_event_links_entity_idx").on(table.chainId, table.entityType, table.entityId),
+  ],
+);
+
+export const engineV2ClassificationTraces = pgTable(
+  "engine_v2_classification_traces",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    canonicalTransactionId: uuid("canonical_transaction_id")
+      .notNull()
+      .references(() => canonicalTransactions.id, { onDelete: "cascade" }),
+    chainId: integer("chain_id").notNull(),
+    txHash: varchar("tx_hash", { length: 66 }).notNull(),
+    classifierVersion: varchar("classifier_version", { length: 32 }).notNull(),
+    matchedRule: text("matched_rule").notNull(),
+    coverageStatus: varchar("coverage_status", { length: 24 }).notNull(),
+    confidence: varchar("confidence", { length: 16 }).notNull(),
+    reasonCodes: text("reason_codes").array().notNull().default(sql`'{}'::text[]`),
+    evidenceJson: jsonb("evidence_json").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).$defaultFn(now).notNull(),
+  },
+  (table) => [
+    index("engine_v2_classification_traces_tx_idx").on(table.chainId, table.txHash),
+    index("engine_v2_classification_traces_rule_idx").on(table.classifierVersion, table.matchedRule),
+  ],
+);
+
+export const engineV2EnrichmentNeeds = pgTable(
+  "engine_v2_enrichment_needs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    chainId: integer("chain_id").notNull(),
+    walletAddress: varchar("wallet_address", { length: 42 }),
+    needType: varchar("need_type", { length: 48 }).notNull(),
+    naturalKey: text("natural_key").notNull(),
+    status: varchar("status", { length: 24 }).notNull().default("queued"),
+    priority: integer("priority").notNull().default(100),
+    sourceDomainEventId: uuid("source_domain_event_id").references(() => engineV2DomainEvents.id, { onDelete: "set null" }),
+    reasonCodes: text("reason_codes").array().notNull().default(sql`'{}'::text[]`),
+    requestJson: jsonb("request_json").$type<Record<string, unknown>>().notNull().default({}),
+    resultJson: jsonb("result_json").$type<Record<string, unknown>>().notNull().default({}),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    lastError: text("last_error"),
+    nextRetryAt: timestamp("next_retry_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).$defaultFn(now).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).$defaultFn(now).notNull(),
+  },
+  (table) => [
+    uniqueIndex("engine_v2_enrichment_needs_natural_uidx").on(table.chainId, table.needType, table.naturalKey),
+    index("engine_v2_enrichment_needs_status_idx").on(table.status, table.priority, table.nextRetryAt),
+  ],
+);
+
+export const engineV2GovernanceLocks = pgTable(
+  "engine_v2_governance_locks",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    chainId: integer("chain_id").notNull(),
+    votingEscrowAddress: varchar("voting_escrow_address", { length: 42 }).notNull(),
+    lockTokenId: text("lock_token_id").notNull(),
+    walletAddress: varchar("wallet_address", { length: 42 }),
+    ownerAddress: varchar("owner_address", { length: 42 }),
+    originTxHash: varchar("origin_tx_hash", { length: 66 }),
+    originKind: varchar("origin_kind", { length: 48 }).notNull().default("unknown"),
+    status: varchar("status", { length: 24 }).notNull().default("unknown"),
+    coverageStatus: varchar("coverage_status", { length: 24 }).notNull().default("partial"),
+    confidence: varchar("confidence", { length: 16 }).notNull().default("unknown"),
+    reasonCodes: text("reason_codes").array().notNull().default(sql`'{}'::text[]`),
+    metadataJson: jsonb("metadata_json").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).$defaultFn(now).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).$defaultFn(now).notNull(),
+  },
+  (table) => [
+    uniqueIndex("engine_v2_governance_locks_identity_uidx").on(table.chainId, table.votingEscrowAddress, table.lockTokenId),
+    index("engine_v2_governance_locks_wallet_idx").on(table.chainId, table.walletAddress),
+  ],
+);
+
+export const engineV2GovernanceLockEvents = pgTable(
+  "engine_v2_governance_lock_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    governanceLockId: uuid("governance_lock_id")
+      .notNull()
+      .references(() => engineV2GovernanceLocks.id, { onDelete: "cascade" }),
+    domainEventId: uuid("domain_event_id").references(() => engineV2DomainEvents.id, { onDelete: "set null" }),
+    chainId: integer("chain_id").notNull(),
+    eventType: varchar("event_type", { length: 48 }).notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+    txHash: varchar("tx_hash", { length: 66 }).notNull(),
+    amountRaw: numeric("amount_raw", { precision: 78, scale: 0 }),
+    lockEnd: timestamp("lock_end", { withTimezone: true }),
+    coverageStatus: varchar("coverage_status", { length: 24 }).notNull().default("unknown"),
+    confidence: varchar("confidence", { length: 16 }).notNull().default("unknown"),
+    evidenceJson: jsonb("evidence_json").$type<Record<string, unknown>>().notNull().default({}),
+  },
+  (table) => [
+    uniqueIndex("engine_v2_governance_lock_events_uidx").on(table.chainId, table.txHash, table.eventType, table.governanceLockId),
+    index("engine_v2_governance_lock_events_lock_idx").on(table.governanceLockId, table.occurredAt),
+  ],
+);
+
+export const engineV2ManagedLockLinks = pgTable(
+  "engine_v2_managed_lock_links",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    chainId: integer("chain_id").notNull(),
+    walletAddress: varchar("wallet_address", { length: 42 }).notNull(),
+    userLockId: uuid("user_lock_id")
+      .notNull()
+      .references(() => engineV2GovernanceLocks.id, { onDelete: "cascade" }),
+    managedLockId: uuid("managed_lock_id").references(() => engineV2GovernanceLocks.id, { onDelete: "set null" }),
+    userTokenId: text("user_token_id").notNull(),
+    managedTokenId: text("managed_token_id").notNull(),
+    managerAddress: varchar("manager_address", { length: 42 }),
+    depositedAt: timestamp("deposited_at", { withTimezone: true }),
+    withdrawnAt: timestamp("withdrawn_at", { withTimezone: true }),
+    evidenceJson: jsonb("evidence_json").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).$defaultFn(now).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).$defaultFn(now).notNull(),
+  },
+  (table) => [
+    uniqueIndex("engine_v2_managed_lock_links_uidx").on(table.chainId, table.walletAddress, table.userTokenId, table.managedTokenId),
+    index("engine_v2_managed_lock_links_user_idx").on(table.userLockId),
+  ],
+);
+
+export const engineV2GovernanceEpochs = pgTable(
+  "engine_v2_governance_epochs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    chainId: integer("chain_id").notNull(),
+    walletAddress: varchar("wallet_address", { length: 42 }).notNull(),
+    epochId: text("epoch_id").notNull(),
+    epochStart: timestamp("epoch_start", { withTimezone: true }),
+    epochEnd: timestamp("epoch_end", { withTimezone: true }),
+    lockTokenId: text("lock_token_id"),
+    voteContextJson: jsonb("vote_context_json").$type<Record<string, unknown>>().notNull().default({}),
+    rewardContextJson: jsonb("reward_context_json").$type<Record<string, unknown>>().notNull().default({}),
+    coverageStatus: varchar("coverage_status", { length: 24 }).notNull().default("unknown"),
+    confidence: varchar("confidence", { length: 16 }).notNull().default("unknown"),
+    createdAt: timestamp("created_at", { withTimezone: true }).$defaultFn(now).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).$defaultFn(now).notNull(),
+  },
+  (table) => [
+    uniqueIndex("engine_v2_governance_epochs_uidx").on(table.chainId, table.walletAddress, table.epochId, table.lockTokenId),
+    index("engine_v2_governance_epochs_wallet_idx").on(table.chainId, table.walletAddress, table.epochStart),
+  ],
+);
+
+export const engineV2GovernanceClaimBatches = pgTable(
+  "engine_v2_governance_claim_batches",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    domainEventId: uuid("domain_event_id").references(() => engineV2DomainEvents.id, { onDelete: "set null" }),
+    chainId: integer("chain_id").notNull(),
+    walletAddress: varchar("wallet_address", { length: 42 }).notNull(),
+    txHash: varchar("tx_hash", { length: 66 }).notNull(),
+    claimSurface: varchar("claim_surface", { length: 48 }).notNull(),
+    itemCount: integer("item_count").notNull().default(0),
+    coverageStatus: varchar("coverage_status", { length: 24 }).notNull().default("unknown"),
+    confidence: varchar("confidence", { length: 16 }).notNull().default("unknown"),
+    evidenceJson: jsonb("evidence_json").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).$defaultFn(now).notNull(),
+  },
+  (table) => [
+    uniqueIndex("engine_v2_governance_claim_batches_uidx").on(table.chainId, table.walletAddress, table.txHash, table.claimSurface),
+  ],
+);
+
+export const engineV2GovernanceClaimItems = pgTable(
+  "engine_v2_governance_claim_items",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    domainEventId: uuid("domain_event_id").references(() => engineV2DomainEvents.id, { onDelete: "set null" }),
+    chainId: integer("chain_id").notNull(),
+    walletAddress: varchar("wallet_address", { length: 42 }).notNull(),
+    txHash: varchar("tx_hash", { length: 66 }).notNull(),
+    itemIndex: integer("item_index").notNull(),
+    rewardType: varchar("reward_type", { length: 32 }).notNull(),
+    tokenAddress: varchar("token_address", { length: 42 }),
+    amountRaw: numeric("amount_raw", { precision: 78, scale: 0 }),
+    valueUsdAtClaim: numeric("value_usd_at_claim", { precision: 38, scale: 18 }),
+    lockTokenId: text("lock_token_id"),
+    poolId: uuid("pool_id").references(() => pools.id, { onDelete: "set null" }),
+    sourceContract: varchar("source_contract", { length: 42 }),
+    affectsTotals: boolean("affects_totals").notNull().default(false),
+    poolContribution: varchar("pool_contribution", { length: 24 }).notNull().default("unresolved"),
+    coverageStatus: varchar("coverage_status", { length: 24 }).notNull().default("unknown"),
+    confidence: varchar("confidence", { length: 16 }).notNull().default("unknown"),
+    evidenceJson: jsonb("evidence_json").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).$defaultFn(now).notNull(),
+  },
+  (table) => [
+    uniqueIndex("engine_v2_governance_claim_items_uidx").on(table.chainId, table.walletAddress, table.txHash, table.itemIndex),
+    index("engine_v2_governance_claim_items_wallet_idx").on(table.chainId, table.walletAddress, table.rewardType),
+  ],
+);
+
+export const engineV2DistributorPoolLinks = pgTable(
+  "engine_v2_distributor_pool_links",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    chainId: integer("chain_id").notNull(),
+    distributorAddress: varchar("distributor_address", { length: 42 }).notNull(),
+    poolAddress: varchar("pool_address", { length: 42 }).notNull(),
+    gaugeAddress: varchar("gauge_address", { length: 42 }),
+    distributorKind: varchar("distributor_kind", { length: 32 }).notNull(),
+    sourceTxHash: varchar("source_tx_hash", { length: 66 }),
+    sourceLogIndex: integer("source_log_index"),
+    evidenceJson: jsonb("evidence_json").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).$defaultFn(now).notNull(),
+  },
+  (table) => [
+    uniqueIndex("engine_v2_distributor_pool_links_uidx").on(table.chainId, table.distributorAddress),
+    index("engine_v2_distributor_pool_links_pool_idx").on(table.chainId, table.poolAddress),
+  ],
+);
+
+export const engineV2AccountingLots = pgTable(
+  "engine_v2_accounting_lots",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    chainId: integer("chain_id").notNull(),
+    walletAddress: varchar("wallet_address", { length: 42 }).notNull(),
+    sourceDomainEventId: uuid("source_domain_event_id").references(() => engineV2DomainEvents.id, { onDelete: "set null" }),
+    lotKind: varchar("lot_kind", { length: 48 }).notNull(),
+    tokenAddress: varchar("token_address", { length: 42 }),
+    amountRaw: numeric("amount_raw", { precision: 78, scale: 0 }),
+    valueUsdAtEvent: numeric("value_usd_at_event", { precision: 38, scale: 18 }),
+    remainingAmountRaw: numeric("remaining_amount_raw", { precision: 78, scale: 0 }),
+    entityType: varchar("entity_type", { length: 48 }),
+    entityId: text("entity_id"),
+    coverageStatus: varchar("coverage_status", { length: 24 }).notNull().default("unknown"),
+    reasonCodes: text("reason_codes").array().notNull().default(sql`'{}'::text[]`),
+    metadataJson: jsonb("metadata_json").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).$defaultFn(now).notNull(),
+  },
+  (table) => [
+    index("engine_v2_accounting_lots_wallet_idx").on(table.chainId, table.walletAddress, table.tokenAddress),
+    index("engine_v2_accounting_lots_entity_idx").on(table.chainId, table.entityType, table.entityId),
+  ],
+);
+
+export const engineV2CashFlows = pgTable(
+  "engine_v2_cash_flows",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    chainId: integer("chain_id").notNull(),
+    walletAddress: varchar("wallet_address", { length: 42 }).notNull(),
+    sourceDomainEventId: uuid("source_domain_event_id").references(() => engineV2DomainEvents.id, { onDelete: "set null" }),
+    flowKind: varchar("flow_kind", { length: 48 }).notNull(),
+    tokenAddress: varchar("token_address", { length: 42 }),
+    amountRaw: numeric("amount_raw", { precision: 78, scale: 0 }),
+    valueUsdAtEvent: numeric("value_usd_at_event", { precision: 38, scale: 18 }),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+    txHash: varchar("tx_hash", { length: 66 }).notNull(),
+    coverageStatus: varchar("coverage_status", { length: 24 }).notNull().default("unknown"),
+    reasonCodes: text("reason_codes").array().notNull().default(sql`'{}'::text[]`),
+    metadataJson: jsonb("metadata_json").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).$defaultFn(now).notNull(),
+  },
+  (table) => [
+    index("engine_v2_cash_flows_wallet_idx").on(table.chainId, table.walletAddress, table.occurredAt),
+    index("engine_v2_cash_flows_event_idx").on(table.sourceDomainEventId),
+  ],
+);
+
+export const engineV2Valuations = pgTable(
+  "engine_v2_valuations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    chainId: integer("chain_id").notNull(),
+    walletAddress: varchar("wallet_address", { length: 42 }),
+    sourceDomainEventId: uuid("source_domain_event_id").references(() => engineV2DomainEvents.id, { onDelete: "set null" }),
+    entityType: varchar("entity_type", { length: 48 }),
+    entityId: text("entity_id"),
+    valuationKind: varchar("valuation_kind", { length: 32 }).notNull(),
+    tokenAddress: varchar("token_address", { length: 42 }),
+    amountRaw: numeric("amount_raw", { precision: 78, scale: 0 }),
+    valueUsd: numeric("value_usd", { precision: 38, scale: 18 }),
+    pricedAt: timestamp("priced_at", { withTimezone: true }),
+    pricePointId: uuid("price_point_id").references(() => engineV2PricePoints.id, { onDelete: "set null" }),
+    status: varchar("status", { length: 24 }).notNull().default("unknown"),
+    reasonCodes: text("reason_codes").array().notNull().default(sql`'{}'::text[]`),
+    metadataJson: jsonb("metadata_json").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).$defaultFn(now).notNull(),
+  },
+  (table) => [
+    index("engine_v2_valuations_entity_idx").on(table.chainId, table.entityType, table.entityId),
+    index("engine_v2_valuations_event_idx").on(table.sourceDomainEventId),
+  ],
+);
+
+export const engineV2ResidualInventory = pgTable(
+  "engine_v2_residual_inventory",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    chainId: integer("chain_id").notNull(),
+    walletAddress: varchar("wallet_address", { length: 42 }).notNull(),
+    tokenAddress: varchar("token_address", { length: 42 }).notNull(),
+    amountRaw: numeric("amount_raw", { precision: 78, scale: 0 }).notNull().default("0"),
+    valueUsd: numeric("value_usd", { precision: 38, scale: 18 }),
+    valuationStatus: varchar("valuation_status", { length: 24 }).notNull().default("unknown"),
+    coverageStatus: varchar("coverage_status", { length: 24 }).notNull().default("partial"),
+    reasonCodes: text("reason_codes").array().notNull().default(sql`'{}'::text[]`),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).$defaultFn(now).notNull(),
+  },
+  (table) => [
+    uniqueIndex("engine_v2_residual_inventory_uidx").on(table.chainId, table.walletAddress, table.tokenAddress),
+  ],
+);
+
+export const engineV2ReadModelRows = pgTable(
+  "engine_v2_read_model_rows",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    chainId: integer("chain_id").notNull(),
+    walletAddress: varchar("wallet_address", { length: 42 }).notNull(),
+    surface: varchar("surface", { length: 32 }).notNull(),
+    rowKey: text("row_key").notNull(),
+    sourceDomainEventId: uuid("source_domain_event_id").references(() => engineV2DomainEvents.id, { onDelete: "set null" }),
+    coverageStatus: varchar("coverage_status", { length: 24 }).notNull().default("unknown"),
+    confidence: varchar("confidence", { length: 16 }).notNull().default("unknown"),
+    rowJson: jsonb("row_json").$type<Record<string, unknown>>().notNull().default({}),
+    evidenceJson: jsonb("evidence_json").$type<Record<string, unknown>>().notNull().default({}),
+    materializedAt: timestamp("materialized_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("engine_v2_read_model_rows_uidx").on(table.chainId, table.walletAddress, table.surface, table.rowKey),
+    index("engine_v2_read_model_rows_surface_idx").on(table.chainId, table.walletAddress, table.surface),
+  ],
+);
+
 export type AnalysisRun = typeof analysisRuns.$inferSelect;

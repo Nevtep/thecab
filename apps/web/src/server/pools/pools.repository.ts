@@ -1,8 +1,17 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 
+import { readEngineV2SurfaceRows } from "@/server/analysis/engine-v2/materializers";
 import { getDb } from "@/server/db/client";
 import { deposits, poolHistorySnapshots, poolTimelineEvents, poolWalletSummaries, strategies, strategyExposures } from "@/server/db/schema";
-import type { PoolDetailRange, PoolPositionToken, PoolPositions, PoolsListItem } from "@/server/pools/pools.types";
+import type { PoolDetailRange, PoolHistoryPoint, PoolPositionToken, PoolPositions, PoolsListItem } from "@/server/pools/pools.types";
+
+type PoolsListRepositoryItem = PoolsListItem & {
+  coveredStartDayUtc: string;
+  coveredEndDayUtc: string;
+  currentManualValueUsd: number;
+  currentStrategyValueUsd: number;
+  currentResidualValueUsd: number;
+};
 
 function asNumber(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -257,6 +266,13 @@ export async function listPoolSummaries(input: {
   walletAddress: string;
   chainId: number;
 }) {
+  const engineV2Rows = await readEngineV2SurfaceRows<PoolsListRepositoryItem>({
+    chainId: input.chainId,
+    walletAddress: input.walletAddress,
+    surface: "pools",
+  });
+  if (engineV2Rows) return engineV2Rows;
+
   const db = getDb();
   const rows = await db
     .select()
@@ -400,6 +416,14 @@ export async function readPoolHistory(input: {
   poolId: string;
   range: PoolDetailRange;
 }) {
+  const engineV2Rows = await readEngineV2SurfaceRows<{ poolId: string; history?: { points?: unknown[] } }>({
+    chainId: input.chainId,
+    walletAddress: input.walletAddress,
+    surface: "pools",
+  });
+  const engineV2Pool = engineV2Rows?.find((row) => row.poolId === input.poolId);
+  if (engineV2Pool?.history?.points) return engineV2Pool.history.points as PoolHistoryPoint[];
+
   const db = getDb();
   const rows = await db
     .select()

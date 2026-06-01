@@ -449,3 +449,16 @@ Must cover:
 - `docs/informe-engine-v2-bugs-gaps.md`
 - `docs/api-research/moralis/address-transactions-decoded-classification-notes.md`
 - `docs/api-research/abis/selector-matches-address-transactions-decoded.md`
+
+## Implementation Status - 2026-06-01
+
+Engine V2 now has the server module boundary, DB schema/migration, Trigger task skeletons, canonical collection, ABI registry, chronological classification, enrichment planning/workers, chronological accounting, read-model materializers, route-side DB-only adapters, CLI scripts, regression runner, i18n reason-code keys, and guarded Engine V2 purge support.
+
+The request-time DataView repositories are wired behind `ANALYSIS_ENGINE_V2_READ_MODELS`; when the flag is absent, existing v1 DB read paths remain the rollback mode. Provider calls remain confined to collection/enrichment worker boundaries.
+
+Remaining limitations are explicit:
+
+- The regression fixture classification still has unresolved rows until persisted ABIs and enriched protocol state are available in a live Engine V2 run.
+- Engine V2 Trigger orchestration is opt-in behind `ANALYSIS_ENGINE_V2_TRIGGER`; legacy phase orchestration remains default rollback behavior.
+- Current-state helpers may validate relations but do not create historical ownership.
+- Missing evidence remains partial/unresolved/excluded/unsupported with reason codes instead of invented totals.

@@ -1,5 +1,6 @@
 import { and, asc, eq } from "drizzle-orm";
 
+import { readEngineV2SurfaceRows } from "@/server/analysis/engine-v2/materializers";
 import { getDb } from "@/server/db/client";
 import {
   pools,
@@ -485,6 +486,15 @@ async function readLifecycleRows(input: {
 }
 
 export async function findStrategySummaries(input: StrategiesListRequest) {
+  const engineV2Rows = await readEngineV2SurfaceRows<StrategySummaryView>({
+    chainId: input.chainId,
+    walletAddress: input.walletAddress,
+    surface: "strategies",
+  });
+  if (engineV2Rows) {
+    return applyStrategiesListRequest({ request: input, rows: engineV2Rows });
+  }
+
   const rows = (await readSummaryRows(input)).map(mapStrategySummaryRow);
   return applyStrategiesListRequest({ request: input, rows });
 }
@@ -494,6 +504,14 @@ export async function findStrategyDetail(input: {
   chainId: number;
   strategyId: string;
 }) {
+  const engineV2Rows = await readEngineV2SurfaceRows<StrategyDetailView>({
+    chainId: input.chainId,
+    walletAddress: input.walletAddress,
+    surface: "strategies",
+  });
+  const engineV2Detail = engineV2Rows?.find((row) => row.strategyExposureId === input.strategyId || row.strategyId === input.strategyId);
+  if (engineV2Detail) return engineV2Detail;
+
   const rows = await readSummaryRows(input);
   const row = rows.find((item) => item.strategyExposureId === input.strategyId || item.strategyId === input.strategyId);
   if (!row) return null;

@@ -1,6 +1,7 @@
 import { and, eq, gte, ilike, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 
 import { readAnalysisStatusContext } from "@/server/analysis/analysis-run.repository";
+import { readEngineV2SurfaceRows } from "@/server/analysis/engine-v2/materializers";
 import { getDb } from "@/server/db/client";
 import { performanceSnapshots, pools, rewardEvents } from "@/server/db/schema";
 import { getExplorerTxUrl, getSupportedChain } from "@/server/chains";
@@ -422,6 +423,23 @@ export async function readRewardsAnalysisContext(input: { walletAddress: string;
 }
 
 export async function findRewards(input: RewardsRequest): Promise<RewardsRepositoryResult> {
+  const engineV2Rows = await readEngineV2SurfaceRows<RewardEventRow>({
+    chainId: input.chainId,
+    walletAddress: input.walletAddress,
+    surface: "rewards",
+  });
+  if (engineV2Rows) {
+    const filtered = applyRewardsFilters(engineV2Rows, input);
+    const startIndex = (input.page - 1) * input.pageSize;
+    return {
+      allRows: filtered,
+      rows: filtered.slice(startIndex, startIndex + input.pageSize),
+      totalRows: filtered.length,
+      historicalCapital: [],
+      availableFilters: calculateAvailableRewardFilters(engineV2Rows),
+    };
+  }
+
   const db = getDb();
   const selectShape = {
     rewardEventId: rewardEvents.id,

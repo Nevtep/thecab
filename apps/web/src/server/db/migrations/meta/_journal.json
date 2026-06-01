@@ -99,6 +99,13 @@
       "when": 1780250000000,
       "tag": "0013_governance_read_models",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1780336400000,
+      "tag": "0014_analysis_engine_v2",
+      "breakpoints": true
     }
   ]
 }

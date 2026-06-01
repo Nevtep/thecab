@@ -108,6 +108,11 @@ async function main() {
     retryableMatrix,
     retrySuccess,
     retryExhaustion,
+    engineV2: {
+      requestTimeDbOnlyFlag: process.env.ANALYSIS_ENGINE_V2_READ_MODELS === "1" || process.env.ANALYSIS_ENGINE_V2_READ_MODELS === "true",
+      enrichmentNeedsAreAnalysisTimeOnly: true,
+      providerBoundary: "collection/enrichment workers only",
+    },
   };
 
   console.log(JSON.stringify(result, null, 2));

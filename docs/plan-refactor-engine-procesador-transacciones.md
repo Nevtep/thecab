@@ -693,3 +693,11 @@ Implicacion para engine V2:
   4. persistencia DB de `ContractAbiRecord`.
 - Si el ABI existe y el `contractName` es `Pool`, `CLGauge`, `Gauge`, `LpWrapper`, `UniversalRouter`, `Router`, `Voter`, `VotingEscrow`, `RewardsDistributor` o `NonfungiblePositionManager`, el classifier puede inferir superficie sin conocer previamente la direccion.
 - Si no hay ABI verificada, la tx queda parcial/unresolved con evidencia visible; no se inventa pool, strategy ni governance linkage.
+
+## Implementation Notes - 2026-06-01
+
+- Moralis decoded wallet history remains the collection/discovery input, not semantic authority.
+- Canonical transactions, logs, internal transactions, movements, and canonical calls are persisted before classification.
+- ABI, selector, protocol known-address, token metadata, price, state snapshot, and provider request evidence are persisted/cached in DB so serverless workers can resume without hardcoded wallet-specific contracts.
+- BaseScan/Etherscan/Sourcify/GitHub ABI fetches, Alchemy pricing/RPC backfills, Moralis decoded tx/NFT transfer backfills, and LpSugar/current-state reads are analysis-time only.
+- Route repositories use `engine_v2_read_model_rows` only when `ANALYSIS_ENGINE_V2_READ_MODELS` is enabled; no request-time provider clients are imported by DataView repositories.

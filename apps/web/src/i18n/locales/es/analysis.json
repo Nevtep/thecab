@@ -67,5 +67,42 @@
   },
   "fallback": {
     "recentViewAvailable": "Los datos recientes del proveedor siguen disponibles mientras el análisis no está disponible."
+  },
+  "engineV2": {
+    "coverage": {
+      "full": "Completa",
+      "share_level": "A nivel de share",
+      "partial": "Parcial",
+      "unresolved": "No resuelta",
+      "unsupported": "No soportada",
+      "excluded": "Excluida",
+      "unavailable": "No disponible",
+      "unknown": "Desconocida"
+    },
+    "confidence": {
+      "high": "Alta",
+      "medium": "Media",
+      "low": "Baja",
+      "none": "Nula",
+      "unknown": "Desconocida"
+    },
+    "reasonCodes": {
+      "missing_abi": "Falta ABI verificada",
+      "missing_selector": "Falta selector",
+      "missing_event_topic": "Falta topic de evento",
+      "missing_token_metadata": "Falta metadata del token",
+      "missing_historical_price": "Falta precio histórico",
+      "missing_pool_definition": "Falta definición del pool",
+      "missing_lock_origin": "Falta origen del lock",
+      "missing_distributor_pool_link": "Falta vínculo distribuidor-pool",
+      "missing_strategy_identity": "Falta identidad de estrategia",
+      "conflicting_evidence": "Evidencia en conflicto",
+      "provider_duplicate": "Duplicado del proveedor",
+      "provider_unavailable": "Proveedor no disponible",
+      "unsupported_transfer": "Transferencia no soportada",
+      "excluded_spam": "Spam excluido",
+      "excluded_airdrop": "Airdrop excluido",
+      "request_time_provider_forbidden": "Llamada a proveedor prohibida en request-time"
+    }
   }
 }

@@ -1,6 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
 
 import { readAnalysisStatusContext } from "@/server/analysis/analysis-run.repository";
+import { readEngineV2SurfaceRows } from "@/server/analysis/engine-v2/materializers";
 import { getDb } from "@/server/db/client";
 import {
   governanceEpochSummaries,
@@ -446,6 +447,38 @@ export async function readGovernanceAnalysisContext(input: GovernanceRequest) {
 }
 
 export async function findGovernanceDataView(input: GovernanceRequest): Promise<GovernanceRepositoryResult> {
+  const engineV2Rows = await readEngineV2SurfaceRows<{
+    kind: "lock" | "event" | "reward" | "epoch" | string;
+    reward?: GovernanceRewardRow;
+    event?: GovernanceRepositoryEventRow;
+    epoch?: GovernanceEpochSummary;
+    lockPanel?: GovernanceLockPanel;
+    metricSnapshot?: GovernanceRepositoryResult["metricSnapshot"];
+  }>({
+    chainId: input.chainId,
+    walletAddress: input.walletAddress,
+    surface: "governance",
+  });
+  if (engineV2Rows) {
+    const rewardRows = engineV2Rows.map((row) => row.reward).filter((row): row is GovernanceRewardRow => Boolean(row));
+    const eventRows = engineV2Rows.map((row) => row.event).filter((row): row is GovernanceRepositoryEventRow => Boolean(row));
+    const epochRows = engineV2Rows.map((row) => row.epoch).filter((row): row is GovernanceEpochSummary => Boolean(row));
+    const lockPanel = engineV2Rows.find((row) => row.lockPanel)?.lockPanel ?? null;
+    const filteredRewards = sortRewards(filterGovernanceRewards(rewardRows, input), input);
+    const startIndex = (input.page - 1) * input.pageSize;
+    return {
+      allRewardRows: rewardRows,
+      rewardRows: filteredRewards.slice(startIndex, startIndex + input.pageSize),
+      totalRewardRows: filteredRewards.length,
+      lockPanel,
+      epochs: epochRows,
+      events: filterGovernanceEvents(eventRows, input),
+      selectedDetailTarget: null,
+      metricSnapshot: engineV2Rows.find((row) => row.metricSnapshot)?.metricSnapshot ?? null,
+      availableFilters: buildAvailableFilters({ rewardRows, epochs: epochRows, events: eventRows }),
+    };
+  }
+
   const db = getDb();
   const walletAddress = input.walletAddress.toLowerCase();
 

@@ -67,5 +67,42 @@
   },
   "fallback": {
     "recentViewAvailable": "Recent provider data is still available while analysis is unavailable."
+  },
+  "engineV2": {
+    "coverage": {
+      "full": "Full",
+      "share_level": "Share-level",
+      "partial": "Partial",
+      "unresolved": "Unresolved",
+      "unsupported": "Unsupported",
+      "excluded": "Excluded",
+      "unavailable": "Unavailable",
+      "unknown": "Unknown"
+    },
+    "confidence": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low",
+      "none": "None",
+      "unknown": "Unknown"
+    },
+    "reasonCodes": {
+      "missing_abi": "Missing verified ABI",
+      "missing_selector": "Missing selector",
+      "missing_event_topic": "Missing event topic",
+      "missing_token_metadata": "Missing token metadata",
+      "missing_historical_price": "Missing historical price",
+      "missing_pool_definition": "Missing pool definition",
+      "missing_lock_origin": "Missing lock origin",
+      "missing_distributor_pool_link": "Missing distributor-to-pool link",
+      "missing_strategy_identity": "Missing strategy identity",
+      "conflicting_evidence": "Conflicting evidence",
+      "provider_duplicate": "Provider duplicate",
+      "provider_unavailable": "Provider unavailable",
+      "unsupported_transfer": "Unsupported transfer",
+      "excluded_spam": "Excluded spam",
+      "excluded_airdrop": "Excluded airdrop",
+      "request_time_provider_forbidden": "Request-time provider call forbidden"
+    }
   }
 }

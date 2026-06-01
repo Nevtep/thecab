@@ -1,5 +1,6 @@
 import { and, asc, eq } from "drizzle-orm";
 
+import { readEngineV2SurfaceRows } from "@/server/analysis/engine-v2/materializers";
 import { getDb } from "@/server/db/client";
 import {
   depositLifecycleEvents,
@@ -323,6 +324,13 @@ export async function findDepositSummaries(input: {
   walletAddress: string;
   chainId: number;
 }): Promise<DepositSummaryView[]> {
+  const engineV2Rows = await readEngineV2SurfaceRows<DepositSummaryView>({
+    chainId: input.chainId,
+    walletAddress: input.walletAddress,
+    surface: "deposits",
+  });
+  if (engineV2Rows) return engineV2Rows;
+
   const db = await getDb();
   const rows = await db
     .select({
@@ -376,6 +384,14 @@ export async function findDepositDetail(input: {
   chainId: number;
   depositId: string;
 }): Promise<DepositDetailView | null> {
+  const engineV2Rows = await readEngineV2SurfaceRows<DepositDetailView>({
+    chainId: input.chainId,
+    walletAddress: input.walletAddress,
+    surface: "deposits",
+  });
+  const engineV2Detail = engineV2Rows?.find((row) => row.depositId === input.depositId);
+  if (engineV2Detail) return engineV2Detail;
+
   const db = await getDb();
   const rows = await db
     .select({
