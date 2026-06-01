@@ -8,6 +8,7 @@ import { parseMoralisDecodedHistoryPage } from "@/server/analysis/engine-v2/coll
 import { extractCanonicalMovements } from "@/server/analysis/engine-v2/canonicalization";
 import {
   classifyTransactionsChronologically,
+  toClassifiedTransactionValues,
   toClassificationTraceValues,
   toDomainEventValues,
 } from "@/server/analysis/engine-v2/classification";
@@ -17,6 +18,7 @@ import { getDb } from "@/server/db/client";
 import {
   canonicalTransactions,
   contractAbis,
+  engineV2ClassifiedTransactions,
   engineV2ClassificationTraces,
   engineV2DomainEventLinks,
   engineV2DomainEvents,
@@ -79,6 +81,7 @@ async function persistClassificationsToDb(input: {
   chainId: number;
   walletAddress: string;
   items: ReturnType<typeof classifyTransactionsChronologically>;
+  registry: Map<Address, AbiRegistryEntry>;
 }) {
   const db = getDb();
   const canonicalRows = await db.select({
@@ -89,11 +92,12 @@ async function persistClassificationsToDb(input: {
     eq(canonicalTransactions.walletAddress, input.walletAddress.toLowerCase()),
   ));
   const canonicalIdByHash = new Map(canonicalRows.map((row) => [row.txHash, row.id] as const));
-  const registry = await loadAbiRegistryFromDb({ chainId: input.chainId });
-
   for (const item of input.items) {
     const txHash = item.tx.hash.toLowerCase();
     const canonicalTransactionId = canonicalIdByHash.get(txHash) ?? null;
+    if (!canonicalTransactionId) {
+      throw new Error(`ENGINE_V2_CANONICAL_TRANSACTION_REQUIRED_FOR_CLASSIFIED_TX:${txHash}`);
+    }
     const movements = extractCanonicalMovements({
       walletAddress: input.walletAddress,
       transaction: item.tx,
@@ -116,7 +120,7 @@ async function persistClassificationsToDb(input: {
         ...extractDomainMetadata({
           chainId: input.chainId,
           tx: item.tx,
-          registry,
+          registry: input.registry,
           eventType: item.classification.eventType,
           eventFamily: item.classification.eventFamily,
           movements,
@@ -150,6 +154,22 @@ async function persistClassificationsToDb(input: {
         metadataJson: values.metadataJson,
       },
     }).returning();
+    const classifiedValues = toClassifiedTransactionValues({
+      canonicalTransactionId,
+      chainId: input.chainId,
+      walletAddress: input.walletAddress as Address,
+      tx: item.tx,
+      registry: input.registry,
+      sequenceIndex: item.sequenceIndex,
+    });
+    const {
+      canonicalTransactionId: _classifiedCanonicalTransactionId,
+      ...classifiedUpdateValues
+    } = classifiedValues;
+    await db.insert(engineV2ClassifiedTransactions).values(classifiedValues).onConflictDoUpdate({
+      target: [engineV2ClassifiedTransactions.canonicalTransactionId],
+      set: classifiedUpdateValues,
+    });
     if (canonicalTransactionId) {
       await db.insert(engineV2ClassificationTraces).values(toClassificationTraceValues({
         canonicalTransactionId,
@@ -400,6 +420,7 @@ export async function runEngineV2ClassifyChronological(
       chainId: payload.chainId,
       walletAddress: payload.walletAddress,
       items: classified,
+      registry,
     });
   }
   const triggerTask = deps.trigger ?? (async (taskId, taskPayload, options) => {

@@ -45,6 +45,55 @@ test("runEngineV2ClassifyChronological classifies oldest transaction first", asy
   assert.deepEqual(result.eventTypes, ["cash_in_native", "cash_in_native"]);
 });
 
+test("runEngineV2ClassifyChronological dedupes duplicate tx hashes before sequencing", async () => {
+  const persisted: string[] = [];
+  const result = await runEngineV2ClassifyChronological({
+    chainId: 8453,
+    walletAddress,
+  }, {
+    loadTransactions: async () => [
+      {
+        hash: "0xdup",
+        from_address: "0x0000000000000000000000000000000000000002",
+        to_address: walletAddress,
+        receipt_status: "1",
+        value: "2",
+        block_timestamp: "2026-01-01T00:00:00.000Z",
+        transaction_index: "0",
+        logs: [],
+      },
+      {
+        hash: "0xdup",
+        from_address: "0x0000000000000000000000000000000000000002",
+        to_address: walletAddress,
+        receipt_status: "1",
+        value: "2",
+        block_timestamp: "2026-01-01T00:00:00.000Z",
+        transaction_index: "0",
+        logs: [],
+      },
+      {
+        hash: "0xnew",
+        from_address: "0x0000000000000000000000000000000000000003",
+        to_address: walletAddress,
+        receipt_status: "1",
+        value: "3",
+        block_timestamp: "2026-01-02T00:00:00.000Z",
+        transaction_index: "0",
+        logs: [],
+      },
+    ],
+    loadRegistry: async () => new Map(),
+    persistClassifications: async (items) => {
+      persisted.push(...items.map((item) => item.tx.hash));
+    },
+    trigger: async () => undefined,
+  });
+
+  assert.deepEqual(persisted, ["0xdup", "0xnew"]);
+  assert.equal(result.classifiedCount, 2);
+});
+
 test("runEngineV2DecodeCanonicalCalls decodes then queues chronological classification", async () => {
   const triggered: string[] = [];
   const result = await runEngineV2DecodeCanonicalCalls({

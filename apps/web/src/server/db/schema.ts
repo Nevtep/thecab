@@ -1623,6 +1623,50 @@ export const engineV2ClassificationTraces = pgTable(
   ],
 );
 
+export const engineV2ClassifiedTransactions = pgTable(
+  "engine_v2_classified_transactions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    canonicalTransactionId: uuid("canonical_transaction_id")
+      .notNull()
+      .references(() => canonicalTransactions.id, { onDelete: "cascade" }),
+    chainId: integer("chain_id").notNull(),
+    walletAddress: varchar("wallet_address", { length: 42 }).notNull(),
+    txHash: varchar("tx_hash", { length: 66 }).notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }),
+    blockNumber: numeric("block_number", { precision: 38, scale: 0 }),
+    transactionIndex: integer("transaction_index"),
+    sequenceIndex: integer("sequence_index").notNull().default(0),
+    fromAddress: varchar("from_address", { length: 42 }),
+    toAddress: varchar("to_address", { length: 42 }),
+    selector: varchar("selector", { length: 10 }).notNull(),
+    contractLabel: text("contract_label"),
+    contractName: text("contract_name"),
+    decodedFunction: varchar("decoded_function", { length: 128 }),
+    decodedArgsJson: jsonb("decoded_args_json").$type<unknown[]>().notNull().default([]),
+    transferCount: integer("transfer_count").notNull().default(0),
+    inboundTransferCount: integer("inbound_transfer_count").notNull().default(0),
+    outboundTransferCount: integer("outbound_transfer_count").notNull().default(0),
+    approvalCount: integer("approval_count").notNull().default(0),
+    classification: varchar("classification", { length: 96 }).notNull(),
+    classifierVersion: varchar("classifier_version", { length: 32 }).notNull(),
+    confidence: varchar("confidence", { length: 48 }).notNull(),
+    reason: text("reason").notNull(),
+    needsResolution: boolean("needs_resolution").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).$defaultFn(now).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).$defaultFn(now).notNull(),
+  },
+  (table) => [
+    uniqueIndex("engine_v2_classified_transactions_canonical_uidx").on(table.canonicalTransactionId),
+    uniqueIndex("engine_v2_classified_transactions_identity_uidx").on(table.chainId, table.walletAddress, table.txHash),
+    index("engine_v2_classified_transactions_wallet_idx").on(table.chainId, table.walletAddress, table.occurredAt),
+    index("engine_v2_classified_transactions_tx_idx").on(table.chainId, table.txHash),
+    index("engine_v2_classified_transactions_classification_idx").on(table.chainId, table.walletAddress, table.classification),
+    index("engine_v2_classified_transactions_selector_idx").on(table.chainId, table.selector),
+    index("engine_v2_classified_transactions_version_idx").on(table.classifierVersion),
+  ],
+);
+
 export const engineV2EnrichmentNeeds = pgTable(
   "engine_v2_enrichment_needs",
   {

@@ -1,5 +1,6 @@
 export * from "./base-classifiers";
 export * from "./canonical-call-decoder";
+export * from "./classified-transaction";
 export * from "./chronological-classifier";
 export * from "./classification-trace";
 export * from "./domain-events.repository";

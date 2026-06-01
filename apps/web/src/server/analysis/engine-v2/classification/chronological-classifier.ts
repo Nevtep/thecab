@@ -1,5 +1,5 @@
 import type { AbiRegistryEntry, Address, MoralisDecodedTransaction } from "@/server/analysis/decoded-history";
-import { sortDecodedTransactionsChronologically } from "@/server/analysis/engine-v2/collection";
+import { dedupeDecodedTransactions, sortDecodedTransactionsChronologically } from "@/server/analysis/engine-v2/collection";
 
 import { classifyBaseTransaction, type EngineV2Classification } from "./base-classifiers";
 import { classifyGovernanceTransaction } from "./governance-classifier";
@@ -18,7 +18,7 @@ export function classifyTransactionsChronologically(input: {
   registry?: Map<Address, AbiRegistryEntry>;
 }) {
   const registry = input.registry ?? new Map();
-  return sortDecodedTransactionsChronologically(input.transactions).map((tx, index): EngineV2ClassifiedTransaction => ({
+  return sortDecodedTransactionsChronologically(dedupeDecodedTransactions(input.transactions)).map((tx, index): EngineV2ClassifiedTransaction => ({
     tx,
     sequenceIndex: index,
     classification: (
