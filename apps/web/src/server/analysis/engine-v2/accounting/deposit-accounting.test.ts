@@ -49,3 +49,35 @@ test("accountManualDeposits projects lifecycle only with explicit tokenId identi
   assert.equal(rows[0]?.capitalOutUsd, "80");
   assert.equal(rows[0]?.rewardsUsd, "7");
 });
+
+test("accountManualDeposits keeps gauge reward claims on the known deposit identity for the same tokenId", () => {
+  const rows = accountManualDeposits({
+    events: [
+      depositEvent({
+        id: "open-event",
+        eventType: "manual_position_created",
+        metadataJson: {
+          positionManagerAddress: "0x00000000000000000000000000000000000000aa",
+          tokenId: "123",
+        },
+      }),
+      depositEvent({
+        id: "claim-event",
+        eventType: "manual_gauge_reward_claim",
+        sequenceIndex: 1,
+        metadataJson: {
+          positionManagerAddress: "0x00000000000000000000000000000000000000bb",
+          tokenId: "123",
+        },
+      }),
+    ],
+  });
+
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0]?.depositId, "8453:0x00000000000000000000000000000000000000aa:123");
+  assert.equal(rows[0]?.tokenId, "123");
+  assert.deepEqual(rows[0]?.lifecycle.map((event) => event.eventType), [
+    "manual_position_created",
+    "manual_gauge_reward_claim",
+  ]);
+});

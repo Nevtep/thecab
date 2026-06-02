@@ -62,7 +62,7 @@ export function runChronologicalAccounting(input: EngineV2AccountingInput): Engi
   const cash = accountCashAndResidualInventory({ events });
   const deposits = accountManualDeposits({ events, links });
   const strategies = accountStrategies({ events, links });
-  const rewards = accountRewards({ events, links });
+  const rewards = accountRewards({ events, links, deposits });
   const governance = accountGovernance({ events, links });
   const pools = accountPools({
     events,

@@ -246,10 +246,10 @@ function classifyDecodedFunction(
     const note = `NonfungiblePositionManager ${fn}${nested.length ? ` [${nested.join(", ")}]` : ""}`;
     if (fn === "mint" || nested.includes("mint")) return done("manual_position_created", "high_action_partial_accounting", note, true);
     if (fn === "increaseLiquidity" || nested.includes("increaseLiquidity")) return done("manual_position_increase", "high_action_partial_accounting", note, true);
-    if (fn === "collect" || nested.includes("collect")) return done("manual_position_fee_claim", "high_action_partial_breakdown", note, true);
     if (fn === "decreaseLiquidity" || nested.includes("decreaseLiquidity") || fn === "burn" || nested.includes("burn")) {
       return done("manual_position_withdraw", "high_action_partial_accounting", note, true);
     }
+    if (fn === "collect" || nested.includes("collect")) return done("manual_position_fee_claim", "high_action_partial_breakdown", note, true);
     if (fn === "approve" || fn === "setApprovalForAll") return done("manual_position_approval", "high", note);
   }
 

@@ -31,9 +31,14 @@ test("engineV2ReadModelsEnabled is explicitly gated", () => {
   assert.equal(engineV2ReadModelsEnabled(), true);
 });
 
-test("persistReadModelRows only upserts the rows it is given", async () => {
+test("persistReadModelRows replaces stale rows for the touched surfaces before upserting", async () => {
   const calls: Array<{ kind: string; payload?: unknown }> = [];
   const db = {
+    delete: () => ({
+      where: async (condition: unknown) => {
+        calls.push({ kind: "delete", payload: condition });
+      },
+    }),
     insert: () => ({
       values: (values: unknown[]) => ({
         onConflictDoUpdate: async (config: unknown) => {
@@ -57,7 +62,7 @@ test("persistReadModelRows only upserts the rows it is given", async () => {
     }],
   });
 
-  assert.deepEqual(calls.map((call) => call.kind), ["insert"]);
+  assert.deepEqual(calls.map((call) => call.kind), ["delete", "insert"]);
 });
 
 test("persistReadModelRows skips writes when there are no rows", async () => {

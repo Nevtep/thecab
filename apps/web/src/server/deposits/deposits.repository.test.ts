@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   mapDepositDetailRows,
   mapDepositSummaryRow,
+  normalizeEngineV2DepositRow,
   type DepositDetailRowRecord,
 } from "@/server/deposits/deposits.repository";
 
@@ -136,4 +137,55 @@ test("mapDepositDetailRows combines decomposition fallback and lifecycle normali
   assert.equal(mapped.mellowStrategyCrossLinkId, "strategy-1");
   assert.equal(mapped.mellowStrategyExternalPositionReference, "71496797");
   assert.equal(mapped.mellowStrategyExternalPositionReferenceStatus, "resolved");
+});
+
+test("normalizeEngineV2DepositRow derives closed and out-of-range statuses plus explicit reward totals from lifecycle", () => {
+  const mapped = normalizeEngineV2DepositRow({
+    ...createSummaryRow({
+      status: "open_active",
+      totalRewardsUsd: 1300000,
+      totalReturnUsd: 1300000,
+      realizedPnlUsd: 0,
+      unrealizedPnlUsd: 0,
+      isInRange: false,
+    }),
+    lifecycle: [
+      {
+        id: "event-claim",
+        sequenceIndex: 0,
+        eventType: "claim_reward",
+        occurredAt: "2026-05-21T00:00:00.000Z",
+        txHash: "0xclaim",
+        logIndex: 0,
+        blockNumber: 1,
+        usdValue: 25,
+        signedTokenDeltas: [],
+        priceSource: "event",
+        confidence: "high",
+        inferredActionId: null,
+        coverageReasonCodes: [],
+        metadata: {},
+      },
+      {
+        id: "event-fee",
+        sequenceIndex: 1,
+        eventType: "collect_fees",
+        occurredAt: "2026-05-22T00:00:00.000Z",
+        txHash: "0xfee",
+        logIndex: 1,
+        blockNumber: 2,
+        usdValue: 999999,
+        signedTokenDeltas: [],
+        priceSource: "event",
+        confidence: "high",
+        inferredActionId: null,
+        coverageReasonCodes: [],
+        metadata: {},
+      },
+    ],
+  });
+
+  assert.equal(mapped.status, "open_out_of_range");
+  assert.equal(mapped.totalRewardsUsd, 25);
+  assert.equal(mapped.totalReturnUsd, 25);
 });

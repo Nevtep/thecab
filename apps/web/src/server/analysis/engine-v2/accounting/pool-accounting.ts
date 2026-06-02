@@ -63,6 +63,7 @@ export function accountPools(input: {
 
   for (const reward of input.rewards ?? []) {
     if (!reward.poolId || reward.poolContribution !== "contributes" || !reward.affectsTotals) continue;
+    if (reward.ownerStatus !== "manual_deposit" && reward.ownerStatus !== "strategy") continue;
     const pool = upsertPool(pools, reward.poolId);
     pool.rewardValueUsd = addNumberString(pool.rewardValueUsd, reward.amountUsd);
   }

@@ -818,6 +818,25 @@ function sumStringNumbers(values: Array<string | null | undefined>) {
   return total > 0 ? String(total) : null;
 }
 
+function sumOwnedRewardClaimsUsd(input: {
+  accounting: EngineV2AccountingOutput;
+  ownerStatus: "manual_deposit" | "strategy";
+  linkedEntityId: string;
+}) {
+  return input.accounting.rewards.reduce((sum, reward) => {
+    if (reward.ownerStatus !== input.ownerStatus) {
+      return sum;
+    }
+    if (reward.linkedEntityId !== input.linkedEntityId || !reward.affectsTotals) {
+      return sum;
+    }
+    if (reward.rewardType.includes("fee")) {
+      return sum;
+    }
+    return sum + toNumber(reward.amountUsd);
+  }, 0);
+}
+
 export function materializeDepositRows(
   accounting: EngineV2AccountingOutput,
   context: EngineV2MaterializationContext = defaultMaterializationContext(),
@@ -845,6 +864,16 @@ export function materializeDepositRows(
         const token0Metadata = getTokenMetadata(context, poolState?.token0Address);
         const token1Metadata = getTokenMetadata(context, poolState?.token1Address);
         const openedByTransferIn = deposit.lifecycle.some((event) => normalizeDepositLifecycleEventType(event.eventType) === "transfer_in");
+        const resolvedRewardsUsd = sumOwnedRewardClaimsUsd({
+          accounting,
+          ownerStatus: "manual_deposit",
+          linkedEntityId: deposit.depositId,
+        });
+        const depositSummaryStatus = deposit.status === "closed"
+          ? "closed"
+          : rangeMetadata.isInRange === false
+            ? "open_out_of_range"
+            : "open_active";
 
         return {
       depositId: deposit.depositId,
@@ -861,7 +890,7 @@ export function materializeDepositRows(
       tokenId: deposit.tokenId,
       token0Symbol: token0Metadata?.symbol ?? null,
       token1Symbol: token1Metadata?.symbol ?? null,
-      status: deposit.status === "closed" ? "closed" : "open_active",
+      status: depositSummaryStatus,
       openedAt: toIso(deposit.openedAt),
       closedAt: toIso(deposit.closedAt),
       openedByTransferIn,
@@ -869,10 +898,10 @@ export function materializeDepositRows(
       currentValueUsd: toNumber(deposit.currentOrCloseValueUsd ?? deposit.openedValueUsd),
       capitalEnteredUsd: toNumber(deposit.capitalInUsd),
       capitalWithdrawnUsd: toNumber(deposit.capitalOutUsd),
-      totalRewardsUsd: toNumber(deposit.rewardsUsd),
+      totalRewardsUsd: resolvedRewardsUsd,
       realizedPnlUsd: 0,
       unrealizedPnlUsd: 0,
-      totalReturnUsd: toNumber(deposit.rewardsUsd),
+      totalReturnUsd: resolvedRewardsUsd,
       totalReturnPct: null,
       estimatedAnnualizedReturnPct: null,
       isInRange: rangeMetadata.isInRange,
@@ -888,9 +917,9 @@ export function materializeDepositRows(
       token0Address: poolState?.token0Address ?? null,
       token1Address: poolState?.token1Address ?? null,
       decomposition: {
-        totalReturnUsd: toNumber(deposit.rewardsUsd),
-        rewardsUsd: toNumber(deposit.rewardsUsd),
-        feesUsd: toNumber(deposit.rewardsUsd),
+        totalReturnUsd: resolvedRewardsUsd,
+        rewardsUsd: resolvedRewardsUsd,
+        feesUsd: 0,
         assetPriceEffectUsd: 0,
         rebalanceEffectUsd: 0,
         realizedPnlUsd: 0,

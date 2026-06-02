@@ -203,6 +203,36 @@ function emptyPoolSummarySeries() {
   };
 }
 
+function hasVisibleEngineV2PoolExposure(row: EngineV2PoolReadModelRow) {
+  const manualPositions = Array.isArray(row.positions?.manualDeposits) ? row.positions.manualDeposits.length : 0;
+  const strategyPositions = Array.isArray(row.positions?.automatedStrategies) ? row.positions.automatedStrategies.length : 0;
+
+  if (manualPositions > 0 || strategyPositions > 0) {
+    return true;
+  }
+
+  return row.currentManualValueUsd > 0 || row.currentStrategyValueUsd > 0;
+}
+
+export function normalizeEngineV2PoolSummaryRow(row: EngineV2PoolReadModelRow) {
+  const normalizedHistoryPoints = Array.isArray(row.history?.points)
+    ? normalizeEngineV2PoolHistoryPoints(row.history.points)
+    : [];
+  const latestCumulativeRewardsUsd = normalizedHistoryPoints.at(-1)?.cumulativeRewardsUsd ?? null;
+  const label = resolveDisplayPoolLabel({
+    rawLabel: row.label,
+    tokenSymbols: asStringArray(row.tokenSymbols),
+    feeTierLabel: row.feeTierLabel,
+    poolType: row.poolType,
+  });
+
+  return {
+    ...row,
+    label,
+    totalRewardsUsd: latestCumulativeRewardsUsd ?? row.totalRewardsUsd,
+  } satisfies EngineV2PoolReadModelRow;
+}
+
 function summarizeEngineV2PoolRows(rows: EngineV2PoolReadModelRow[]) {
   const buckets = new Map<string, {
     activePoolCount: number;
@@ -430,7 +460,11 @@ export async function listPoolSummaries(input: {
     walletAddress: input.walletAddress,
     surface: "pools",
   });
-  if (engineV2Rows?.some((row) => hasRichEngineV2PoolRow(row))) return engineV2Rows;
+  if (engineV2Rows?.some((row) => hasRichEngineV2PoolRow(row))) {
+    return engineV2Rows
+      .filter(hasVisibleEngineV2PoolExposure)
+      .map(normalizeEngineV2PoolSummaryRow);
+  }
 
   const db = getDb();
   const rows = await db

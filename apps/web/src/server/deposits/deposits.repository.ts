@@ -120,6 +120,53 @@ function normalizePriceSource(value: string | null): DepositLifecycleEventView["
   }
 }
 
+function deriveEngineV2DepositStatus(row: Partial<DepositDetailView>) {
+  if (row.closedAt) {
+    return "closed" as const;
+  }
+  return row.isInRange === false ? "open_out_of_range" as const : "open_active" as const;
+}
+
+function sumEngineV2DepositLifecycleRewards(row: Partial<DepositDetailView>) {
+  if (!Array.isArray((row as { lifecycle?: unknown[] }).lifecycle)) {
+    return null;
+  }
+
+  return ((row as { lifecycle?: unknown[] }).lifecycle ?? []).reduce((sum, event) => {
+    const record = asRecord(event);
+    if (asString(record.eventType) !== "claim_reward") {
+      return sum;
+    }
+    return sum + (asNumber(record.usdValue) ?? 0);
+  }, 0);
+}
+
+export function normalizeEngineV2DepositRow<T extends DepositSummaryView>(row: T): T;
+export function normalizeEngineV2DepositRow<T extends DepositDetailView>(row: T): T;
+export function normalizeEngineV2DepositRow<T extends DepositSummaryView | DepositDetailView>(row: T): T {
+  const derivedRewardsUsd = sumEngineV2DepositLifecycleRewards(row);
+  const totalRewardsUsd = derivedRewardsUsd ?? row.totalRewardsUsd;
+  const totalReturnUsd = totalRewardsUsd + row.realizedPnlUsd + row.unrealizedPnlUsd;
+
+  const normalized = {
+    ...row,
+    status: deriveEngineV2DepositStatus(row),
+    totalRewardsUsd,
+    totalReturnUsd,
+  } as T;
+
+  if ("decomposition" in normalized && normalized.decomposition) {
+    normalized.decomposition = {
+      ...normalized.decomposition,
+      totalReturnUsd,
+      rewardsUsd: totalRewardsUsd,
+      feesUsd: 0,
+    };
+  }
+
+  return normalized;
+}
+
 function normalizeLifecycleEventType(value: string): DepositLifecycleEventView["eventType"] {
   switch (value) {
     case "mint_position":
@@ -344,7 +391,9 @@ export async function findDepositSummaries(input: {
     walletAddress: input.walletAddress,
     surface: "deposits",
   });
-  if (engineV2Rows?.some((row) => hasRichEngineV2DepositRow(row))) return engineV2Rows;
+  if (engineV2Rows?.some((row) => hasRichEngineV2DepositRow(row))) {
+    return engineV2Rows.map((row) => normalizeEngineV2DepositRow(row));
+  }
 
   const db = await getDb();
   const rows = await db
@@ -405,7 +454,7 @@ export async function findDepositDetail(input: {
     surface: "deposits",
   });
   const engineV2Detail = engineV2Rows?.find((row) => row.depositId === input.depositId);
-  if (engineV2Detail && hasRichEngineV2DepositRow(engineV2Detail)) return engineV2Detail;
+  if (engineV2Detail && hasRichEngineV2DepositRow(engineV2Detail)) return normalizeEngineV2DepositRow(engineV2Detail);
 
   const db = await getDb();
   const rows = await db

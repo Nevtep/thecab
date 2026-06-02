@@ -104,7 +104,7 @@ export function accountManualDeposits(input: {
     if (event.eventFamily !== "deposit" && !event.eventType.startsWith("manual_")) continue;
     const identity = depositIdentity(event, links);
     const knownDepositId = identity.tokenId ? knownDepositByTokenId.get(identity.tokenId) : null;
-    const depositId = identity.depositId ?? knownDepositId;
+    const depositId = knownDepositId ?? identity.depositId;
     if (!depositId || !identity.tokenId) continue;
     knownDepositByTokenId.set(identity.tokenId, depositId);
 

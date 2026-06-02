@@ -1,5 +1,6 @@
 import { assertSupportedChain } from "@/server/chains";
 import { getLatestAnalysisRun } from "@/server/analysis/analysis-run.repository";
+import { readEngineV2SurfaceRows } from "@/server/analysis/engine-v2/materializers";
 import {
   ASSET_TRUST_CLASSIFIER_VERSION,
   type AssetTrustClassifierInput,
@@ -2131,6 +2132,46 @@ function sumRewardEventValueUsd(values: Array<{ amountUsd: string | number | nul
   return values.reduce((sum, row) => sum + (asNumber(row.amountUsd) ?? 0), 0);
 }
 
+type OverviewAnalyzedRewardTotalRow = {
+  usdValueAtClaim?: number | string | null;
+  rewardType?: string | null;
+  sourceSurface?: string | null;
+  owner?: {
+    status?: string | null;
+  } | null;
+};
+
+export function sumAnalyzedOverviewRewardTotals(rows: OverviewAnalyzedRewardTotalRow[] | null) {
+  const normalizedRows = rows ?? [];
+  if (normalizedRows.length === 0) {
+    return null;
+  }
+
+  return normalizedRows.reduce((sum, row) => {
+    const ownerStatus = row.owner?.status ?? row.sourceSurface ?? null;
+    if (ownerStatus !== "manual_deposit" && ownerStatus !== "strategy") {
+      return sum;
+    }
+    if ((row.rewardType ?? "").includes("fee")) {
+      return sum;
+    }
+    return sum + (asNumber(row.usdValueAtClaim) ?? 0);
+  }, 0);
+}
+
+async function readOverviewAnalyzedAccumulatedRewardsUsd(input: {
+  walletAddress: string;
+  chainId: number;
+}) {
+  const rewardRows = await readEngineV2SurfaceRows<OverviewAnalyzedRewardTotalRow>({
+    chainId: input.chainId,
+    walletAddress: input.walletAddress,
+    surface: "rewards",
+  });
+
+  return sumAnalyzedOverviewRewardTotals(rewardRows);
+}
+
 function toOverviewCoverageStatus(
   status: OverviewResponse["protocolPositions"]["coverageStatus"],
 ): OverviewResponse["distribution"]["slices"][number]["coverageStatus"] {
@@ -2292,7 +2333,13 @@ async function getRecentOverviewChartFallback(input: OverviewRequest): Promise<O
     granularity: bucketConfig.granularity,
     rewardRows: realizedRewardRows,
   });
-  const estimatedRealizedRewardsUsd = sumRewardEventValueUsd(realizedRewardRows);
+  const analyzedAccumulatedRewardsUsd = canUseAnalyzedOverviewActivity(response.analysis.status)
+    ? await readOverviewAnalyzedAccumulatedRewardsUsd({
+        walletAddress: input.walletAddress,
+        chainId: input.chainId,
+      })
+    : null;
+  const estimatedRealizedRewardsUsd = analyzedAccumulatedRewardsUsd ?? sumRewardEventValueUsd(realizedRewardRows);
   const snapshotValuesByBucket = buildSnapshotValueLookup({
     range: input.range,
     granularity: bucketConfig.granularity,
@@ -2576,7 +2623,13 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
   const tokens = tokensResult.status === "fulfilled" ? (tokensResult.value.result ?? []) : [];
   const history = historyResult.status === "fulfilled" ? (historyResult.value.result ?? []) : [];
   const defiPositions = defiPositionsResult.status === "fulfilled" ? defiPositionsResult.value : [];
-  const estimatedRealizedRewardsUsd = sumRewardEventValueUsd(realizedRewardRows);
+  const analyzedAccumulatedRewardsUsd = canUseAnalyzedOverviewActivity(response.analysis.status)
+    ? await readOverviewAnalyzedAccumulatedRewardsUsd({
+        walletAddress: input.walletAddress,
+        chainId: input.chainId,
+      })
+    : null;
+  const estimatedRealizedRewardsUsd = analyzedAccumulatedRewardsUsd ?? sumRewardEventValueUsd(realizedRewardRows);
 
   const tokenPricingContexts = tokens.map((token) => {
     const tokenAddress = asString(token.token_address)?.toLowerCase() ?? null;

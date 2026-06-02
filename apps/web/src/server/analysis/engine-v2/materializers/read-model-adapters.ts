@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, notInArray, sql } from "drizzle-orm";
 
 import { getDb } from "@/server/db/client";
 import { engineV2ReadModelRows } from "@/server/db/schema";
@@ -24,6 +24,9 @@ export function toReadModelRowValues(input: EngineV2ReadModelRowInput): typeof e
 }
 
 export type EngineV2ReadModelDb = {
+  delete?(table: unknown): {
+    where(condition: unknown): Promise<unknown>;
+  };
   insert(table: unknown): {
     values(values: unknown[]): {
       onConflictDoUpdate(config: unknown): Promise<unknown>;
@@ -36,6 +39,26 @@ export async function persistReadModelRows(input: {
   rows: EngineV2ReadModelRowInput[];
 }) {
   if (input.rows.length === 0) return;
+
+  if (typeof input.db.delete === "function") {
+    const rowKeysBySurface = input.rows.reduce<Map<string, string[]>>((acc, row) => {
+      const current = acc.get(row.surface) ?? [];
+      current.push(row.rowKey);
+      acc.set(row.surface, current);
+      return acc;
+    }, new Map());
+    const chainId = input.rows[0]?.chainId ?? 0;
+    const walletAddress = input.rows[0]?.walletAddress.toLowerCase() ?? "";
+
+    for (const [surface, rowKeys] of rowKeysBySurface) {
+      await input.db.delete(engineV2ReadModelRows).where(and(
+        eq(engineV2ReadModelRows.chainId, chainId),
+        eq(engineV2ReadModelRows.walletAddress, walletAddress),
+        eq(engineV2ReadModelRows.surface, surface),
+        notInArray(engineV2ReadModelRows.rowKey, rowKeys),
+      ));
+    }
+  }
 
   await input.db.insert(engineV2ReadModelRows)
     .values(input.rows.map(toReadModelRowValues))

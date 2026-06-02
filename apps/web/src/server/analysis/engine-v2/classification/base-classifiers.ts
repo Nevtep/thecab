@@ -45,7 +45,32 @@ export function confidenceForClassification(confidence: string): EngineV2Classif
   return "none";
 }
 
+function toJsonSafeValue(value: unknown): unknown {
+  if (typeof value === "bigint") return value.toString();
+  if (Array.isArray(value)) return value.map((item) => toJsonSafeValue(item));
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, toJsonSafeValue(item)]));
+  }
+  return value ?? null;
+}
+
+function firstTokenId(value: unknown): string | null {
+  if (typeof value === "bigint") return value.toString();
+  if (typeof value === "number" && Number.isInteger(value)) return String(value);
+  if (typeof value === "string" && /^\d+$/.test(value)) return value;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const tokenId = firstTokenId(item);
+      if (tokenId) return tokenId;
+    }
+  }
+  return null;
+}
+
 export function classificationFromSnapshot(snapshot: ClassifiedDecodedTransaction): EngineV2Classification {
+  const decodedArgs = toJsonSafeValue(Array.from(snapshot.decodedArgs));
+  const tokenId = firstTokenId(decodedArgs);
+
   return {
     eventType: snapshot.classification,
     eventFamily: eventFamilyForClassification(snapshot.classification),
@@ -61,6 +86,8 @@ export function classificationFromSnapshot(snapshot: ClassifiedDecodedTransactio
       contractLabel: snapshot.contractLabel,
       contractName: snapshot.contractName,
       decodedFunction: snapshot.decodedFunction,
+      decodedArgs,
+      tokenId,
       transferCount: snapshot.transferCount,
       inboundTransferCount: snapshot.inboundTransferCount,
       outboundTransferCount: snapshot.outboundTransferCount,
@@ -71,6 +98,8 @@ export function classificationFromSnapshot(snapshot: ClassifiedDecodedTransactio
       contractLabel: snapshot.contractLabel,
       contractName: snapshot.contractName,
       decodedFunction: snapshot.decodedFunction,
+      decodedArgs,
+      tokenId,
       transferCount: snapshot.transferCount,
       inboundTransferCount: snapshot.inboundTransferCount,
       outboundTransferCount: snapshot.outboundTransferCount,

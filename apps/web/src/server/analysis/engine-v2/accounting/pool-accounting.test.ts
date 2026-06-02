@@ -17,5 +17,5 @@ test("accountPools aggregates only explicit pool links and does not infer from t
   assert.equal(rows[0]?.poolId, "pool-1");
   assert.equal(rows[0]?.manualDepositValueUsd, "110");
   assert.equal(rows[0]?.strategyValueUsd, "50");
-  assert.equal(rows[0]?.rewardValueUsd, "5");
+  assert.equal(rows[0]?.rewardValueUsd, "0");
 });
