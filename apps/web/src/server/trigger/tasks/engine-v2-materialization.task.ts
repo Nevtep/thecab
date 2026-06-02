@@ -115,6 +115,7 @@ function normalizeAddress(value: unknown) {
 }
 
 export function buildGaugePoolIdByGaugeAddress(input: {
+  chainId: number;
   rewardClaimGaugeAddresses: string[];
   protocolGaugeRows: GaugePoolProtocolRow[];
   eventGaugeRows: GaugePoolEventRow[];
@@ -134,7 +135,7 @@ export function buildGaugePoolIdByGaugeAddress(input: {
 
     const metadata = asRecord(row.metadataJson);
     const poolId = asString(metadata.poolId)
-      ?? (normalizeAddress(metadata.poolAddress) ? `${SUPPORTED_CHAIN_ID}:${normalizeAddress(metadata.poolAddress)}` : null);
+      ?? (normalizeAddress(metadata.poolAddress) ? `${input.chainId}:${normalizeAddress(metadata.poolAddress)}` : null);
     if (!poolId) continue;
 
     gaugePoolIdByGaugeAddress.set(gaugeAddress, poolId);
@@ -157,13 +158,23 @@ async function ethCall(input: {
   chainId: number;
   address: string;
   functionName: "token0" | "token1" | "previewMint" | "pool";
-  args?: readonly unknown[];
+  args?: readonly [bigint];
 }) {
-  const data = encodeFunctionData({
-    abi: MELLOW_WRAPPER_ABI,
-    functionName: input.functionName,
-    args: input.args,
-  });
+  const data = input.functionName === "previewMint"
+    ? (() => {
+      if (!input.args) {
+        throw new Error("MELLOW_PREVIEW_MINT_ARGS_REQUIRED");
+      }
+      return encodeFunctionData({
+        abi: MELLOW_WRAPPER_ABI,
+        functionName: "previewMint",
+        args: input.args,
+      });
+    })()
+    : encodeFunctionData({
+      abi: MELLOW_WRAPPER_ABI,
+      functionName: input.functionName,
+    });
 
   const result = await alchemyRpc<`0x${string}`>(
     "eth_call",
@@ -234,7 +245,7 @@ async function loadCurrentStrategyStateBase(input: {
     const token0Address = normalizeAddress(String(token0AddressRaw));
     const token1Address = normalizeAddress(String(token1AddressRaw));
     const underlyingPoolAddress = normalizeAddress(String(poolAddressRaw));
-    const [token0AmountRaw, token1AmountRaw] = previewMintResult as readonly [bigint, bigint];
+    const [token0AmountRaw, token1AmountRaw] = previewMintResult as unknown as readonly [bigint, bigint];
 
     return {
       strategyExposureId: input.strategyExposureId,
@@ -581,7 +592,7 @@ async function loadAccountingInputFromDb(input: { chainId: number; walletAddress
       inArray(engineV2DomainEventLinks.domainEventId, eventIds),
     ))
     : [];
-  const accountingInput = {
+  const accountingInput: EngineV2AccountingInput = {
     events: events.map((event) => ({
       id: event.id,
       chainId: event.chainId,
@@ -607,7 +618,7 @@ async function loadAccountingInputFromDb(input: { chainId: number; walletAddress
       confidence: link.confidence,
       evidenceJson: link.evidenceJson,
     })),
-  } satisfies EngineV2AccountingInput;
+  };
 
   const rewardClaimGaugeAddresses = Array.from(new Set(
     accountingInput.events
@@ -663,6 +674,7 @@ async function loadAccountingInputFromDb(input: { chainId: number; walletAddress
   });
 
   const gaugePoolIdByGaugeAddress = buildGaugePoolIdByGaugeAddress({
+    chainId: input.chainId,
     rewardClaimGaugeAddresses,
     protocolGaugeRows,
     eventGaugeRows,
@@ -819,7 +831,7 @@ export async function runEngineV2AccountChronological(rawPayload: unknown, deps:
     chainId: payload.chainId,
     walletAddress: payload.walletAddress,
     eventCount: accountingInput.events.length,
-    linkCount: accountingInput.links.length,
+    linkCount: accountingInput.links?.length ?? 0,
   });
   await materializeLegacySummaryTables({
     analysisRunId: payload.analysisRunId,

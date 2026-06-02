@@ -279,6 +279,7 @@ test("hydrateAccountingInputWithPersistedPrices carries historical pricing into 
 
 test("buildGaugePoolIdByGaugeAddress falls back to gauge lifecycle events when protocol metadata is missing", () => {
   const result = buildGaugePoolIdByGaugeAddress({
+    chainId: 8453,
     rewardClaimGaugeAddresses: ["0x519BbD1dd8C6a94c46080e24F316c14Ee758C025"],
     protocolGaugeRows: [],
     eventGaugeRows: [
@@ -297,6 +298,7 @@ test("buildGaugePoolIdByGaugeAddress falls back to gauge lifecycle events when p
 
 test("buildGaugePoolIdByGaugeAddress keeps protocol metadata as the primary source", () => {
   const result = buildGaugePoolIdByGaugeAddress({
+    chainId: 8453,
     rewardClaimGaugeAddresses: ["0x4f09bab2f0e15e2a078a227fe1537665f55b8360"],
     protocolGaugeRows: [
       {

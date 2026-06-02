@@ -197,6 +197,128 @@ test("accountRewards resolves basic gauge claims to the active deposit episode f
   assert.equal(rows[0]?.rewardType, "reward_claim");
 });
 
+test("accountRewards resolves basic gauge claims to the latest closed basic episode after removeLiquidity", () => {
+  const poolId = "8453:0xcdac0d6c6c59727a65f871236188350531885c43";
+  const closedDepositId = "8453:basic_amm:0xcdac0d6c6c59727a65f871236188350531885c43";
+  const deposits: EngineV2DepositProjection[] = [{
+    depositId: closedDepositId,
+    tokenId: null,
+    poolId,
+    status: "closed",
+    openedAt: new Date("2026-02-22T21:12:53.000Z"),
+    closedAt: new Date("2026-03-05T16:51:01.000Z"),
+    openedValueUsd: "100",
+    currentOrCloseValueUsd: "95",
+    capitalInUsd: "100",
+    capitalOutUsd: "95",
+    rewardsUsd: "0",
+    lifecycle: [],
+    coverageStatus: "full",
+    confidence: "high",
+    reasonCodes: [],
+  }];
+
+  const rows = accountRewards({
+    deposits,
+    gaugePoolIdByGaugeAddress: new Map([["0x519bbd1dd8c6a94c46080e24f316c14ee758c025", poolId]]),
+    events: [
+      rewardEvent({
+        id: "basic-gauge-claim-post-close",
+        eventType: "manual_gauge_reward_claim",
+        eventFamily: "deposit",
+        occurredAt: new Date("2026-03-05T16:52:35.000Z"),
+        txHash: "0xbf1129574cc93a84c213991aada4dacf7672e9b08cfe1fbfc51d9cf7fc7b9a3a",
+        metadataJson: {
+          rewardId: "basic-gauge-claim-post-close-1",
+          rewardType: "unknown",
+          claimContract: "0x519bbd1dd8c6a94c46080e24f316c14ee758c025",
+        },
+      }),
+    ],
+  });
+
+  assert.equal(rows[0]?.ownerStatus, "manual_deposit");
+  assert.equal(rows[0]?.linkedEntityId, closedDepositId);
+  assert.equal(rows[0]?.poolId, poolId);
+  assert.equal(rows[0]?.rewardType, "reward_claim");
+  assert.deepEqual(rows[0]?.reasonCodes ?? [], []);
+});
+
+test("accountRewards expands basic pool claimFees into one fee item per inbound token and resolves the closed episode", () => {
+  const poolAddress = "0xcdac0d6c6c59727a65f871236188350531885c43";
+  const poolId = `8453:${poolAddress}`;
+  const closedDepositId = `8453:basic_amm:${poolAddress}`;
+  const deposits: EngineV2DepositProjection[] = [{
+    depositId: closedDepositId,
+    tokenId: null,
+    poolId,
+    status: "closed",
+    openedAt: new Date("2026-02-22T21:12:53.000Z"),
+    closedAt: new Date("2026-03-05T16:51:01.000Z"),
+    openedValueUsd: "100",
+    currentOrCloseValueUsd: "95",
+    capitalInUsd: "100",
+    capitalOutUsd: "95",
+    rewardsUsd: "0",
+    lifecycle: [],
+    coverageStatus: "full",
+    confidence: "high",
+    reasonCodes: [],
+  }];
+
+  const rows = accountRewards({
+    deposits,
+    events: [
+      rewardEvent({
+        id: "basic-pool-fee-claim",
+        eventType: "manual_pool_fee_claim",
+        eventFamily: "deposit",
+        occurredAt: new Date("2026-03-05T16:51:49.000Z"),
+        txHash: "0xd1e9dd394439266e57449cf8dbc22325000523f910ec6b61b24f645bf3799792",
+        metadataJson: {
+          rewardId: "basic-pool-fee-claim-1",
+          rewardType: "fee_claim",
+          claimContract: poolAddress,
+        },
+        evidenceJson: {
+          movements: [
+            {
+              assetType: "erc20",
+              direction: "in",
+              tokenAddress: "0x4200000000000000000000000000000000000006",
+              amountRaw: "10135986357961343",
+              valueUsdAtEvent: "24.10",
+            },
+            {
+              assetType: "erc20",
+              direction: "in",
+              tokenAddress: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+              amountRaw: "20953414",
+              valueUsdAtEvent: "20.95",
+            },
+          ],
+        },
+      }),
+    ],
+  });
+
+  assert.equal(rows.length, 2);
+  assert.deepEqual(rows.map((row) => row.rewardId), [
+    "basic-pool-fee-claim-1:0",
+    "basic-pool-fee-claim-1:1",
+  ]);
+  assert.deepEqual(rows.map((row) => row.tokenAddress), [
+    "0x4200000000000000000000000000000000000006",
+    "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+  ]);
+  assert.deepEqual(rows.map((row) => row.amountUsd), ["24.10", "20.95"]);
+  assert.deepEqual(rows.map((row) => row.ownerStatus), ["manual_deposit", "manual_deposit"]);
+  assert.deepEqual(rows.map((row) => row.linkedEntityId), [closedDepositId, closedDepositId]);
+  assert.deepEqual(rows.map((row) => row.poolId), [poolId, poolId]);
+  assert.deepEqual(rows.map((row) => row.rewardType), ["fee_claim", "fee_claim"]);
+  assert.deepEqual(rows.map((row) => row.reasonCodes), [[], []]);
+});
+
 test("accountRewards normalizes manual fee claims away from governance_fee", () => {
   const rows = accountRewards({
     events: [

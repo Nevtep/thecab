@@ -118,6 +118,12 @@ export async function getPoolsList(input: PoolsListRequest): Promise<PoolsListRe
   const weightedReturnValues = filtered
     .map((row) => row.annualizedReturnPct)
     .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  const coveredStartDays = filtered
+    .map((row) => row.coveredStartDayUtc)
+    .filter((value): value is string => typeof value === "string" && value.length > 0);
+  const coveredEndDays = filtered
+    .map((row) => row.coveredEndDayUtc)
+    .filter((value): value is string => typeof value === "string" && value.length > 0);
   const weightedAnnualizedReturnPct = weightedReturnValues.length > 0
     ? weightedReturnValues.reduce((sum, value) => sum + value, 0) / weightedReturnValues.length
     : summarySeries.estimatedAnnualizedReturnPct.at(-1) ?? null;
@@ -127,11 +133,11 @@ export async function getPoolsList(input: PoolsListRequest): Promise<PoolsListRe
     chainId: input.chainId,
     analysisStatus: access.analysisStatus,
     coveredRange: {
-      startDayUtc: filtered.length > 0
-        ? filtered.reduce((min, row) => min === null || row.coveredStartDayUtc < min ? row.coveredStartDayUtc : min, null as string | null)
+      startDayUtc: coveredStartDays.length > 0
+        ? coveredStartDays.reduce((min, value) => value < min ? value : min)
         : null,
-      endDayUtc: filtered.length > 0
-        ? filtered.reduce((max, row) => max === null || row.coveredEndDayUtc > max ? row.coveredEndDayUtc : max, null as string | null)
+      endDayUtc: coveredEndDays.length > 0
+        ? coveredEndDays.reduce((max, value) => value > max ? value : max)
         : null,
     },
     summary: {

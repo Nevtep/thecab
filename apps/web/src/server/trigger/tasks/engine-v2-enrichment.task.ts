@@ -33,8 +33,8 @@ import { taskError, taskInfo, taskLog, taskWarn, withTaskLogging } from "@/serve
 export type EngineV2EnrichmentDeps = {
   planNeeds?: (input: { chainId: number; walletAddress: string }) => Promise<EngineV2EnrichmentNeedInput[]>;
   persistNeeds?: typeof persistEnrichmentNeeds;
-  loadQueuedNeeds?: (input: { chainId: number; walletAddress: string; needTypes?: string[]; limit: number }) => Promise<EngineV2EnrichmentNeedInput[]>;
-  resolveNeed?: (need: EngineV2EnrichmentNeedInput) => Promise<"resolved" | "unresolved" | "failed">;
+  loadQueuedNeeds?: (input: { chainId: number; walletAddress: string; needTypes?: string[]; limit: number }) => Promise<Array<EngineV2EnrichmentNeedInput & { id?: string }>>;
+  resolveNeed?: (need: EngineV2EnrichmentNeedInput & { id?: string }) => Promise<"resolved" | "unresolved" | "failed">;
   trigger?: (taskId: string, payload: Record<string, unknown>, options: { idempotencyKey: string }) => Promise<unknown>;
 };
 

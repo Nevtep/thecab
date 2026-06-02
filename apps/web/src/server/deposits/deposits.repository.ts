@@ -132,7 +132,7 @@ function sumEngineV2DepositLifecycleRewards(row: Partial<DepositDetailView>) {
     return null;
   }
 
-  return ((row as { lifecycle?: unknown[] }).lifecycle ?? []).reduce((sum, event) => {
+  return ((row as { lifecycle?: unknown[] }).lifecycle ?? []).reduce<number>((sum, event) => {
     const record = asRecord(event);
     if (asString(record.eventType) !== "claim_reward") {
       return sum;

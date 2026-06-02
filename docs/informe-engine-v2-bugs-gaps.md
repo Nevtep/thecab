@@ -1253,7 +1253,7 @@ And request-time APIs continue reading only persisted DB rows
 
 ## BUG-EV2-010: Basic Gauge `getReward(address)` Post-Close Claim No Se Asigna Al Episodio Cerrado Correcto
 
-Estado: known bug abierto al 2026-06-02.
+Estado: corregido el 2026-06-02.
 
 ### Caso Reproducible
 
@@ -1349,9 +1349,17 @@ Debe afirmar:
 - owner resuelto al ultimo episodio cerrado del mismo pool cuando el candidato es unico;
 - unresolved si existe reapertura o multiples candidatos validos.
 
+### Cierre De Implementacion
+
+Se corrigio en `reward-accounting` con una regla deterministica y acotada a basic pools:
+
+- primero intenta asignar el claim al episodio activo del mismo pool;
+- si no existe episodio activo, toma el ultimo episodio basic cerrado del mismo pool solo cuando el candidato cerrado mas reciente es unico y no hubo reapertura antes del claim;
+- si no puede decidir con esas condiciones, mantiene `unresolved`.
+
 ## BUG-EV2-011: `Pool.claimFees()` En Basic Pools Colapsa Dos Tokens En Una Sola Reward Row Y No Conserva Owner/Pool Deterministicos
 
-Estado: known bug abierto al 2026-06-02.
+Estado: corregido el 2026-06-02.
 
 ### Caso Reproducible
 
@@ -1450,6 +1458,15 @@ Debe afirmar:
 - el claim produce dos reward items, uno por token;
 - ambos items conservan el mismo pool;
 - ambos se asignan al episodio basic correcto o quedan unresolved solo si la regla residual no puede decidir deterministamente.
+
+### Cierre De Implementacion
+
+Se corrigio en `reward-accounting` sin tocar las reglas ya resueltas de otros surfaces:
+
+- `manual_pool_fee_claim` toma `tx.to_address` como identidad explicita del pool basic;
+- el claim se expande a un reward item por cada inbound ERC20 movement del evento;
+- cada item conserva su propio `tokenAddress`, `amountRaw` y `valueUsdAtEvent`;
+- el owner se resuelve contra el mismo episodio basic con la misma regla activa/post-cierre aplicada a `manual_gauge_reward_claim`.
 
 ## Cambios Documentales Realizados
 

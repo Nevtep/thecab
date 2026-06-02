@@ -42,6 +42,12 @@ function asInteger(value: unknown) {
   return Number.isInteger(parsed) ? parsed : null;
 }
 
+function movementRecords(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item))
+    : [];
+}
+
 function linksForEvent(links: EngineV2EntityLinkLike[], event: EngineV2DomainEventLike) {
   if (!event.id) return [];
   return links.filter((link) => link.domainEventId === event.id);
@@ -76,6 +82,134 @@ function activeDepositAtEventTime(deposit: EngineV2DepositProjection, occurredAt
   return openedAt <= eventTime && eventTime <= closedAt;
 }
 
+function resolveBasicDepositAtEventTime(input: {
+  depositsByPoolId: Map<string, EngineV2DepositProjection[]>;
+  poolId: string | null;
+  occurredAt: Date;
+}) {
+  if (!input.poolId) {
+    return {
+      depositId: null,
+      deposit: null,
+      ambiguityReasonCode: null,
+      activeMatchCount: 0,
+    };
+  }
+
+  const poolDeposits = input.depositsByPoolId.get(input.poolId) ?? [];
+  const activeDeposits = poolDeposits.filter((deposit) => activeDepositAtEventTime(deposit, input.occurredAt));
+  if (activeDeposits.length === 1) {
+    return {
+      depositId: activeDeposits[0]?.depositId ?? null,
+      deposit: activeDeposits[0] ?? null,
+      ambiguityReasonCode: null,
+      activeMatchCount: activeDeposits.length,
+    };
+  }
+  if (activeDeposits.length > 1) {
+    return {
+      depositId: null,
+      deposit: null,
+      ambiguityReasonCode: "ambiguous_active_basic_deposit",
+      activeMatchCount: activeDeposits.length,
+    };
+  }
+
+  const eventTime = input.occurredAt.getTime();
+  const closedCandidates = poolDeposits.filter((deposit) => {
+    const closedAt = deposit.closedAt?.getTime();
+    return typeof closedAt === "number" && Number.isFinite(closedAt) && closedAt < eventTime;
+  });
+  if (closedCandidates.length === 0) {
+    return {
+      depositId: null,
+      deposit: null,
+      ambiguityReasonCode: null,
+      activeMatchCount: 0,
+    };
+  }
+
+  const latestClosedAt = Math.max(...closedCandidates.map((deposit) => deposit.closedAt?.getTime() ?? Number.NEGATIVE_INFINITY));
+  const latestClosedCandidates = closedCandidates.filter((deposit) => (deposit.closedAt?.getTime() ?? Number.NEGATIVE_INFINITY) === latestClosedAt);
+  if (latestClosedCandidates.length !== 1) {
+    return {
+      depositId: null,
+      deposit: null,
+      ambiguityReasonCode: "ambiguous_closed_basic_deposit",
+      activeMatchCount: 0,
+    };
+  }
+
+  const candidate = latestClosedCandidates[0] ?? null;
+  const reopenedBeforeClaim = poolDeposits.some((deposit) => {
+    if (!candidate || deposit.depositId === candidate.depositId) return false;
+    const openedAt = deposit.openedAt?.getTime();
+    return typeof openedAt === "number"
+      && Number.isFinite(openedAt)
+      && openedAt > latestClosedAt
+      && openedAt < eventTime;
+  });
+  if (reopenedBeforeClaim) {
+    return {
+      depositId: null,
+      deposit: null,
+      ambiguityReasonCode: "reopened_basic_deposit_before_claim",
+      activeMatchCount: 0,
+    };
+  }
+
+  return {
+    depositId: candidate?.depositId ?? null,
+    deposit: candidate,
+    ambiguityReasonCode: null,
+    activeMatchCount: 0,
+  };
+}
+
+function rewardItemsForEvent(input: {
+  event: EngineV2DomainEventLike;
+  metadata: Record<string, unknown>;
+  evidence: Record<string, unknown>;
+  baseRewardId: string;
+}) {
+  if (input.event.eventType !== "manual_pool_fee_claim") {
+    return [{
+      rewardId: input.baseRewardId,
+      itemIndex: asInteger(input.metadata.itemIndex),
+      tokenAddress: asString(input.metadata.tokenAddress),
+      amountRaw: asString(input.metadata.amountRaw),
+      amountUsd: asString(input.metadata.amountUsd) ?? asString(input.metadata.valueUsd) ?? asString(input.metadata.valueUsdAtEvent),
+    }];
+  }
+
+  const inboundErc20Movements = movementRecords(input.evidence.movements).filter((movement) => (
+    asString(movement.assetType) === "erc20"
+    && asString(movement.direction) === "in"
+    && Boolean(asString(movement.tokenAddress))
+    && Boolean(asString(movement.amountRaw))
+  ));
+  if (inboundErc20Movements.length === 0) {
+    return [{
+      rewardId: input.baseRewardId,
+      itemIndex: asInteger(input.metadata.itemIndex),
+      tokenAddress: asString(input.metadata.tokenAddress),
+      amountRaw: asString(input.metadata.amountRaw),
+      amountUsd: asString(input.metadata.amountUsd) ?? asString(input.metadata.valueUsd) ?? asString(input.metadata.valueUsdAtEvent),
+    }];
+  }
+
+  return inboundErc20Movements.map((movement, index) => ({
+    rewardId: inboundErc20Movements.length === 1 ? input.baseRewardId : `${input.baseRewardId}:${index}`,
+    itemIndex: inboundErc20Movements.length === 1 ? asInteger(input.metadata.itemIndex) : index,
+    tokenAddress: asString(movement.tokenAddress) ?? asString(input.metadata.tokenAddress),
+    amountRaw: asString(movement.amountRaw) ?? asString(input.metadata.amountRaw),
+    amountUsd: asString(movement.valueUsdAtEvent)
+      ?? (inboundErc20Movements.length === 1
+        ? asString(input.metadata.amountUsd) ?? asString(input.metadata.valueUsd) ?? asString(input.metadata.valueUsdAtEvent)
+        : null),
+  }));
+}
+
 export function accountRewards(input: {
   events: EngineV2DomainEventLike[];
   links?: EngineV2EntityLinkLike[];
@@ -102,14 +236,13 @@ export function accountRewards(input: {
   for (const event of input.events) {
     if (!isRewardEvent(event)) continue;
     const metadata = asRecord(event.metadataJson);
+    const evidence = asRecord(event.evidenceJson);
     const eventLinks = linksForEvent(links, event);
     const depositLink = eventLinks.find((link) => link.entityType === "deposit");
     const strategyLink = eventLinks.find((link) => link.entityType === "strategy" || link.entityType === "strategy_exposure");
     const governanceLink = eventLinks.find((link) => link.entityType === "governance_lock" || link.entityType === "governance_epoch");
     const poolLink = eventLinks.find((link) => link.entityType === "pool");
-    const rewardId = asString(metadata.rewardId) ?? `${event.id ?? event.txHash}:${asString(metadata.itemIndex) ?? "0"}`;
-    if (seen.has(rewardId)) continue;
-    seen.add(rewardId);
+    const baseRewardId = asString(metadata.rewardId) ?? `${event.id ?? event.txHash}:${asString(metadata.itemIndex) ?? "0"}`;
 
     const isExcluded = event.coverageStatus === "excluded";
     const metadataStrategyExposureId = asString(metadata.strategyExposureId);
@@ -120,18 +253,27 @@ export function accountRewards(input: {
       ?? asString(metadata.toAddress)?.toLowerCase()
       ?? null;
     const gaugePoolId = gaugeAddress ? input.gaugePoolIdByGaugeAddress?.get(gaugeAddress) ?? null : null;
-    const activeBasicDeposits = gaugePoolId
-      ? (depositsByPoolId.get(gaugePoolId) ?? []).filter((deposit) => activeDepositAtEventTime(deposit, event.occurredAt))
-      : [];
-    const gaugeResolvedDepositId = event.eventType === "manual_gauge_reward_claim" && activeBasicDeposits.length === 1
-      ? activeBasicDeposits[0]?.depositId ?? null
+    const poolContractPoolId = event.eventType === "manual_pool_fee_claim" && gaugeAddress
+      ? `${event.chainId}:${gaugeAddress}`
       : null;
+    const explicitPoolId = poolLink?.entityId ?? asString(metadata.poolId) ?? poolContractPoolId ?? gaugePoolId ?? null;
+    const basicDepositResolution = (
+      event.eventType === "manual_gauge_reward_claim" || event.eventType === "manual_pool_fee_claim"
+    )
+      ? resolveBasicDepositAtEventTime({
+        depositsByPoolId,
+        poolId: explicitPoolId,
+        occurredAt: event.occurredAt,
+      })
+      : { depositId: null, deposit: null, ambiguityReasonCode: null, activeMatchCount: 0 };
     const resolvedDepositId = depositLink?.entityId
       ?? metadataDepositId
       ?? (metadataTokenId ? depositIdByTokenId.get(metadataTokenId) ?? null : null)
-      ?? gaugeResolvedDepositId;
-    const resolvedDeposit = resolvedDepositId ? depositsById.get(resolvedDepositId) ?? null : null;
-    const resolvedPoolId = poolLink?.entityId ?? asString(metadata.poolId) ?? gaugePoolId ?? resolvedDeposit?.poolId ?? null;
+      ?? basicDepositResolution.depositId;
+    const resolvedDeposit = resolvedDepositId
+      ? depositsById.get(resolvedDepositId) ?? basicDepositResolution.deposit ?? null
+      : basicDepositResolution.deposit ?? null;
+    const resolvedPoolId = explicitPoolId ?? resolvedDeposit?.poolId ?? null;
     const ownerStatus = isExcluded ? "excluded" :
       strategyLink ? "strategy" :
       metadataStrategyExposureId ? "strategy" :
@@ -157,33 +299,44 @@ export function accountRewards(input: {
       resolvedPoolId ? "contributes" :
       rewardType === "rebase" ? "none" :
       "unresolved";
+    const reasonCodes = [...new Set([
+      ...event.reasonCodes,
+      ...(basicDepositResolution.ambiguityReasonCode ? [basicDepositResolution.ambiguityReasonCode] : []),
+      ...(ownerStatus === "unresolved" ? ["missing_explicit_owner"] : []),
+      ...(poolContribution === "unresolved" && event.eventFamily === "governance" ? ["missing_distributor_pool_link"] : []),
+    ])];
 
-    rewards.push({
-      rewardId,
-      sourceDomainEventId: event.id ?? null,
-      itemIndex: asInteger(metadata.itemIndex),
-      rewardType,
-      tokenAddress: asString(metadata.tokenAddress),
-      amountRaw: asString(metadata.amountRaw),
-      amountUsd: asString(metadata.amountUsd) ?? asString(metadata.valueUsd) ?? asString(metadata.valueUsdAtEvent),
-      lockTokenId: asString(metadata.lockTokenId),
-      sourceContract: asString(metadata.sourceContract) ?? asString(metadata.distributorAddress) ?? asString(metadata.claimContract),
-      ownerStatus,
-      linkedEntityId: strategyLink?.entityId ?? metadataStrategyExposureId ?? resolvedDepositId ?? governanceLink?.entityId ?? null,
-      poolId: resolvedPoolId,
-      affectsTotals,
-      poolContribution,
-      coverageStatus: isExcluded ? "excluded" : event.coverageStatus,
-      confidence: event.confidence,
-      reasonCodes: [...new Set([
-        ...event.reasonCodes,
-        ...(event.eventType === "manual_gauge_reward_claim" && gaugePoolId && activeBasicDeposits.length > 1 ? ["ambiguous_active_basic_deposit"] : []),
-        ...(ownerStatus === "unresolved" ? ["missing_explicit_owner"] : []),
-        ...(poolContribution === "unresolved" && event.eventFamily === "governance" ? ["missing_distributor_pool_link"] : []),
-      ])],
-      txHash: event.txHash,
-      occurredAt: event.occurredAt,
-    });
+    for (const rewardItem of rewardItemsForEvent({
+      event,
+      metadata,
+      evidence,
+      baseRewardId,
+    })) {
+      if (seen.has(rewardItem.rewardId)) continue;
+      seen.add(rewardItem.rewardId);
+
+      rewards.push({
+        rewardId: rewardItem.rewardId,
+        sourceDomainEventId: event.id ?? null,
+        itemIndex: rewardItem.itemIndex,
+        rewardType,
+        tokenAddress: rewardItem.tokenAddress,
+        amountRaw: rewardItem.amountRaw,
+        amountUsd: rewardItem.amountUsd,
+        lockTokenId: asString(metadata.lockTokenId),
+        sourceContract: asString(metadata.sourceContract) ?? asString(metadata.distributorAddress) ?? asString(metadata.claimContract),
+        ownerStatus,
+        linkedEntityId: strategyLink?.entityId ?? metadataStrategyExposureId ?? resolvedDepositId ?? governanceLink?.entityId ?? null,
+        poolId: resolvedPoolId,
+        affectsTotals,
+        poolContribution,
+        coverageStatus: isExcluded ? "excluded" : event.coverageStatus,
+        confidence: event.confidence,
+        reasonCodes,
+        txHash: event.txHash,
+        occurredAt: event.occurredAt,
+      });
+    }
   }
 
   return rewards;

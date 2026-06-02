@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { runStartAnalysis, type StartAnalysisPayload } from "@/app/api/analysis/start/route";
+import { runStartAnalysis, type StartAnalysisPayload } from "@/app/api/analysis/start/start-analysis";
 
 function createPayload(overrides: Partial<StartAnalysisPayload> = {}): StartAnalysisPayload {
   return {
