@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { resolveRequestLocale } from "@/i18n/resolveRequestLocale";
 import { assertSupportedChain, SUPPORTED_CHAIN_ID } from "@/server/chains";
+import { OVERVIEW_RANGES } from "@/server/overview/overview.types";
 import { getSettings, updateSettings } from "@/server/settings/settings.service";
 
 const RESPONSE_HEADERS = {
@@ -20,7 +21,7 @@ const settingsUpdateSchema = z.object({
   chainId: z.number().int().positive().default(SUPPORTED_CHAIN_ID),
   preferences: z.object({
     languagePreference: z.enum(["en", "es"] as const).optional(),
-    defaultOverviewRange: z.enum(["24h", "7d", "30d"] as const).optional(),
+    defaultOverviewRange: z.enum(OVERVIEW_RANGES).optional(),
   }).strict(),
 }).strict();
 

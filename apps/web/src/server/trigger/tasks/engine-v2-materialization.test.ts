@@ -321,3 +321,23 @@ test("buildGaugePoolIdByGaugeAddress keeps protocol metadata as the primary sour
     "8453:0x6cdcb1c4a4d1c3c6d054b27ac5b77e89eafb971d",
   );
 });
+
+test("buildGaugePoolIdByGaugeAddress ignores legacy UUID pool ids from lifecycle metadata when a pool address is available", () => {
+  const result = buildGaugePoolIdByGaugeAddress({
+    chainId: 8453,
+    rewardClaimGaugeAddresses: ["0x519BbD1dd8C6a94c46080e24F316c14Ee758C025"],
+    protocolGaugeRows: [],
+    eventGaugeRows: [
+      {
+        gaugeAddress: "0x519bbd1dd8c6a94c46080e24f316c14ee758c025",
+        poolId: "6dc17ba3-94d8-4f42-8f2b-e3424ae519f0",
+        poolAddress: "0x70acdf2ad0bf2402c957154f944c19ef4e1cbae1",
+      },
+    ],
+  });
+
+  assert.equal(
+    result.get("0x519bbd1dd8c6a94c46080e24f316c14ee758c025"),
+    "8453:0x70acdf2ad0bf2402c957154f944c19ef4e1cbae1",
+  );
+});

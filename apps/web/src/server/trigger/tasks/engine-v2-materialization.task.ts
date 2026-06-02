@@ -107,11 +107,26 @@ type GaugePoolProtocolRow = {
 type GaugePoolEventRow = {
   gaugeAddress: string | null;
   poolId: string | null;
+  poolAddress: string | null;
 };
 
 function normalizeAddress(value: unknown) {
   const address = asString(value);
   return address ? address.toLowerCase() : null;
+}
+
+function canonicalPoolId(input: {
+  chainId: number;
+  poolId?: string | null;
+  poolAddress?: string | null;
+}) {
+  const normalizedPoolId = asString(input.poolId);
+  if (normalizedPoolId && /^\d+:0x[a-f0-9]{40}$/i.test(normalizedPoolId)) {
+    return normalizedPoolId.toLowerCase();
+  }
+
+  const normalizedPoolAddress = normalizeAddress(input.poolAddress);
+  return normalizedPoolAddress ? `${input.chainId}:${normalizedPoolAddress}` : null;
 }
 
 export function buildGaugePoolIdByGaugeAddress(input: {
@@ -134,8 +149,11 @@ export function buildGaugePoolIdByGaugeAddress(input: {
     if (rewardClaimGaugeSet.size > 0 && !rewardClaimGaugeSet.has(gaugeAddress)) continue;
 
     const metadata = asRecord(row.metadataJson);
-    const poolId = asString(metadata.poolId)
-      ?? (normalizeAddress(metadata.poolAddress) ? `${input.chainId}:${normalizeAddress(metadata.poolAddress)}` : null);
+    const poolId = canonicalPoolId({
+      chainId: input.chainId,
+      poolId: asString(metadata.poolId),
+      poolAddress: normalizeAddress(metadata.poolAddress),
+    });
     if (!poolId) continue;
 
     gaugePoolIdByGaugeAddress.set(gaugeAddress, poolId);
@@ -143,7 +161,11 @@ export function buildGaugePoolIdByGaugeAddress(input: {
 
   for (const row of input.eventGaugeRows) {
     const gaugeAddress = normalizeAddress(row.gaugeAddress);
-    const poolId = asString(row.poolId);
+    const poolId = canonicalPoolId({
+      chainId: input.chainId,
+      poolId: row.poolId,
+      poolAddress: row.poolAddress,
+    });
     if (!gaugeAddress || !poolId) continue;
     if (rewardClaimGaugeSet.size > 0 && !rewardClaimGaugeSet.has(gaugeAddress)) continue;
     if (gaugePoolIdByGaugeAddress.has(gaugeAddress)) continue;
@@ -670,6 +692,7 @@ async function loadAccountingInputFromDb(input: { chainId: number; walletAddress
     return {
       gaugeAddress: normalizeAddress(metadata.toAddress) ?? gaugeAddressByTxHash.get(event.txHash) ?? null,
       poolId: asString(metadata.poolId),
+      poolAddress: normalizeAddress(metadata.poolAddress),
     } satisfies GaugePoolEventRow;
   });
 
