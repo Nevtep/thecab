@@ -39,7 +39,7 @@ function createSettingsResponse(overrides?: Partial<SettingsResponse>): Settings
         theme: "cab-dark",
       },
       supportedLanguages: ["en", "es"],
-      supportedOverviewRanges: ["24h", "7d", "30d"],
+      supportedOverviewRanges: ["30d", "90d", "full_history"],
       supportedAnalysisModes: ["full_history", "incremental"],
     },
     ...overrides,

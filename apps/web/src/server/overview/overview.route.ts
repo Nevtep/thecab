@@ -6,7 +6,7 @@ import {
   DEFAULT_OVERVIEW_RANGE,
   normalizeOverviewRange,
 } from "@/server/overview/getRecentOverview";
-import type { OverviewRequest, OverviewResponse } from "@/server/overview/overview.types";
+import { OVERVIEW_RANGES, type OverviewRequest, type OverviewResponse } from "@/server/overview/overview.types";
 
 export const overviewQuerySchema = z.object({
   walletAddress: z
@@ -14,7 +14,7 @@ export const overviewQuerySchema = z.object({
     .regex(/^0x[a-fA-F0-9]{40}$/)
     .transform((value) => value.toLowerCase()),
   chainId: z.coerce.number().int().positive().default(SUPPORTED_CHAIN_ID),
-  range: z.enum(["24h", "7d", "30d"] as const).catch(DEFAULT_OVERVIEW_RANGE),
+  range: z.enum(OVERVIEW_RANGES).catch(DEFAULT_OVERVIEW_RANGE),
 });
 
 const FORBIDDEN_RESPONSE_KEYS = new Set([

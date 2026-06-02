@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 
 import { SettingsComponent } from "@/features/settings/Settings.component";
 import { mapSettingsResponseToViewModel } from "@/features/settings/settings.mappers";
+import type { OverviewRange } from "@/features/overview/overview.types";
 import { buildSettingsUpdateRequest } from "@/features/settings/settings.queries";
 import type { SettingsResponse } from "@/features/settings/settings.types";
 import { queryKeys } from "@/queries/keys";
@@ -200,7 +201,7 @@ export function SettingsContainer() {
     }
   }
 
-  async function handleOverviewRangeChange(nextRange: "24h" | "7d" | "30d") {
+  async function handleOverviewRangeChange(nextRange: OverviewRange) {
     if (!walletAddress || !settingsResponse || nextRange === settingsResponse.preferences.defaultOverviewRange) {
       return;
     }

@@ -97,3 +97,74 @@ test("ensureAbiForSeed is DB-first and does not fetch on cache hit", async () =>
   assert.equal(result.status, "hit");
   assert.equal(fetched, false);
 });
+
+test("ensureAbiForSeed retries explorer rate limits before giving up", async () => {
+  let fetchCount = 0;
+  const slept: number[] = [];
+  const result = await ensureAbiForSeed({
+    chainId: 8453,
+    apiKey: "unused",
+    seed: {
+      protocol: "observed",
+      label: "Rate Limited Wrapper",
+      address: "0x0000000000000000000000000000000000000002",
+      expectedKind: "observed-contract",
+    },
+    repository: {
+      getContractAbi: async () => null,
+      putFetchedAbi: async () => ({
+        chainId: 8453,
+        address: "0x0000000000000000000000000000000000000002",
+        label: "LpWrapper",
+        protocol: "observed",
+        expectedKind: "observed-contract",
+        fetchedAt: "2026-01-01T00:00:00.000Z",
+        sources: { basescanApi: "", basescanCode: "" },
+        source: {
+          contractName: "LpWrapper",
+          compilerVersion: null,
+          optimizationUsed: null,
+          runs: null,
+          constructorArguments: null,
+          evmVersion: null,
+          library: null,
+          licenseType: null,
+          proxy: false,
+          implementation: null,
+          swarmSource: null,
+        },
+        abi: transferAbi,
+        warnings: [],
+      }),
+    },
+    retryDelaysMs: [0, 0],
+    sleep: async (ms) => {
+      slept.push(ms);
+    },
+    fetcher: async () => {
+      fetchCount += 1;
+      if (fetchCount < 3) {
+        return new Response(JSON.stringify({
+          status: "0",
+          message: "NOTOK",
+          result: "Max calls per sec rate limit reached (3/sec)",
+        }));
+      }
+
+      return new Response(JSON.stringify({
+        status: "1",
+        message: "OK",
+        result: [{
+          ABI: JSON.stringify(transferAbi),
+          ContractName: "LpWrapper",
+          Proxy: "0",
+          Implementation: "",
+        }],
+      }));
+    },
+  });
+
+  assert.equal(result.status, "fetched");
+  assert.equal(fetchCount, 3);
+  assert.deepEqual(slept, [0, 0]);
+});

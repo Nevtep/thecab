@@ -25,6 +25,18 @@ export type AbiRegistryFetchResult =
   | { status: "fetched"; entry: AbiRegistryEntry }
   | { status: "miss"; reason: string };
 
+const EXPLORER_RATE_LIMIT_RETRY_DELAYS_MS = [1000, 2000, 4000] as const;
+
+function isExplorerRateLimitError(error: unknown) {
+  if (!(error instanceof Error)) return false;
+  return /rate limit|max calls per sec/i.test(error.message);
+}
+
+function waitFor(ms: number) {
+  if (ms <= 0) return Promise.resolve();
+  return new Promise<void>((resolve) => setTimeout(resolve, ms));
+}
+
 function rowToEntry(row: Record<string, unknown> | undefined): AbiRegistryEntry | null {
   if (!row || !Array.isArray(row.abiJson)) return null;
   const address = normalizeAddress(row.address);
@@ -162,6 +174,8 @@ export async function ensureAbiForSeed(input: FetchVerifiedContractAbiInput & {
       sourceProvider?: string;
     }): Promise<AbiRegistryEntry | null>;
   };
+  retryDelaysMs?: readonly number[];
+  sleep?: (ms: number) => Promise<void>;
 }): Promise<AbiRegistryFetchResult> {
   const existing = await input.repository.getContractAbi({
     chainId: input.chainId,
@@ -169,22 +183,30 @@ export async function ensureAbiForSeed(input: FetchVerifiedContractAbiInput & {
   });
   if (existing) return { status: "hit", entry: existing };
 
-  try {
-    const record = await fetchVerifiedContractAbi(input);
-    const entry = await input.repository.putFetchedAbi({
-      chainId: input.chainId,
-      seed: input.seed,
-      source: {
-        ABI: JSON.stringify(record.abi ?? []),
-        ContractName: record.source.contractName ?? record.label,
-        Proxy: record.source.proxy ? "1" : "0",
-        Implementation: record.source.implementation,
-      },
-      sourceUrl: record.sources.basescanApi,
-      sourceProvider: "etherscan-v2",
-    });
-    return entry ? { status: "fetched", entry } : { status: "miss", reason: "abi_not_persisted" };
-  } catch (error) {
-    return { status: "miss", reason: error instanceof Error ? error.message : "abi_fetch_failed" };
+  const retryDelaysMs = input.retryDelaysMs ?? EXPLORER_RATE_LIMIT_RETRY_DELAYS_MS;
+  const sleep = input.sleep ?? waitFor;
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      const record = await fetchVerifiedContractAbi(input);
+      const entry = await input.repository.putFetchedAbi({
+        chainId: input.chainId,
+        seed: input.seed,
+        source: {
+          ABI: JSON.stringify(record.abi ?? []),
+          ContractName: record.source.contractName ?? record.label,
+          Proxy: record.source.proxy ? "1" : "0",
+          Implementation: record.source.implementation,
+        },
+        sourceUrl: record.sources.basescanApi,
+        sourceProvider: "etherscan-v2",
+      });
+      return entry ? { status: "fetched", entry } : { status: "miss", reason: "abi_not_persisted" };
+    } catch (error) {
+      const retryDelayMs = retryDelaysMs[attempt] ?? null;
+      if (!isExplorerRateLimitError(error) || retryDelayMs === null) {
+        return { status: "miss", reason: error instanceof Error ? error.message : "abi_fetch_failed" };
+      }
+      await sleep(retryDelayMs);
+    }
   }
 }

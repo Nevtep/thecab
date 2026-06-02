@@ -25,7 +25,7 @@ function createViewModel(): Pick<OverviewViewModel, "chart" | "metrics"> {
       source: "recent_provider_data",
       coverageStatus: "recent",
       coverageReasonCodes: [],
-      range: "7d",
+      range: "30d",
       hasRewardMarkers: true,
       events: [],
       points: [
@@ -58,7 +58,7 @@ function createViewModel(): Pick<OverviewViewModel, "chart" | "metrics"> {
 test("buildPortfolioEvolutionModel computes summary, cumulative rewards, and marker buckets", () => {
   const model = buildPortfolioEvolutionModel({
     viewModel: createViewModel(),
-    range: "7d",
+    range: "30d",
     locale: "es",
     activity: {
       source: "recent_provider_data",
@@ -103,7 +103,7 @@ test("buildPortfolioEvolutionModel computes summary, cumulative rewards, and mar
 test("buildPortfolioEvolutionModel maps deposits and withdrawals to capital-state markers", () => {
   const model = buildPortfolioEvolutionModel({
     viewModel: createViewModel(),
-    range: "7d",
+    range: "30d",
     locale: "en",
     activity: {
       source: "recent_provider_data",
@@ -170,7 +170,7 @@ test("buildPortfolioEvolutionModel falls back to backend chart events for aero r
 
   const model = buildPortfolioEvolutionModel({
     viewModel,
-    range: "7d",
+    range: "30d",
     locale: "es",
     activity: null,
   });
@@ -200,7 +200,7 @@ test("buildPortfolioEvolutionModel preserves backend cash-out markers with detai
 
   const model = buildPortfolioEvolutionModel({
     viewModel,
-    range: "7d",
+    range: "30d",
     locale: "en",
     activity: null,
   });
@@ -222,7 +222,7 @@ test("buildPortfolioEvolutionModel normalizes rewards to zero across every bucke
 
   const model = buildPortfolioEvolutionModel({
     viewModel,
-    range: "7d",
+    range: "30d",
     locale: "es",
     activity: null,
   });

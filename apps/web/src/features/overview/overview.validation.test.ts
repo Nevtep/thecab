@@ -17,7 +17,7 @@ function createOverviewViewModel(input: {
     walletAddress: "0x0ECD939B7FCA4DC4A0675D8D28BAD12CEFAE0954",
     chainId: 8453,
     mode: "recent_view",
-    selectedRange: "7d",
+    selectedRange: "30d",
     analysis: {
       status: input.analysisStatus,
       runId: "run_123",
@@ -63,7 +63,7 @@ function createOverviewViewModel(input: {
       source: "recent_provider_data",
       coverageStatus: input.coverageStatus,
       coverageReasonCodes: input.coverageReasonCodes,
-      range: "7d",
+      range: "30d",
       hasRewardMarkers: false,
       events: [],
       points: [

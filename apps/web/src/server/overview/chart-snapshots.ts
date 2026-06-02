@@ -33,7 +33,7 @@ export function buildSnapshotValueLookup(input: {
   granularity: "hour" | "day";
   snapshotRows: Array<{
     capturedAt: Date;
-    totalValueUsd: string;
+    totalValueUsd: string | null;
     deployedValueUsd: string | null;
     idleValueUsd: string | null;
     metadataJson: Record<string, unknown>;
@@ -56,7 +56,7 @@ export function buildSnapshotValueLookup(input: {
   }>();
 
   function getSnapshotCandidateScore(row: {
-    totalValueUsd: string;
+    totalValueUsd: string | null;
     deployedValueUsd: string | null;
     idleValueUsd: string | null;
     metadataJson: Record<string, unknown>;

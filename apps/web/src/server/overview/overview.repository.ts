@@ -1,5 +1,6 @@
 import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 
+import { readEngineV2SurfaceRows } from "@/server/analysis/engine-v2/materializers";
 import { getDb } from "@/server/db/client";
 import {
   approvalLinks,
@@ -51,11 +52,103 @@ type AnalyzedPerformanceSnapshotRow = {
 
 type MergedAnalyzedPerformanceSnapshotRow = {
   capturedAt: Date;
-  totalValueUsd: string;
+  totalValueUsd: string | null;
   deployedValueUsd: string | null;
   idleValueUsd: string | null;
   metadataJson: Record<string, unknown>;
 };
+
+type EngineV2PoolHistoryReadModelRow = {
+  history?: {
+    points?: unknown[];
+  };
+};
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+function readOverviewPoolHistorySnapshotsFromEngineV2(input: {
+  rows: EngineV2PoolHistoryReadModelRow[];
+  startAt: Date;
+  endAt: Date;
+}) {
+  const buckets = new Map<string, { capturedAt: Date; deployedValueUsd: number; rewardValueUsd: number }>();
+
+  for (const row of input.rows) {
+    const historyPoints = Array.isArray(row.history?.points) ? row.history.points : [];
+
+    for (const pointCandidate of historyPoints) {
+      const point = asRecord(pointCandidate);
+      const dayUtc = typeof point.dayUtc === "string" ? point.dayUtc : null;
+      if (!dayUtc) {
+        continue;
+      }
+
+      const capturedAt = new Date(`${dayUtc}T00:00:00.000Z`);
+      if (Number.isNaN(capturedAt.getTime()) || capturedAt < input.startAt || capturedAt > input.endAt) {
+        continue;
+      }
+
+      const bucket = buckets.get(dayUtc) ?? {
+        capturedAt,
+        deployedValueUsd: 0,
+        rewardValueUsd: 0,
+      };
+      const deployedValueUsd = Number(point.deployedValueUsd ?? 0);
+      const rewardValueUsd = Number(point.rewardValueUsd ?? 0);
+
+      bucket.deployedValueUsd += Number.isFinite(deployedValueUsd) ? deployedValueUsd : 0;
+      bucket.rewardValueUsd += Number.isFinite(rewardValueUsd) ? rewardValueUsd : 0;
+      buckets.set(dayUtc, bucket);
+    }
+  }
+
+  return Array.from(buckets.entries())
+    .sort(([leftDay], [rightDay]) => leftDay.localeCompare(rightDay))
+    .map(([, bucket]) => ({
+      capturedAt: bucket.capturedAt,
+      totalValueUsd: null,
+      deployedValueUsd: formatSnapshotUsd(bucket.deployedValueUsd),
+      idleValueUsd: null,
+      metadataJson: {
+        dayUtc: bucket.capturedAt.toISOString().slice(0, 10),
+        rewardValueUsd: bucket.rewardValueUsd,
+        snapshotKind: "analysis_engine_daily",
+        source: "analyzed_history",
+        sourceSurface: "engine_v2_pools",
+      },
+    } satisfies MergedAnalyzedPerformanceSnapshotRow));
+}
+
+function readOverviewEarliestEngineV2PoolHistoryAt(rows: EngineV2PoolHistoryReadModelRow[]) {
+  let earliest: Date | null = null;
+
+  for (const row of rows) {
+    const historyPoints = Array.isArray(row.history?.points) ? row.history.points : [];
+
+    for (const pointCandidate of historyPoints) {
+      const point = asRecord(pointCandidate);
+      const dayUtc = typeof point.dayUtc === "string" ? point.dayUtc : null;
+      if (!dayUtc) {
+        continue;
+      }
+
+      const capturedAt = new Date(`${dayUtc}T00:00:00.000Z`);
+      if (Number.isNaN(capturedAt.getTime())) {
+        continue;
+      }
+
+      if (!earliest || capturedAt < earliest) {
+        earliest = capturedAt;
+      }
+    }
+  }
+
+  return earliest;
+}
 
 export function mergeAnalyzedPerformanceSnapshotRows(
   rows: AnalyzedPerformanceSnapshotRow[],
@@ -482,6 +575,24 @@ export async function readOverviewAnalyzedPortfolioSnapshots(input: ScopedWallet
   startAt: Date;
   endAt: Date;
 }) {
+  const engineV2Rows = await readEngineV2SurfaceRows<EngineV2PoolHistoryReadModelRow>({
+    chainId: input.chainId,
+    walletAddress: input.walletAddress,
+    surface: "pools",
+  });
+
+  if (engineV2Rows && engineV2Rows.length > 0) {
+    const engineV2Snapshots = readOverviewPoolHistorySnapshotsFromEngineV2({
+      rows: engineV2Rows,
+      startAt: input.startAt,
+      endAt: input.endAt,
+    });
+
+    if (engineV2Snapshots.length > 0) {
+      return engineV2Snapshots;
+    }
+  }
+
   const db = getDb();
 
   const rows = await db
@@ -505,6 +616,49 @@ export async function readOverviewAnalyzedPortfolioSnapshots(input: ScopedWallet
     .orderBy(desc(performanceSnapshots.capturedAt));
 
   return mergeAnalyzedPerformanceSnapshotRows(rows);
+}
+
+export async function readOverviewChartHistoryStartAt(input: ScopedWalletInput) {
+  const db = getDb();
+  const [engineV2Rows, portfolioSnapshotRows, performanceSnapshotRows] = await Promise.all([
+    readEngineV2SurfaceRows<EngineV2PoolHistoryReadModelRow>({
+      chainId: input.chainId,
+      walletAddress: input.walletAddress,
+      surface: "pools",
+    }),
+    db
+      .select({ capturedAt: sql<Date | null>`min(${portfolioSnapshots.capturedAt})` })
+      .from(portfolioSnapshots)
+      .where(
+        and(
+          eq(portfolioSnapshots.walletAddress, input.walletAddress.toLowerCase()),
+          eq(portfolioSnapshots.chainId, input.chainId),
+        ),
+      ),
+    db
+      .select({ capturedAt: sql<Date | null>`min(${performanceSnapshots.capturedAt})` })
+      .from(performanceSnapshots)
+      .where(
+        and(
+          eq(performanceSnapshots.walletAddress, input.walletAddress.toLowerCase()),
+          eq(performanceSnapshots.chainId, input.chainId),
+          inArray(performanceSnapshots.scope, ["portfolio", "idle"]),
+          eq(performanceSnapshots.resolution, "daily"),
+        ),
+      ),
+  ]);
+
+  const candidateDates = [
+    engineV2Rows ? readOverviewEarliestEngineV2PoolHistoryAt(engineV2Rows) : null,
+    portfolioSnapshotRows[0]?.capturedAt ?? null,
+    performanceSnapshotRows[0]?.capturedAt ?? null,
+  ].filter((value): value is Date => value instanceof Date && !Number.isNaN(value.getTime()));
+
+  if (candidateDates.length === 0) {
+    return null;
+  }
+
+  return candidateDates.sort((left, right) => left.getTime() - right.getTime())[0] ?? null;
 }
 
 export async function getLatestOverviewPortfolioSnapshot(input: ScopedWalletInput) {

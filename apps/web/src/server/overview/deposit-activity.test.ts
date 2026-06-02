@@ -138,7 +138,7 @@ test("buildOverviewAnalyzedActivityReadInput keeps activity lists limited but ch
     },
   );
 
-  for (const range of ["24h", "7d", "30d"] as const) {
+  for (const range of ["30d", "90d", "full_history"] as const) {
     assert.deepEqual(
       buildOverviewAnalyzedActivityReadInput({
         surface: "chart",

@@ -190,12 +190,16 @@ export function OverviewContainer() {
       !isConnected ||
       !isSupportedChain ||
       !chartViewModel ||
-      screenState.range !== "30d"
+      (screenState.range !== "90d" && screenState.range !== "full_history")
     ) {
       return;
     }
 
-    for (const range of ["24h", "7d"] as const) {
+    for (const range of ["30d", "90d"] as const) {
+      if (range === screenState.range) {
+        continue;
+      }
+
       const warmupKey = `${walletAddress}:${resolvedChainId}:${range}`;
       if (warmedSnapshotKeysRef.current.has(warmupKey)) {
         continue;

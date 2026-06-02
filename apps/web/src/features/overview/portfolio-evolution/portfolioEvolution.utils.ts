@@ -61,35 +61,24 @@ function roundUsd(value: number) {
 }
 
 function toBucketTimestamp(timestamp: string, range: OverviewRange) {
+  void range;
   const date = new Date(timestamp);
   date.setUTCMinutes(0, 0, 0);
-
-  if (range !== "24h") {
-    date.setUTCHours(0, 0, 0, 0);
-  }
+  date.setUTCHours(0, 0, 0, 0);
 
   return date.toISOString();
 }
 
 export function formatPortfolioEvolutionBucketLabel(timestamp: string, range: OverviewRange, locale: string) {
+  void range;
   const date = new Date(timestamp);
-
-  if (range === "24h") {
-    return formatDateParts(date, locale, { hour: "numeric" });
-  }
 
   return formatDateParts(date, locale, { month: "short", day: "numeric", timeZone: "UTC" });
 }
 
 export function formatPortfolioEvolutionBucketTimestamp(timestamp: string, range: OverviewRange, locale: string) {
+  void range;
   const date = new Date(timestamp);
-
-  if (range === "24h") {
-    return formatDateParts(date, locale, {
-      dateStyle: "medium",
-      timeStyle: "short",
-    });
-  }
 
   return formatDateParts(date, locale, {
     dateStyle: "medium",

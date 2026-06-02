@@ -23,6 +23,7 @@ import {
 import { getOverviewNavigationItems } from "@/features/settings/settings.mappers";
 import { buildSettingsDiagnosticsRows, resolveSettingsScreenState } from "@/features/settings/settings.view";
 import { mapOverviewAnalysisStatusToBadgeStatus } from "@/features/overview/overview.mappers";
+import type { OverviewRange } from "@/features/overview/overview.types";
 
 import type { SettingsViewModel } from "@/features/settings/settings.types";
 
@@ -37,7 +38,7 @@ type SettingsComponentProps = {
   isStartingAnalysis: boolean;
   onRetry: () => void;
   onLanguageChange: (language: "en" | "es") => void;
-  onDefaultOverviewRangeChange: (range: "24h" | "7d" | "30d") => void;
+  onDefaultOverviewRangeChange: (range: OverviewRange) => void;
   onRefreshOverview: () => void;
   onDisconnect: () => void;
   onStartAnalysis: (mode: "full_history" | "incremental") => void;
@@ -258,7 +259,7 @@ export function SettingsComponent({
                     label: option.label,
                   }))}
                   selectedKey={viewModel.displaySection.defaultOverviewRange.value}
-                  onSelect={(value) => onDefaultOverviewRangeChange(value as "24h" | "7d" | "30d")}
+                  onSelect={(value) => onDefaultOverviewRangeChange(value as OverviewRange)}
                   disabled={viewModel.displaySection.defaultOverviewRange.isPending}
                 />
               </CabStack>

@@ -52,7 +52,7 @@ export function createInitialOverviewScreenState(
 }
 
 export function normalizeOverviewRange(range?: string | null): OverviewRange {
-  if (range === "24h" || range === "7d" || range === "30d") {
+  if (range === "30d" || range === "90d" || range === "full_history") {
     return range;
   }
 

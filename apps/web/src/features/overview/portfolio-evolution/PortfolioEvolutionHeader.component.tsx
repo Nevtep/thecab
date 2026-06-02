@@ -21,7 +21,7 @@ export function PortfolioEvolutionHeader({
   onRangeChange,
 }: PortfolioEvolutionHeaderProps) {
   const { t } = useTranslation(["overview"]);
-  const rangeOptions = (["24h", "7d", "30d"] as const).map((option) => ({
+  const rangeOptions = (["30d", "90d", "full_history"] as const).map((option) => ({
     key: option,
     label: t(`ranges.${option}`),
   }));

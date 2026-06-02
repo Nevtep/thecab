@@ -1,6 +1,6 @@
 import type { AnalysisStatus, AnalysisSummary } from "@/analysis/analysisStatus";
 
-export type OverviewRange = "24h" | "7d" | "30d";
+export type OverviewRange = "30d" | "90d" | "full_history";
 
 export type OverviewMode = "recent_view";
 

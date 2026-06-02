@@ -21,6 +21,7 @@ import {
   readKnownProtocolContracts,
   readOverviewActiveAerodromePositionTokenIds,
   readOverviewAnalyzedPortfolioSnapshots,
+  readOverviewChartHistoryStartAt,
   readRecentOverviewAnalyzedActivity,
   readOverviewPricePointsInRange,
   readOverviewPortfolioSnapshots,
@@ -44,16 +45,16 @@ import type {
 
 export const DEFAULT_OVERVIEW_RANGE: OverviewRange = "30d";
 
-const OVERVIEW_BUCKET_CONFIG: Record<OverviewRange, { granularity: "hour" | "day"; bucketCount: number }> = {
-  "24h": { granularity: "hour", bucketCount: 24 },
-  "7d": { granularity: "day", bucketCount: 7 },
+const OVERVIEW_BUCKET_CONFIG: Record<OverviewRange, { granularity: "hour" | "day"; bucketCount: number | null }> = {
   "30d": { granularity: "day", bucketCount: 30 },
+  "90d": { granularity: "day", bucketCount: 90 },
+  full_history: { granularity: "day", bucketCount: null },
 };
 
 const OVERVIEW_ACTIVITY_LIMIT: Record<OverviewRange, number> = {
-  "24h": 16,
-  "7d": 28,
   "30d": 48,
+  "90d": 72,
+  full_history: 96,
 };
 
 export function buildOverviewAnalyzedActivityReadInput(input: {
@@ -905,7 +906,7 @@ function buildDistributionSliceComposition(
 }
 
 export function normalizeOverviewRange(range?: string | null): OverviewRange {
-  if (range === "24h" || range === "30d") {
+  if (range === "30d" || range === "90d" || range === "full_history") {
     return range;
   }
 
@@ -1457,6 +1458,30 @@ function buildChartPoints(
   hasProtocolPositions: boolean,
   hasPartialProtocolHistory: boolean,
 ) {
+  function estimateIdleValueUsd(bucketTimestamp: string) {
+    let idleValueUsd = 0;
+    let hasIdleValue = false;
+    let hasMissingPrice = false;
+
+    for (const tokenBalance of tokenBalances) {
+      const priceByBucket = seriesByToken.get(tokenBalance.tokenAddress);
+      const historicalPriceUsd = priceByBucket?.get(bucketTimestamp);
+
+      if (historicalPriceUsd === undefined) {
+        hasMissingPrice = true;
+        continue;
+      }
+
+      idleValueUsd += tokenBalance.balance * historicalPriceUsd;
+      hasIdleValue = true;
+    }
+
+    return {
+      idleValueUsd: hasIdleValue ? idleValueUsd : null,
+      hasMissingPrice,
+    };
+  }
+
   let hasPartialHistory = hasPartialProtocolHistory;
 
   const points: OverviewChartPoint[] = bucketTimestamps.map((bucketTimestamp) => {
@@ -1467,21 +1492,26 @@ function buildChartPoints(
       const deployedValueUsd = shouldMergeDeployedValue
         ? estimatedDeployedValueUsd
         : snapshotPoint.deployedValueUsd;
+      const estimatedIdleValue = estimateIdleValueUsd(bucketTimestamp);
+      if (snapshotPoint.idleValueUsd === null && estimatedIdleValue.hasMissingPrice) {
+        hasPartialHistory = true;
+      }
+      const idleValueUsd = snapshotPoint.idleValueUsd ?? estimatedIdleValue.idleValueUsd;
       const totalValueUsd =
-        shouldMergeDeployedValue
-          ? (snapshotPoint.idleValueUsd === null && deployedValueUsd === null
+        shouldMergeDeployedValue || snapshotPoint.totalValueUsd === null
+          ? (idleValueUsd === null && deployedValueUsd === null
               ? null
-              : (snapshotPoint.idleValueUsd ?? 0) + (deployedValueUsd ?? 0))
+              : (idleValueUsd ?? 0) + (deployedValueUsd ?? 0))
           : snapshotPoint.totalValueUsd ??
-            (snapshotPoint.idleValueUsd === null && deployedValueUsd === null
+            (idleValueUsd === null && deployedValueUsd === null
               ? null
-              : (snapshotPoint.idleValueUsd ?? 0) + (deployedValueUsd ?? 0));
+              : (idleValueUsd ?? 0) + (deployedValueUsd ?? 0));
 
       return {
         capturedAt: bucketTimestamp,
         totalValueUsd,
         deployedValueUsd,
-        idleValueUsd: snapshotPoint.idleValueUsd,
+        idleValueUsd,
         rewardValueUsd:
           (() => {
             const derivedRewardValueUsd = rewardValuesByBucket.get(bucketTimestamp) ?? null;
@@ -1498,33 +1528,22 @@ function buildChartPoints(
       hasPartialHistory = true;
     }
 
-    let idleValueUsd = 0;
-    let hasIdleValue = false;
-
-    for (const tokenBalance of tokenBalances) {
-      const priceByBucket = seriesByToken.get(tokenBalance.tokenAddress);
-      const historicalPriceUsd = priceByBucket?.get(bucketTimestamp);
-
-      if (historicalPriceUsd === undefined) {
-        hasPartialHistory = true;
-        continue;
-      }
-
-      idleValueUsd += tokenBalance.balance * historicalPriceUsd;
-      hasIdleValue = true;
+    const estimatedIdleValue = estimateIdleValueUsd(bucketTimestamp);
+    if (estimatedIdleValue.hasMissingPrice) {
+      hasPartialHistory = true;
     }
 
     const estimatedDeployedValueUsd = estimatedDeployedValueByBucket.get(bucketTimestamp) ?? null;
     const totalValueUsd =
-      !hasIdleValue && estimatedDeployedValueUsd === null
+      estimatedIdleValue.idleValueUsd === null && estimatedDeployedValueUsd === null
         ? null
-        : (hasIdleValue ? idleValueUsd : 0) + (estimatedDeployedValueUsd ?? 0);
+        : (estimatedIdleValue.idleValueUsd ?? 0) + (estimatedDeployedValueUsd ?? 0);
 
     return {
       capturedAt: bucketTimestamp,
       totalValueUsd,
       deployedValueUsd: estimatedDeployedValueUsd,
-      idleValueUsd: hasIdleValue ? idleValueUsd : null,
+      idleValueUsd: estimatedIdleValue.idleValueUsd,
       rewardValueUsd: rewardValuesByBucket.get(bucketTimestamp) ?? null,
     };
   });
@@ -1563,13 +1582,18 @@ function floorDateToGranularity(date: Date, granularity: "hour" | "day") {
   return alignedDate;
 }
 
-function buildBucketTimestamps(range: OverviewRange, referenceDate: Date) {
+function buildBucketTimestamps(range: OverviewRange, referenceDate: Date, startAt?: Date | null) {
   const config = getRecentOverviewBucketConfig(range);
   const alignedEndDate = floorDateToGranularity(referenceDate, config.granularity);
   const bucketMs = config.granularity === "hour" ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+  const bucketCount = config.bucketCount ?? (() => {
+    const alignedStartDate = floorDateToGranularity(startAt ?? referenceDate, config.granularity);
+    const elapsedMs = Math.max(0, alignedEndDate.getTime() - alignedStartDate.getTime());
+    return Math.floor(elapsedMs / bucketMs) + 1;
+  })();
 
-  return Array.from({ length: config.bucketCount }, (_, index) => {
-    const offset = config.bucketCount - index - 1;
+  return Array.from({ length: bucketCount }, (_, index) => {
+    const offset = bucketCount - index - 1;
     return new Date(alignedEndDate.getTime() - offset * bucketMs).toISOString();
   });
 }
@@ -2304,7 +2328,13 @@ async function getRecentOverviewChartFallback(input: OverviewRequest): Promise<O
   const response = await getRecentOverviewShell(input);
   const now = new Date();
   const bucketConfig = getRecentOverviewBucketConfig(input.range);
-  const bucketTimestamps = buildBucketTimestamps(input.range, now);
+  const chartHistoryStartAt = input.range === "full_history"
+    ? await readOverviewChartHistoryStartAt({
+        walletAddress: input.walletAddress,
+        chainId: input.chainId,
+      })
+    : null;
+  const bucketTimestamps = buildBucketTimestamps(input.range, now, chartHistoryStartAt);
   const rangeStartAt = new Date(bucketTimestamps[0] ?? now.toISOString());
   const [historicalSnapshotRows, analyzedSnapshotRows, realizedRewardRows] = await Promise.all([
     readOverviewPortfolioSnapshots({
@@ -2417,7 +2447,7 @@ async function getRecentOverviewChartFallback(input: OverviewRequest): Promise<O
   };
   response.chart = {
     ...response.chart,
-    source: "partial_fallback",
+    source: analyzedSnapshotRows.length > 0 ? "analyzed_history" : "partial_fallback",
     coverageStatus: "partial",
     coverageReasonCodes,
     range: input.range,
@@ -2549,7 +2579,13 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
   const response = createEmptyRecentOverviewResponse(input);
   const now = new Date();
   const bucketConfig = getRecentOverviewBucketConfig(input.range);
-  const bucketTimestamps = buildBucketTimestamps(input.range, now);
+  const chartHistoryStartAt = input.range === "full_history"
+    ? await readOverviewChartHistoryStartAt({
+        walletAddress: input.walletAddress,
+        chainId: input.chainId,
+      })
+    : null;
+  const bucketTimestamps = buildBucketTimestamps(input.range, now, chartHistoryStartAt);
   const rangeStartAt = new Date(bucketTimestamps[0] ?? now.toISOString());
   const [tokensResult, historyResult, defiPositionsResult, latestRun, freshness, protocolMetadata, activeAerodromeTokenIds, realizedRewardRows] = await Promise.all([
     getWalletTokens(input.walletAddress, input.chainId).then(
@@ -2821,8 +2857,7 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
         priceUsd,
         valueUsd,
         movement24hPct: calculatePercentChange(priceUsd, movement24hBaseline),
-        movement7dPct:
-          input.range === "24h" ? null : calculatePercentChange(priceUsd, movement7dBaseline),
+        movement7dPct: calculatePercentChange(priceUsd, movement7dBaseline),
         classification: "idle" as const,
         priceConfidence: resolvedPriceEntry?.confidence ?? null,
         trustStatus: trustClassification.trustStatus,
@@ -3077,7 +3112,11 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
 
   response.chart = {
     ...response.chart,
-    source: chartPartial ? "partial_fallback" : "recent_provider_data",
+    source: analyzedSnapshotRows.length > 0
+      ? (chartPartial ? "partial_fallback" : "analyzed_history")
+      : chartPartial
+        ? "partial_fallback"
+        : "recent_provider_data",
     coverageStatus: chartPartial ? "partial" : coverageStatus,
     coverageReasonCodes: chartPartial ? uniqueCoverageReasonCodes : uniqueCoverageReasonCodes,
     hasRewardMarkers,

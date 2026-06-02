@@ -6,7 +6,7 @@ import { buildRewardValueLookup, buildSnapshotValueLookup, toBucketTimestamp } f
 test("current point does not override an existing persisted bucket snapshot", () => {
   const existingBucketTimestamp = toBucketTimestamp("2026-05-25T00:00:00.000Z", "day");
   const lookup = buildSnapshotValueLookup({
-    range: "7d",
+    range: "30d",
     granularity: "day",
     snapshotRows: [
       {
@@ -16,7 +16,7 @@ test("current point does not override an existing persisted bucket snapshot", ()
         idleValueUsd: "400",
         metadataJson: {
           snapshotKind: "range_bucket",
-          range: "7d",
+          range: "30d",
           rewardValueUsd: 25,
         },
       },
@@ -41,7 +41,7 @@ test("current point does not override an existing persisted bucket snapshot", ()
 test("current point seeds the bucket when no persisted snapshot exists", () => {
   const currentBucketTimestamp = toBucketTimestamp("2026-05-25T12:00:00.000Z", "day");
   const lookup = buildSnapshotValueLookup({
-    range: "7d",
+    range: "30d",
     granularity: "day",
     snapshotRows: [],
     currentPoint: {

@@ -9,7 +9,7 @@ import type {
   ProtocolPositionCoverageReasonCode,
 } from "@/server/protocol-positions/protocolPositions.types";
 
-export const OVERVIEW_RANGES = ["24h", "7d", "30d"] as const;
+export const OVERVIEW_RANGES = ["30d", "90d", "full_history"] as const;
 
 export const EXISTING_OVERVIEW_COVERAGE_REASON_CODES = [
   "analysisPending",
