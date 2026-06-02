@@ -7,6 +7,8 @@ import {
 } from "@/server/analysis/analysis-run.repository";
 import { taskInfo, taskWarn, withTaskLogging } from "@/server/trigger/tasks/task-logging";
 
+export const ANALYSIS_RUN_TASK_ID = "analysis-run-v2";
+
 export type AnalysisMode = "full_history" | "incremental";
 
 export type AnalysisRunTaskPayload = {
@@ -68,7 +70,7 @@ export async function runEngineV2AnalysisOrchestration(
     stage: "engine_v2_collection",
     progressPct: 5,
   });
-  taskInfo("analysis-run", "triggering engine-v2-start-collection", {
+  taskInfo(ANALYSIS_RUN_TASK_ID, "triggering engine-v2-start-collection", {
     runId: payload.runId,
     walletAddress: payload.walletAddress,
     chainId: payload.chainId,
@@ -78,7 +80,7 @@ export async function runEngineV2AnalysisOrchestration(
     idempotencyKey: `${payload.runId}:engine-v2:start`,
   });
   if (!result.ok) {
-    taskWarn("analysis-run", "engine-v2-start-collection returned a non-ok result", {
+    taskWarn(ANALYSIS_RUN_TASK_ID, "engine-v2-start-collection returned a non-ok result", {
       runId: payload.runId,
       error: result.error instanceof Error ? result.error.message : result.error,
     });
@@ -92,7 +94,7 @@ export async function runEngineV2AnalysisOrchestration(
     throw result.error ?? new Error("engine-v2-start-collection failed");
   }
 
-  taskInfo("analysis-run", "engine-v2-start-collection accepted the run", {
+  taskInfo(ANALYSIS_RUN_TASK_ID, "engine-v2-start-collection accepted the run", {
     runId: payload.runId,
     mode: payload.mode,
   });
@@ -114,7 +116,7 @@ export async function runAnalysisRunTask(
   }
 
   if (currentRun.status === "cancelled") {
-    taskWarn("analysis-run", "analysis run is already cancelled; skipping orchestration", {
+    taskWarn(ANALYSIS_RUN_TASK_ID, "analysis run is already cancelled; skipping orchestration", {
       runId: payload.runId,
     });
     return { cancelled: true };
@@ -124,6 +126,6 @@ export async function runAnalysisRunTask(
 }
 
 export const analysisRunTask = task({
-  id: "analysis-run",
-  run: async (payload: AnalysisRunTaskPayload) => withTaskLogging("analysis-run", payload, () => runAnalysisRunTask(payload)),
+  id: ANALYSIS_RUN_TASK_ID,
+  run: async (payload: AnalysisRunTaskPayload) => withTaskLogging(ANALYSIS_RUN_TASK_ID, payload, () => runAnalysisRunTask(payload)),
 });

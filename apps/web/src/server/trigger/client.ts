@@ -2,12 +2,12 @@ import { getEnv } from "@/server/env";
 
 import { runs, tasks } from "@trigger.dev/sdk/v3";
 
-import type { AnalysisRunTaskPayload } from "@/server/trigger/tasks/analysis-run.task";
+import { ANALYSIS_RUN_TASK_ID, type AnalysisRunTaskPayload } from "@/server/trigger/tasks/analysis-run.task";
 
 export async function triggerAnalysisRunTask(payload: AnalysisRunTaskPayload) {
   getEnv();
-  return tasks.trigger("analysis-run", payload, {
-    idempotencyKey: `${payload.runId}:analysis-run`,
+  return tasks.trigger(ANALYSIS_RUN_TASK_ID, payload, {
+    idempotencyKey: `${payload.runId}:${ANALYSIS_RUN_TASK_ID}`,
     concurrencyKey: `${payload.chainId}:${payload.walletAddress.toLowerCase()}`,
     tags: ["analysis", payload.walletAddress.toLowerCase()],
   });

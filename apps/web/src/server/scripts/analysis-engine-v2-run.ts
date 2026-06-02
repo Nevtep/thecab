@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 
 import { SUPPORTED_CHAIN_ID } from "@/server/chains";
 import { ENGINE_V2_TRIGGER_TASK_IDS } from "@/server/trigger/tasks/engine-v2-index.task";
+import { ANALYSIS_RUN_TASK_ID } from "@/server/trigger/tasks/analysis-run.task";
 
 function loadLocalEnvFile() {
   const envFilePath = resolve(process.cwd(), ".env.local");
@@ -66,7 +67,7 @@ async function main() {
     taskPlan,
     startNote: args.dryRun
       ? "Dry-run only. Pass --start from an environment with Trigger credentials to enqueue externally."
-      : "Validated Engine V2 task plan. Use analysis-run orchestration to enqueue the always-on Engine V2 pipeline.",
+      : `Validated Engine V2 task plan. Use ${ANALYSIS_RUN_TASK_ID} orchestration to enqueue the always-on Engine V2 pipeline.`,
   }, null, 2));
 }
 
