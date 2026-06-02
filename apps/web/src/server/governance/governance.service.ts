@@ -566,8 +566,8 @@ export function buildLockedGovernanceResponse(input: GovernanceRequest, analysis
     locks: {
       rows: [],
       primaryLockId: null,
+      primaryLock: null,
     },
-    lockPanel: null,
     epochTimeline: { epochs: [] },
     rewardBreakdown: buildRewardBreakdown([]),
     rewards: {
@@ -617,8 +617,8 @@ export function buildReadyGovernanceResponse(input: {
     locks: {
       rows: input.repository.lockPanels,
       primaryLockId: input.repository.primaryLockId,
+      primaryLock,
     },
-    lockPanel: primaryLock,
     epochTimeline: {
       epochs: input.repository.epochs,
     },

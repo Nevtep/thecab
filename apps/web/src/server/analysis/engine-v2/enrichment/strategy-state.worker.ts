@@ -8,6 +8,11 @@ export function strategyStateSnapshot(input: {
   shareTokenAddress?: string | null;
   underlyingPoolAddress?: string | null;
   currentSharesRaw?: string | null;
+  token0Address?: string | null;
+  token1Address?: string | null;
+  token0AmountRaw?: string | null;
+  token1AmountRaw?: string | null;
+  currentEstimatedValueUsd?: string | null;
   sourceProvider?: string;
   evidenceJson?: Record<string, unknown>;
 }): typeof engineV2ProtocolStateSnapshots.$inferInsert {
@@ -23,6 +28,11 @@ export function strategyStateSnapshot(input: {
       shareTokenAddress: input.shareTokenAddress?.toLowerCase() ?? null,
       underlyingPoolAddress: input.underlyingPoolAddress?.toLowerCase() ?? null,
       currentSharesRaw: input.currentSharesRaw ?? null,
+      token0Address: input.token0Address?.toLowerCase() ?? null,
+      token1Address: input.token1Address?.toLowerCase() ?? null,
+      token0AmountRaw: input.token0AmountRaw ?? null,
+      token1AmountRaw: input.token1AmountRaw ?? null,
+      currentEstimatedValueUsd: input.currentEstimatedValueUsd ?? null,
     },
     evidenceJson: {
       currentStateOnly: true,

@@ -2,6 +2,143 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { runChronologicalAccounting } from "@/server/analysis/engine-v2/accounting";
+
+import { materializeDepositRows, materializeStrategyRows } from "./dataview-materializers";
+import {
+  collectMaterializationPoolIds,
+  type EngineV2MaterializationContext,
+} from "./load-materialization-context";
+
+function buildContext(): EngineV2MaterializationContext {
+  return {
+    poolStateByPoolId: new Map([
+      ["8453:0xpool", {
+        poolId: "8453:0xpool",
+        poolAddress: "0xpool",
+        token0Address: "0x00000000000000000000000000000000000000aa",
+        token1Address: "0x00000000000000000000000000000000000000bb",
+        tickSpacing: 100,
+        feeTierBps: null,
+      }],
+    ]),
+    tokenMetadataByAddress: new Map([
+      ["0x00000000000000000000000000000000000000aa", {
+        tokenAddress: "0x00000000000000000000000000000000000000aa",
+        symbol: "WETH",
+        decimals: 18,
+      }],
+      ["0x00000000000000000000000000000000000000bb", {
+        tokenAddress: "0x00000000000000000000000000000000000000bb",
+        symbol: "USDC",
+        decimals: 6,
+      }],
+      ["0x00000000000000000000000000000000000000dd", {
+        tokenAddress: "0x00000000000000000000000000000000000000dd",
+        symbol: "mweth-usdc",
+        decimals: 18,
+      }],
+    ]),
+    governanceLockByLockKey: new Map(),
+    governanceLockByTokenId: new Map(),
+    strategyStateByExposureId: new Map(),
+    strategyStateByWrapperAddress: new Map(),
+  };
+}
+
+test("collectMaterializationPoolIds includes strategy-only pool ids", () => {
+  const accounting = runChronologicalAccounting({
+    events: [
+      {
+        id: "strategy-open",
+        chainId: 8453,
+        walletAddress: "0x0000000000000000000000000000000000000001",
+        eventType: "strategy_deposit",
+        eventFamily: "strategy",
+        occurredAt: new Date("2026-01-01T00:00:00.000Z"),
+        txHash: "0x1",
+        sequenceIndex: 0,
+        coverageStatus: "full",
+        confidence: "high",
+        reasonCodes: [],
+        metadataJson: {
+          strategyExposureId: "strategy-1",
+          poolId: "8453:0xpool",
+          wrapperAddress: "0x00000000000000000000000000000000000000dd",
+          valueUsd: "1250",
+          sharesRaw: "1000",
+        },
+      },
+    ],
+    links: [],
+  });
+
+  assert.deepEqual(collectMaterializationPoolIds(accounting), ["8453:0xpool"]);
+});
+
+test("materializers prefer normalized pool labels and avoid raw pool ids", () => {
+  const accounting = runChronologicalAccounting({
+    events: [
+      {
+        id: "deposit-open",
+        chainId: 8453,
+        walletAddress: "0x0000000000000000000000000000000000000001",
+        eventType: "manual_position_created",
+        eventFamily: "deposit",
+        occurredAt: new Date("2026-01-01T00:00:00.000Z"),
+        txHash: "0xdep",
+        sequenceIndex: 0,
+        coverageStatus: "full",
+        confidence: "high",
+        reasonCodes: [],
+        metadataJson: {
+          depositId: "dep-1",
+          tokenId: "71093441",
+          poolId: "8453:0xpool",
+          valueUsd: "2600",
+        },
+      },
+      {
+        id: "strategy-open",
+        chainId: 8453,
+        walletAddress: "0x0000000000000000000000000000000000000001",
+        eventType: "strategy_deposit",
+        eventFamily: "strategy",
+        occurredAt: new Date("2026-01-02T00:00:00.000Z"),
+        txHash: "0xstrat",
+        sequenceIndex: 1,
+        coverageStatus: "full",
+        confidence: "high",
+        reasonCodes: [],
+        metadataJson: {
+          strategyExposureId: "strategy-1",
+          poolId: "8453:0xpool",
+          wrapperAddress: "0x00000000000000000000000000000000000000dd",
+          valueUsd: "1250",
+          sharesRaw: "1000",
+        },
+      },
+    ],
+    links: [],
+  });
+
+  const context = buildContext();
+  const [depositRow] = materializeDepositRows(accounting, context);
+  const [strategyRow] = materializeStrategyRows(accounting, context);
+  const unresolvedDepositRow = materializeDepositRows(accounting, {
+    ...context,
+    poolStateByPoolId: new Map(),
+    tokenMetadataByAddress: new Map(),
+  })[0];
+
+  assert.equal((depositRow?.rowJson as { poolLabel?: string }).poolLabel, "WETH / USDC 100");
+  assert.equal((depositRow?.rowJson as { positionLabel?: string }).positionLabel, "WETH / USDC 100 · CL #71093441");
+  assert.equal((strategyRow?.rowJson as { poolLabel?: string | null }).poolLabel, "WETH / USDC 100");
+  assert.equal((strategyRow?.rowJson as { strategyLabel?: string }).strategyLabel, "Mellow WETH / USDC 100");
+  assert.equal((unresolvedDepositRow?.rowJson as { poolLabel?: string }).poolLabel, "Unresolved pool");
+});import assert from "node:assert/strict";
+import test from "node:test";
+
+import { runChronologicalAccounting } from "@/server/analysis/engine-v2/accounting";
 import type { EngineV2MaterializationContext } from "@/server/analysis/engine-v2/materializers/load-materialization-context";
 
 import { materializeAllDataViewRows } from "./index";
@@ -126,6 +263,13 @@ test("materializeAllDataViewRows enriches deposit rows from pool snapshots and t
           positionManagerAddress: "0x00000000000000000000000000000000000000aa",
           tokenId: "1",
           poolId,
+          rangeLowerTick: -266400,
+          rangeUpperTick: -265900,
+          rangeLowerPrice: "0.0269757447",
+          rangeUpperPrice: "0.0283587498",
+          isInRange: true,
+          rangeQuoteTokenSymbol: "USDC",
+          rangeDisplayFractionDigits: 4,
         },
         evidenceJson: {
           movements: [
@@ -161,6 +305,10 @@ test("materializeAllDataViewRows enriches deposit rows from pool snapshots and t
       ["0x833589fcd6edb6e08f4c7c32d4f71b54bda02913", { tokenAddress: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913", symbol: "USDC", decimals: 6 }],
       [poolId.split(":").at(-1) ?? "", { tokenAddress: poolId.split(":").at(-1) ?? "", symbol: "AERO-LP", decimals: 18 }],
     ]),
+    governanceLockByLockKey: new Map(),
+    governanceLockByTokenId: new Map(),
+    strategyStateByExposureId: new Map(),
+    strategyStateByWrapperAddress: new Map(),
   };
 
   const depositRow = materializeAllDataViewRows(accounting, context).find((row) => row.surface === "deposits");
@@ -178,6 +326,11 @@ test("materializeAllDataViewRows enriches deposit rows from pool snapshots and t
   assert.equal(rowJson?.token0Address, "0x4200000000000000000000000000000000000006");
   assert.equal(rowJson?.token1Address, "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913");
   assert.equal(rowJson?.feeTierBps, 100);
+  assert.equal(rowJson?.tickLower, -266400);
+  assert.equal(rowJson?.tickUpper, -265900);
+  assert.equal(rowJson?.rangeLowerPrice, 0.0269757447);
+  assert.equal(rowJson?.rangeUpperPrice, 0.0283587498);
+  assert.equal(rowJson?.isInRange, true);
   assert.equal(lifecycle[0]?.eventType, "mint_position");
   assert.equal(lifecycle[1]?.eventType, "stake");
   assert.equal(firstDelta[0]?.symbol, "WETH");
@@ -193,6 +346,11 @@ test("materializeAllDataViewRows enriches deposit rows from pool snapshots and t
   assert.equal(poolRowJson?.poolType, "cl");
   assert.equal(poolRowJson?.latestActivityAt, "2026-01-02T00:00:00.000Z");
   assert.equal((poolRowJson?.positions as { manualDeposits: Array<Record<string, unknown>> }).manualDeposits[0]?.depositId, "8453:0x00000000000000000000000000000000000000aa:1");
+  assert.equal((poolRowJson?.positions as { manualDeposits: Array<Record<string, unknown>> }).manualDeposits[0]?.tickLower, -266400);
+  assert.equal((poolRowJson?.positions as { manualDeposits: Array<Record<string, unknown>> }).manualDeposits[0]?.tickUpper, -265900);
+  assert.equal((poolRowJson?.positions as { manualDeposits: Array<Record<string, unknown>> }).manualDeposits[0]?.rangeLowerPrice, 0.0269757447);
+  assert.equal((poolRowJson?.positions as { manualDeposits: Array<Record<string, unknown>> }).manualDeposits[0]?.rangeUpperPrice, 0.0283587498);
+  assert.equal((poolRowJson?.positions as { manualDeposits: Array<Record<string, unknown>> }).manualDeposits[0]?.isInRange, true);
   assert.equal(poolHistory[0]?.dayUtc, "2026-01-01");
   assert.equal(poolHistory[1]?.dayUtc, "2026-01-02");
   assert.equal(poolHistory[1]?.totalValueUsd, 10);
@@ -286,6 +444,19 @@ test("materializeAllDataViewRows enriches strategy rows from pool context and ow
       ["0x833589fcd6edb6e08f4c7c32d4f71b54bda02913", { tokenAddress: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913", symbol: "USDC", decimals: 6 }],
       ["0x940181a94a35a4569e4529a3cdfb74e38fd98631", { tokenAddress: "0x940181a94a35a4569e4529a3cdfb74e38fd98631", symbol: "AERO", decimals: 18 }],
     ]),
+    governanceLockByLockKey: new Map(),
+    governanceLockByTokenId: new Map(),
+    strategyStateByExposureId: new Map([[
+      `8453:${wrapperAddress}`,
+      {
+        strategyExposureId: `8453:${wrapperAddress}`,
+        wrapperAddress,
+        underlyingPoolAddress: poolId.split(":").at(-1) ?? null,
+        currentSharesRaw: "1000000000000000000",
+        currentEstimatedValueUsd: 135,
+      },
+    ]]),
+    strategyStateByWrapperAddress: new Map(),
   };
 
   const strategyRow = materializeAllDataViewRows(accounting, context).find((row) => row.surface === "strategies");
@@ -296,9 +467,10 @@ test("materializeAllDataViewRows enriches strategy rows from pool context and ow
   const rewards = Array.isArray(rowJson?.rewards) ? rowJson.rewards as Array<Record<string, unknown>> : [];
   const history = Array.isArray(rowJson?.history) ? rowJson.history as Array<Record<string, unknown>> : [];
 
-  assert.equal(rowJson?.strategyLabel, "MVS:WETH-USDC-100");
+  assert.equal(rowJson?.strategyLabel, "Mellow WETH / USDC 100");
   assert.equal(rowJson?.poolLabel, "WETH / USDC 100");
   assert.equal(rowJson?.shareSymbol, "MVS:WETH-USDC-100");
+  assert.equal(rowJson?.currentEstimatedValueUsd, 135);
   assert.equal(rowJson?.resolvedRewardCount, 1);
   assert.equal(rowJson?.unresolvedRewardCount, 0);
   assert.equal(lifecycle[1]?.eventType, "strategy_claim");
@@ -314,12 +486,97 @@ test("materializeAllDataViewRows enriches strategy rows from pool context and ow
   const automatedStrategies = (poolRowJson?.positions as { automatedStrategies: Array<Record<string, unknown>> }).automatedStrategies;
   const poolHistory = (poolRowJson?.history as { points: Array<Record<string, unknown>> }).points;
   const poolTimeline = (poolRowJson?.timeline as { items: Array<Record<string, unknown>> }).items;
-  assert.equal(automatedStrategies[0]?.strategyLabel, "MVS:WETH-USDC-100");
-  assert.equal(automatedStrategies[0]?.valueUsd, 100);
+  assert.equal(automatedStrategies[0]?.strategyLabel, "Mellow WETH / USDC 100");
+  assert.equal(automatedStrategies[0]?.valueUsd, 135);
   assert.equal(poolHistory[1]?.rewardValueUsd, 5);
   assert.equal(poolHistory[1]?.cumulativeRewardsUsd, 5);
   assert.equal(poolTimeline[0]?.eventType, "strategy_reward");
   assert.equal(poolTimeline[0]?.relatedStrategyId, `8453:${wrapperAddress}`);
+});
+
+test("materializeAllDataViewRows keeps closed manual deposits in pool detail positions", () => {
+  const poolId = "8453:0xb2cc224c1c9fee385f8ad6a55b4d94e92359dc59";
+  const depositId = "8453:0x00000000000000000000000000000000000000aa:71093441";
+  const accounting = runChronologicalAccounting({
+    events: [
+      {
+        id: "deposit-open",
+        chainId: 8453,
+        walletAddress,
+        eventType: "manual_position_created",
+        eventFamily: "deposit",
+        occurredAt: new Date("2026-01-01T00:00:00.000Z"),
+        txHash: "0xdeposit-open",
+        sequenceIndex: 0,
+        coverageStatus: "full",
+        confidence: "high",
+        reasonCodes: [],
+        metadataJson: {
+          depositId,
+          tokenId: "71093441",
+          poolId,
+          valueUsd: "1200",
+          rangeLowerTick: -210000,
+          rangeUpperTick: -209000,
+          rangeLowerPrice: "1.25",
+          rangeUpperPrice: "1.5",
+          isInRange: false,
+        },
+      },
+      {
+        id: "deposit-close",
+        chainId: 8453,
+        walletAddress,
+        eventType: "manual_position_close",
+        eventFamily: "deposit",
+        occurredAt: new Date("2026-01-02T00:00:00.000Z"),
+        txHash: "0xdeposit-close",
+        sequenceIndex: 1,
+        coverageStatus: "full",
+        confidence: "high",
+        reasonCodes: [],
+        metadataJson: {
+          depositId,
+          tokenId: "71093441",
+          poolId,
+          valueUsd: "800",
+        },
+      },
+    ],
+    links: [],
+  });
+
+  const context: EngineV2MaterializationContext = {
+    poolStateByPoolId: new Map([[poolId, {
+      poolId,
+      poolAddress: poolId.split(":").at(-1) ?? "",
+      token0Address: "0x4200000000000000000000000000000000000006",
+      token1Address: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+      tickSpacing: 100,
+      feeTierBps: 100,
+    }]]),
+    tokenMetadataByAddress: new Map([
+      ["0x4200000000000000000000000000000000000006", { tokenAddress: "0x4200000000000000000000000000000000000006", symbol: "WETH", decimals: 18 }],
+      ["0x833589fcd6edb6e08f4c7c32d4f71b54bda02913", { tokenAddress: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913", symbol: "USDC", decimals: 6 }],
+    ]),
+    governanceLockByLockKey: new Map(),
+    governanceLockByTokenId: new Map(),
+    strategyStateByExposureId: new Map(),
+    strategyStateByWrapperAddress: new Map(),
+  };
+
+  const poolRow = materializeAllDataViewRows(accounting, context).find((row) => row.surface === "pools");
+  const manualDeposits = ((poolRow?.rowJson as { positions?: { manualDeposits?: Array<Record<string, unknown>> } })?.positions?.manualDeposits) ?? [];
+
+  assert.equal(manualDeposits.length, 1);
+  assert.equal(manualDeposits[0]?.depositId, depositId);
+  assert.equal(manualDeposits[0]?.status, "closed");
+  assert.equal(manualDeposits[0]?.valueUsd, 800);
+  assert.equal(manualDeposits[0]?.tickLower, -210000);
+  assert.equal(manualDeposits[0]?.tickUpper, -209000);
+  assert.equal(manualDeposits[0]?.rangeLowerPrice, 1.25);
+  assert.equal(manualDeposits[0]?.rangeUpperPrice, 1.5);
+  assert.equal(manualDeposits[0]?.isInRange, false);
 });
 
 test("materializeAllDataViewRows enriches governance rows from persisted lock metadata and explicit source evidence", () => {
@@ -483,6 +740,8 @@ test("materializeAllDataViewRows enriches governance rows from persisted lock me
         veAeroExposure: "1845.771",
       },
     }]]),
+    strategyStateByExposureId: new Map(),
+    strategyStateByWrapperAddress: new Map(),
   };
 
   const rows = materializeAllDataViewRows(accounting, context).filter((row) => row.surface === "governance");
@@ -598,6 +857,8 @@ test("materializeAllDataViewRows uses the primary direct lock in governance summ
       }],
     ]),
     governanceLockByTokenId: new Map(),
+    strategyStateByExposureId: new Map(),
+    strategyStateByWrapperAddress: new Map(),
   };
 
   const rows = materializeAllDataViewRows(accounting, context).filter((row) => row.surface === "governance");

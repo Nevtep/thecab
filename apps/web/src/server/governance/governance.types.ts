@@ -182,8 +182,8 @@ export type GovernanceResponse = {
   locks: {
     rows: GovernanceLockPanel[];
     primaryLockId: string | null;
+    primaryLock: GovernanceLockPanel | null;
   };
-  lockPanel: GovernanceLockPanel | null;
   epochTimeline: {
     epochs: GovernanceEpochSummary[];
   };

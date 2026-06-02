@@ -427,20 +427,53 @@ export async function finalizeAnalysisRun(input: {
   lastError?: string | null;
 }) {
   const db = getDb();
-  const [row] = await db
-    .update(analysisRuns)
-    .set({
-      status: input.status ?? "complete",
-      coverage: input.coverage,
-      coverageReasonsJson: input.coverageReasonsJson,
-      lastError: input.lastError ?? null,
-      completedAt: input.status === "failed" ? null : new Date(),
-      stage: input.status === "failed" ? "failed" : "completed",
-      progressPct: 100,
-      updatedAt: new Date(),
-    })
-    .where(eq(analysisRuns.id, input.runId))
-    .returning();
+  const status = input.status ?? "complete";
+  const now = new Date();
+
+  const row = await db.transaction(async (tx) => {
+    if (status === "complete") {
+      const current = await tx.query.analysisRuns.findFirst({
+        where: eq(analysisRuns.id, input.runId),
+      });
+
+      if (current) {
+        await tx
+          .update(analysisRuns)
+          .set({
+            status: "cancelled",
+            stage: "cancelled",
+            completedAt: null,
+            cancelledAt: now,
+            cancelledReason: "superseded_by_newer_complete_run",
+            updatedAt: now,
+          })
+          .where(and(
+            eq(analysisRuns.walletAddress, current.walletAddress),
+            eq(analysisRuns.chainId, current.chainId),
+            eq(analysisRuns.utcDayBucket, current.utcDayBucket),
+            eq(analysisRuns.status, "complete"),
+            ne(analysisRuns.id, current.id),
+          ));
+      }
+    }
+
+    const [updated] = await tx
+      .update(analysisRuns)
+      .set({
+        status,
+        coverage: input.coverage,
+        coverageReasonsJson: input.coverageReasonsJson,
+        lastError: input.lastError ?? null,
+        completedAt: status === "failed" ? null : now,
+        stage: status === "failed" ? "failed" : "completed",
+        progressPct: 100,
+        updatedAt: now,
+      })
+      .where(eq(analysisRuns.id, input.runId))
+      .returning();
+
+    return updated;
+  });
 
   return row;
 }

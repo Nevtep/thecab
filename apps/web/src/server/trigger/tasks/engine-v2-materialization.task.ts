@@ -1,7 +1,9 @@
 import { task, tasks } from "@trigger.dev/sdk/v3";
 import { and, asc, eq, inArray } from "drizzle-orm";
+import { decodeFunctionResult, encodeFunctionData, parseAbi } from "viem";
 
 import { finalizeAnalysisRun, updateAnalysisRunProgress, type AnalysisRunCoverage } from "@/server/analysis/analysis-run.repository";
+import { strategyStateSnapshot } from "@/server/analysis/engine-v2/enrichment";
 import { materializeDepositReadModels } from "@/server/analysis/deposit-read-models";
 import {
   persistAccountingOutputs,
@@ -16,9 +18,17 @@ import {
 import { loadMaterializationContext, materializeAllDataViewRows, persistReadModelRows } from "@/server/analysis/engine-v2/materializers";
 import { engineV2MaterializationPayloadSchema, engineV2WalletPayloadSchema } from "@/server/analysis/engine-v2/payloads";
 import { materializePoolReadModels } from "@/server/analysis/pool-read-models";
+import { alchemyRpc, getCurrentTokenPricesByAddress } from "@/server/providers/alchemy";
 import { materializeStrategyReadModels } from "@/server/analysis/strategy-read-models";
 import { getDb } from "@/server/db/client";
-import { engineV2DomainEventLinks, engineV2DomainEvents, engineV2ReadModelRows } from "@/server/db/schema";
+import {
+  engineV2DomainEventLinks,
+  engineV2DomainEvents,
+  engineV2PricePoints,
+  engineV2ProtocolStateSnapshots,
+  engineV2ReadModelRows,
+  engineV2TokenMetadata,
+} from "@/server/db/schema";
 import { taskInfo, taskWarn, withTaskLogging } from "@/server/trigger/tasks/task-logging";
 
 export type EngineV2MaterializationDeps = {
@@ -35,6 +45,478 @@ export type EngineV2MaterializationDeps = {
   finalizeRun?: typeof finalizeAnalysisRun;
 };
 
+type EngineV2PersistedTokenMetadata = {
+  tokenAddress: string;
+  decimals: number | null;
+};
+
+type EngineV2PersistedPricePoint = {
+  tokenAddress: string;
+  pricedAt: Date | null;
+  priceUsd: string | null;
+};
+
+const HISTORICAL_PRICE_MATCH_WINDOW_MS = 60 * 60 * 1000;
+
+const MELLOW_WRAPPER_ABI = parseAbi([
+  "function token0() view returns (address)",
+  "function token1() view returns (address)",
+  "function previewMint(uint256 lpAmount) view returns (uint256 amount0, uint256 amount1)",
+  "function pool() view returns (address)",
+]);
+
+type CurrentStrategyStateBase = {
+  strategyExposureId: string;
+  wrapperAddress: string;
+  underlyingPoolAddress: string | null;
+  currentSharesRaw: string;
+  token0Address: string | null;
+  token1Address: string | null;
+  token0AmountRaw: string | null;
+  token1AmountRaw: string | null;
+  sourceProvider: string;
+  evidenceJson: Record<string, unknown>;
+};
+
+type CurrentPriceEntry = {
+  priceUsd: number;
+  pricedAt: string | null;
+};
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function asString(value: unknown) {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+}
+
+function movementRecords(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item))
+    : [];
+}
+
+function normalizeAddress(value: unknown) {
+  const address = asString(value);
+  return address ? address.toLowerCase() : null;
+}
+
+async function ethCall(input: {
+  chainId: number;
+  address: string;
+  functionName: "token0" | "token1" | "previewMint" | "pool";
+  args?: readonly unknown[];
+}) {
+  const data = encodeFunctionData({
+    abi: MELLOW_WRAPPER_ABI,
+    functionName: input.functionName,
+    args: input.args,
+  });
+
+  const result = await alchemyRpc<`0x${string}`>(
+    "eth_call",
+    [{ to: input.address, data }, "latest"],
+    { chainId: input.chainId },
+  );
+
+  return decodeFunctionResult({
+    abi: MELLOW_WRAPPER_ABI,
+    functionName: input.functionName,
+    data: result,
+  });
+}
+
+function dividePow10(rawAmount: string, decimals: number) {
+  if (!/^-?\d+$/.test(rawAmount)) return 0;
+  const negative = rawAmount.startsWith("-");
+  const digits = negative ? rawAmount.slice(1) : rawAmount;
+  const padded = digits.padStart(decimals + 1, "0");
+  const intPart = padded.slice(0, padded.length - decimals);
+  const fracPart = padded.slice(padded.length - decimals);
+  const value = Number(`${intPart}.${fracPart}`);
+  if (!Number.isFinite(value)) return 0;
+  return negative ? -value : value;
+}
+
+function toDecimalString(value: number) {
+  if (!Number.isFinite(value)) return null;
+  const normalized = value.toFixed(18).replace(/\.0+$|(?<=\.[0-9]*?)0+$/u, "").replace(/\.$/, "");
+  return normalized.length > 0 ? normalized : "0";
+}
+
+function sumDecimalStrings(values: Array<string | null>) {
+  const total = values.reduce((sum, value) => sum + (value ? Number(value) : 0), 0);
+  return total > 0 ? toDecimalString(total) : null;
+}
+
+function buildCurrentPriceMap(priceResult: Awaited<ReturnType<typeof getCurrentTokenPricesByAddress>> | null) {
+  const priceMap = new Map<string, CurrentPriceEntry>();
+  for (const item of priceResult?.data ?? []) {
+    const tokenAddress = normalizeAddress(item.address);
+    const usdPrice = item.prices?.find((price) => price.currency === "usd") ?? item.prices?.[0];
+    const parsedPrice = usdPrice ? Number(usdPrice.value) : NaN;
+    if (!tokenAddress || !Number.isFinite(parsedPrice)) continue;
+
+    priceMap.set(tokenAddress, {
+      priceUsd: parsedPrice,
+      pricedAt: usdPrice?.lastUpdatedAt ?? null,
+    });
+  }
+  return priceMap;
+}
+
+async function loadCurrentStrategyStateBase(input: {
+  chainId: number;
+  strategyExposureId: string;
+  wrapperAddress: string;
+  currentSharesRaw: string;
+}) {
+  try {
+    const [token0AddressRaw, token1AddressRaw, previewMintResult, poolAddressRaw] = await Promise.all([
+      ethCall({ chainId: input.chainId, address: input.wrapperAddress, functionName: "token0" }),
+      ethCall({ chainId: input.chainId, address: input.wrapperAddress, functionName: "token1" }),
+      ethCall({ chainId: input.chainId, address: input.wrapperAddress, functionName: "previewMint", args: [BigInt(input.currentSharesRaw)] }),
+      ethCall({ chainId: input.chainId, address: input.wrapperAddress, functionName: "pool" }),
+    ]);
+
+    const token0Address = normalizeAddress(String(token0AddressRaw));
+    const token1Address = normalizeAddress(String(token1AddressRaw));
+    const underlyingPoolAddress = normalizeAddress(String(poolAddressRaw));
+    const [token0AmountRaw, token1AmountRaw] = previewMintResult as readonly [bigint, bigint];
+
+    return {
+      strategyExposureId: input.strategyExposureId,
+      wrapperAddress: input.wrapperAddress,
+      underlyingPoolAddress,
+      currentSharesRaw: input.currentSharesRaw,
+      token0Address,
+      token1Address,
+      token0AmountRaw: token0AmountRaw.toString(),
+      token1AmountRaw: token1AmountRaw.toString(),
+      sourceProvider: "alchemy_eth_call",
+      evidenceJson: {
+        resolutionStatus: "resolved",
+      },
+    } satisfies CurrentStrategyStateBase;
+  } catch (error) {
+    return {
+      strategyExposureId: input.strategyExposureId,
+      wrapperAddress: input.wrapperAddress,
+      underlyingPoolAddress: null,
+      currentSharesRaw: input.currentSharesRaw,
+      token0Address: null,
+      token1Address: null,
+      token0AmountRaw: null,
+      token1AmountRaw: null,
+      sourceProvider: "alchemy_eth_call",
+      evidenceJson: {
+        resolutionStatus: "unresolved",
+        error: error instanceof Error ? error.message : String(error),
+      },
+    } satisfies CurrentStrategyStateBase;
+  }
+}
+
+async function persistCurrentStrategyStateSnapshots(input: {
+  chainId: number;
+  accounting: ReturnType<typeof runChronologicalAccounting>;
+}) {
+  const strategyInputs = input.accounting.strategies
+    .map((strategy) => ({
+      strategyExposureId: strategy.strategyExposureId,
+      wrapperAddress: normalizeAddress(strategy.wrapperAddress),
+      currentSharesRaw: strategy.currentSharesRaw,
+    }))
+    .filter((strategy): strategy is { strategyExposureId: string; wrapperAddress: string; currentSharesRaw: string } => (
+      Boolean(strategy.wrapperAddress)
+      && /^\d+$/.test(strategy.currentSharesRaw)
+    ));
+
+  if (strategyInputs.length === 0) {
+    return;
+  }
+
+  const db = getDb();
+  const states = await Promise.all(strategyInputs.map((strategy) => loadCurrentStrategyStateBase({
+    chainId: input.chainId,
+    strategyExposureId: strategy.strategyExposureId,
+    wrapperAddress: strategy.wrapperAddress,
+    currentSharesRaw: strategy.currentSharesRaw,
+  })));
+
+  const tokenAddresses = Array.from(new Set(
+    states.flatMap((state) => [state.token0Address, state.token1Address]).filter((address): address is string => Boolean(address)),
+  ));
+  const [tokenMetadataRows, priceResult] = await Promise.all([
+    tokenAddresses.length === 0
+      ? Promise.resolve([])
+      : db.select({
+        tokenAddress: engineV2TokenMetadata.tokenAddress,
+        decimals: engineV2TokenMetadata.decimals,
+      }).from(engineV2TokenMetadata).where(and(
+        eq(engineV2TokenMetadata.chainId, input.chainId),
+        inArray(engineV2TokenMetadata.tokenAddress, tokenAddresses),
+      )),
+    tokenAddresses.length === 0
+      ? Promise.resolve(null)
+      : getCurrentTokenPricesByAddress(input.chainId, tokenAddresses).catch(() => null),
+  ]);
+
+  const tokenDecimalsByAddress = new Map(
+    tokenMetadataRows.map((row) => [row.tokenAddress.toLowerCase(), row.decimals] as const),
+  );
+  const priceMap = buildCurrentPriceMap(priceResult);
+
+  await Promise.all(states.map(async (state) => {
+    const token0Decimals = state.token0Address ? tokenDecimalsByAddress.get(state.token0Address) ?? null : null;
+    const token1Decimals = state.token1Address ? tokenDecimalsByAddress.get(state.token1Address) ?? null : null;
+    const token0Price = state.token0Address ? priceMap.get(state.token0Address) ?? null : null;
+    const token1Price = state.token1Address ? priceMap.get(state.token1Address) ?? null : null;
+    const token0NeedsPrice = Boolean(state.token0AmountRaw && state.token0AmountRaw !== "0");
+    const token1NeedsPrice = Boolean(state.token1AmountRaw && state.token1AmountRaw !== "0");
+    const missingPriceTokenAddresses = [
+      token0NeedsPrice && (token0Decimals === null || !token0Price) ? state.token0Address : null,
+      token1NeedsPrice && (token1Decimals === null || !token1Price) ? state.token1Address : null,
+    ].filter((address): address is string => Boolean(address));
+
+    const currentEstimatedValueUsd = missingPriceTokenAddresses.length > 0
+      ? null
+      : toDecimalString(
+        (state.token0AmountRaw && token0Decimals !== null && token0Price
+          ? dividePow10(state.token0AmountRaw, token0Decimals) * token0Price.priceUsd
+          : 0)
+        + (state.token1AmountRaw && token1Decimals !== null && token1Price
+          ? dividePow10(state.token1AmountRaw, token1Decimals) * token1Price.priceUsd
+          : 0),
+      );
+
+    const snapshot = strategyStateSnapshot({
+      chainId: input.chainId,
+      wrapperAddress: state.wrapperAddress,
+      strategyExposureId: state.strategyExposureId,
+      blockNumber: "0",
+      shareTokenAddress: state.wrapperAddress,
+      underlyingPoolAddress: state.underlyingPoolAddress,
+      currentSharesRaw: state.currentSharesRaw,
+      token0Address: state.token0Address,
+      token1Address: state.token1Address,
+      token0AmountRaw: state.token0AmountRaw,
+      token1AmountRaw: state.token1AmountRaw,
+      currentEstimatedValueUsd,
+      sourceProvider: state.sourceProvider,
+      evidenceJson: {
+        ...state.evidenceJson,
+        valueResolutionStatus: missingPriceTokenAddresses.length === 0 ? "resolved" : "unresolved",
+        missingPriceTokenAddresses,
+        valueUpdatedAt: token0Price?.pricedAt ?? token1Price?.pricedAt ?? null,
+      },
+    });
+
+    await db.insert(engineV2ProtocolStateSnapshots).values(snapshot).onConflictDoUpdate({
+      target: [
+        engineV2ProtocolStateSnapshots.chainId,
+        engineV2ProtocolStateSnapshots.protocol,
+        engineV2ProtocolStateSnapshots.subjectType,
+        engineV2ProtocolStateSnapshots.subjectAddress,
+        engineV2ProtocolStateSnapshots.subjectId,
+        engineV2ProtocolStateSnapshots.blockNumber,
+      ],
+      set: {
+        observedAt: new Date(),
+        sourceProvider: snapshot.sourceProvider,
+        stateJson: snapshot.stateJson,
+        evidenceJson: snapshot.evidenceJson,
+      },
+    });
+  }));
+}
+
+function isRewardLikeEvent(event: Pick<EngineV2DomainEventLike, "eventType" | "eventFamily">) {
+  const source = `${event.eventType} ${event.eventFamily}`.toLowerCase();
+  return source.includes("reward")
+    || source.includes("claim")
+    || source.includes("rebase")
+    || source.includes("fee")
+    || source.includes("bribe");
+}
+
+function preferredMovementDirectionsForEvent(event: Pick<EngineV2DomainEventLike, "eventType" | "eventFamily">) {
+  const source = `${event.eventType} ${event.eventFamily}`.toLowerCase();
+  if (isRewardLikeEvent(event)) return ["in"] as const;
+  if (
+    source.includes("withdraw")
+    || source.includes("unstake")
+    || source.includes("redeem")
+    || source.includes("decrease")
+    || source.includes("close")
+    || source.includes("burn")
+    || source.includes("cash_in")
+  ) {
+    return ["in"] as const;
+  }
+  if (
+    source.includes("deposit")
+    || source.includes("open")
+    || source.includes("create")
+    || source.includes("mint")
+    || source.includes("increase")
+    || source.includes("stake")
+    || source.includes("cash_out")
+  ) {
+    return ["out"] as const;
+  }
+  return ["in", "out"] as const;
+}
+
+function buildPricePointsByToken(rows: EngineV2PersistedPricePoint[]) {
+  const byToken = new Map<string, Array<{ pricedAt: Date; priceUsd: number }>>();
+  for (const row of rows) {
+    const tokenAddress = normalizeAddress(row.tokenAddress);
+    const priceUsd = row.priceUsd ? Number(row.priceUsd) : NaN;
+    if (!tokenAddress || !(row.pricedAt instanceof Date) || !Number.isFinite(priceUsd)) continue;
+    const bucket = byToken.get(tokenAddress) ?? [];
+    bucket.push({ pricedAt: row.pricedAt, priceUsd });
+    byToken.set(tokenAddress, bucket);
+  }
+  for (const bucket of byToken.values()) {
+    bucket.sort((left, right) => left.pricedAt.getTime() - right.pricedAt.getTime());
+  }
+  return byToken;
+}
+
+function findNearestHistoricalPrice(input: {
+  occurredAt: Date;
+  rows: Array<{ pricedAt: Date; priceUsd: number }>;
+}) {
+  let best: { pricedAt: Date; priceUsd: number } | null = null;
+  let bestDelta = Number.POSITIVE_INFINITY;
+  for (const row of input.rows) {
+    const delta = Math.abs(row.pricedAt.getTime() - input.occurredAt.getTime());
+    if (delta > HISTORICAL_PRICE_MATCH_WINDOW_MS || delta >= bestDelta) continue;
+    best = row;
+    bestDelta = delta;
+  }
+  return best;
+}
+
+function movementUsdValue(input: {
+  movement: Record<string, unknown>;
+  occurredAt: Date;
+  tokenDecimalsByAddress: Map<string, number | null>;
+  pricePointsByToken: Map<string, Array<{ pricedAt: Date; priceUsd: number }>>;
+}) {
+  const direction = asString(input.movement.direction);
+  const assetType = asString(input.movement.assetType);
+  if ((direction !== "in" && direction !== "out") || assetType !== "erc20") return null;
+  const tokenAddress = normalizeAddress(input.movement.tokenAddress);
+  const amountRaw = asString(input.movement.amountRaw);
+  const decimals = tokenAddress ? input.tokenDecimalsByAddress.get(tokenAddress) ?? null : null;
+  const pricePoint = tokenAddress ? findNearestHistoricalPrice({
+    occurredAt: input.occurredAt,
+    rows: input.pricePointsByToken.get(tokenAddress) ?? [],
+  }) : null;
+  if (!tokenAddress || !amountRaw || decimals === null || decimals < 0 || !pricePoint) return null;
+  const tokenAmount = dividePow10(amountRaw, decimals);
+  if (!Number.isFinite(tokenAmount) || tokenAmount === 0) return null;
+  return toDecimalString(Math.abs(tokenAmount * pricePoint.priceUsd));
+}
+
+function metadataTokenUsdValue(input: {
+  metadata: Record<string, unknown>;
+  occurredAt: Date;
+  tokenDecimalsByAddress: Map<string, number | null>;
+  pricePointsByToken: Map<string, Array<{ pricedAt: Date; priceUsd: number }>>;
+}) {
+  const tokenAddress = normalizeAddress(input.metadata.tokenAddress);
+  const amountRaw = asString(input.metadata.amountRaw);
+  const decimals = tokenAddress ? input.tokenDecimalsByAddress.get(tokenAddress) ?? null : null;
+  const pricePoint = tokenAddress ? findNearestHistoricalPrice({
+    occurredAt: input.occurredAt,
+    rows: input.pricePointsByToken.get(tokenAddress) ?? [],
+  }) : null;
+  if (!tokenAddress || !amountRaw || decimals === null || decimals < 0 || !pricePoint) return null;
+  const tokenAmount = dividePow10(amountRaw, decimals);
+  if (!Number.isFinite(tokenAmount) || tokenAmount === 0) return null;
+  return toDecimalString(Math.abs(tokenAmount * pricePoint.priceUsd));
+}
+
+export function hydrateAccountingInputWithPersistedPrices(input: {
+  accountingInput: EngineV2AccountingInput;
+  tokenMetadataRows: EngineV2PersistedTokenMetadata[];
+  pricePointRows: EngineV2PersistedPricePoint[];
+}) {
+  const tokenDecimalsByAddress = new Map(
+    input.tokenMetadataRows.map((row) => [row.tokenAddress.toLowerCase(), row.decimals] as const),
+  );
+  const pricePointsByToken = buildPricePointsByToken(input.pricePointRows);
+
+  return {
+    ...input.accountingInput,
+    events: input.accountingInput.events.map((event) => {
+      const metadata = asRecord(event.metadataJson);
+      const evidence = asRecord(event.evidenceJson);
+      const hydratedMovements = movementRecords(evidence.movements).map((movement) => {
+        if (asString(movement.valueUsdAtEvent)) return movement;
+        const valueUsdAtEvent = movementUsdValue({
+          movement,
+          occurredAt: event.occurredAt,
+          tokenDecimalsByAddress,
+          pricePointsByToken,
+        });
+        return valueUsdAtEvent ? { ...movement, valueUsdAtEvent } : movement;
+      });
+
+      const movementValuesByDirection = hydratedMovements.reduce<Record<string, Array<string | null>>>((acc, movement) => {
+        const direction = asString(movement.direction);
+        if (direction === "in" || direction === "out") {
+          acc[direction] ??= [];
+          acc[direction].push(asString(movement.valueUsdAtEvent));
+        }
+        return acc;
+      }, {});
+
+      const derivedEventValueUsd = sumDecimalStrings(
+        preferredMovementDirectionsForEvent(event)
+          .flatMap((direction) => movementValuesByDirection[direction] ?? []),
+      );
+      const derivedRewardUsd = sumDecimalStrings(movementValuesByDirection.in ?? [])
+        ?? metadataTokenUsdValue({
+          metadata,
+          occurredAt: event.occurredAt,
+          tokenDecimalsByAddress,
+          pricePointsByToken,
+        });
+
+      const nextMetadata = { ...metadata };
+      if (!asString(nextMetadata.valueUsd) && derivedEventValueUsd) {
+        nextMetadata.valueUsd = derivedEventValueUsd;
+      }
+      if (!asString(nextMetadata.valueUsdAtEvent) && derivedEventValueUsd) {
+        nextMetadata.valueUsdAtEvent = derivedEventValueUsd;
+      }
+      if (isRewardLikeEvent(event) && !asString(nextMetadata.amountUsd) && derivedRewardUsd) {
+        nextMetadata.amountUsd = derivedRewardUsd;
+      }
+      if (isRewardLikeEvent(event) && !asString(nextMetadata.valueUsd) && derivedRewardUsd) {
+        nextMetadata.valueUsd = derivedRewardUsd;
+      }
+      if (isRewardLikeEvent(event) && !asString(nextMetadata.valueUsdAtEvent) && derivedRewardUsd) {
+        nextMetadata.valueUsdAtEvent = derivedRewardUsd;
+      }
+
+      return {
+        ...event,
+        metadataJson: nextMetadata,
+        evidenceJson: {
+          ...evidence,
+          movements: hydratedMovements,
+        },
+      };
+    }),
+  } satisfies EngineV2AccountingInput;
+}
+
 async function loadAccountingInputFromDb(input: { chainId: number; walletAddress: string }): Promise<EngineV2AccountingInput> {
   const db = getDb();
   const events = await db.select().from(engineV2DomainEvents).where(and(
@@ -48,7 +530,7 @@ async function loadAccountingInputFromDb(input: { chainId: number; walletAddress
       inArray(engineV2DomainEventLinks.domainEventId, eventIds),
     ))
     : [];
-  return {
+  const accountingInput = {
     events: events.map((event) => ({
       id: event.id,
       chainId: event.chainId,
@@ -74,7 +556,48 @@ async function loadAccountingInputFromDb(input: { chainId: number; walletAddress
       confidence: link.confidence,
       evidenceJson: link.evidenceJson,
     })),
-  };
+  } satisfies EngineV2AccountingInput;
+
+  const tokenAddresses = Array.from(new Set(
+    accountingInput.events.flatMap((event) => {
+      const metadata = asRecord(event.metadataJson);
+      const evidence = asRecord(event.evidenceJson);
+      return [
+        normalizeAddress(metadata.tokenAddress),
+        ...movementRecords(evidence.movements).map((movement) => normalizeAddress(movement.tokenAddress)),
+      ].filter((value): value is string => Boolean(value));
+    }),
+  ));
+
+  if (tokenAddresses.length === 0) {
+    return accountingInput;
+  }
+
+  const [tokenMetadataRows, pricePointRows] = await Promise.all([
+    db.select({
+      tokenAddress: engineV2TokenMetadata.tokenAddress,
+      decimals: engineV2TokenMetadata.decimals,
+    }).from(engineV2TokenMetadata).where(and(
+      eq(engineV2TokenMetadata.chainId, input.chainId),
+      inArray(engineV2TokenMetadata.tokenAddress, tokenAddresses),
+    )),
+    db.select({
+      tokenAddress: engineV2PricePoints.tokenAddress,
+      pricedAt: engineV2PricePoints.pricedAt,
+      priceUsd: engineV2PricePoints.priceUsd,
+    }).from(engineV2PricePoints).where(and(
+      eq(engineV2PricePoints.chainId, input.chainId),
+      eq(engineV2PricePoints.resolution, "historical"),
+      eq(engineV2PricePoints.status, "resolved"),
+      inArray(engineV2PricePoints.tokenAddress, tokenAddresses),
+    )),
+  ]);
+
+  return hydrateAccountingInputWithPersistedPrices({
+    accountingInput,
+    tokenMetadataRows,
+    pricePointRows,
+  });
 }
 
 async function loadMaterializedRowStatsFromDb(input: { chainId: number; walletAddress: string }) {
@@ -242,6 +765,10 @@ export async function runEngineV2AccountChronological(rawPayload: unknown, deps:
   } else {
     await persistAccountingOutputs(accountingPayload);
   }
+  await persistCurrentStrategyStateSnapshots({
+    chainId: payload.chainId,
+    accounting,
+  });
   const materializationContext = await (deps.loadMaterializationContext?.({
     chainId: payload.chainId,
     accounting,
@@ -305,7 +832,18 @@ export async function runEngineV2MaterializeReadModels(rawPayload: unknown, deps
         deps,
       });
       const accounting = runChronologicalAccounting(accountingInput);
-      const rows = materializeAllDataViewRows(accounting);
+      await persistCurrentStrategyStateSnapshots({
+        chainId: payload.chainId,
+        accounting,
+      });
+      const materializationContext = await (deps.loadMaterializationContext?.({
+        chainId: payload.chainId,
+        accounting,
+      }) ?? loadMaterializationContext({
+        chainId: payload.chainId,
+        accounting,
+      }));
+      const rows = materializeAllDataViewRows(accounting, materializationContext);
       if (deps.persistRows) {
         await deps.persistRows({ db: undefined as never, rows });
       } else {

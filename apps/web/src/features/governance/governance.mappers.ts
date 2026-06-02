@@ -1,4 +1,4 @@
-import type { GovernanceResponse } from "@/server/governance/governance.types";
+import type { GovernanceLockPanel, GovernanceResponse } from "@/server/governance/governance.types";
 
 function dedupe<TValue>(values: TValue[]) {
   return Array.from(new Set(values));
@@ -38,7 +38,7 @@ function normalizeReasonCodes<TValue extends { reasonCodes: string[] }>(value: T
   };
 }
 
-function normalizeLockPanel<TValue extends GovernanceResponse["lockPanel"]>(lockPanel: TValue): TValue {
+function normalizeLockPanel<TValue extends GovernanceLockPanel | null>(lockPanel: TValue): TValue {
   if (!lockPanel) return lockPanel;
   return {
     ...lockPanel,
@@ -50,7 +50,7 @@ function normalizeLockPanel<TValue extends GovernanceResponse["lockPanel"]>(lock
 export function mapGovernanceResponseToViewModel(response: GovernanceResponse): GovernanceResponse {
   const lockRows = response.locks.rows.map((lock) => normalizeLockPanel(lock));
   const primaryLock = lockRows.find((lock) => (lock.lockExposureId ?? lock.lockId) === response.locks.primaryLockId)
-    ?? normalizeLockPanel(response.lockPanel);
+    ?? normalizeLockPanel(response.locks.primaryLock);
   return {
     ...response,
     walletAddress: response.walletAddress.toLowerCase(),
@@ -66,8 +66,8 @@ export function mapGovernanceResponseToViewModel(response: GovernanceResponse): 
     locks: {
       rows: lockRows,
       primaryLockId: response.locks.primaryLockId,
+      primaryLock,
     },
-    lockPanel: primaryLock,
     epochTimeline: {
       epochs: [...response.epochTimeline.epochs].sort((left, right) =>
         (left.epochStartAt ?? left.epochId).localeCompare(right.epochStartAt ?? right.epochId),

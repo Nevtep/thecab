@@ -74,6 +74,19 @@ function asInteger(value: unknown) {
   return null;
 }
 
+function asBoolean(value: unknown) {
+  return typeof value === "boolean" ? value : null;
+}
+
+function asNullableFiniteNumber(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
 function movementRecords(value: unknown) {
   return Array.isArray(value)
     ? value.filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === "object" && !Array.isArray(entry))
@@ -83,6 +96,8 @@ function movementRecords(value: unknown) {
 function normalizeAddress(value: string | null | undefined) {
   return value ? value.toLowerCase() : null;
 }
+
+const UNRESOLVED_POOL_LABEL = "Unresolved pool";
 
 function poolAddressFromPoolId(poolId: string | null | undefined) {
   if (!poolId) return null;
@@ -96,6 +111,8 @@ function defaultMaterializationContext(): EngineV2MaterializationContext {
     tokenMetadataByAddress: new Map(),
     governanceLockByLockKey: new Map(),
     governanceLockByTokenId: new Map(),
+    strategyStateByExposureId: new Map(),
+    strategyStateByWrapperAddress: new Map(),
   };
 }
 
@@ -107,6 +124,15 @@ function getPoolState(context: EngineV2MaterializationContext, poolId: string | 
 function getTokenMetadata(context: EngineV2MaterializationContext, tokenAddress: string | null | undefined) {
   const normalized = normalizeAddress(tokenAddress);
   return normalized ? context.tokenMetadataByAddress.get(normalized) ?? null : null;
+}
+
+function getStrategyState(
+  context: EngineV2MaterializationContext,
+  strategy: EngineV2AccountingOutput["strategies"][number],
+) {
+  const normalizedWrapperAddress = normalizeAddress(strategy.wrapperAddress);
+  return context.strategyStateByExposureId.get(strategy.strategyExposureId)
+    ?? (normalizedWrapperAddress ? context.strategyStateByWrapperAddress.get(normalizedWrapperAddress) ?? null : null);
 }
 
 function poolKindFromState(input: {
@@ -123,12 +149,20 @@ function poolLabelFromState(input: {
   poolState: EngineV2MaterializationPoolState | null;
   context: EngineV2MaterializationContext;
 }) {
-  if (!input.poolId) return "Unresolved pool";
+  if (!input.poolId) return UNRESOLVED_POOL_LABEL;
   const token0Symbol = getTokenMetadata(input.context, input.poolState?.token0Address)?.symbol ?? null;
   const token1Symbol = getTokenMetadata(input.context, input.poolState?.token1Address)?.symbol ?? null;
-  if (!token0Symbol || !token1Symbol) return input.poolId;
+  if (!token0Symbol || !token1Symbol) return UNRESOLVED_POOL_LABEL;
   const suffix = input.poolState?.feeTierBps ?? input.poolState?.tickSpacing;
   return suffix ? `${token0Symbol} / ${token1Symbol} ${suffix}` : `${token0Symbol} / ${token1Symbol}`;
+}
+
+function visiblePoolLabel(poolId: string | null | undefined, context: EngineV2MaterializationContext) {
+  return poolLabelFromState({
+    poolId,
+    poolState: getPoolState(context, poolId),
+    context,
+  });
 }
 
 function positionLabelFromDeposit(input: {
@@ -218,6 +252,56 @@ function buildDepositLifecycleTokenDeltas(input: {
     });
 }
 
+function resolveDepositRangeMetadata(input: {
+  deposit: EngineV2AccountingOutput["deposits"][number];
+  sourceEventsById: Map<string, EngineV2AccountingOutput["events"][number]>;
+  context: EngineV2MaterializationContext;
+}) {
+  const metadataCandidates = [...input.deposit.lifecycle]
+    .map((item) => item.eventId)
+    .filter((eventId): eventId is string => typeof eventId === "string" && eventId.length > 0)
+    .map((eventId) => {
+      const sourceEvent = input.sourceEventsById.get(eventId);
+      return sourceEvent ? asRecord(sourceEvent.metadataJson) : null;
+    })
+    .filter((metadata): metadata is Record<string, unknown> => Boolean(metadata))
+    .reverse();
+
+  const tickLower = metadataCandidates
+    .map((metadata) => asInteger(metadata.rangeLowerTick) ?? asInteger(metadata.tickLower))
+    .find((value): value is number => value !== null) ?? null;
+  const tickUpper = metadataCandidates
+    .map((metadata) => asInteger(metadata.rangeUpperTick) ?? asInteger(metadata.tickUpper))
+    .find((value): value is number => value !== null) ?? null;
+  const rangeLowerPrice = metadataCandidates
+    .map((metadata) => asNullableFiniteNumber(metadata.rangeLowerPrice))
+    .find((value): value is number => value !== null) ?? null;
+  const rangeUpperPrice = metadataCandidates
+    .map((metadata) => asNullableFiniteNumber(metadata.rangeUpperPrice))
+    .find((value): value is number => value !== null) ?? null;
+  const isInRange = metadataCandidates
+    .map((metadata) => asBoolean(metadata.isInRange))
+    .find((value): value is boolean => value !== null) ?? null;
+  const rangeQuoteTokenSymbol = metadataCandidates
+    .map((metadata) => asString(metadata.rangeQuoteTokenSymbol))
+    .find((value): value is string => Boolean(value))
+    ?? getTokenMetadata(input.context, getPoolState(input.context, input.deposit.poolId)?.token1Address)?.symbol
+    ?? null;
+  const rangeDisplayFractionDigits = metadataCandidates
+    .map((metadata) => asInteger(metadata.rangeDisplayFractionDigits))
+    .find((value): value is number => value !== null) ?? null;
+
+  return {
+    tickLower,
+    tickUpper,
+    rangeLowerPrice,
+    rangeUpperPrice,
+    isInRange,
+    rangeQuoteTokenSymbol,
+    rangeDisplayFractionDigits,
+  };
+}
+
 function buildStrategyLifecycleTokenDeltas(input: {
   eventId: string | null;
   sourceEventsById: Map<string, EngineV2AccountingOutput["events"][number]>;
@@ -300,12 +384,8 @@ function buildStrategyHistory(input: {
 
 function resolvedPoolLabel(poolId: string | null | undefined, context: EngineV2MaterializationContext) {
   if (!poolId) return null;
-  const label = poolLabelFromState({
-    poolId,
-    poolState: getPoolState(context, poolId),
-    context,
-  });
-  return label !== poolId ? label : null;
+  const label = visiblePoolLabel(poolId, context);
+  return label === UNRESOLVED_POOL_LABEL ? null : label;
 }
 
 function getGovernanceLockContext(input: {
@@ -369,7 +449,15 @@ function buildGovernanceEventTokenMovements(input: {
     });
 }
 
-function strategyCurrentEstimatedValueUsd(strategy: EngineV2AccountingOutput["strategies"][number]) {
+function strategyCurrentEstimatedValueUsd(
+  strategy: EngineV2AccountingOutput["strategies"][number],
+  context: EngineV2MaterializationContext,
+) {
+  const persistedStrategyState = getStrategyState(context, strategy);
+  if (persistedStrategyState) {
+    return persistedStrategyState.currentEstimatedValueUsd;
+  }
+
   const latestNonRewardValue = [...strategy.lifecycle]
     .reverse()
     .find((event) => !event.eventType.includes("reward") && !event.eventType.includes("claim") && event.valueUsd)?.valueUsd;
@@ -382,8 +470,8 @@ function strategyDisplayLabel(input: {
   poolLabel: string | null;
 }) {
   const shareMetadata = getTokenMetadata(input.context, input.strategy.wrapperAddress);
-  return shareMetadata?.symbol
-    ?? (input.poolLabel ? `Mellow ${input.poolLabel}` : null)
+  return (input.poolLabel ? `Mellow ${input.poolLabel}` : null)
+    ?? shareMetadata?.symbol
     ?? (input.strategy.wrapperAddress ? `Mellow ${input.strategy.wrapperAddress.slice(0, 6)}` : input.strategy.strategyExposureId);
 }
 
@@ -405,7 +493,7 @@ function resolveRewardPoolContext(input: {
   if (directPoolId) {
     return {
       poolId: directPoolId,
-      poolLabel: resolvedPoolLabel(directPoolId, input.context) ?? directPoolId,
+      poolLabel: visiblePoolLabel(directPoolId, input.context),
       poolContributionStatus: input.reward.poolContribution,
       countingRule: input.reward.ownerStatus === "governance" ? "explicit_pool_evidence" : "owner_resolved_pool",
     };
@@ -416,7 +504,7 @@ function resolveRewardPoolContext(input: {
     if (deposit?.poolId) {
       return {
         poolId: deposit.poolId,
-        poolLabel: resolvedPoolLabel(deposit.poolId, input.context) ?? deposit.poolId,
+        poolLabel: visiblePoolLabel(deposit.poolId, input.context),
         poolContributionStatus: "contributes",
         countingRule: "owner_resolved_pool",
       };
@@ -428,7 +516,7 @@ function resolveRewardPoolContext(input: {
     if (strategy?.poolId) {
       return {
         poolId: strategy.poolId,
-        poolLabel: resolvedPoolLabel(strategy.poolId, input.context) ?? strategy.poolId,
+        poolLabel: visiblePoolLabel(strategy.poolId, input.context),
         poolContributionStatus: "contributes",
         countingRule: "owner_resolved_pool",
       };
@@ -753,6 +841,7 @@ export function materializeDepositRows(
         const poolState = getPoolState(context, deposit.poolId);
         const poolKind = poolKindFromState({ depositTokenId: deposit.tokenId, poolState });
         const poolLabel = poolLabelFromState({ poolId: deposit.poolId, poolState, context });
+        const rangeMetadata = resolveDepositRangeMetadata({ deposit, sourceEventsById, context });
         const token0Metadata = getTokenMetadata(context, poolState?.token0Address);
         const token1Metadata = getTokenMetadata(context, poolState?.token1Address);
         const openedByTransferIn = deposit.lifecycle.some((event) => normalizeDepositLifecycleEventType(event.eventType) === "transfer_in");
@@ -786,16 +875,16 @@ export function materializeDepositRows(
       totalReturnUsd: toNumber(deposit.rewardsUsd),
       totalReturnPct: null,
       estimatedAnnualizedReturnPct: null,
-      isInRange: null,
-      rangeLowerPrice: null,
-      rangeUpperPrice: null,
+      isInRange: rangeMetadata.isInRange,
+      rangeLowerPrice: rangeMetadata.rangeLowerPrice,
+      rangeUpperPrice: rangeMetadata.rangeUpperPrice,
       coverageStatus: coverageStatus(deposit.coverageStatus),
       confidence: confidence(deposit.confidence),
       coverageReasonCodes: deposit.reasonCodes,
       coveredStartDayUtc: deposit.openedAt?.toISOString().slice(0, 10) ?? null,
       coveredEndDayUtc: (deposit.closedAt ?? deposit.lifecycle.at(-1)?.occurredAt)?.toISOString().slice(0, 10) ?? null,
-      tickLower: null,
-      tickUpper: null,
+      tickLower: rangeMetadata.tickLower,
+      tickUpper: rangeMetadata.tickUpper,
       token0Address: poolState?.token0Address ?? null,
       token1Address: poolState?.token1Address ?? null,
       decomposition: {
@@ -868,7 +957,7 @@ export function materializeStrategyRows(
         const strategyRewards = accounting.rewards
           .filter((reward) => reward.ownerStatus === "strategy" && reward.linkedEntityId === strategy.strategyExposureId)
           .sort((left, right) => left.occurredAt.getTime() - right.occurredAt.getTime());
-        const currentEstimatedValueUsd = strategyCurrentEstimatedValueUsd(strategy);
+        const currentEstimatedValueUsd = strategyCurrentEstimatedValueUsd(strategy, context);
         const rewards = strategyRewards.map((reward) => {
           const sourceMetadata = reward.sourceDomainEventId
             ? asRecord(sourceEventsById.get(reward.sourceDomainEventId)?.metadataJson)
@@ -982,6 +1071,12 @@ export function materializePoolRows(
   accounting: EngineV2AccountingOutput,
   context: EngineV2MaterializationContext = defaultMaterializationContext(),
 ): EngineV2ReadModelRowInput[] {
+  const sourceEventsById = new Map(
+    accounting.events
+      .filter((event): event is typeof event & { id: string } => typeof event.id === "string" && event.id.length > 0)
+      .map((event) => [event.id, event]),
+  );
+
   return accounting.pools.map((pool) => row({
     chainId: accounting.events[0]?.chainId ?? 0,
     walletAddress: accounting.events[0]?.walletAddress ?? "",
@@ -1012,23 +1107,26 @@ export function materializePoolRows(
           .filter((value): value is Date => value instanceof Date && Number.isFinite(value.getTime()))
           .sort((left, right) => left.getTime() - right.getTime());
         const manualDeposits = accounting.deposits
-          .filter((deposit) => deposit.poolId === pool.poolId && deposit.status !== "closed")
-          .map((deposit) => ({
-            depositId: deposit.depositId,
-            tokenId: deposit.tokenId,
-            status: deriveDepositPoolPositionStatus(deposit),
-            coverageStatus: coverageStatus(deposit.coverageStatus),
-            tickLower: null,
-            tickUpper: null,
-            rangeLowerPrice: null,
-            rangeUpperPrice: null,
-            rangeQuoteTokenSymbol: token1Metadata?.symbol ?? null,
-            rangeDisplayFractionDigits: null,
-            isInRange: null,
-            valueUsd: toNullableNumber(deposit.currentOrCloseValueUsd ?? deposit.openedValueUsd),
-            tokens: tokenSymbols.map((symbol) => ({ symbol, amount: null })),
-            annualizedReturnPct: null,
-          }));
+          .filter((deposit) => deposit.poolId === pool.poolId)
+          .map((deposit) => {
+            const rangeMetadata = resolveDepositRangeMetadata({ deposit, sourceEventsById, context });
+            return {
+              depositId: deposit.depositId,
+              tokenId: deposit.tokenId,
+              status: deriveDepositPoolPositionStatus(deposit),
+              coverageStatus: coverageStatus(deposit.coverageStatus),
+              tickLower: rangeMetadata.tickLower,
+              tickUpper: rangeMetadata.tickUpper,
+              rangeLowerPrice: rangeMetadata.rangeLowerPrice,
+              rangeUpperPrice: rangeMetadata.rangeUpperPrice,
+              rangeQuoteTokenSymbol: rangeMetadata.rangeQuoteTokenSymbol ?? token1Metadata?.symbol ?? null,
+              rangeDisplayFractionDigits: rangeMetadata.rangeDisplayFractionDigits,
+              isInRange: rangeMetadata.isInRange,
+              valueUsd: toNullableNumber(deposit.currentOrCloseValueUsd ?? deposit.openedValueUsd),
+              tokens: tokenSymbols.map((symbol) => ({ symbol, amount: null })),
+              annualizedReturnPct: null,
+            };
+          });
         const automatedStrategies = accounting.strategies
           .filter((strategy) => strategy.poolId === pool.poolId)
           .map((strategy) => {
@@ -1038,7 +1136,7 @@ export function materializePoolRows(
               strategyId: strategy.strategyId ?? strategy.strategyExposureId,
               strategyLabel: strategyDisplayLabel({ strategy, context, poolLabel }),
               coverageStatus: coverageStatus(strategy.coverageStatus),
-              valueUsd: strategyCurrentEstimatedValueUsd(strategy),
+              valueUsd: strategyCurrentEstimatedValueUsd(strategy, context),
               externalStrategyPositionReference: null,
               externalStrategyPositionReferenceStatus: null,
               tokens: tokenSymbols.map((symbol) => ({ symbol, amount: null })),

@@ -19,6 +19,14 @@ export type EngineV2MaterializationPoolState = {
   feeTierBps: number | null;
 };
 
+export type EngineV2MaterializationStrategyState = {
+  strategyExposureId: string | null;
+  wrapperAddress: string;
+  underlyingPoolAddress: string | null;
+  currentSharesRaw: string | null;
+  currentEstimatedValueUsd: number | null;
+};
+
 export type EngineV2MaterializationGovernanceLock = {
   lockKey: string;
   lockTokenId: string;
@@ -37,6 +45,8 @@ export type EngineV2MaterializationContext = {
   tokenMetadataByAddress: Map<string, EngineV2MaterializationTokenMetadata>;
   governanceLockByLockKey: Map<string, EngineV2MaterializationGovernanceLock>;
   governanceLockByTokenId: Map<string, EngineV2MaterializationGovernanceLock>;
+  strategyStateByExposureId: Map<string, EngineV2MaterializationStrategyState>;
+  strategyStateByWrapperAddress: Map<string, EngineV2MaterializationStrategyState>;
 };
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -52,6 +62,15 @@ function asInteger(value: unknown) {
   if (typeof value === "string" && value.trim().length > 0) {
     const parsed = Number(value);
     return Number.isInteger(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function asNullableFiniteNumber(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
   }
   return null;
 }
@@ -74,7 +93,18 @@ export function emptyMaterializationContext(): EngineV2MaterializationContext {
     tokenMetadataByAddress: new Map(),
     governanceLockByLockKey: new Map(),
     governanceLockByTokenId: new Map(),
+    strategyStateByExposureId: new Map(),
+    strategyStateByWrapperAddress: new Map(),
   };
+}
+
+export function collectMaterializationPoolIds(accounting: EngineV2AccountingOutput) {
+  return Array.from(new Set([
+    ...accounting.deposits.map((deposit) => deposit.poolId),
+    ...accounting.strategies.map((strategy) => strategy.poolId),
+    ...accounting.pools.map((pool) => pool.poolId),
+    ...accounting.rewards.map((reward) => reward.poolId),
+  ].filter((poolId): poolId is string => typeof poolId === "string" && poolId.length > 0)));
 }
 
 export async function loadMaterializationContext(input: {
@@ -83,14 +113,15 @@ export async function loadMaterializationContext(input: {
 }): Promise<EngineV2MaterializationContext> {
   const context = emptyMaterializationContext();
   const db = getDb();
-  const poolIds = Array.from(new Set(
-    input.accounting.deposits
-      .map((deposit) => deposit.poolId)
-      .filter((poolId): poolId is string => typeof poolId === "string" && poolId.length > 0),
-  ));
+  const poolIds = collectMaterializationPoolIds(input.accounting);
   const poolAddresses = poolIds
     .map((poolId) => poolAddressFromPoolId(poolId))
     .filter((poolAddress): poolAddress is string => Boolean(poolAddress));
+  const strategyWrapperAddresses = Array.from(new Set(
+    input.accounting.strategies
+      .map((strategy) => asString(strategy.wrapperAddress)?.toLowerCase() ?? null)
+      .filter((wrapperAddress): wrapperAddress is string => Boolean(wrapperAddress)),
+  ));
   const governanceTokenIds = Array.from(new Set([
     ...input.accounting.governance.locks.map((lock) => lock.tokenId),
     ...input.accounting.governance.events.map((event) => event.tokenId).filter((tokenId): tokenId is string => typeof tokenId === "string" && tokenId.length > 0),
@@ -118,6 +149,27 @@ export async function loadMaterializationContext(input: {
     }
   }
 
+  const strategySnapshotRows = strategyWrapperAddresses.length === 0
+    ? []
+    : await db
+      .select()
+      .from(engineV2ProtocolStateSnapshots)
+      .where(and(
+        eq(engineV2ProtocolStateSnapshots.chainId, input.chainId),
+        eq(engineV2ProtocolStateSnapshots.protocol, "mellow"),
+        eq(engineV2ProtocolStateSnapshots.subjectType, "strategy"),
+        inArray(engineV2ProtocolStateSnapshots.subjectAddress, strategyWrapperAddresses),
+      ))
+      .orderBy(desc(engineV2ProtocolStateSnapshots.observedAt));
+
+  const latestStrategySnapshotByAddress = new Map<string, typeof strategySnapshotRows[number]>();
+  for (const snapshot of strategySnapshotRows) {
+    const key = snapshot.subjectAddress.toLowerCase();
+    if (!latestStrategySnapshotByAddress.has(key)) {
+      latestStrategySnapshotByAddress.set(key, snapshot);
+    }
+  }
+
   const tokenAddresses = new Set<string>();
   for (const poolId of poolIds) {
     const poolAddress = poolAddressFromPoolId(poolId);
@@ -136,6 +188,27 @@ export async function loadMaterializationContext(input: {
       tickSpacing: asInteger(state.tickSpacing),
       feeTierBps: asInteger(state.feeTier),
     });
+  }
+
+  for (const snapshot of latestStrategySnapshotByAddress.values()) {
+    const state = asRecord(snapshot.stateJson);
+    const token0Address = asString(state.token0Address)?.toLowerCase() ?? null;
+    const token1Address = asString(state.token1Address)?.toLowerCase() ?? null;
+    if (token0Address) tokenAddresses.add(token0Address);
+    if (token1Address) tokenAddresses.add(token1Address);
+
+    const materializedStrategyState = {
+      strategyExposureId: snapshot.subjectId ?? null,
+      wrapperAddress: snapshot.subjectAddress.toLowerCase(),
+      underlyingPoolAddress: asString(state.underlyingPoolAddress)?.toLowerCase() ?? null,
+      currentSharesRaw: asString(state.currentSharesRaw),
+      currentEstimatedValueUsd: asNullableFiniteNumber(state.currentEstimatedValueUsd),
+    } satisfies EngineV2MaterializationStrategyState;
+
+    context.strategyStateByWrapperAddress.set(materializedStrategyState.wrapperAddress, materializedStrategyState);
+    if (materializedStrategyState.strategyExposureId) {
+      context.strategyStateByExposureId.set(materializedStrategyState.strategyExposureId, materializedStrategyState);
+    }
   }
 
   for (const event of input.accounting.events) {

@@ -224,6 +224,7 @@ test("buildReadyGovernanceResponse assembles first-screen surfaces from reposito
   assert.equal(response.summary.governanceRewardsClaimedUsd.valueUsd, "1500.00");
   assert.equal(response.locks.rows.length, 1);
   assert.equal(response.locks.primaryLockId, lockPanel.lockExposureId);
+  assert.equal(response.locks.primaryLock?.lockId, "170");
   assert.equal(response.epochTimeline.epochs.length, 1);
   assert.equal(response.rewardBreakdown.segments.length, 2);
   assert.equal(response.selectedDetail.selectionKind, "reward");
@@ -251,7 +252,7 @@ test("buildReadyGovernanceResponse uses the primary direct lock for summary stat
     }),
   });
 
-  assert.equal(response.lockPanel?.lockId, "170");
+  assert.equal(response.locks.primaryLock?.lockId, "170");
   assert.equal(response.summary.lockedAero.value, "2203.245");
   assert.deepEqual(response.locks.rows.map((row) => row.lockKind), ["protocol_grant", "direct"]);
 });
