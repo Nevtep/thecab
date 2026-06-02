@@ -79,16 +79,6 @@ async function main() {
   try {
     await client.query("BEGIN");
 
-    const runIds = (await client.query<{ id: string }>(
-      `select id from analysis_runs where wallet_address = $1 and chain_id = $2`,
-      [walletAddress, chainId],
-    )).rows.map((row) => row.id);
-
-    const sliceIds = (await client.query<{ id: string }>(
-      `select id from analysis_slices where wallet_address = $1 and chain_id = $2`,
-      [walletAddress, chainId],
-    )).rows.map((row) => row.id);
-
     const engineV2Steps: DeleteStep[] = [
       {
         label: "engine_v2_read_model_rows",
@@ -327,6 +317,17 @@ async function main() {
       {
         label: "processed_txs",
         query: `delete from processed_txs where wallet_address = $1 and chain_id = $2`,
+      },
+      {
+        label: "raw_provider_records_detach_analysis_refs",
+        query: `
+          update raw_provider_records
+          set run_id = null,
+              slice_id = null
+          where wallet_address = $1
+            and chain_id = $2
+            and (run_id is not null or slice_id is not null)
+        `,
       },
       {
         label: "strategy_exposures",

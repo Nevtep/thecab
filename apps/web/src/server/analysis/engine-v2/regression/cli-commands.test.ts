@@ -9,6 +9,8 @@ test("Engine V2 CLI commands expose run/regression and guarded purge entry point
   const diagnosticsSource = readFileSync(resolve(process.cwd(), "src/server/scripts/analysis-engine-v2-diagnostics.ts"), "utf8");
   const packageJson = readFileSync(resolve(process.cwd(), "package.json"), "utf8");
   const purgeSource = readFileSync(resolve(process.cwd(), "src/server/scripts/db-purge.ts"), "utf8");
+  const rawProviderRecordsDetachIndex = purgeSource.indexOf('label: "raw_provider_records_detach_analysis_refs"');
+  const analysisSlicesIndex = purgeSource.indexOf('label: "analysis_slices"');
 
   assert.match(packageJson, /analysis:v2:run/);
   assert.match(packageJson, /analysis:v2:regression/);
@@ -19,5 +21,11 @@ test("Engine V2 CLI commands expose run/regression and guarded purge entry point
   assert.match(diagnosticsSource, /engine_v2_classified_transactions/);
   assert.match(purgeSource, /confirm-engine-v2-purge/);
   assert.match(purgeSource, /engine_v2_classified_transactions/);
+  assert.match(purgeSource, /label:\s*"raw_provider_records_detach_analysis_refs"/);
+  assert.match(purgeSource, /update raw_provider_records/);
+  assert.match(purgeSource, /set run_id = null,\s*slice_id = null/);
   assert.doesNotMatch(purgeSource, /label:\s*"raw_provider_records"/);
+  assert.ok(rawProviderRecordsDetachIndex >= 0);
+  assert.ok(analysisSlicesIndex >= 0);
+  assert.ok(rawProviderRecordsDetachIndex < analysisSlicesIndex);
 });
