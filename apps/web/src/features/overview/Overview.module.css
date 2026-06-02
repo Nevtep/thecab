@@ -2,11 +2,32 @@
   display: grid;
   gap: 16px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-areas:
+    "historical capital"
+    "protocol protocol";
+}
+
+.primaryGridWithoutHistorical {
+  grid-template-areas:
+    "capital capital"
+    "protocol protocol";
 }
 
 .primaryPanel {
   min-width: 0;
   display: flex;
+}
+
+.historicalPanel {
+  grid-area: historical;
+}
+
+.capitalPanel {
+  grid-area: capital;
+}
+
+.protocolPanel {
+  grid-area: protocol;
 }
 
 .primaryPanel > * {
@@ -17,6 +38,10 @@
 @media (max-width: 1920px) {
   .primaryGrid {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "historical"
+      "capital"
+      "protocol";
     align-items: start;
   }
 }

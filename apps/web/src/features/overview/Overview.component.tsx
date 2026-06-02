@@ -645,32 +645,38 @@ export function OverviewComponent({
             </CabText>
           ) : null}
 
-          <div className={styles.primaryGrid}>
-            <div className={styles.primaryPanel}>
-              {isInitialProtocolPositionsLoading ? (
-                <CabLoadingPanel label={t("states.loadingProtocolPositions")} />
-              ) : !resolvedProtocolPositionsViewModel && protocolPositionsErrorCode ? (
-                <CabErrorPanel
-                  title={t("states.providerFailureTitle")}
-                  description={t(`states.errors.${protocolPositionsErrorCode}`, { defaultValue: t("states.providerFailureDescription") })}
-                  retryLabel={t("actions.refresh")}
-                  onRetry={onRefresh}
-                />
-              ) : !resolvedProtocolPositionsViewModel ? (
-                <CabEmptyState
-                  title={t("states.emptyTitle")}
-                  description={t("states.emptyDescription")}
-                />
-              ) : (
-                <ProtocolPositionsSection
-                  protocolPositions={resolvedProtocolPositionsViewModel.protocolPositions}
-                  sourceSubtitle={t(`overview:sources.${resolvedProtocolPositionsViewModel.protocolPositions.source}`)}
-                  coverageMessage={protocolPositionsCoverageMessage}
-                />
-              )}
-            </div>
+          <div className={`${styles.primaryGrid} ${!showHistoricalAnalysisCards ? styles.primaryGridWithoutHistorical : ""}`.trim()}>
+            {showHistoricalAnalysisCards ? (
+              <div className={`${styles.primaryPanel} ${styles.historicalPanel}`}>
+                {isInitialChartLoading ? (
+                  <CabLoadingPanel label={t("states.loadingChart")} />
+                ) : !resolvedChartViewModel && chartErrorCode ? (
+                  <CabErrorPanel
+                    title={t("states.providerFailureTitle")}
+                    description={t(`states.errors.${chartErrorCode}`, { defaultValue: t("states.providerFailureDescription") })}
+                    retryLabel={t("actions.refresh")}
+                    onRetry={onRefresh}
+                  />
+                ) : !resolvedChartViewModel ? (
+                  <CabEmptyState
+                    title={t("states.emptyTitle")}
+                    description={t("states.emptyDescription")}
+                  />
+                ) : (
+                  <PortfolioEvolutionSection
+                    viewModel={resolvedChartViewModel}
+                    model={portfolioEvolutionModel}
+                    activity={activityViewModel}
+                    range={range}
+                    locale={locale}
+                    isRefreshing={isChartRefreshing}
+                    onRangeChange={onRangeChange}
+                  />
+                )}
+              </div>
+            ) : null}
 
-            <div className={styles.primaryPanel}>
+            <div className={`${styles.primaryPanel} ${styles.capitalPanel}`}>
               {isInitialChartLoading ? (
                 <CabLoadingPanel label={t("states.loadingDistribution")} />
               ) : !resolvedChartViewModel && chartErrorCode ? (
@@ -694,37 +700,31 @@ export function OverviewComponent({
                 />
               )}
             </div>
-          </div>
 
-          {showHistoricalAnalysisCards ? (
-            <div className={styles.primaryPanel}>
-              {isInitialChartLoading ? (
-                <CabLoadingPanel label={t("states.loadingChart")} />
-              ) : !resolvedChartViewModel && chartErrorCode ? (
+            <div className={`${styles.primaryPanel} ${styles.protocolPanel}`}>
+              {isInitialProtocolPositionsLoading ? (
+                <CabLoadingPanel label={t("states.loadingProtocolPositions")} />
+              ) : !resolvedProtocolPositionsViewModel && protocolPositionsErrorCode ? (
                 <CabErrorPanel
                   title={t("states.providerFailureTitle")}
-                  description={t(`states.errors.${chartErrorCode}`, { defaultValue: t("states.providerFailureDescription") })}
+                  description={t(`states.errors.${protocolPositionsErrorCode}`, { defaultValue: t("states.providerFailureDescription") })}
                   retryLabel={t("actions.refresh")}
                   onRetry={onRefresh}
                 />
-              ) : !resolvedChartViewModel ? (
+              ) : !resolvedProtocolPositionsViewModel ? (
                 <CabEmptyState
                   title={t("states.emptyTitle")}
                   description={t("states.emptyDescription")}
                 />
               ) : (
-                <PortfolioEvolutionSection
-                  viewModel={resolvedChartViewModel}
-                  model={portfolioEvolutionModel}
-                  activity={activityViewModel}
-                  range={range}
-                  locale={locale}
-                  isRefreshing={isChartRefreshing}
-                  onRangeChange={onRangeChange}
+                <ProtocolPositionsSection
+                  protocolPositions={resolvedProtocolPositionsViewModel.protocolPositions}
+                  sourceSubtitle={t(`overview:sources.${resolvedProtocolPositionsViewModel.protocolPositions.source}`)}
+                  coverageMessage={protocolPositionsCoverageMessage}
                 />
               )}
             </div>
-          ) : null}
+          </div>
 
           <div
             style={{
