@@ -6,6 +6,8 @@ import {
   type MoralisDecodedTransaction,
 } from "@/server/analysis/decoded-history";
 
+import { decodeCanonicalTransactionCalls } from "./canonical-call-decoder";
+
 export type EngineV2Classification = {
   eventType: string;
   eventFamily: string;
@@ -67,9 +69,54 @@ function firstTokenId(value: unknown): string | null {
   return null;
 }
 
+function firstStructuredTokenId(value: unknown): string | null {
+  if (typeof value === "bigint") return value.toString();
+  if (typeof value === "number" && Number.isInteger(value)) return String(value);
+  if (typeof value === "string" && /^\d+$/.test(value)) return value;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const tokenId = firstStructuredTokenId(item);
+      if (tokenId) return tokenId;
+    }
+  }
+  if (value && typeof value === "object") {
+    for (const item of Object.values(value)) {
+      const tokenId = firstStructuredTokenId(item);
+      if (tokenId) return tokenId;
+    }
+  }
+  return null;
+}
+
+function explicitCollectTokenId(input: {
+  tx: MoralisDecodedTransaction;
+  registry: Map<Address, AbiRegistryEntry>;
+}) {
+  const collectTokenIds = Array.from(new Set(
+    decodeCanonicalTransactionCalls(input)
+      .filter((call) => call.functionName === "collect")
+      .map((call) => firstStructuredTokenId(call.args))
+      .filter((tokenId): tokenId is string => Boolean(tokenId)),
+  ));
+
+  return collectTokenIds.length === 1 ? collectTokenIds[0] : null;
+}
+
+function extractDeterministicTokenId(snapshot: ClassifiedDecodedTransaction) {
+  switch (snapshot.classification) {
+    case "manual_pool_deposit_router":
+    case "manual_pool_withdraw_router":
+    case "manual_gauge_stake":
+    case "manual_gauge_unstake":
+      return null;
+    default:
+      return firstTokenId(toJsonSafeValue(Array.from(snapshot.decodedArgs)));
+  }
+}
+
 export function classificationFromSnapshot(snapshot: ClassifiedDecodedTransaction): EngineV2Classification {
   const decodedArgs = toJsonSafeValue(Array.from(snapshot.decodedArgs));
-  const tokenId = firstTokenId(decodedArgs);
+  const tokenId = extractDeterministicTokenId(snapshot);
 
   return {
     eventType: snapshot.classification,
@@ -144,6 +191,25 @@ export function classifyBaseTransaction(input: {
     walletAddress: input.walletAddress,
     registry: input.registry ?? new Map(),
   });
+  const classification = classificationFromSnapshot(snapshot);
 
-  return classificationFromSnapshot(snapshot);
+  if (classification.eventType === "manual_position_fee_claim") {
+    const collectTokenId = explicitCollectTokenId({
+      tx: input.tx,
+      registry: input.registry ?? new Map(),
+    });
+
+    if (collectTokenId) {
+      classification.evidence = {
+        ...classification.evidence,
+        tokenId: collectTokenId,
+      };
+      classification.metadataJson = {
+        ...(classification.metadataJson ?? {}),
+        tokenId: collectTokenId,
+      };
+    }
+  }
+
+  return classification;
 }

@@ -8,6 +8,7 @@ export function poolDefinitionSnapshot(input: {
   token1?: string | null;
   tickSpacing?: number | null;
   feeTier?: string | null;
+  poolType?: string | null;
   sourceProvider?: string;
   evidenceJson?: Record<string, unknown>;
 }): typeof engineV2ProtocolStateSnapshots.$inferInsert {
@@ -24,6 +25,7 @@ export function poolDefinitionSnapshot(input: {
       token1: input.token1?.toLowerCase() ?? null,
       tickSpacing: input.tickSpacing ?? null,
       feeTier: input.feeTier ?? null,
+      poolType: input.poolType ?? null,
     },
     evidenceJson: input.evidenceJson ?? {},
   };

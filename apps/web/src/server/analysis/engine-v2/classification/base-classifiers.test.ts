@@ -128,6 +128,39 @@ test("classificationFromSnapshot maps the shared research snapshot into Engine V
   assert.equal(result.metadataJson?.decodedFunction, "transfer");
 });
 
+test("classificationFromSnapshot does not promote basic pool amounts into tokenId", () => {
+  const result = classificationFromSnapshot({
+    hash: "0xpool",
+    timestamp: "2026-02-22T21:12:53.000Z",
+    blockNumber: 456,
+    transactionIndex: 3,
+    fromAddress: walletAddress,
+    toAddress: "0x0000000000000000000000000000000000000010",
+    selector: "0xe8e33700",
+    contractLabel: "Aerodrome Router",
+    contractName: "Router",
+    decodedFunction: "addLiquidity",
+    decodedArgs: [
+      "0x4200000000000000000000000000000000000006",
+      "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+      false,
+      "7000000000",
+      "1000000000000000000",
+    ],
+    transferCount: 3,
+    inboundTransferCount: 1,
+    outboundTransferCount: 2,
+    approvalCount: 0,
+    classification: "manual_pool_deposit_router",
+    confidence: "high_action_partial_accounting",
+    reason: "Router.addLiquidity",
+    needsResolution: true,
+  });
+
+  assert.equal(result.evidence.tokenId, null);
+  assert.equal(result.metadataJson?.tokenId, null);
+});
+
 test("classifyBaseTransaction carries snapshot-derived evidence for decoded protocol calls", () => {
   const result = classifyBaseTransaction({
     walletAddress,
@@ -504,4 +537,102 @@ test("classifyBaseTransaction preserves tokenId for gauge getReward(uint256) cla
   assert.equal(result.eventType, "manual_gauge_reward_claim");
   assert.equal(result.metadataJson?.tokenId, "71251309");
   assert.equal(result.evidence.tokenId, "71251309");
+});
+
+test("classifyBaseTransaction preserves tokenId for position-manager multicall collect fee claims", () => {
+  const positionManagerAddress = "0x827922686190790b37229fd06084350e74485b72";
+  const positionManagerAbi = [
+    {
+      type: "function",
+      name: "collect",
+      stateMutability: "payable",
+      inputs: [
+        {
+          name: "params",
+          type: "tuple",
+          components: [
+            { name: "tokenId", type: "uint256" },
+            { name: "recipient", type: "address" },
+            { name: "amount0Max", type: "uint128" },
+            { name: "amount1Max", type: "uint128" },
+          ],
+        },
+      ],
+      outputs: [
+        { name: "amount0", type: "uint256" },
+        { name: "amount1", type: "uint256" },
+      ],
+    },
+    {
+      type: "function",
+      name: "multicall",
+      stateMutability: "payable",
+      inputs: [{ name: "data", type: "bytes[]" }],
+      outputs: [{ name: "results", type: "bytes[]" }],
+    },
+  ] as const;
+
+  const nestedCollect = encodeFunctionData({
+    abi: positionManagerAbi,
+    functionName: "collect",
+    args: [{
+      tokenId: 56109602n,
+      recipient: walletAddress as `0x${string}`,
+      amount0Max: 340282366920938463463374607431768211455n,
+      amount1Max: 340282366920938463463374607431768211455n,
+    }],
+  });
+  const input = encodeFunctionData({
+    abi: positionManagerAbi,
+    functionName: "multicall",
+    args: [[nestedCollect]],
+  });
+
+  const result = classifyBaseTransaction({
+    walletAddress,
+    registry: new Map([
+      [
+        positionManagerAddress,
+        {
+          chainId: 8453,
+          address: positionManagerAddress,
+          label: "Slipstream Nonfungible Position Manager",
+          protocol: "aerodrome",
+          expectedKind: "position-manager",
+          fetchedAt: "2026-01-01T00:00:00.000Z",
+          sources: {
+            basescanApi: "",
+            basescanCode: "",
+          },
+          source: {
+            contractName: "SlipstreamPositionManager",
+            compilerVersion: null,
+            optimizationUsed: null,
+            runs: null,
+            constructorArguments: null,
+            evmVersion: null,
+            library: null,
+            licenseType: null,
+            proxy: false,
+            implementation: null,
+            swarmSource: null,
+          },
+          abi: positionManagerAbi,
+          warnings: [],
+        },
+      ],
+    ]),
+    tx: {
+      hash: "0x2d0aa8c822b5a9867f02fdb901f4bc049303e4a9362e97674d0957f76712abcd",
+      from_address: walletAddress,
+      to_address: positionManagerAddress,
+      receipt_status: "1",
+      input,
+      logs: [],
+    },
+  });
+
+  assert.equal(result.eventType, "manual_position_fee_claim");
+  assert.equal(result.metadataJson?.tokenId, "56109602");
+  assert.equal(result.evidence.tokenId, "56109602");
 });

@@ -52,16 +52,36 @@ function isRewardEvent(event: EngineV2DomainEventLike) {
   return source.includes("reward") || source.includes("claim") || source.includes("rebase") || source.includes("fee") || source.includes("bribe");
 }
 
-function normalizeRewardType(value: string | null, ownerStatus: EngineV2RewardProjection["ownerStatus"]) {
+function normalizeRewardType(input: {
+  value: string | null;
+  ownerStatus: EngineV2RewardProjection["ownerStatus"];
+  eventFamily: string;
+}) {
+  const { value, ownerStatus, eventFamily } = input;
   if (!value) return null;
   if (value === "unknown") return null;
   if ((value === "manual_reward" || value === "manual_reward_claim") && ownerStatus === "manual_deposit") {
     return "reward_claim";
   }
+  if (value === "governance_fee" && eventFamily !== "governance" && ownerStatus !== "governance") {
+    return "fee_claim";
+  }
   return value;
 }
 
-export function accountRewards(input: { events: EngineV2DomainEventLike[]; links?: EngineV2EntityLinkLike[]; deposits?: EngineV2DepositProjection[] }) {
+function activeDepositAtEventTime(deposit: EngineV2DepositProjection, occurredAt: Date) {
+  const openedAt = deposit.openedAt?.getTime() ?? Number.NEGATIVE_INFINITY;
+  const closedAt = deposit.closedAt?.getTime() ?? Number.POSITIVE_INFINITY;
+  const eventTime = occurredAt.getTime();
+  return openedAt <= eventTime && eventTime <= closedAt;
+}
+
+export function accountRewards(input: {
+  events: EngineV2DomainEventLike[];
+  links?: EngineV2EntityLinkLike[];
+  deposits?: EngineV2DepositProjection[];
+  gaugePoolIdByGaugeAddress?: Map<string, string>;
+}) {
   const links = input.links ?? [];
   const depositsById = new Map((input.deposits ?? []).map((deposit) => [deposit.depositId, deposit] as const));
   const depositIdByTokenId = new Map(
@@ -69,6 +89,13 @@ export function accountRewards(input: { events: EngineV2DomainEventLike[]; links
       .filter((deposit) => typeof deposit.tokenId === "string" && deposit.tokenId.length > 0)
       .map((deposit) => [deposit.tokenId, deposit.depositId] as const),
   );
+  const depositsByPoolId = new Map<string, EngineV2DepositProjection[]>();
+  for (const deposit of input.deposits ?? []) {
+    if (!deposit.poolId) continue;
+    const bucket = depositsByPoolId.get(deposit.poolId) ?? [];
+    bucket.push(deposit);
+    depositsByPoolId.set(deposit.poolId, bucket);
+  }
   const seen = new Set<string>();
   const rewards: EngineV2RewardProjection[] = [];
 
@@ -88,18 +115,38 @@ export function accountRewards(input: { events: EngineV2DomainEventLike[]; links
     const metadataStrategyExposureId = asString(metadata.strategyExposureId);
     const metadataDepositId = asString(metadata.depositId);
     const metadataTokenId = asString(metadata.tokenId) ?? asString(asRecord(event.evidenceJson).tokenId);
-    const resolvedDepositId = depositLink?.entityId ?? metadataDepositId ?? (metadataTokenId ? depositIdByTokenId.get(metadataTokenId) ?? null : null);
+    const gaugeAddress = asString(metadata.claimContract)?.toLowerCase()
+      ?? asString(metadata.sourceContract)?.toLowerCase()
+      ?? asString(metadata.toAddress)?.toLowerCase()
+      ?? null;
+    const gaugePoolId = gaugeAddress ? input.gaugePoolIdByGaugeAddress?.get(gaugeAddress) ?? null : null;
+    const activeBasicDeposits = gaugePoolId
+      ? (depositsByPoolId.get(gaugePoolId) ?? []).filter((deposit) => activeDepositAtEventTime(deposit, event.occurredAt))
+      : [];
+    const gaugeResolvedDepositId = event.eventType === "manual_gauge_reward_claim" && activeBasicDeposits.length === 1
+      ? activeBasicDeposits[0]?.depositId ?? null
+      : null;
+    const resolvedDepositId = depositLink?.entityId
+      ?? metadataDepositId
+      ?? (metadataTokenId ? depositIdByTokenId.get(metadataTokenId) ?? null : null)
+      ?? gaugeResolvedDepositId;
     const resolvedDeposit = resolvedDepositId ? depositsById.get(resolvedDepositId) ?? null : null;
-    const resolvedPoolId = poolLink?.entityId ?? asString(metadata.poolId) ?? resolvedDeposit?.poolId ?? null;
+    const resolvedPoolId = poolLink?.entityId ?? asString(metadata.poolId) ?? gaugePoolId ?? resolvedDeposit?.poolId ?? null;
     const ownerStatus = isExcluded ? "excluded" :
       strategyLink ? "strategy" :
       metadataStrategyExposureId ? "strategy" :
       resolvedDepositId ? "manual_deposit" :
       governanceLink || event.eventFamily === "governance" ? "governance" :
       "unresolved";
-    const rewardType = normalizeRewardType(asString(metadata.rewardType), ownerStatus) ?? (
+    const rewardType = normalizeRewardType({
+      value: asString(metadata.rewardType),
+      ownerStatus,
+      eventFamily: event.eventFamily,
+    }) ?? (
       event.eventType.includes("bribe") ? "governance_bribe" :
-      event.eventType.includes("fee") ? "governance_fee" :
+      event.eventType.includes("fee")
+        ? (event.eventFamily === "governance" || ownerStatus === "governance" ? "governance_fee" : "fee_claim")
+        :
       event.eventType.includes("rebase") ? "rebase" :
       event.eventFamily === "strategy" ? "strategy_reward" :
       ownerStatus === "manual_deposit" ? "reward_claim" :
@@ -130,8 +177,9 @@ export function accountRewards(input: { events: EngineV2DomainEventLike[]; links
       confidence: event.confidence,
       reasonCodes: [...new Set([
         ...event.reasonCodes,
+        ...(event.eventType === "manual_gauge_reward_claim" && gaugePoolId && activeBasicDeposits.length > 1 ? ["ambiguous_active_basic_deposit"] : []),
         ...(ownerStatus === "unresolved" ? ["missing_explicit_owner"] : []),
-        ...(poolContribution === "unresolved" ? ["missing_distributor_pool_link"] : []),
+        ...(poolContribution === "unresolved" && event.eventFamily === "governance" ? ["missing_distributor_pool_link"] : []),
       ])],
       txHash: event.txHash,
       occurredAt: event.occurredAt,

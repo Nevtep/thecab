@@ -18,6 +18,20 @@ test("poolDefinitionSnapshot stores explicit pool definition evidence", () => {
   assert.equal(row.stateJson?.tickSpacing, 100);
 });
 
+test("poolDefinitionSnapshot stores basic pool type when no tick spacing exists", () => {
+  const row = poolDefinitionSnapshot({
+    chainId: 8453,
+    poolAddress: "0x0000000000000000000000000000000000000011",
+    token0: "0x0000000000000000000000000000000000000002",
+    token1: "0x0000000000000000000000000000000000000003",
+    poolType: "volatile",
+  });
+
+  assert.equal(row.subjectType, "pool");
+  assert.equal(row.stateJson?.tickSpacing, null);
+  assert.equal(row.stateJson?.poolType, "volatile");
+});
+
 test("distributorPoolLinkFromGaugeCreated requires explicit GaugeCreated pool/distributor evidence", () => {
   const row = distributorPoolLinkFromGaugeCreated({
     chainId: 8453,

@@ -205,6 +205,10 @@ function asString(value: unknown) {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
+function asBoolean(value: unknown) {
+  return typeof value === "boolean" ? value : null;
+}
+
 function firstMovement(input: {
   movements: Array<Record<string, unknown>>;
   assetType?: string;
@@ -232,6 +236,63 @@ function findProtocolPoolAddress(tx: MoralisDecodedTransaction, positionManagerA
     }
   }
   return null;
+}
+
+function poolTypeFromStableFlag(stable: boolean | null) {
+  if (stable === true) return "stable";
+  if (stable === false) return "volatile";
+  return null;
+}
+
+function basicPoolMetadata(input: {
+  chainId: number;
+  eventType: string;
+  decodedFunction: string | null;
+  decodedArgs: unknown[];
+  movements: Array<Record<string, unknown>>;
+  tx: MoralisDecodedTransaction;
+}) {
+  const supportedEventTypes = new Set([
+    "manual_pool_deposit_router",
+    "manual_pool_withdraw_router",
+    "manual_gauge_stake",
+    "manual_gauge_unstake",
+  ]);
+  if (!supportedEventTypes.has(input.eventType)) {
+    return null;
+  }
+
+  const routerPoolAddress = input.decodedFunction === "addLiquidity" || input.decodedFunction === "removeLiquidity"
+    ? findProtocolPoolAddress(input.tx, null)
+    : null;
+  const lpDirection = input.eventType.includes("unstake") ? "in" : input.eventType.includes("stake") ? "out" : null;
+  const lpMovement = lpDirection
+    ? firstMovement({
+      movements: input.movements,
+      assetType: "erc20",
+      direction: lpDirection,
+    })
+    : null;
+  const poolAddress = routerPoolAddress ?? asString(lpMovement?.tokenAddress);
+  if (!poolAddress) {
+    return null;
+  }
+
+  const stable = input.decodedFunction === "addLiquidity" || input.decodedFunction === "removeLiquidity"
+    ? asBoolean(input.decodedArgs[2])
+    : null;
+  const poolId = `${input.chainId}:${poolAddress}`;
+
+  return {
+    depositKind: "basic_amm",
+    depositId: `${input.chainId}:basic_amm:${poolAddress}`,
+    poolAddress,
+    poolId,
+    primaryPoolId: poolId,
+    poolType: poolTypeFromStableFlag(stable),
+    stable,
+    shareTokenAddress: poolAddress,
+  } satisfies Record<string, unknown>;
 }
 
 function votingEscrowAddressFromRegistry(registry: Map<Address, AbiRegistryEntry>) {
@@ -308,11 +369,21 @@ function extractDomainMetadata(input: {
   const erc721Out = firstMovement({ movements: input.movements, assetType: "erc721", direction: "out" });
   const primaryErc721 = erc721In ?? erc721Out;
   const primaryErc20 = firstMovement({ movements: input.movements, assetType: "erc20" });
+  const basicPool = basicPoolMetadata({
+    chainId: input.chainId,
+    eventType: input.eventType,
+    decodedFunction: decoded.functionName ?? null,
+    decodedArgs: Array.isArray(decoded.args) ? decoded.args : [],
+    movements: input.movements,
+    tx: input.tx,
+  });
 
   if (input.eventFamily === "deposit" || input.eventType.startsWith("manual_")) {
     const tokenId = asString(primaryErc721?.tokenId);
-    const positionManagerAddress = asString(primaryErc721?.tokenAddress) ?? normalizeAddress(input.tx.to_address);
-    const poolAddress = findProtocolPoolAddress(input.tx, positionManagerAddress);
+    const positionManagerAddress = basicPool
+      ? null
+      : asString(primaryErc721?.tokenAddress) ?? normalizeAddress(input.tx.to_address);
+    const poolAddress = asString(basicPool?.poolAddress) ?? findProtocolPoolAddress(input.tx, positionManagerAddress);
     if (tokenId) metadata.tokenId = tokenId;
     if (positionManagerAddress) metadata.positionManagerAddress = positionManagerAddress;
     if (positionManagerAddress && tokenId) metadata.depositId = `${input.chainId}:${positionManagerAddress.toLowerCase()}:${tokenId}`;
@@ -321,6 +392,7 @@ function extractDomainMetadata(input: {
       metadata.poolId = `${input.chainId}:${poolAddress}`;
       metadata.primaryPoolId = metadata.poolId;
     }
+    if (basicPool) Object.assign(metadata, basicPool);
     metadata.sourceSurface = "deposit";
   }
 
@@ -379,13 +451,23 @@ function extractDomainMetadata(input: {
   if (input.eventType.includes("claim") || input.eventType.includes("reward") || input.eventType.includes("fee") || input.eventType.includes("bribe")) {
     if (primaryErc20?.tokenAddress) metadata.tokenAddress = primaryErc20.tokenAddress;
     if (primaryErc20?.amountRaw) metadata.amountRaw = primaryErc20.amountRaw;
+    const claimContract = normalizeAddress(input.tx.to_address);
+    if (claimContract) metadata.claimContract = claimContract;
+    if (claimContract) metadata.toAddress = claimContract;
     metadata.rewardId = `${input.tx.hash.toLowerCase()}:${input.eventType}`;
     metadata.rewardType =
       input.eventType.includes("bribe") ? "governance_bribe" :
-      input.eventType.includes("fee") ? "governance_fee" :
+      input.eventType.includes("fee")
+        ? (input.eventFamily === "governance" || input.eventType.startsWith("governance_") ? "governance_fee" : "fee_claim")
+        :
       input.eventType.includes("rebase") ? "rebase" :
       input.eventType.includes("strategy") ? "strategy_reward" :
       "unknown";
+  }
+
+  if (input.eventType === "manual_gauge_stake" || input.eventType === "manual_gauge_unstake") {
+    const gaugeAddress = normalizeAddress(input.tx.to_address);
+    if (gaugeAddress) metadata.toAddress = gaugeAddress;
   }
 
   if (primaryErc20?.tokenAddress) metadata.tokenAddress ??= primaryErc20.tokenAddress;

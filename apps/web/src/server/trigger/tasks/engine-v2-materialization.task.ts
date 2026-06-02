@@ -22,12 +22,14 @@ import { alchemyRpc, getCurrentTokenPricesByAddress } from "@/server/providers/a
 import { materializeStrategyReadModels } from "@/server/analysis/strategy-read-models";
 import { getDb } from "@/server/db/client";
 import {
+  engineV2ClassifiedTransactions,
   engineV2DomainEventLinks,
   engineV2DomainEvents,
   engineV2PricePoints,
   engineV2ProtocolStateSnapshots,
   engineV2ReadModelRows,
   engineV2TokenMetadata,
+  protocolContracts,
 } from "@/server/db/schema";
 import { taskInfo, taskWarn, withTaskLogging } from "@/server/trigger/tasks/task-logging";
 
@@ -97,9 +99,58 @@ function movementRecords(value: unknown) {
     : [];
 }
 
+type GaugePoolProtocolRow = {
+  address: string;
+  metadataJson: unknown;
+};
+
+type GaugePoolEventRow = {
+  gaugeAddress: string | null;
+  poolId: string | null;
+};
+
 function normalizeAddress(value: unknown) {
   const address = asString(value);
   return address ? address.toLowerCase() : null;
+}
+
+export function buildGaugePoolIdByGaugeAddress(input: {
+  rewardClaimGaugeAddresses: string[];
+  protocolGaugeRows: GaugePoolProtocolRow[];
+  eventGaugeRows: GaugePoolEventRow[];
+}) {
+  const rewardClaimGaugeSet = new Set(
+    input.rewardClaimGaugeAddresses
+      .map((address) => normalizeAddress(address))
+      .filter((address): address is string => Boolean(address)),
+  );
+
+  const gaugePoolIdByGaugeAddress = new Map<string, string>();
+
+  for (const row of input.protocolGaugeRows) {
+    const gaugeAddress = normalizeAddress(row.address);
+    if (!gaugeAddress) continue;
+    if (rewardClaimGaugeSet.size > 0 && !rewardClaimGaugeSet.has(gaugeAddress)) continue;
+
+    const metadata = asRecord(row.metadataJson);
+    const poolId = asString(metadata.poolId)
+      ?? (normalizeAddress(metadata.poolAddress) ? `${SUPPORTED_CHAIN_ID}:${normalizeAddress(metadata.poolAddress)}` : null);
+    if (!poolId) continue;
+
+    gaugePoolIdByGaugeAddress.set(gaugeAddress, poolId);
+  }
+
+  for (const row of input.eventGaugeRows) {
+    const gaugeAddress = normalizeAddress(row.gaugeAddress);
+    const poolId = asString(row.poolId);
+    if (!gaugeAddress || !poolId) continue;
+    if (rewardClaimGaugeSet.size > 0 && !rewardClaimGaugeSet.has(gaugeAddress)) continue;
+    if (gaugePoolIdByGaugeAddress.has(gaugeAddress)) continue;
+
+    gaugePoolIdByGaugeAddress.set(gaugeAddress, poolId);
+  }
+
+  return gaugePoolIdByGaugeAddress;
 }
 
 async function ethCall(input: {
@@ -557,6 +608,67 @@ async function loadAccountingInputFromDb(input: { chainId: number; walletAddress
       evidenceJson: link.evidenceJson,
     })),
   } satisfies EngineV2AccountingInput;
+
+  const rewardClaimGaugeAddresses = Array.from(new Set(
+    accountingInput.events
+      .filter((event) => event.eventType === "manual_gauge_reward_claim")
+      .map((event) => normalizeAddress(asRecord(event.metadataJson).claimContract))
+      .filter((value): value is string => Boolean(value)),
+  ));
+
+  let protocolGaugeRows: GaugePoolProtocolRow[] = [];
+  if (rewardClaimGaugeAddresses.length > 0) {
+    protocolGaugeRows = await db.select({
+      address: protocolContracts.address,
+      metadataJson: protocolContracts.metadataJson,
+    }).from(protocolContracts).where(and(
+      eq(protocolContracts.chainId, input.chainId),
+      eq(protocolContracts.protocol, "aerodrome"),
+      eq(protocolContracts.contractType, "gauge"),
+      inArray(protocolContracts.address, rewardClaimGaugeAddresses),
+    ));
+  }
+
+  const gaugeLifecycleEvents = accountingInput.events.filter((event) => {
+    if (!event.eventType.startsWith("manual_gauge_")) return false;
+    return Boolean(asString(asRecord(event.metadataJson).poolId));
+  });
+
+  const gaugeLifecycleTxHashes = Array.from(new Set(gaugeLifecycleEvents.map((event) => event.txHash)));
+  let gaugeAddressByTxHash = new Map<string, string>();
+  if (gaugeLifecycleTxHashes.length > 0) {
+    const classifiedGaugeRows = await db.select({
+      txHash: engineV2ClassifiedTransactions.txHash,
+      toAddress: engineV2ClassifiedTransactions.toAddress,
+    }).from(engineV2ClassifiedTransactions).where(and(
+      eq(engineV2ClassifiedTransactions.chainId, input.chainId),
+      eq(engineV2ClassifiedTransactions.walletAddress, input.walletAddress),
+      inArray(engineV2ClassifiedTransactions.txHash, gaugeLifecycleTxHashes),
+    ));
+
+    gaugeAddressByTxHash = new Map(
+      classifiedGaugeRows.flatMap((row) => {
+        const gaugeAddress = normalizeAddress(row.toAddress);
+        return gaugeAddress ? [[row.txHash, gaugeAddress] as const] : [];
+      }),
+    );
+  }
+
+  const eventGaugeRows = gaugeLifecycleEvents.map((event) => {
+    const metadata = asRecord(event.metadataJson);
+    return {
+      gaugeAddress: normalizeAddress(metadata.toAddress) ?? gaugeAddressByTxHash.get(event.txHash) ?? null,
+      poolId: asString(metadata.poolId),
+    } satisfies GaugePoolEventRow;
+  });
+
+  const gaugePoolIdByGaugeAddress = buildGaugePoolIdByGaugeAddress({
+    rewardClaimGaugeAddresses,
+    protocolGaugeRows,
+    eventGaugeRows,
+  });
+
+  accountingInput.gaugePoolIdByGaugeAddress = gaugePoolIdByGaugeAddress;
 
   const tokenAddresses = Array.from(new Set(
     accountingInput.events.flatMap((event) => {

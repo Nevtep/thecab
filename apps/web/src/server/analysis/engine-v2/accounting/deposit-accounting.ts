@@ -2,7 +2,7 @@ import type { EngineV2DomainEventLike, EngineV2EntityLinkLike } from "./chronolo
 
 export type EngineV2DepositProjection = {
   depositId: string;
-  tokenId: string;
+  tokenId: string | null;
   poolId: string | null;
   status: "open" | "closed" | "unknown";
   openedAt: Date | null;
@@ -65,6 +65,22 @@ function explicitNftIdentityFromMovements(input: {
   };
 }
 
+function basicAmmDepositId(metadata: Record<string, unknown>, chainId: number) {
+  const explicitDepositId = asString(metadata.depositId);
+  if (explicitDepositId) return explicitDepositId;
+  if (asString(metadata.depositKind) !== "basic_amm") return null;
+  const poolAddress = asString(metadata.poolAddress) ?? asString(metadata.poolId)?.split(":").at(-1) ?? null;
+  return poolAddress ? `${chainId}:basic_amm:${poolAddress}` : null;
+}
+
+function isBasicAmmDeposit(metadata: Record<string, unknown>, tokenId: string | null) {
+  return asString(metadata.depositKind) === "basic_amm" && !tokenId;
+}
+
+function basicAmmEpisodeId(baseDepositId: string, episodeIndex: number) {
+  return episodeIndex <= 1 ? baseDepositId : `${baseDepositId}:${episodeIndex}`;
+}
+
 function addDecimal(left: string, right: string | null) {
   if (!right) return left;
   const total = Number(left) + Number(right);
@@ -83,7 +99,10 @@ function depositIdentity(event: EngineV2DomainEventLike, links: EngineV2EntityLi
   const depositLink = linkForEvent(links, event, "deposit");
   const positionManager = asString(metadata.positionManagerAddress) ?? asString(evidence.positionManagerAddress) ?? movementIdentity.positionManagerAddress;
   const tokenId = asString(metadata.tokenId) ?? asString(evidence.tokenId) ?? movementIdentity.tokenId;
-  const depositId = depositLink?.entityId ?? asString(metadata.depositId) ?? (positionManager && tokenId ? `${event.chainId}:${positionManager.toLowerCase()}:${tokenId}` : null);
+  const depositId = depositLink?.entityId
+    ?? asString(metadata.depositId)
+    ?? (positionManager && tokenId ? `${event.chainId}:${positionManager.toLowerCase()}:${tokenId}` : null)
+    ?? basicAmmDepositId(metadata, event.chainId);
   const poolLink = linkForEvent(links, event, "pool");
   return {
     depositId,
@@ -99,16 +118,32 @@ export function accountManualDeposits(input: {
   const links = input.links ?? [];
   const deposits = new Map<string, EngineV2DepositProjection>();
   const knownDepositByTokenId = new Map<string, string>();
+  const activeBasicDepositByBaseId = new Map<string, string>();
+  const nextBasicDepositEpisodeByBaseId = new Map<string, number>();
 
   for (const event of input.events) {
     if (event.eventFamily !== "deposit" && !event.eventType.startsWith("manual_")) continue;
     const identity = depositIdentity(event, links);
-    const knownDepositId = identity.tokenId ? knownDepositByTokenId.get(identity.tokenId) : null;
-    const depositId = knownDepositId ?? identity.depositId;
-    if (!depositId || !identity.tokenId) continue;
-    knownDepositByTokenId.set(identity.tokenId, depositId);
-
     const metadata = asRecord(event.metadataJson);
+    const knownDepositId = identity.tokenId ? knownDepositByTokenId.get(identity.tokenId) : null;
+    let depositId = knownDepositId ?? identity.depositId;
+    const basicAmm = isBasicAmmDeposit(metadata, identity.tokenId);
+    if (basicAmm && identity.depositId) {
+      const activeDepositId = activeBasicDepositByBaseId.get(identity.depositId) ?? null;
+      if (activeDepositId) {
+        depositId = activeDepositId;
+      } else {
+        const nextEpisode = (nextBasicDepositEpisodeByBaseId.get(identity.depositId) ?? 0) + 1;
+        nextBasicDepositEpisodeByBaseId.set(identity.depositId, nextEpisode);
+        depositId = basicAmmEpisodeId(identity.depositId, nextEpisode);
+        activeBasicDepositByBaseId.set(identity.depositId, depositId);
+      }
+    }
+    if (!depositId) continue;
+    if (identity.tokenId) {
+      knownDepositByTokenId.set(identity.tokenId, depositId);
+    }
+
     const valueUsd = asNumberString(metadata.valueUsd) ?? asNumberString(metadata.valueUsdAtEvent);
     const existing = deposits.get(depositId) ?? {
       depositId,
@@ -160,6 +195,10 @@ export function accountManualDeposits(input: {
       reasonCodes: event.reasonCodes,
     });
     deposits.set(depositId, existing);
+
+    if (basicAmm && identity.depositId && (event.eventType.includes("close") || event.eventType.includes("withdraw"))) {
+      activeBasicDepositByBaseId.delete(identity.depositId);
+    }
   }
 
   return [...deposits.values()];

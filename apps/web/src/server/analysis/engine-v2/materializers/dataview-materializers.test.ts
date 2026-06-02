@@ -358,6 +358,124 @@ test("materializeAllDataViewRows enriches deposit rows from pool snapshots and t
   assert.equal(poolTimeline[1]?.eventType, "mint_position");
 });
 
+test("materializeAllDataViewRows labels basic volatile deposits without inventing tokenId", () => {
+  const poolId = "8453:0xb2cc224c1c9fee385f8ad6a55b4d94e92359dc59";
+  const poolAddress = poolId.split(":").at(-1) ?? "";
+  const depositId = `8453:basic_amm:${poolAddress}`;
+  const accounting = runChronologicalAccounting({
+    events: [
+      {
+        id: "basic-open",
+        chainId: 8453,
+        walletAddress,
+        eventType: "manual_pool_deposit_router",
+        eventFamily: "deposit",
+        occurredAt: new Date("2026-01-01T00:00:00.000Z"),
+        txHash: "0xbasic-open",
+        sequenceIndex: 0,
+        coverageStatus: "full",
+        confidence: "high",
+        reasonCodes: [],
+        metadataJson: {
+          depositKind: "basic_amm",
+          depositId,
+          poolId,
+          poolAddress,
+          poolType: "volatile",
+          valueUsd: "10",
+        },
+        evidenceJson: {
+          movements: [
+            {
+              assetType: "erc20",
+              direction: "out",
+              tokenAddress: "0x4200000000000000000000000000000000000006",
+              amountRaw: "1000000000000000000",
+            },
+            {
+              assetType: "erc20",
+              direction: "out",
+              tokenAddress: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+              amountRaw: "7000000000",
+            },
+          ],
+        },
+      },
+      {
+        id: "basic-close",
+        chainId: 8453,
+        walletAddress,
+        eventType: "manual_pool_withdraw_router",
+        eventFamily: "deposit",
+        occurredAt: new Date("2026-01-02T00:00:00.000Z"),
+        txHash: "0xbasic-close",
+        sequenceIndex: 1,
+        coverageStatus: "full",
+        confidence: "high",
+        reasonCodes: [],
+        metadataJson: {
+          depositKind: "basic_amm",
+          depositId,
+          poolId,
+          poolAddress,
+          poolType: "volatile",
+          valueUsd: "8",
+        },
+        evidenceJson: {
+          movements: [
+            {
+              assetType: "erc20",
+              direction: "in",
+              tokenAddress: "0x4200000000000000000000000000000000000006",
+              amountRaw: "900000000000000000",
+            },
+          ],
+        },
+      },
+    ],
+    links: [
+      { domainEventId: "basic-open", entityType: "deposit", entityId: depositId },
+      { domainEventId: "basic-open", entityType: "pool", entityId: poolId },
+      { domainEventId: "basic-close", entityType: "deposit", entityId: depositId },
+      { domainEventId: "basic-close", entityType: "pool", entityId: poolId },
+    ],
+  });
+
+  const context: EngineV2MaterializationContext = {
+    poolStateByPoolId: new Map([[poolId, {
+      poolId,
+      poolAddress,
+      token0Address: "0x4200000000000000000000000000000000000006",
+      token1Address: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+      tickSpacing: null,
+      feeTierBps: null,
+      poolType: "volatile",
+    }]]),
+    tokenMetadataByAddress: new Map([
+      ["0x4200000000000000000000000000000000000006", { tokenAddress: "0x4200000000000000000000000000000000000006", symbol: "WETH", decimals: 18 }],
+      ["0x833589fcd6edb6e08f4c7c32d4f71b54bda02913", { tokenAddress: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913", symbol: "USDC", decimals: 6 }],
+      [poolAddress, { tokenAddress: poolAddress, symbol: "vAMM-WETH/USDC", decimals: 18 }],
+    ]),
+    governanceLockByLockKey: new Map(),
+    governanceLockByTokenId: new Map(),
+    strategyStateByExposureId: new Map(),
+    strategyStateByWrapperAddress: new Map(),
+  };
+
+  const rows = materializeAllDataViewRows(accounting, context);
+  const depositRow = rows.find((row) => row.surface === "deposits");
+  const poolRow = rows.find((row) => row.surface === "pools");
+  const depositJson = depositRow?.rowJson as Record<string, unknown> | undefined;
+  const poolJson = poolRow?.rowJson as Record<string, unknown> | undefined;
+
+  assert.equal(depositJson?.poolLabel, "WETH / USDC Volatile");
+  assert.equal(depositJson?.positionLabel, "WETH / USDC Volatile");
+  assert.equal(depositJson?.poolKind, "basic_volatile");
+  assert.equal(depositJson?.tokenId, null);
+  assert.equal(poolJson?.label, "WETH / USDC Volatile");
+  assert.equal(poolJson?.poolType, "volatile");
+});
+
 test("materializeAllDataViewRows enriches strategy rows from pool context and owned rewards", () => {
   const poolId = "8453:0xb2cc224c1c9fee385f8ad6a55b4d94e92359dc59";
   const wrapperAddress = "0xcd975e6a5f55137755487f0918b8ca74acce7925";

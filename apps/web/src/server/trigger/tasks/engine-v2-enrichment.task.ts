@@ -57,6 +57,7 @@ const AERODROME_POOL_ABI = parseAbi([
   "function token0() view returns (address)",
   "function token1() view returns (address)",
   "function tickSpacing() view returns (int24)",
+  "function stable() view returns (bool)",
 ]);
 
 const PROTOCOL_GRANT_ADDRESS_KINDS = new Set([
@@ -481,16 +482,23 @@ async function resolvePoolDefinitionNeed(need: EngineV2EnrichmentNeedInput & { i
     });
   }
 
-  const [token0Hex, token1Hex, tickSpacingHex] = await Promise.all([
+  const [token0Hex, token1Hex, tickSpacingHex, stableHex] = await Promise.all([
     alchemyRpc<string>("eth_call", [{ to: poolAddress, data: encodeFunctionData({ abi: AERODROME_POOL_ABI, functionName: "token0" }) }, "latest"], { chainId: need.chainId }),
     alchemyRpc<string>("eth_call", [{ to: poolAddress, data: encodeFunctionData({ abi: AERODROME_POOL_ABI, functionName: "token1" }) }, "latest"], { chainId: need.chainId }),
-    alchemyRpc<string>("eth_call", [{ to: poolAddress, data: encodeFunctionData({ abi: AERODROME_POOL_ABI, functionName: "tickSpacing" }) }, "latest"], { chainId: need.chainId }),
+    alchemyRpc<string>("eth_call", [{ to: poolAddress, data: encodeFunctionData({ abi: AERODROME_POOL_ABI, functionName: "tickSpacing" }) }, "latest"], { chainId: need.chainId }).catch(() => null),
+    alchemyRpc<string>("eth_call", [{ to: poolAddress, data: encodeFunctionData({ abi: AERODROME_POOL_ABI, functionName: "stable" }) }, "latest"], { chainId: need.chainId }).catch(() => null),
   ]);
 
   const token0 = normalizeAddress(decodeFunctionResult({ abi: AERODROME_POOL_ABI, functionName: "token0", data: token0Hex as `0x${string}` }));
   const token1 = normalizeAddress(decodeFunctionResult({ abi: AERODROME_POOL_ABI, functionName: "token1", data: token1Hex as `0x${string}` }));
-  const tickSpacing = Number(decodeFunctionResult({ abi: AERODROME_POOL_ABI, functionName: "tickSpacing", data: tickSpacingHex as `0x${string}` }));
-  if (!token0 || !token1 || !Number.isFinite(tickSpacing)) {
+  const tickSpacing = typeof tickSpacingHex === "string"
+    ? Number(decodeFunctionResult({ abi: AERODROME_POOL_ABI, functionName: "tickSpacing", data: tickSpacingHex as `0x${string}` }))
+    : null;
+  const stable = typeof stableHex === "string"
+    ? decodeFunctionResult({ abi: AERODROME_POOL_ABI, functionName: "stable", data: stableHex as `0x${string}` })
+    : null;
+  const poolType = stable === true ? "stable" : stable === false ? "volatile" : null;
+  if (!token0 || !token1 || (!Number.isFinite(tickSpacing ?? Number.NaN) && !poolType)) {
     return markNeedUnresolved(need);
   }
 
@@ -500,7 +508,8 @@ async function resolvePoolDefinitionNeed(need: EngineV2EnrichmentNeedInput & { i
       poolAddress,
       token0,
       token1,
-      tickSpacing,
+      tickSpacing: Number.isFinite(tickSpacing ?? Number.NaN) ? tickSpacing : null,
+      poolType,
       evidenceJson: { resolver: "engine-v2-enrichment" },
     }),
   ]).onConflictDoNothing();
@@ -510,7 +519,8 @@ async function resolvePoolDefinitionNeed(need: EngineV2EnrichmentNeedInput & { i
     poolAddress,
     token0,
     token1,
-    tickSpacing,
+    tickSpacing: Number.isFinite(tickSpacing ?? Number.NaN) ? tickSpacing : null,
+    poolType,
   });
 }
 

@@ -17,6 +17,7 @@ export type EngineV2MaterializationPoolState = {
   token1Address: string | null;
   tickSpacing: number | null;
   feeTierBps: number | null;
+  poolType?: string | null;
 };
 
 export type EngineV2MaterializationStrategyState = {
@@ -187,6 +188,7 @@ export async function loadMaterializationContext(input: {
       token1Address,
       tickSpacing: asInteger(state.tickSpacing),
       feeTierBps: asInteger(state.feeTier),
+      poolType: asString(state.poolType),
     });
   }
 

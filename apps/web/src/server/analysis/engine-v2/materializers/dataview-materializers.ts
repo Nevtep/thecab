@@ -141,7 +141,17 @@ function poolKindFromState(input: {
 }) {
   if (input.depositTokenId) return "cl";
   if (input.poolState?.tickSpacing !== null && input.poolState?.tickSpacing !== undefined) return "cl";
+  if (input.poolState?.poolType === "stable") return "basic_stable";
+  if (input.poolState?.poolType === "volatile") return "basic_volatile";
   return "unknown";
+}
+
+function poolLabelSuffix(poolState: EngineV2MaterializationPoolState | null) {
+  const suffix = poolState?.feeTierBps ?? poolState?.tickSpacing;
+  if (suffix !== null && suffix !== undefined) return String(suffix);
+  if (poolState?.poolType === "stable") return "Stable";
+  if (poolState?.poolType === "volatile") return "Volatile";
+  return null;
 }
 
 function poolLabelFromState(input: {
@@ -153,7 +163,7 @@ function poolLabelFromState(input: {
   const token0Symbol = getTokenMetadata(input.context, input.poolState?.token0Address)?.symbol ?? null;
   const token1Symbol = getTokenMetadata(input.context, input.poolState?.token1Address)?.symbol ?? null;
   if (!token0Symbol || !token1Symbol) return UNRESOLVED_POOL_LABEL;
-  const suffix = input.poolState?.feeTierBps ?? input.poolState?.tickSpacing;
+  const suffix = poolLabelSuffix(input.poolState);
   return suffix ? `${token0Symbol} / ${token1Symbol} ${suffix}` : `${token0Symbol} / ${token1Symbol}`;
 }
 
@@ -171,7 +181,7 @@ function positionLabelFromDeposit(input: {
   poolLabel: string;
   poolKind: string;
 }) {
-  if (!input.tokenId) return input.depositId;
+  if (!input.tokenId) return input.poolLabel !== UNRESOLVED_POOL_LABEL ? input.poolLabel : input.depositId;
   const suffix = input.poolKind === "cl" ? " · CL" : "";
   return `${input.poolLabel}${suffix} #${input.tokenId}`;
 }
@@ -1180,7 +1190,7 @@ export function materializePoolRows(
       poolAddress: poolState?.poolAddress ?? pool.poolId.split(":").at(-1) ?? pool.poolId,
       tokenSymbols,
       feeTierLabel: formatFeeTierLabel(poolState?.tickSpacing),
-      poolType: poolState?.tickSpacing !== null && poolState?.tickSpacing !== undefined ? "cl" : null,
+      poolType: poolState?.tickSpacing !== null && poolState?.tickSpacing !== undefined ? "cl" : poolState?.poolType ?? null,
       protocolFamily: "aerodrome",
       status: "active",
       exposureMix: Number(pool.strategyValueUsd) > 0 && Number(pool.manualDepositValueUsd) > 0 ? "mixed" : Number(pool.strategyValueUsd) > 0 ? "automated" : "manual",

@@ -1251,6 +1251,206 @@ And does not fabricate creation, ownership, pool, strategy, reward or lock origi
 And request-time APIs continue reading only persisted DB rows
 ```
 
+## BUG-EV2-010: Basic Gauge `getReward(address)` Post-Close Claim No Se Asigna Al Episodio Cerrado Correcto
+
+Estado: known bug abierto al 2026-06-02.
+
+### Caso Reproducible
+
+Tx:
+
+```text
+0xbf1129574cc93a84c213991aada4dacf7672e9b08cfe1fbfc51d9cf7fc7b9a3a
+```
+
+Clasificacion actual:
+
+```text
+event_type: manual_gauge_reward_claim
+decoded_function: getReward
+to_address / gauge: 0x519bbd1dd8c6a94c46080e24f316c14ee758c025
+reward_type materialized: unknown
+owner.status: unresolved
+poolContribution.status: contributes
+poolContribution.poolId: 8453:0xcdac0d6c6c59727a65f871236188350531885c43
+poolContribution.poolLabel: WETH / USDC Volatile
+```
+
+El pool se resuelve correctamente, pero el owner no.
+
+### Evidencia Del Timeline
+
+Para el pool `8453:0xcdac0d6c6c59727a65f871236188350531885c43` el timeline persistido queda:
+
+```text
+2026-02-22T21:12:53Z  manual_pool_deposit_router   depositId=8453:basic_amm:0xcdac...
+2026-03-05T15:55:39Z  manual_gauge_stake          gauge=0x519bbd...
+2026-03-05T16:49:37Z  manual_gauge_unstake        gauge=0x519bbd...
+2026-03-05T16:51:01Z  manual_pool_withdraw_router depositId=8453:basic_amm:0xcdac...
+2026-03-05T16:52:35Z  manual_gauge_reward_claim   tx=0xbf112957...
+```
+
+Lectura:
+
+- el gauge ya quedo mapeado al pool correcto;
+- el claim ocurre despues de `manual_gauge_unstake` y despues de `manual_pool_withdraw_router`;
+- en basic pools, `manual_gauge_unstake` no cierra el deposito; el cierre del episodio lo marca `manual_pool_withdraw_router` / removeLiquidity;
+- la logica actual de accounting solo asigna claims basic cuando encuentra un episodio activo al timestamp del claim;
+- por eso el reward queda con pool correcto pero `owner=unresolved`.
+
+### Por Que Sigue Siendo Bug
+
+En Aerodrome basic pools puede existir un claim residual inmediatamente despues del unstake y aun despues del `manual_pool_withdraw_router` del mismo episodio. En este caso no falta pool identity; falta una regla deterministica para claims residuales post-cierre.
+
+La tx no debe quedar mezclada con otro pool ni con otro episodio, pero tampoco conviene adivinar ownership por ventana temporal amplia.
+
+### Solucion Propuesta
+
+Agregar una regla de asignacion residual post-close solo para `manual_gauge_reward_claim` en basic pools:
+
+```text
+1. Resolver gauge -> pool de forma deterministica.
+2. Buscar episodio activo al momento del claim.
+3. Si no existe episodio activo:
+  - buscar el ultimo episodio del mismo pool/gauge cerrado antes del claim;
+  - exigir que no exista reapertura posterior previa al claim;
+  - exigir que el candidato sea unico.
+4. Si esas condiciones se cumplen, asignar el claim al ultimo episodio cerrado.
+5. Si no, mantener unresolved.
+```
+
+Fuente de verdad recomendada:
+
+- prioridad 1: episodio activo por pool;
+- prioridad 2: ultimo episodio del mismo pool ligado al mismo gauge, cerrado inmediatamente antes del claim y sin conflicto posterior;
+- nunca usar heuristicas por monto o por proximidad entre pools.
+
+### Persistencia Esperada Cuando Se Corrija
+
+```text
+reward_type: reward_claim
+owner.status: manual_deposit
+owner.entityId: 8453:basic_amm:0xcdac0d6c6c59727a65f871236188350531885c43
+poolContribution.poolId: 8453:0xcdac0d6c6c59727a65f871236188350531885c43
+```
+
+### Regression Propuesta
+
+Fixture deterministico con:
+
+```text
+deposit open -> gauge stake -> gauge unstake -> pool withdraw -> getReward(address)
+```
+
+Debe afirmar:
+
+- pool correcto resuelto por gauge;
+- sin episodio activo al claim time;
+- owner resuelto al ultimo episodio cerrado del mismo pool cuando el candidato es unico;
+- unresolved si existe reapertura o multiples candidatos validos.
+
+## BUG-EV2-011: `Pool.claimFees()` En Basic Pools Colapsa Dos Tokens En Una Sola Reward Row Y No Conserva Owner/Pool Deterministicos
+
+Estado: known bug abierto al 2026-06-02.
+
+### Caso Reproducible
+
+Tx:
+
+```text
+0xd1e9dd394439266e57449cf8dbc22325000523f910ec6b61b24f645bf3799792
+```
+
+Clasificacion actual:
+
+```text
+event_type: manual_pool_fee_claim
+decoded_function: claimFees
+to_address: 0xcdac0d6c6c59727a65f871236188350531885c43
+classification.reason: Pool.claimFees
+reward_type materialized: fee_claim
+owner.status: unresolved
+poolContribution.status: unresolved
+```
+
+### Evidencia De Movimientos Canonicos
+
+La tx tiene dos ingresos ERC20 reales hacia la wallet:
+
+```text
+WETH  0x4200000000000000000000000000000000000006  amount_raw=10135986357961343
+USDC  0x833589fcd6edb6e08f4c7c32d4f71b54bda02913  amount_raw=20953414
+```
+
+Sin embargo, la fila de rewards actual solo materializa el primer token observado.
+
+### Evidencia Del Timeline
+
+En el mismo pool WETH / USDC Volatile:
+
+```text
+2026-03-05T16:51:01Z  manual_pool_withdraw_router depositId=8453:basic_amm:0xcdac...
+2026-03-05T16:51:49Z  manual_pool_fee_claim       tx=0xd1e9dd39...
+```
+
+O sea:
+
+- `claimFees()` se ejecuta sobre el contrato del pool correcto;
+- ocurre despues del `manual_pool_withdraw_router` del episodio basic;
+- entrega dos tokens;
+- hoy no se persiste `poolId` explicito en `metadata_json` para este caso;
+- y la materializacion colapsa el claim a una sola reward row usando el primer ERC20 inbound.
+
+### Por Que Sigue Siendo Bug
+
+Este caso mezcla dos problemas distintos:
+
+1. falta el pool identity explicito aunque el `to_address` ya es el pool contract;
+2. falta breakdown multi-item para `claimFees()` en pools basic cuando entran dos tokens.
+
+Mientras eso no se resuelva, la UI muestra un solo fee claim sin owner ni pool, aunque la tx real devuelve WETH y USDC del pool WETH / USDC Volatile.
+
+### Solucion Propuesta
+
+Para `manual_pool_fee_claim` sobre basic pools:
+
+```text
+1. Promover `tx.to_address` a `poolAddress/poolId` explicitos cuando el target es el pool contract.
+2. Materializar un reward item por cada inbound ERC20 movement del claim.
+3. Conservar una dedupe key por (tx_hash, token_address, item_index).
+4. Resolver owner contra el episodio basic del mismo pool:
+  - primero episodio activo;
+  - no tratar `manual_gauge_unstake` como cierre de episodio;
+  - si no existe, reutilizar la misma regla residual post-close propuesta en BUG-EV2-010.
+```
+
+La solucion no debe asumir governance. La evidencia actual muestra que esta tx es un `Pool.claimFees()` directo sobre el pool basic, no un `Voter.claimFees()` de governance.
+
+### Persistencia Esperada Cuando Se Corrija
+
+Dos reward rows:
+
+```text
+tx=0xd1e9dd39...
+item 0 -> token=WETH, reward_type=fee_claim, poolId=8453:0xcdac..., owner=manual_deposit
+item 1 -> token=USDC, reward_type=fee_claim, poolId=8453:0xcdac..., owner=manual_deposit
+```
+
+### Regression Propuesta
+
+Fixture con:
+
+```text
+basic pool claimFees() -> two inbound ERC20 movements -> no tokenId
+```
+
+Debe afirmar:
+
+- `manual_pool_fee_claim` persiste `poolId` desde `tx.to_address`;
+- el claim produce dos reward items, uno por token;
+- ambos items conservan el mismo pool;
+- ambos se asignan al episodio basic correcto o quedan unresolved solo si la regla residual no puede decidir deterministamente.
+
 ## Cambios Documentales Realizados
 
 Este documento complementa:

@@ -42,7 +42,6 @@ function toneForCoverage(coverage: string) {
   return "neutral" as const;
 }
 
-export function GovernanceLockPanel({ lockPanel, labels }: Props) {
 export function GovernanceLockPanel({ locks, labels }: Props) {
   return (
     <CabCard density="compact">
@@ -84,7 +83,7 @@ export function GovernanceLockPanel({ locks, labels }: Props) {
                     <CabText variant="label">{labels.getKind(lockPanel.lockKind)}</CabText>
                     <CabStack row alignItems="center" gap="$2">
                       {(lockPanel.lockExposureId ?? lockPanel.lockId) === locks.primaryLockId ? (
-                        <CabBadge tone="signal" size="sm">{labels.primary}</CabBadge>
+                        <CabBadge tone="info" size="sm" variant="emphasis">{labels.primary}</CabBadge>
                       ) : null}
                       <CabBadge tone={toneForCoverage(lockPanel.coverageState)} size="sm">
                         {labels.getCoverage(lockPanel.coverageState)}

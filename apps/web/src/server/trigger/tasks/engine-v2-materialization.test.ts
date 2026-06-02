@@ -4,6 +4,7 @@ import test from "node:test";
 import { runChronologicalAccounting } from "@/server/analysis/engine-v2/accounting";
 import { emptyMaterializationContext } from "@/server/analysis/engine-v2/materializers/load-materialization-context";
 import {
+  buildGaugePoolIdByGaugeAddress,
   hydrateAccountingInputWithPersistedPrices,
   runEngineV2AccountChronological,
   runEngineV2MaterializeReadModels,
@@ -273,5 +274,48 @@ test("hydrateAccountingInputWithPersistedPrices carries historical pricing into 
   assert.equal(
     (accounting.events[1]?.evidenceJson as { movements?: Array<{ direction?: string; valueUsdAtEvent?: string | null }> })?.movements?.find((movement) => movement.direction === "internal")?.valueUsdAtEvent ?? null,
     null,
+  );
+});
+
+test("buildGaugePoolIdByGaugeAddress falls back to gauge lifecycle events when protocol metadata is missing", () => {
+  const result = buildGaugePoolIdByGaugeAddress({
+    rewardClaimGaugeAddresses: ["0x519BbD1dd8C6a94c46080e24F316c14Ee758C025"],
+    protocolGaugeRows: [],
+    eventGaugeRows: [
+      {
+        gaugeAddress: "0x519bbd1dd8c6a94c46080e24f316c14ee758c025",
+        poolId: "8453:0xcdac0d6c6c59727a65f871236188350531885c43",
+      },
+    ],
+  });
+
+  assert.equal(
+    result.get("0x519bbd1dd8c6a94c46080e24f316c14ee758c025"),
+    "8453:0xcdac0d6c6c59727a65f871236188350531885c43",
+  );
+});
+
+test("buildGaugePoolIdByGaugeAddress keeps protocol metadata as the primary source", () => {
+  const result = buildGaugePoolIdByGaugeAddress({
+    rewardClaimGaugeAddresses: ["0x4f09bab2f0e15e2a078a227fe1537665f55b8360"],
+    protocolGaugeRows: [
+      {
+        address: "0x4f09bab2f0e15e2a078a227fe1537665f55b8360",
+        metadataJson: {
+          poolId: "8453:0x6cdcb1c4a4d1c3c6d054b27ac5b77e89eafb971d",
+        },
+      },
+    ],
+    eventGaugeRows: [
+      {
+        gaugeAddress: "0x4f09bab2f0e15e2a078a227fe1537665f55b8360",
+        poolId: "8453:0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+      },
+    ],
+  });
+
+  assert.equal(
+    result.get("0x4f09bab2f0e15e2a078a227fe1537665f55b8360"),
+    "8453:0x6cdcb1c4a4d1c3c6d054b27ac5b77e89eafb971d",
   );
 });
