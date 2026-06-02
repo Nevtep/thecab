@@ -1,4 +1,6 @@
 import type { EngineV2AccountingOutput } from "@/server/analysis/engine-v2/accounting";
+import { deriveGovernanceLockKind, resolvePrimaryGovernanceLockPanel, selectPrimaryGovernanceLockId } from "@/server/governance/governance-locks";
+import type { GovernanceLockPanel } from "@/server/governance/governance.types";
 
 import { materializeActivityRows, type EngineV2ReadModelRowInput } from "./activity-materializer";
 import type { EngineV2MaterializationContext, EngineV2MaterializationPoolState } from "./load-materialization-context";
@@ -57,6 +59,10 @@ function asObjectArray(value: unknown) {
   return Array.isArray(value)
     ? value.filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === "object" && !Array.isArray(entry))
     : [];
+}
+
+function asGovernanceLockPanel(value: unknown): GovernanceLockPanel | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as GovernanceLockPanel : null;
 }
 
 function asInteger(value: unknown) {
@@ -1246,6 +1252,13 @@ export function materializeGovernanceRows(
             : expiresAt && expiresAt.getTime() < Date.now()
               ? "expired"
               : "active";
+        const lockKind = deriveGovernanceLockKind({
+          status: persistedLock?.status ?? lock.status,
+          originKind: persistedLock?.originKind ?? lock.originKind,
+          managedTokenId: lock.managedTokenId,
+          provenance: asString(persistedLock?.metadataJson?.provenance),
+          explicitKind: asString(persistedLock?.metadataJson?.lockKind),
+        });
         const lockReasonCodes = Array.from(new Set([
           ...lock.reasonCodes,
           ...(persistedLock?.reasonCodes ?? []),
@@ -1257,9 +1270,11 @@ export function materializeGovernanceRows(
       lockPanel: {
         lockExposureId: persistedLock?.lockKey ?? lock.lockKey,
         lockId: lock.tokenId,
+        lockKind,
         status,
         createdAt: toIso(createdAt),
         expiresAt: toIso(expiresAt),
+        managedTokenId: lock.managedTokenId,
         lockedAeroAmount: latestAmount,
         lockedAeroValueUsd,
         veAeroExposure,
@@ -1528,11 +1543,22 @@ export function materializeGovernanceRows(
           kind: "metric",
           metricSnapshot: {
             summary: {
+              ...(function primaryGovernanceLockSummary() {
+                const lockPanels = lockRows
+                  .map((lockRow) => asGovernanceLockPanel(asRecord(lockRow.rowJson).lockPanel))
+                  .filter((lockPanel): lockPanel is GovernanceLockPanel => Boolean(lockPanel));
+                const primaryLock = resolvePrimaryGovernanceLockPanel({
+                  rows: lockPanels,
+                  primaryLockId: selectPrimaryGovernanceLockId(lockPanels),
+                });
+                return {
               totalEvents: accounting.governance.events.length,
-              lockedAero: lockRows[0]?.rowJson.lockPanel.lockedAeroAmount ?? null,
-              veAeroExposure: lockRows[0]?.rowJson.lockPanel.veAeroExposure ?? null,
+              lockedAero: primaryLock?.lockedAeroAmount ?? null,
+              veAeroExposure: primaryLock?.veAeroExposure ?? null,
               governanceRewardsClaimedUsd: sumStringNumbers(governanceRewards.filter((reward) => reward.affectsTotals).map((reward) => reward.amountUsd)),
               estimatedGovernanceReturn: null,
+                };
+              })(),
             },
             selectedDetail: null,
             coverageState: worstGovernanceCoverage([

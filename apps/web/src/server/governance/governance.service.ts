@@ -7,6 +7,7 @@ import {
   type GovernanceRepositoryResult,
   type GovernanceSelectedDetailTarget,
 } from "@/server/governance/governance.repository";
+import { resolvePrimaryGovernanceLockPanel } from "@/server/governance/governance-locks";
 import type {
   GovernanceAnalysisState,
   GovernanceCoverageState,
@@ -142,7 +143,10 @@ export function buildEmptyGovernanceSummary(reasonCodes = ["governanceReadModelU
 }
 
 function buildSummary(repository: GovernanceRepositoryResult): GovernanceSummary {
-  const lockPanel = repository.lockPanel;
+  const lockPanel = resolvePrimaryGovernanceLockPanel({
+    rows: repository.lockPanels,
+    primaryLockId: repository.primaryLockId,
+  });
   const rewardsUsd = repository.allRewardRows
     .filter((row) => row.affectsTotals)
     .reduce((sum, row) => sum + (asNumber(row.valueUsdAtClaim) ?? 0), 0);
@@ -151,6 +155,7 @@ function buildSummary(repository: GovernanceRepositoryResult): GovernanceSummary
   const coverageStates = [
     lockPanel?.coverageState,
     repository.metricSnapshot?.coverageState,
+    ...repository.lockPanels.map((row) => row.coverageState),
     ...repository.allRewardRows.map((row) => row.coverageState),
     ...repository.epochs.map((epoch) => epoch.coverageState),
   ].filter((value): value is GovernanceCoverageState => Boolean(value));
@@ -558,6 +563,10 @@ export function buildLockedGovernanceResponse(input: GovernanceRequest, analysis
       activeChips: createGovernanceActiveChips(input),
     },
     summary: buildEmptyGovernanceSummary(["analysisNotReady"]),
+    locks: {
+      rows: [],
+      primaryLockId: null,
+    },
     lockPanel: null,
     epochTimeline: { epochs: [] },
     rewardBreakdown: buildRewardBreakdown([]),
@@ -585,8 +594,12 @@ export function buildReadyGovernanceResponse(input: {
   repository: GovernanceRepositoryResult;
   analysis: GovernanceAnalysisState;
 }): GovernanceResponse {
+  const primaryLock = resolvePrimaryGovernanceLockPanel({
+    rows: input.repository.lockPanels,
+    primaryLockId: input.repository.primaryLockId,
+  });
   const hasGovernanceData = Boolean(
-    input.repository.lockPanel ||
+    input.repository.lockPanels.length > 0 ||
     input.repository.epochs.length > 0 ||
     input.repository.allRewardRows.length > 0 ||
     input.repository.events.length > 0,
@@ -601,7 +614,11 @@ export function buildReadyGovernanceResponse(input: {
       activeChips: createGovernanceActiveChips(input.request),
     },
     summary: buildSummary(input.repository),
-    lockPanel: input.repository.lockPanel,
+    locks: {
+      rows: input.repository.lockPanels,
+      primaryLockId: input.repository.primaryLockId,
+    },
+    lockPanel: primaryLock,
     epochTimeline: {
       epochs: input.repository.epochs,
     },

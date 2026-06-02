@@ -38,7 +38,19 @@ function normalizeReasonCodes<TValue extends { reasonCodes: string[] }>(value: T
   };
 }
 
+function normalizeLockPanel<TValue extends GovernanceResponse["lockPanel"]>(lockPanel: TValue): TValue {
+  if (!lockPanel) return lockPanel;
+  return {
+    ...lockPanel,
+    reasonCodes: dedupe(lockPanel.reasonCodes),
+    lifecycle: [...lockPanel.lifecycle].sort((left, right) => left.occurredAt.localeCompare(right.occurredAt)),
+  } as TValue;
+}
+
 export function mapGovernanceResponseToViewModel(response: GovernanceResponse): GovernanceResponse {
+  const lockRows = response.locks.rows.map((lock) => normalizeLockPanel(lock));
+  const primaryLock = lockRows.find((lock) => (lock.lockExposureId ?? lock.lockId) === response.locks.primaryLockId)
+    ?? normalizeLockPanel(response.lockPanel);
   return {
     ...response,
     walletAddress: response.walletAddress.toLowerCase(),
@@ -51,13 +63,11 @@ export function mapGovernanceResponseToViewModel(response: GovernanceResponse): 
       estimatedGovernanceReturn: normalizeReasonCodes(response.summary.estimatedGovernanceReturn),
       overallCoverage: normalizeReasonCodes(response.summary.overallCoverage),
     },
-    lockPanel: response.lockPanel
-      ? {
-          ...response.lockPanel,
-          reasonCodes: dedupe(response.lockPanel.reasonCodes),
-          lifecycle: [...response.lockPanel.lifecycle].sort((left, right) => left.occurredAt.localeCompare(right.occurredAt)),
-        }
-      : null,
+    locks: {
+      rows: lockRows,
+      primaryLockId: response.locks.primaryLockId,
+    },
+    lockPanel: primaryLock,
     epochTimeline: {
       epochs: [...response.epochTimeline.epochs].sort((left, right) =>
         (left.epochStartAt ?? left.epochId).localeCompare(right.epochStartAt ?? right.epochId),

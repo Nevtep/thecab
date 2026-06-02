@@ -14,4 +14,6 @@ test("Engine V2 CLI commands expose run/regression and guarded purge entry point
   assert.match(runSource, /fresh|incremental|reanalysis|fixture/);
   assert.match(regressionSource, /runEngineV2Regression/);
   assert.match(purgeSource, /confirm-engine-v2-purge/);
+  assert.match(purgeSource, /engine_v2_classified_transactions/);
+  assert.doesNotMatch(purgeSource, /label:\s*"raw_provider_records"/);
 });

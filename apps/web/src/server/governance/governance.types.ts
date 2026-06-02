@@ -15,6 +15,7 @@ export type GovernanceCoverageState = typeof GOVERNANCE_COVERAGE_STATES[number];
 export type GovernanceConfidence = typeof GOVERNANCE_CONFIDENCE_STATES[number];
 export type GovernanceSortKey = typeof GOVERNANCE_SORT_KEYS[number];
 export type GovernanceErrorCode = typeof GOVERNANCE_ERROR_CODES[number];
+export type GovernanceLockKind = "direct" | "deposited_managed" | "managed_or_relay" | "protocol_grant" | "unknown";
 
 export type GovernanceAnalysisState = {
   status: "not_analyzed" | "queued" | "running" | "ready" | "failed" | "stale";
@@ -53,9 +54,11 @@ export type GovernanceSummary = {
 export type GovernanceLockPanel = {
   lockExposureId: string | null;
   lockId: string | null;
+  lockKind: GovernanceLockKind;
   status: "active" | "expired" | "withdrawn" | "partial" | "unknown";
   createdAt: string | null;
   expiresAt: string | null;
+  managedTokenId: string | null;
   lockedAeroAmount: string | null;
   lockedAeroValueUsd: string | null;
   veAeroExposure: string | null;
@@ -176,6 +179,10 @@ export type GovernanceResponse = {
   analysis: GovernanceAnalysisState;
   filters: GovernanceFilters;
   summary: GovernanceSummary;
+  locks: {
+    rows: GovernanceLockPanel[];
+    primaryLockId: string | null;
+  };
   lockPanel: GovernanceLockPanel | null;
   epochTimeline: {
     epochs: GovernanceEpochSummary[];

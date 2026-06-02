@@ -213,12 +213,15 @@ export function GovernanceComponent(input: Props) {
         <CabStack className={styles.leftArea}>
           <div className={styles.panelGrid}>
             <GovernanceLockPanel
-              lockPanel={input.viewModel.lockPanel}
+              locks={input.viewModel.locks}
               labels={{
                 title: t("governance:panels.lock"),
                 empty: t("governance:lock.empty"),
+                primary: t("governance:lock.primary", { defaultValue: "Primary" }),
+                kind: t("governance:lock.kind", { defaultValue: "Type" }),
                 status: t("governance:lock.status"),
                 lockId: t("governance:lock.lockId"),
+                managedTokenId: t("governance:lock.managedTokenId", { defaultValue: "Managed token" }),
                 createdAt: t("governance:lock.createdAt"),
                 expiresAt: t("governance:lock.expiresAt"),
                 lockedAero: t("governance:lock.lockedAero"),
@@ -227,6 +230,18 @@ export function GovernanceComponent(input: Props) {
                 confidence: t("governance:lock.confidence"),
                 lifecycle: t("governance:lock.lifecycle"),
                 noLifecycle: t("governance:lock.noLifecycle"),
+                getKind: (value) => t(`governance:lock.kinds.${value}`, {
+                  defaultValue:
+                    value === "direct"
+                      ? "Direct wallet lock"
+                      : value === "deposited_managed"
+                        ? "Deposited-managed lock"
+                        : value === "managed_or_relay"
+                          ? "Managed or relay lock"
+                          : value === "protocol_grant"
+                            ? "Protocol-grant lock"
+                            : "Unknown lock",
+                }),
                 getStatus: (value) => t(`governance:lock.statuses.${value}`, { defaultValue: value }),
                 getCoverage: (value) => t(`coverage:level.${value}`, { defaultValue: value }),
                 getConfidence: (value) => t(`governance:confidence.${value}`, { defaultValue: value }),

@@ -55,9 +55,11 @@ const readyAnalysis: GovernanceAnalysisState = {
 const lockPanel: GovernanceLockPanel = {
   lockExposureId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
   lockId: "170",
+  lockKind: "direct",
   status: "active",
   createdAt: "2026-05-01T00:00:00.000Z",
   expiresAt: "2027-05-01T00:00:00.000Z",
+  managedTokenId: null,
   lockedAeroAmount: "2203.245",
   lockedAeroValueUsd: "48264.31",
   veAeroExposure: "1845.771",
@@ -155,7 +157,8 @@ function repository(overrides: Partial<GovernanceRepositoryResult> = {}): Govern
     allRewardRows: [primaryReward],
     rewardRows: [primaryReward],
     totalRewardRows: 1,
-    lockPanel,
+    lockPanels: [lockPanel],
+    primaryLockId: lockPanel.lockExposureId,
     epochs: [epoch170],
     events: [],
     selectedDetailTarget: { kind: "reward", reward: primaryReward },
@@ -219,10 +222,38 @@ test("buildReadyGovernanceResponse assembles first-screen surfaces from reposito
   assert.equal(response.screenKind, "ready");
   assert.equal(response.summary.lockedAero.value, "2203.245");
   assert.equal(response.summary.governanceRewardsClaimedUsd.valueUsd, "1500.00");
+  assert.equal(response.locks.rows.length, 1);
+  assert.equal(response.locks.primaryLockId, lockPanel.lockExposureId);
   assert.equal(response.epochTimeline.epochs.length, 1);
   assert.equal(response.rewardBreakdown.segments.length, 2);
   assert.equal(response.selectedDetail.selectionKind, "reward");
   assert.equal(response.rewards.pagination.totalPages, 1);
+});
+
+test("buildReadyGovernanceResponse uses the primary direct lock for summary state", () => {
+  const protocolGrantLock: GovernanceLockPanel = {
+    ...lockPanel,
+    lockExposureId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+    lockId: "90",
+    lockKind: "protocol_grant",
+    lockedAeroAmount: "12",
+    lockedAeroValueUsd: "24.00",
+    veAeroExposure: "10",
+    reasonCodes: ["protocolGrantLock"],
+  };
+
+  const response = buildReadyGovernanceResponse({
+    request: request(),
+    analysis: readyAnalysis,
+    repository: repository({
+      lockPanels: [protocolGrantLock, lockPanel],
+      primaryLockId: lockPanel.lockExposureId,
+    }),
+  });
+
+  assert.equal(response.lockPanel?.lockId, "170");
+  assert.equal(response.summary.lockedAero.value, "2203.245");
+  assert.deepEqual(response.locks.rows.map((row) => row.lockKind), ["protocol_grant", "direct"]);
 });
 
 test("buildReadyGovernanceResponse reconciles rewardEventId selection and unassociated reward totals", () => {

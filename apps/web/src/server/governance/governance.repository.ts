@@ -10,6 +10,12 @@ import {
   governanceMetricSnapshots,
   governanceRewardRows,
 } from "@/server/db/schema";
+import {
+  deriveGovernanceLockKind,
+  normalizeGovernanceLockKind,
+  selectPrimaryGovernanceLockId,
+  sortGovernanceLockPanels,
+} from "@/server/governance/governance-locks";
 import type {
   GovernanceConfidence,
   GovernanceCoverageState,
@@ -42,7 +48,8 @@ export type GovernanceRepositoryResult = {
   allRewardRows: GovernanceRewardRow[];
   rewardRows: GovernanceRewardRow[];
   totalRewardRows: number;
-  lockPanel: GovernanceLockPanel | null;
+  lockPanels: GovernanceLockPanel[];
+  primaryLockId: string | null;
   epochs: GovernanceEpochSummary[];
   events: GovernanceRepositoryEventRow[];
   selectedDetailTarget: GovernanceSelectedDetailTarget | null;
@@ -183,15 +190,25 @@ function mapLifecycleItem(value: Record<string, unknown>): GovernanceLockLifecyc
 }
 
 function mapLockPanel(row: typeof governanceLockExposures.$inferSelect): GovernanceLockPanel {
+  const metadata = asRecord(row.metadataJson);
+  const managedTokenId = asString(metadata.managedTokenId);
   return {
     lockExposureId: row.id,
     lockId: row.lockId,
+    lockKind: deriveGovernanceLockKind({
+      status: row.status,
+      originKind: asString(metadata.originKind),
+      managedTokenId,
+      provenance: asString(metadata.provenance),
+      explicitKind: asString(metadata.lockKind),
+    }),
     status:
       row.status === "active" || row.status === "expired" || row.status === "withdrawn" || row.status === "partial"
         ? row.status
         : "unknown",
     createdAt: toIso(row.createdAtUtc),
     expiresAt: toIso(row.expiresAtUtc),
+    managedTokenId,
     lockedAeroAmount: row.lockedAeroAmount,
     lockedAeroValueUsd: row.lockedAeroValueUsd,
     veAeroExposure: row.veAeroExposure,
@@ -340,22 +357,41 @@ function normalizeEngineV2GovernanceEvent(row: Record<string, unknown>): Governa
 
 function normalizeEngineV2LockPanel(row: Record<string, unknown>): GovernanceLockPanel | null {
   const nested = asRecord(row.lockPanel);
-  if (Object.keys(nested).length > 0) return nested as GovernanceLockPanel;
-  if (asString(row.kind) !== "lock") return null;
-  const lockId = asString(row.tokenId) ?? asString(row.lockId);
+  const source = Object.keys(nested).length > 0 ? nested : asString(row.kind) === "lock" ? row : null;
+  if (!source) return null;
+  const lockId = asString(source.lockId) ?? asString(source.tokenId) ?? asString(row.tokenId) ?? asString(row.lockId);
+  const managedTokenId = asString(source.managedTokenId) ?? asString(row.managedTokenId);
   return {
-    lockExposureId: asString(row.lockKey),
+    lockExposureId: asString(source.lockExposureId) ?? asString(source.lockKey) ?? asString(row.lockKey),
     lockId,
-    status: asString(row.status) === "deposited_managed" ? "active" : "unknown",
-    createdAt: null,
-    expiresAt: null,
-    lockedAeroAmount: null,
-    lockedAeroValueUsd: null,
-    veAeroExposure: null,
-    coverageState: normalizeCoverage(asString(row.coverageStatus)),
-    confidence: normalizeConfidence(asString(row.confidence)),
-    reasonCodes: asStringArray(row.reasonCodes),
-    lifecycle: [],
+    lockKind: deriveGovernanceLockKind({
+      status: asString(source.status) ?? asString(row.status),
+      originKind: asString(source.originKind) ?? asString(row.originKind),
+      managedTokenId,
+      provenance: asString(source.provenance) ?? asString(row.provenance),
+      explicitKind: normalizeGovernanceLockKind(asString(source.lockKind) ?? asString(row.lockKind)),
+    }),
+    status:
+      asString(source.status) === "active" ||
+      asString(source.status) === "expired" ||
+      asString(source.status) === "withdrawn" ||
+      asString(source.status) === "partial"
+        ? asString(source.status) as GovernanceLockPanel["status"]
+        : asString(source.status) === "deposited_managed"
+          ? "partial"
+          : "unknown",
+    createdAt: asString(source.createdAt),
+    expiresAt: asString(source.expiresAt),
+    managedTokenId,
+    lockedAeroAmount: asString(source.lockedAeroAmount),
+    lockedAeroValueUsd: asString(source.lockedAeroValueUsd),
+    veAeroExposure: asString(source.veAeroExposure),
+    coverageState: normalizeCoverage(asString(source.coverageState) ?? asString(source.coverageStatus) ?? asString(row.coverageStatus)),
+    confidence: normalizeConfidence(asString(source.confidence) ?? asString(row.confidence)),
+    reasonCodes: asStringArray(source.reasonCodes ?? row.reasonCodes),
+    lifecycle: asObjectArray(source.lifecycle)
+      .map(mapLifecycleItem)
+      .filter((item): item is GovernanceLockLifecycleItem => Boolean(item)),
   };
 }
 
@@ -520,9 +556,10 @@ export async function findGovernanceDataView(input: GovernanceRequest): Promise<
       .map((row) => normalizeEngineV2GovernanceEvent(row as Record<string, unknown>))
       .filter((row): row is GovernanceRepositoryEventRow => Boolean(row));
     const epochRows = engineV2Rows.map((row) => row.epoch).filter((row): row is GovernanceEpochSummary => Boolean(row));
-    const lockPanel = engineV2Rows
+    const lockPanels = sortGovernanceLockPanels(engineV2Rows
       .map((row) => normalizeEngineV2LockPanel(row as Record<string, unknown>))
-      .find((row): row is GovernanceLockPanel => Boolean(row)) ?? null;
+      .filter((row): row is GovernanceLockPanel => Boolean(row)));
+    const primaryLockId = selectPrimaryGovernanceLockId(lockPanels);
     const filteredRewards = sortRewards(filterGovernanceRewards(rewardRows, input), input);
     const events = filterGovernanceEvents(eventRows, input);
     const startIndex = (input.page - 1) * input.pageSize;
@@ -530,7 +567,8 @@ export async function findGovernanceDataView(input: GovernanceRequest): Promise<
       allRewardRows: rewardRows,
       rewardRows: filteredRewards.slice(startIndex, startIndex + input.pageSize),
       totalRewardRows: filteredRewards.length,
-      lockPanel,
+      lockPanels,
+      primaryLockId,
       epochs: epochRows,
       events,
       selectedDetailTarget: resolveSelectedDetailTarget({
@@ -550,7 +588,8 @@ export async function findGovernanceDataView(input: GovernanceRequest): Promise<
       allRewardRows: [],
       rewardRows: [],
       totalRewardRows: 0,
-      lockPanel: null,
+      lockPanels: [],
+      primaryLockId: null,
       epochs: [],
       events: [],
       selectedDetailTarget: null,
@@ -567,8 +606,7 @@ export async function findGovernanceDataView(input: GovernanceRequest): Promise<
       .select()
       .from(governanceLockExposures)
       .where(and(eq(governanceLockExposures.chainId, input.chainId), eq(governanceLockExposures.walletAddress, walletAddress)))
-      .orderBy(desc(governanceLockExposures.materializedAt))
-      .limit(1),
+      .orderBy(desc(governanceLockExposures.materializedAt)),
     db
       .select()
       .from(governanceEpochSummaries)
@@ -594,7 +632,8 @@ export async function findGovernanceDataView(input: GovernanceRequest): Promise<
       .limit(1),
   ]);
 
-  const lockPanel = lockRows[0] ? mapLockPanel(lockRows[0]) : null;
+  const lockPanels = sortGovernanceLockPanels(lockRows.map(mapLockPanel));
+  const primaryLockId = selectPrimaryGovernanceLockId(lockPanels);
   const epochs = epochRows.map(mapEpoch);
   const allRewardRows = rewardRows.map(mapReward);
   const allEvents = eventRows.map(mapEvent);
@@ -609,7 +648,8 @@ export async function findGovernanceDataView(input: GovernanceRequest): Promise<
     allRewardRows,
     rewardRows: pagedRewards,
     totalRewardRows,
-    lockPanel,
+    lockPanels,
+    primaryLockId,
     epochs,
     events,
     selectedDetailTarget: resolveSelectedDetailTarget({

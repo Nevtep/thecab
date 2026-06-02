@@ -506,6 +506,7 @@ test("materializeAllDataViewRows enriches governance rows from persisted lock me
   assert.equal(lockPanel.lockedAeroAmount, "2203245000000000000000");
   assert.equal(lockPanel.lockedAeroValueUsd, "48264.31");
   assert.equal(lockPanel.veAeroExposure, "1845.771");
+  assert.equal(lockPanel.lockKind, "direct");
   assert.equal(lockPanel.status, "active");
   assert.equal((lockPanel.lifecycle as Array<Record<string, unknown>>)[0]?.durationDeltaDays, 365);
   assert.equal(governanceEvent.protocolSurface, "voter");
@@ -516,6 +517,93 @@ test("materializeAllDataViewRows enriches governance rows from persisted lock me
   assert.equal((((governanceReward.pool as Record<string, unknown>).label)), "WETH / USDC 100");
   assert.equal(governanceEpoch.epochStartAt, "2026-01-02T00:00:00.000Z");
   assert.equal(governanceEpoch.epochEndAt, "2026-01-09T00:00:00.000Z");
+  assert.equal(metricSnapshot.summary.lockedAero, "2203245000000000000000");
+  assert.equal(metricSnapshot.summary.veAeroExposure, "1845.771");
+});
+
+test("materializeAllDataViewRows uses the primary direct lock in governance summary metrics when multiple locks exist", () => {
+  const votingEscrowAddress = "0x00000000000000000000000000000000000000aa";
+  const accounting = runChronologicalAccounting({
+    events: [
+      {
+        id: "gov-grant",
+        chainId: 8453,
+        walletAddress,
+        eventType: "governance_lock_grant",
+        eventFamily: "governance",
+        occurredAt: new Date("2026-01-01T00:00:00.000Z"),
+        txHash: "0xgrant",
+        sequenceIndex: 0,
+        coverageStatus: "full",
+        confidence: "high",
+        reasonCodes: [],
+        metadataJson: { votingEscrowAddress, lockTokenId: "90" },
+      },
+      {
+        id: "gov-create",
+        chainId: 8453,
+        walletAddress,
+        eventType: "governance_create_lock",
+        eventFamily: "governance",
+        occurredAt: new Date("2026-01-02T00:00:00.000Z"),
+        txHash: "0xdirect",
+        sequenceIndex: 1,
+        coverageStatus: "full",
+        confidence: "high",
+        reasonCodes: [],
+        metadataJson: { votingEscrowAddress, lockTokenId: "170", amountRaw: "2203245000000000000000" },
+      },
+    ],
+    links: [
+      { domainEventId: "gov-grant", entityType: "governance_lock", entityId: `8453:${votingEscrowAddress}:90` },
+      { domainEventId: "gov-create", entityType: "governance_lock", entityId: `8453:${votingEscrowAddress}:170` },
+    ],
+  });
+
+  const context: EngineV2MaterializationContext = {
+    poolStateByPoolId: new Map(),
+    tokenMetadataByAddress: new Map(),
+    governanceLockByLockKey: new Map([
+      [`8453:${votingEscrowAddress}:90`, {
+        lockKey: `8453:${votingEscrowAddress}:90`,
+        lockTokenId: "90",
+        votingEscrowAddress,
+        originTxHash: "0xgrant",
+        originKind: "protocol_grant_or_external_transfer",
+        status: "unknown",
+        coverageStatus: "full",
+        confidence: "high",
+        reasonCodes: [],
+        metadataJson: {
+          provenance: "protocol_grant",
+          lockedAeroValueUsd: "24.00",
+          veAeroExposure: "10",
+        },
+      }],
+      [`8453:${votingEscrowAddress}:170`, {
+        lockKey: `8453:${votingEscrowAddress}:170`,
+        lockTokenId: "170",
+        votingEscrowAddress,
+        originTxHash: "0xdirect",
+        originKind: "create_lock",
+        status: "unknown",
+        coverageStatus: "full",
+        confidence: "high",
+        reasonCodes: [],
+        metadataJson: {
+          lockedAeroAmount: "2203245000000000000000",
+          lockedAeroValueUsd: "48264.31",
+          veAeroExposure: "1845.771",
+        },
+      }],
+    ]),
+    governanceLockByTokenId: new Map(),
+  };
+
+  const rows = materializeAllDataViewRows(accounting, context).filter((row) => row.surface === "governance");
+  const metricRow = rows.find((row) => (row.rowJson as Record<string, unknown>)?.kind === "metric");
+  const metricSnapshot = (metricRow?.rowJson as { metricSnapshot: { summary: Record<string, unknown> } }).metricSnapshot;
+
   assert.equal(metricSnapshot.summary.lockedAero, "2203245000000000000000");
   assert.equal(metricSnapshot.summary.veAeroExposure, "1845.771");
 });

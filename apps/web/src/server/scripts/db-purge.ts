@@ -154,6 +154,10 @@ async function main() {
         `,
       },
       {
+        label: "engine_v2_classified_transactions",
+        query: `delete from engine_v2_classified_transactions where wallet_address = $1 and chain_id = $2`,
+      },
+      {
         label: "engine_v2_domain_event_links",
         query: `
           delete from engine_v2_domain_event_links
@@ -212,16 +216,6 @@ async function main() {
     ];
 
     const legacySteps: DeleteStep[] = [
-      {
-        label: "raw_provider_records",
-        query: `
-          delete from raw_provider_records
-          where (wallet_address = $1 and chain_id = $2)
-            or run_id = any($3::uuid[])
-            or slice_id = any($4::uuid[])
-        `,
-        values: [walletAddress, chainId, runIds, sliceIds],
-      },
       {
         label: "coverage_reports",
         query: `delete from coverage_reports where wallet_address = $1 and chain_id = $2`,

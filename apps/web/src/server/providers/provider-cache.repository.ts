@@ -12,6 +12,7 @@ import {
 
 const PROVIDER_CACHE_PREFIX = "provider-cache:v1";
 type ProviderCacheReadOrder = "redis-first" | "db-first";
+export const DEFAULT_PROVIDER_CACHE_READ_ORDER: ProviderCacheReadOrder = "db-first";
 
 function buildProviderCacheStorageKey(input: {
   provider: string;
@@ -73,7 +74,7 @@ export async function readProviderCachedResponse<T>(input: {
     }
   };
 
-  if ((input.readOrder ?? "redis-first") === "redis-first") {
+  if ((input.readOrder ?? DEFAULT_PROVIDER_CACHE_READ_ORDER) === "redis-first") {
     const redisPayload = await readRedisPayload();
     if (redisPayload !== null) {
       return redisPayload;
@@ -105,7 +106,7 @@ export async function readProviderCachedResponse<T>(input: {
 
   const payload = rows[0]?.responseJson?.payload;
   if (payload === undefined) {
-    if ((input.readOrder ?? "redis-first") === "db-first") {
+    if ((input.readOrder ?? DEFAULT_PROVIDER_CACHE_READ_ORDER) === "db-first") {
       const redisPayload = await readRedisPayload();
       if (redisPayload !== null) {
         return redisPayload;
