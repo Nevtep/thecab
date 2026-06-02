@@ -450,11 +450,18 @@ Must cover:
 - `docs/api-research/moralis/address-transactions-decoded-classification-notes.md`
 - `docs/api-research/abis/selector-matches-address-transactions-decoded.md`
 
-## Implementation Status - 2026-06-01
+## Implementation Status - 2026-06-02
 
 Engine V2 now has the server module boundary, DB schema/migration, Trigger task skeletons, canonical collection, ABI registry, chronological classification, enrichment planning/workers, chronological accounting, read-model materializers, route-side DB-only adapters, CLI scripts, regression runner, i18n reason-code keys, and guarded Engine V2 purge support.
 
 The request-time DataView repositories now read from Engine V2 DB-only adapters unconditionally on the active product path. Provider calls remain confined to collection/enrichment worker boundaries.
+
+Repository signoff basis is now explicit:
+
+- `pnpm build` passes on the active app path.
+- The public analysis start route remains on the product path and now satisfies Next.js route export constraints without changing runtime behavior.
+- The last documented basic-pool reward/fee attribution gaps were closed with focused accounting regressions and materialization validation.
+- Request-time DataView repositories remain DB-only on the active path.
 
 Remaining limitations are explicit:
 
@@ -463,3 +470,4 @@ Remaining limitations are explicit:
 - Provider-backed enrichment resolvers still need fuller wiring so queued needs can be resolved instead of staying persisted as explicit gaps.
 - Current-state helpers may validate relations but do not create historical ownership.
 - Missing evidence remains partial/unresolved/excluded/unsupported with reason codes instead of invented totals.
+- A fresh provider-backed rerun against the real wallet was not re-executed as part of the 2026-06-02 closure pass, so this status is repository/regression signoff rather than a new certification of live-wallet materialized output.

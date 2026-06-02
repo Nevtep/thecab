@@ -1,6 +1,6 @@
 # The Cab - Informe De Avance, Features Pendientes Y Gaps Contra Product Spec
 
-**Fecha:** 2026-05-31  
+**Fecha:** 2026-06-02  
 **Referencia principal:** `docs/spec/the-cab-product-technical-spec.md` v1.4.3  
 **Referencias de soporte:** `docs/spec/the-cab-feature-feasibility-implementation-architecture.md`, `docs/spec/the-cab-brand-spec.md`, planes activos en `specs/`
 
@@ -42,11 +42,11 @@ La revisión se hizo contra:
 - Specs activas hasta `specs/014-activity-dataview`.
 - Siguiente spec creado para cerrar Governance: `specs/015-governance-engine-dataview`.
 
-Esta es una revisión estática y de estado de implementación. No certifica que la calidad de datos sea correcta para todas las wallets. El engine todavía necesita regresiones más profundas contra transacciones reales de Base y filas reales de la base analizada.
+Esta es una revisión estática y de estado de implementación. Al 2026-06-02 sí existe base para signoff de repo del Engine V2: build verde, rutas DB-only sobre read models, quickstart con validaciones registradas y regresiones determinísticas/focales en verde. Eso no certifica todavía que la calidad de datos sea correcta para todas las wallets; una nueva corrida provider-backed sobre la wallet real sigue siendo una validación separada.
 
 ## 3. Estado General
 
-El producto tiene una base fuerte hasta Activity y una primera implementacion de Governance lista para testing:
+El producto tiene una base fuerte hasta Activity y un Engine V2 en estado de signoff de repo:
 
 - Landing existente.
 - Conexión de wallet existente.
@@ -66,9 +66,9 @@ El producto tiene una base fuerte hasta Activity y una primera implementacion de
 - Pipeline de análisis con Trigger.dev.
 - Providers Moralis y Alchemy encapsulados.
 
-El producto todavía no cumple todo el product spec porque falta estabilizar el engine con mas evidencia real:
+El producto todavía no cumple todo el product spec porque falta estabilizar algunas superficies con más evidencia real:
 
-- Governance: implementada como DataView, pero la corrida final de la wallet analizada materializo `0` eventos governance; falta estabilizar clasificacion/materializacion real.
+- Governance: implementada como DataView, pero la última referencia documentada de la wallet analizada materializó `0` eventos governance; sigue faltando una pasada provider-backed nueva para certificar población real.
 - Activity: implementada en una primera versión funcional, todavía con gaps de engine, fixtures y explainability profunda.
 
 Además, varias pantallas existentes necesitan cerrar gaps de explicabilidad, consistencia visual y semántica de datos.
@@ -81,12 +81,12 @@ Además, varias pantallas existentes necesitan cerrar gaps de explicabilidad, co
 | Wallet connection | Implementada | Patrón de adapter/wagmi presente, con enforcement de Base. |
 | Connected shell | Implementado | Sidebar contiene Overview, Pools, Deposits, Strategies, Rewards, Governance, Activity y Settings. |
 | Overview | Implementado con gaps | Existe fast overview, chart, activity preview, allocation y CTA de análisis. El rango default y all-history tienen drift. |
-| Analysis jobs | Implementado, requiere hardening | Hay orchestration, slices, provider records, fases y read models. El riesgo principal es clasificación. |
+| Analysis jobs | Implementado y validado a nivel repo | Hay orchestration, canonicalización, clasificación, enrichment, accounting, materialización, build verde y validaciones registradas en `specs/016-analysis-engine-v2/quickstart.md`. El riesgo residual principal es certificación nueva sobre wallet real. |
 | Pools | Implementado con gaps | Lista/detalle existen. Falta mejor exposición de residual, rebalance y atribución parcial. |
 | Deposits | Implementado con gaps | Lista/detalle, lifecycle, chart, movements y decomposition existen. Falta pulir DS y validar semántica. |
 | Strategies | Implementado con gaps | Lista/detalle existen. Falta actividad interna dedicada y relación explícita con pools subyacentes. |
 | Rewards | Implementado con gaps | DataView existe. Faltan breakdowns completos, custom date range y vista completa de excluidos/no resueltos. |
-| Governance | Ready for testing con gap de engine | DataView, API DB-only, filtros, links, selected detail, read models y regression existen. La DB lista de la wallet actual produjo `0` eventos governance, asi que falta hardening de clasificacion/materializacion real. |
+| Governance | Ready for testing con riesgo de población real | DataView, API DB-only, filtros, links, selected detail, read models y regression existen. El riesgo abierto ya no es de build o request path sino de validar una corrida provider-backed nueva con eventos governance poblados. |
 | Activity | En implementación avanzada | DataView/API/detail rail ya existen. Checks de typecheck, unit, i18n, DS y regression pasaron. Se desactivo evidencia explorer live por default en `phase-activity`; quedan gaps de explainability profunda y estabilización con mas fixtures reales. |
 | Settings | Básico implementado | Faltan limpiar cache local, preferencias de formato numérico y separación más clara de diagnostics. |
 | CSV/export | Correctamente ausente | El product spec lo excluye de v1. |
@@ -204,7 +204,7 @@ Esa transacción es un airdrop de phishing y no debe sumar como reward. Los caso
 
 ### 6.1 Governance Engine Y DataView
 
-**Estado:** ready for testing con gap de engine. Implementado bajo `specs/015-governance-engine-dataview`.
+**Estado:** ready for testing con riesgo residual de población real. Implementado bajo `specs/015-governance-engine-dataview`.
 
 El product spec requiere una sección Governance de primer nivel. Debe cubrir:
 
@@ -623,6 +623,16 @@ Debe incluir:
 - Settings preferences/cache.
 - DS/i18n/query/chain consistency pass.
 
+### Signoff De Repo - Engine V2
+
+Estado al 2026-06-02:
+
+- `pnpm build` verde en `apps/web`.
+- Quickstart de `specs/016-analysis-engine-v2/quickstart.md` actualizado con evidencia ejecutada y alcance de signoff.
+- Bugs documentados de reward accounting para basic pools cerrados en `docs/informe-engine-v2-bugs-gaps.md`.
+- Request paths históricos siguen DB-only y consumen read models/materializaciones.
+- El signoff alcanzado es de repositorio/código/regresión, no una nueva certificación provider-backed de una wallet real específica.
+
 ## 12. Checklist Para Considerar v1 Completo
 
 - Governance tiene DataView funcional.
@@ -646,8 +656,8 @@ Debe incluir:
 
 ## 13. Conclusión
 
-The Cab está en una etapa avanzada de construcción de vistas históricas, pero todavía no está cerrado contra el product spec. La UI principal ya permite ver suficiente producto como para avanzar, pero también expone que el engine necesita un pase fuerte de clasificación, coverage y regresión.
+The Cab está en una etapa avanzada de construcción de vistas históricas y Engine V2 ya tiene base suficiente para signoff de repositorio. La UI principal ya permite ver suficiente producto como para avanzar y el pipeline histórico quedó con build verde, validaciones registradas y request paths DB-only.
 
-La recomendación es no seguir puliendo Rewards visualmente por ahora. Activity y Governance ya existen como DataViews first-class; conviene usarlas para auditar el engine, estabilizar clasificación/materialización con transacciones reales, y después volver a cerrar los gaps de Overview, Pools, Deposits, Strategies, Rewards y Settings con una pasada de consistencia DS/i18n/chain/query.
+La recomendación es no reabrir ahora el núcleo del engine salvo para una nueva corrida provider-backed de validación real. Activity y Governance ya existen como DataViews first-class; el siguiente paso útil después del signoff de repo es certificar la materialización real con una wallet poblada y luego volver a cerrar los gaps de Overview, Pools, Deposits, Strategies, Rewards y Settings con una pasada de consistencia DS/i18n/chain/query.
 
 La regla más importante para los próximos pasos es mantener visible la incertidumbre. Cuando falte evidencia, el producto debe mostrar unresolved, partial, excluded o unavailable. No debe fabricar ownership, rewards, lifecycle events ni aggregates para que una pantalla parezca más completa.
