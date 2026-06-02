@@ -19,6 +19,7 @@ import { materializePoolReadModels } from "@/server/analysis/pool-read-models";
 import { materializeStrategyReadModels } from "@/server/analysis/strategy-read-models";
 import { getDb } from "@/server/db/client";
 import { engineV2DomainEventLinks, engineV2DomainEvents, engineV2ReadModelRows } from "@/server/db/schema";
+import { taskInfo, taskWarn, withTaskLogging } from "@/server/trigger/tasks/task-logging";
 
 export type EngineV2MaterializationDeps = {
   loadAccountingInput?: (input: { chainId: number; walletAddress: string }) => Promise<EngineV2AccountingInput>;
@@ -179,6 +180,12 @@ export async function runEngineV2AccountChronological(rawPayload: unknown, deps:
     });
   }
   const accountingInput = await (deps.loadAccountingInput?.(payload) ?? loadAccountingInputFromDb(payload));
+  taskInfo("engine-v2-account-chronological", "loaded accounting input", {
+    chainId: payload.chainId,
+    walletAddress: payload.walletAddress,
+    eventCount: accountingInput.events.length,
+    linkCount: accountingInput.links.length,
+  });
   await materializeLegacySummaryTables({
     analysisRunId: payload.analysisRunId,
     chainId: payload.chainId,
@@ -187,6 +194,16 @@ export async function runEngineV2AccountChronological(rawPayload: unknown, deps:
     deps,
   });
   const accounting = runChronologicalAccounting(accountingInput);
+  taskInfo("engine-v2-account-chronological", "accounting summary", {
+    eventCount: accounting.events.length,
+    cashFlowCount: accounting.cashFlows.length,
+    residualInventoryCount: accounting.residualInventory.length,
+    depositCount: accounting.deposits.length,
+    strategyCount: accounting.strategies.length,
+    poolCount: accounting.pools.length,
+    rewardCount: accounting.rewards.length,
+    governanceEventCount: accounting.governance.events.length,
+  });
   const accountingPayload = {
     chainId: payload.chainId,
     walletAddress: payload.walletAddress,
@@ -238,6 +255,9 @@ export async function runEngineV2AccountChronological(rawPayload: unknown, deps:
   } else {
     await persistReadModelRows({ db: getDb(), rows });
   }
+  taskInfo("engine-v2-account-chronological", "persisted read model rows and queueing final materialization step", {
+    rowCount: rows.length,
+  });
   const triggerTask = deps.trigger ?? ((taskId, taskPayload, options) => tasks.trigger(taskId, taskPayload, options));
   await triggerTask("engine-v2-materialize-read-models", {
     ...payload,
@@ -268,6 +288,11 @@ export async function runEngineV2MaterializeReadModels(rawPayload: unknown, deps
       progressPct: 96,
     });
   }
+  taskInfo("engine-v2-materialize-read-models", "materializing read models", {
+    chainId: payload.chainId,
+    walletAddress: payload.walletAddress,
+    rowsAlreadyPersisted: payload.rowsAlreadyPersisted,
+  });
   const stats = payload.rowsAlreadyPersisted
     ? await (deps.loadMaterializedRowStats?.(payload) ?? loadMaterializedRowStatsFromDb(payload))
     : await (async () => {
@@ -299,8 +324,16 @@ export async function runEngineV2MaterializeReadModels(rawPayload: unknown, deps
         }))),
       };
     })();
+  taskInfo("engine-v2-materialize-read-models", "materialization stats computed", stats);
   if (payload.analysisRunId) {
     const finalizeRun = deps.finalizeRun ?? finalizeAnalysisRun;
+    if (stats.coverage !== "full") {
+      taskWarn("engine-v2-materialize-read-models", "finalizing analysis run with non-full coverage", {
+        analysisRunId: payload.analysisRunId,
+        coverage: stats.coverage,
+        coverageReasonsJson: stats.coverageReasonsJson,
+      });
+    }
     await finalizeRun({
       runId: payload.analysisRunId,
       status: "complete",
@@ -341,12 +374,20 @@ function eventToDomainLike(
 
 export const engineV2AccountChronologicalTask = task({
   id: "engine-v2-account-chronological",
-  run: async (payload: unknown) => runEngineV2AccountChronological(payload),
+  run: async (payload: unknown) => withTaskLogging(
+    "engine-v2-account-chronological",
+    payload,
+    () => runEngineV2AccountChronological(payload),
+  ),
 });
 
 export const engineV2MaterializeReadModelsTask = task({
   id: "engine-v2-materialize-read-models",
-  run: async (payload: unknown) => runEngineV2MaterializeReadModels(payload),
+  run: async (payload: unknown) => withTaskLogging(
+    "engine-v2-materialize-read-models",
+    payload,
+    () => runEngineV2MaterializeReadModels(payload),
+  ),
 });
 
 export type { EngineV2DomainEventLike, EngineV2EntityLinkLike };

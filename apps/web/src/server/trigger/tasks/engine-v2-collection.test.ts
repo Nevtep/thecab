@@ -50,12 +50,13 @@ function createDeps(overrides: Partial<EngineV2CollectionTaskDeps> = {}) {
 }
 
 test("runEngineV2StartCollection queues the first decoded history page", async () => {
-  const { triggered } = createDeps();
+  const { triggered, deps } = createDeps();
 
   const result = await runEngineV2StartCollection({
     chainId: 8453,
     walletAddress,
   }, {
+    db: deps.db,
     trigger: async (taskId, payload, options) => {
       triggered.push({ taskId, payload, options });
     },

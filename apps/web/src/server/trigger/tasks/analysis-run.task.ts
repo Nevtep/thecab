@@ -5,6 +5,7 @@ import {
   getAnalysisRunById,
   updateAnalysisRunProgress,
 } from "@/server/analysis/analysis-run.repository";
+import { taskInfo, taskWarn, withTaskLogging } from "@/server/trigger/tasks/task-logging";
 
 export type AnalysisMode = "full_history" | "incremental";
 
@@ -67,10 +68,20 @@ export async function runEngineV2AnalysisOrchestration(
     stage: "engine_v2_collection",
     progressPct: 5,
   });
+  taskInfo("analysis-run", "triggering engine-v2-start-collection", {
+    runId: payload.runId,
+    walletAddress: payload.walletAddress,
+    chainId: payload.chainId,
+    mode: payload.mode,
+  });
   const result = await deps.triggerAndWait("engine-v2-start-collection", enginePayload, {
     idempotencyKey: `${payload.runId}:engine-v2:start`,
   });
   if (!result.ok) {
+    taskWarn("analysis-run", "engine-v2-start-collection returned a non-ok result", {
+      runId: payload.runId,
+      error: result.error instanceof Error ? result.error.message : result.error,
+    });
     await deps.finalizeAnalysisRun({
       runId: payload.runId,
       status: "failed",
@@ -80,6 +91,11 @@ export async function runEngineV2AnalysisOrchestration(
     });
     throw result.error ?? new Error("engine-v2-start-collection failed");
   }
+
+  taskInfo("analysis-run", "engine-v2-start-collection accepted the run", {
+    runId: payload.runId,
+    mode: payload.mode,
+  });
 
   return {
     engine: "v2",
@@ -98,6 +114,9 @@ export async function runAnalysisRunTask(
   }
 
   if (currentRun.status === "cancelled") {
+    taskWarn("analysis-run", "analysis run is already cancelled; skipping orchestration", {
+      runId: payload.runId,
+    });
     return { cancelled: true };
   }
 
@@ -106,5 +125,5 @@ export async function runAnalysisRunTask(
 
 export const analysisRunTask = task({
   id: "analysis-run",
-  run: async (payload: AnalysisRunTaskPayload) => runAnalysisRunTask(payload),
+  run: async (payload: AnalysisRunTaskPayload) => withTaskLogging("analysis-run", payload, () => runAnalysisRunTask(payload)),
 });

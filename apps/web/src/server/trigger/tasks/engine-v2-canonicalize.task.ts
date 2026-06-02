@@ -14,6 +14,7 @@ import {
 } from "@/server/analysis/engine-v2/canonicalization";
 import { engineV2CollectionPagePayloadSchema } from "@/server/analysis/engine-v2/payloads";
 import { getDb } from "@/server/db/client";
+import { taskInfo, taskLog, taskWarn, withTaskLogging } from "@/server/trigger/tasks/task-logging";
 
 type EngineV2Db = ReturnType<typeof getDb>;
 
@@ -74,6 +75,16 @@ export async function runEngineV2CanonicalizeHistory(
       pages.flatMap((page) => parseMoralisDecodedHistoryPage(page.rawJson).transactions),
     ),
   );
+  taskInfo("engine-v2-canonicalize-history", "loaded provider pages for canonicalization", {
+    collectionRunId: payload.collectionRunId,
+    pageCount: pages.length,
+    normalizedTransactionCount: normalizedTransactions.length,
+  });
+  if (normalizedTransactions.length === 0) {
+    taskWarn("engine-v2-canonicalize-history", "no normalized transactions were produced for canonicalization", {
+      collectionRunId: payload.collectionRunId,
+    });
+  }
 
   let canonicalized = 0;
   for (const transaction of normalizedTransactions) {
@@ -105,8 +116,19 @@ export async function runEngineV2CanonicalizeHistory(
       transaction,
     });
     canonicalized += 1;
+    if (canonicalized === 1 || canonicalized % 100 === 0 || canonicalized === normalizedTransactions.length) {
+      taskLog("engine-v2-canonicalize-history", "canonicalization progress", {
+        canonicalized,
+        total: normalizedTransactions.length,
+        txHash: transaction.hash,
+      });
+    }
   }
 
+  taskInfo("engine-v2-canonicalize-history", "queueing protocol bootstrap", {
+    collectionRunId: payload.collectionRunId,
+    canonicalized,
+  });
   await triggerTask("engine-v2-protocol-bootstrap", {
     ...payload,
     chainId: payload.chainId,
@@ -120,5 +142,9 @@ export async function runEngineV2CanonicalizeHistory(
 
 export const engineV2CanonicalizeHistoryTask = task({
   id: "engine-v2-canonicalize-history",
-  run: async (rawPayload: unknown) => runEngineV2CanonicalizeHistory(rawPayload),
+  run: async (rawPayload: unknown) => withTaskLogging(
+    "engine-v2-canonicalize-history",
+    rawPayload,
+    () => runEngineV2CanonicalizeHistory(rawPayload),
+  ),
 });

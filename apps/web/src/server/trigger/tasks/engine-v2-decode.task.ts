@@ -16,6 +16,7 @@ import { parseMoralisDecodedHistoryPage } from "@/server/analysis/engine-v2/coll
 import { engineV2WalletPayloadSchema } from "@/server/analysis/engine-v2/payloads";
 import { getDb } from "@/server/db/client";
 import { canonicalCalls, canonicalTransactions, contractAbis } from "@/server/db/schema";
+import { taskInfo, taskLog, taskWarn, withTaskLogging } from "@/server/trigger/tasks/task-logging";
 
 type AbiRegistryRepositoryLike = {
   getContractAbi(input: { chainId: number; address: string }): Promise<AbiRegistryEntry | null>;
@@ -234,6 +235,11 @@ export async function runEngineV2ProtocolBootstrap(rawPayload: unknown, deps: En
     });
   }
   const rows = protocolKnownAddressRowsForSeeds(payload.chainId);
+  taskInfo("engine-v2-protocol-bootstrap", "persisting protocol known addresses", {
+    chainId: payload.chainId,
+    walletAddress: payload.walletAddress,
+    knownAddressCount: rows.length,
+  });
   if (deps.putKnownAddresses) {
     await deps.putKnownAddresses(rows);
   } else {
@@ -241,6 +247,10 @@ export async function runEngineV2ProtocolBootstrap(rawPayload: unknown, deps: En
     await createEngineV2AbiRegistryRepository(getDb()).putKnownAddresses(rows);
   }
   const triggerTask = deps.trigger ?? ((taskId, taskPayload, options) => tasks.trigger(taskId, taskPayload, options));
+  taskInfo("engine-v2-protocol-bootstrap", "queueing ABI registry ensure step", {
+    chainId: payload.chainId,
+    walletAddress: payload.walletAddress,
+  });
   await triggerTask("engine-v2-ensure-abi-registry", payload, {
     idempotencyKey: `engine-v2-ensure-abi-registry:${payload.chainId}:${payload.walletAddress}`,
   });
@@ -260,6 +270,12 @@ export async function runEngineV2EnsureAbiRegistry(rawPayload: unknown, deps: En
   const baseSeeds = protocolBootstrapSeedsForChain(payload.chainId);
   const apiKey = deps.apiKey ?? process.env.ETHERSCAN_API_KEY ?? process.env.BASESCAN_API_KEY ?? null;
   const results = [];
+  taskInfo("engine-v2-ensure-abi-registry", "ensuring ABI registry", {
+    chainId: payload.chainId,
+    walletAddress: payload.walletAddress,
+    baseSeedCount: baseSeeds.length,
+    hasApiKey: Boolean(apiKey),
+  });
   if (apiKey) {
     const { createEngineV2AbiRegistryRepository } = await import("@/server/analysis/engine-v2/abi-registry");
     const registryRepository = deps.abiRegistryRepository ?? createEngineV2AbiRegistryRepository(getDb());
@@ -273,11 +289,31 @@ export async function runEngineV2EnsureAbiRegistry(rawPayload: unknown, deps: En
       transactions,
       registry,
     });
+    taskInfo("engine-v2-ensure-abi-registry", "discovered observed ABI seeds", {
+      transactionCount: transactions.length,
+      existingRegistrySize: registry.size,
+      observedSeedCount: observedSeeds.length,
+    });
     for (const seed of observedSeeds) {
       results.push(await (deps.ensureAbi ?? ensureAbiForSeed)({ chainId: payload.chainId, seed, apiKey, repository: registryRepository }));
     }
+  } else {
+    taskWarn("engine-v2-ensure-abi-registry", "no explorer API key available; skipping external ABI fetch", {
+      chainId: payload.chainId,
+      walletAddress: payload.walletAddress,
+    });
   }
+  taskInfo("engine-v2-ensure-abi-registry", "ABI ensure summary", {
+    baseSeedCount: baseSeeds.length,
+    observedSeedCount: Math.max(results.length - baseSeeds.length, 0),
+    resolvedCount: results.filter((result) => result.status !== "miss").length,
+    missCount: results.filter((result) => result.status === "miss").length,
+  });
   const triggerTask = deps.trigger ?? ((taskId, taskPayload, options) => tasks.trigger(taskId, taskPayload, options));
+  taskInfo("engine-v2-ensure-abi-registry", "queueing canonical call decoding", {
+    chainId: payload.chainId,
+    walletAddress: payload.walletAddress,
+  });
   await triggerTask("engine-v2-decode-canonical-calls", payload, {
     idempotencyKey: `engine-v2-decode-canonical-calls:${payload.chainId}:${payload.walletAddress}`,
   });
@@ -299,8 +335,14 @@ export async function runEngineV2DecodeCanonicalCalls(rawPayload: unknown, deps:
   }
   const transactions = await (deps.loadTransactions?.(payload) ?? loadTransactionsFromProviderPages(payload));
   const registry = await (deps.loadRegistry?.(payload) ?? loadAbiRegistryFromDb(payload));
+  taskInfo("engine-v2-decode-canonical-calls", "decoding canonical calls", {
+    chainId: payload.chainId,
+    walletAddress: payload.walletAddress,
+    transactionCount: transactions.length,
+    registrySize: registry.size,
+  });
   let decodedCallCount = 0;
-  for (const tx of transactions) {
+  for (const [index, tx] of transactions.entries()) {
     const calls = decodeCanonicalTransactionCalls({ tx, registry });
     decodedCallCount += calls.length;
     if (deps.persistDecodedCalls) {
@@ -312,8 +354,21 @@ export async function runEngineV2DecodeCanonicalCalls(rawPayload: unknown, deps:
         calls,
       });
     }
+    if (index === 0 || (index + 1) % 100 === 0 || index + 1 === transactions.length) {
+      taskLog("engine-v2-decode-canonical-calls", "decode progress", {
+        processedTransactions: index + 1,
+        totalTransactions: transactions.length,
+        txHash: tx.hash,
+        cumulativeDecodedCallCount: decodedCallCount,
+      });
+    }
   }
   const triggerTask = deps.trigger ?? ((taskId, taskPayload, options) => tasks.trigger(taskId, taskPayload, options));
+  taskInfo("engine-v2-decode-canonical-calls", "queueing chronological classification", {
+    chainId: payload.chainId,
+    walletAddress: payload.walletAddress,
+    decodedCallCount,
+  });
   await triggerTask("engine-v2-classify-chronological", payload, {
     idempotencyKey: `engine-v2-classify-chronological:${payload.chainId}:${payload.walletAddress}`,
   });
@@ -323,15 +378,27 @@ export async function runEngineV2DecodeCanonicalCalls(rawPayload: unknown, deps:
 
 export const engineV2ProtocolBootstrapTask = task({
   id: "engine-v2-protocol-bootstrap",
-  run: async (payload: unknown) => runEngineV2ProtocolBootstrap(payload),
+  run: async (payload: unknown) => withTaskLogging(
+    "engine-v2-protocol-bootstrap",
+    payload,
+    () => runEngineV2ProtocolBootstrap(payload),
+  ),
 });
 
 export const engineV2EnsureAbiRegistryTask = task({
   id: "engine-v2-ensure-abi-registry",
-  run: async (payload: unknown) => runEngineV2EnsureAbiRegistry(payload),
+  run: async (payload: unknown) => withTaskLogging(
+    "engine-v2-ensure-abi-registry",
+    payload,
+    () => runEngineV2EnsureAbiRegistry(payload),
+  ),
 });
 
 export const engineV2DecodeCanonicalCallsTask = task({
   id: "engine-v2-decode-canonical-calls",
-  run: async (payload: unknown) => runEngineV2DecodeCanonicalCalls(payload),
+  run: async (payload: unknown) => withTaskLogging(
+    "engine-v2-decode-canonical-calls",
+    payload,
+    () => runEngineV2DecodeCanonicalCalls(payload),
+  ),
 });

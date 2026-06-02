@@ -28,6 +28,7 @@ import {
   engineV2ProtocolStateSnapshots,
   engineV2TokenMetadata,
 } from "@/server/db/schema";
+import { taskError, taskInfo, taskLog, taskWarn, withTaskLogging } from "@/server/trigger/tasks/task-logging";
 
 export type EngineV2EnrichmentDeps = {
   planNeeds?: (input: { chainId: number; walletAddress: string }) => Promise<EngineV2EnrichmentNeedInput[]>;
@@ -665,6 +666,13 @@ export async function resolveEnrichmentNeed(need: EngineV2EnrichmentNeedInput & 
         return await markNeedUnresolved(need);
     }
   } catch (error) {
+    taskError("engine-v2-run-enrichment-batch", "need resolution failed and will be marked failed", {
+      needId: need.id,
+      needType: need.needType,
+      targetType: need.targetType,
+      targetId: need.targetId,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return markNeedFailed(need, error);
   }
 }
@@ -679,11 +687,24 @@ export async function runEngineV2PlanEnrichment(rawPayload: unknown, deps: Engin
     });
   }
   const needs = await (deps.planNeeds?.(payload) ?? planNeedsFromDomainEvents(payload));
+  taskInfo("engine-v2-plan-enrichment", "planned enrichment needs", {
+    chainId: payload.chainId,
+    walletAddress: payload.walletAddress,
+    plannedNeedCount: needs.length,
+  });
   const result = await (deps.persistNeeds ?? persistEnrichmentNeeds)({
     db: getDb(),
     needs,
   });
+  taskInfo("engine-v2-plan-enrichment", "persisted enrichment needs", {
+    result,
+  });
   const triggerTask = deps.trigger ?? ((taskId, taskPayload, options) => tasks.trigger(taskId, taskPayload, options));
+  taskInfo("engine-v2-plan-enrichment", "queueing first enrichment batch", {
+    chainId: payload.chainId,
+    walletAddress: payload.walletAddress,
+    collectionRunId: payload.collectionRunId ?? null,
+  });
   await triggerTask("engine-v2-run-enrichment-batch", payload, {
     idempotencyKey: `engine-v2-run-enrichment:${payload.chainId}:${payload.walletAddress}:${payload.collectionRunId ?? "latest"}`,
   });
@@ -712,9 +733,42 @@ export async function runEngineV2RunEnrichmentBatch(rawPayload: unknown, deps: E
     limit: payload.limit,
   }));
   const boundedNeeds = needs.slice(0, payload.limit);
+  taskInfo("engine-v2-run-enrichment-batch", "loaded queued enrichment needs", {
+    chainId: payload.chainId,
+    walletAddress: payload.walletAddress,
+    requestedLimit: payload.limit,
+    requestedNeedTypes: payload.needTypes ?? null,
+    queuedNeedCount: needs.length,
+    attemptedNeedCount: boundedNeeds.length,
+  });
+  if (boundedNeeds.length === 0) {
+    taskWarn("engine-v2-run-enrichment-batch", "no queued enrichment needs found in this batch", {
+      chainId: payload.chainId,
+      walletAddress: payload.walletAddress,
+      requestedNeedTypes: payload.needTypes ?? null,
+    });
+  }
   const results = [];
-  for (const need of boundedNeeds) {
-    results.push(await (deps.resolveNeed?.(need) ?? resolveEnrichmentNeed(need)));
+  for (const [index, need] of boundedNeeds.entries()) {
+    taskLog("engine-v2-run-enrichment-batch", "resolving enrichment need", {
+      index: index + 1,
+      total: boundedNeeds.length,
+      needId: need.id,
+      needType: need.needType,
+      targetType: need.targetType,
+      targetId: need.targetId,
+      reasonCodes: need.reasonCodes ?? [],
+    });
+    const result = await (deps.resolveNeed?.(need) ?? resolveEnrichmentNeed(need));
+    results.push(result);
+    taskLog("engine-v2-run-enrichment-batch", "enrichment need resolved", {
+      index: index + 1,
+      total: boundedNeeds.length,
+      needId: need.id,
+      needType: need.needType,
+      targetId: need.targetId,
+      result,
+    });
   }
 
   const triggerTask = deps.trigger ?? ((taskId, taskPayload, options) => tasks.trigger(taskId, taskPayload, options));
@@ -732,32 +786,59 @@ export async function runEngineV2RunEnrichmentBatch(rawPayload: unknown, deps: E
       limit: 1,
     }))
     : [];
+  const batchSummary = {
+    attemptedCount: boundedNeeds.length,
+    resolvedCount: results.filter((result) => result === "resolved").length,
+    unresolvedCount: results.filter((result) => result === "unresolved").length,
+    failedCount: results.filter((result) => result === "failed").length,
+    remainingBlockingNeedCount: remainingBlockingNeeds.length,
+  };
+  taskInfo("engine-v2-run-enrichment-batch", "batch resolution summary", batchSummary);
 
   if (remainingBlockingNeeds.length > 0) {
     const nextNeedKey = remainingBlockingNeeds[0]?.id ?? `${remainingBlockingNeeds[0]?.needType ?? "queued"}:${remainingBlockingNeeds[0]?.targetId ?? "unknown"}`;
+    taskWarn("engine-v2-run-enrichment-batch", "blocking enrichment needs remain; queueing another batch", {
+      nextNeedKey,
+      remainingBlockingNeedType: remainingBlockingNeeds[0]?.needType ?? null,
+      remainingBlockingTargetId: remainingBlockingNeeds[0]?.targetId ?? null,
+      requestedNeedTypes: payload.needTypes ?? null,
+    });
     await triggerTask("engine-v2-run-enrichment-batch", payload, {
       idempotencyKey: `engine-v2-run-enrichment:${payload.chainId}:${payload.walletAddress}:${payload.collectionRunId ?? "latest"}:${nextNeedKey}`,
     });
   } else {
+    taskInfo("engine-v2-run-enrichment-batch", "no blocking enrichment needs remain; queueing accounting", {
+      chainId: payload.chainId,
+      walletAddress: payload.walletAddress,
+      collectionRunId: payload.collectionRunId ?? null,
+    });
     await triggerTask("engine-v2-account-chronological", payload, {
       idempotencyKey: `engine-v2-account:${payload.chainId}:${payload.walletAddress}:${payload.collectionRunId ?? "latest"}`,
     });
   }
 
   return {
-    attemptedCount: boundedNeeds.length,
-    resolvedCount: results.filter((result) => result === "resolved").length,
-    unresolvedCount: results.filter((result) => result === "unresolved").length,
-    failedCount: results.filter((result) => result === "failed").length,
+    attemptedCount: batchSummary.attemptedCount,
+    resolvedCount: batchSummary.resolvedCount,
+    unresolvedCount: batchSummary.unresolvedCount,
+    failedCount: batchSummary.failedCount,
   };
 }
 
 export const engineV2PlanEnrichmentTask = task({
   id: "engine-v2-plan-enrichment",
-  run: async (payload: unknown) => runEngineV2PlanEnrichment(payload),
+  run: async (payload: unknown) => withTaskLogging(
+    "engine-v2-plan-enrichment",
+    payload,
+    () => runEngineV2PlanEnrichment(payload),
+  ),
 });
 
 export const engineV2RunEnrichmentBatchTask = task({
   id: "engine-v2-run-enrichment-batch",
-  run: async (payload: unknown) => runEngineV2RunEnrichmentBatch(payload),
+  run: async (payload: unknown) => withTaskLogging(
+    "engine-v2-run-enrichment-batch",
+    payload,
+    () => runEngineV2RunEnrichmentBatch(payload),
+  ),
 });

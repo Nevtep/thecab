@@ -23,6 +23,7 @@ import {
   engineV2DomainEventLinks,
   engineV2DomainEvents,
 } from "@/server/db/schema";
+import { taskInfo, withTaskLogging } from "@/server/trigger/tasks/task-logging";
 
 export type EngineV2ClassificationDeps = {
   loadTransactions?: (input: { chainId: number; walletAddress: string }) => Promise<MoralisDecodedTransaction[]>;
@@ -408,6 +409,12 @@ export async function runEngineV2ClassifyChronological(
   }
   const transactions = await (deps.loadTransactions?.(payload) ?? loadTransactionsFromProviderPages(payload));
   const registry = await (deps.loadRegistry?.(payload) ?? loadAbiRegistryFromDb(payload));
+  taskInfo("engine-v2-classify-chronological", "classifying transactions chronologically", {
+    chainId: payload.chainId,
+    walletAddress: payload.walletAddress,
+    transactionCount: transactions.length,
+    registrySize: registry.size,
+  });
   const classified = classifyTransactionsChronologically({
     transactions,
     walletAddress: payload.walletAddress as Address,
@@ -423,9 +430,21 @@ export async function runEngineV2ClassifyChronological(
       registry,
     });
   }
+  const eventTypeCounts = classified.reduce<Record<string, number>>((acc, item) => {
+    acc[item.classification.eventType] = (acc[item.classification.eventType] ?? 0) + 1;
+    return acc;
+  }, {});
+  taskInfo("engine-v2-classify-chronological", "classification summary", {
+    classifiedCount: classified.length,
+    eventTypeCounts,
+  });
   const triggerTask = deps.trigger ?? (async (taskId, taskPayload, options) => {
     const { tasks } = await import("@trigger.dev/sdk/v3");
     await tasks.trigger(taskId, taskPayload, options);
+  });
+  taskInfo("engine-v2-classify-chronological", "queueing enrichment planning", {
+    chainId: payload.chainId,
+    walletAddress: payload.walletAddress,
   });
   await triggerTask("engine-v2-plan-enrichment", payload, {
     idempotencyKey: `engine-v2-plan-enrichment:${payload.chainId}:${payload.walletAddress}:${payload.collectionRunId ?? "latest"}`,
@@ -439,5 +458,9 @@ export async function runEngineV2ClassifyChronological(
 
 export const engineV2ClassifyChronologicalTask = task({
   id: "engine-v2-classify-chronological",
-  run: async (payload: unknown) => runEngineV2ClassifyChronological(payload),
+  run: async (payload: unknown) => withTaskLogging(
+    "engine-v2-classify-chronological",
+    payload,
+    () => runEngineV2ClassifyChronological(payload),
+  ),
 });

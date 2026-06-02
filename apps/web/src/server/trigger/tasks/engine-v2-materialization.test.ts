@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { emptyMaterializationContext } from "@/server/analysis/engine-v2/materializers/load-materialization-context";
 import { runEngineV2AccountChronological, runEngineV2MaterializeReadModels } from "./engine-v2-materialization.task";
 
 const payload = {
@@ -92,6 +93,7 @@ test("runEngineV2AccountChronological accounts loaded events in chronological or
         { domainEventId: "gov-claim", entityType: "governance_lock", entityId: "lock-113464" },
       ],
     }),
+    loadMaterializationContext: async () => emptyMaterializationContext(),
     persistAccounting: async (input) => {
       accountingPayload = input as unknown as Record<string, unknown>;
     },
