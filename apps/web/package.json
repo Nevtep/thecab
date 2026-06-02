@@ -31,6 +31,7 @@
     "analysis:activity-regression": "tsx src/server/scripts/analysis-activity-regression.ts",
     "analysis:v2:run": "tsx src/server/scripts/analysis-engine-v2-run.ts",
     "analysis:v2:regression": "tsx src/server/scripts/analysis-engine-v2-regression.ts",
+    "analysis:v2:diagnostics": "tsx src/server/scripts/analysis-engine-v2-diagnostics.ts",
     "i18n:check": "tsx scripts/check-i18n-parity.ts",
     "ds:check": "tsx scripts/check-ds-color-semantics.ts && tsx scripts/check-wcag-contrast.ts && tsx scripts/check-hardcoded-hex.ts",
     "ds:contrast": "tsx scripts/check-wcag-contrast.ts",
