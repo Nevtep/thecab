@@ -82,6 +82,7 @@ export type OverviewScreenState = {
 
 export type OverviewDistributionCompositionToken = {
   symbol: string;
+  tokenAddress: string | null;
   amount: number | null;
 };
 
@@ -147,7 +148,7 @@ export type OverviewViewModel = {
     }>;
     events: Array<{
       id: string;
-      type: "cash_out" | "claim" | "rebalance" | "move_to_idle" | "redeploy" | "lock" | "vote";
+      type: "cash_out" | "claim" | "rebalance" | "move_to_idle" | "redeploy" | "lock" | "vote" | "swap";
       occurredAt: string;
       capturedAt: string;
       detail: string | null;
@@ -211,6 +212,8 @@ export type OverviewViewModel = {
       valueUpdatedAt: string | null;
       primaryTokenSymbol: string | null;
       secondaryTokenSymbol: string | null;
+      primaryTokenAddress: string | null;
+      secondaryTokenAddress: string | null;
       primaryTokenAmount: number | null;
       secondaryTokenAmount: number | null;
       poolLabel: string | null;

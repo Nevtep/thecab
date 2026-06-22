@@ -17,12 +17,20 @@
   },
   "actions": {
     "refresh": "Actualizar",
+    "approval": "Aprobación",
+    "failed": "Fallida",
+    "position_created": "Posición creada",
     "deposit": "Depósito",
     "withdraw": "Retiro",
     "swap": "Swap",
     "claim": "Claim",
     "strategy": "Estrategia",
     "governance": "Gobernanza",
+    "stake": "Stake",
+    "unstake": "Unstake",
+    "cash_in": "Entrada de capital",
+    "cash_out": "Salida de capital",
+    "noop": "Sin efecto",
     "transfer": "Transferencia",
     "airdrop": "Airdrop",
     "unsupported": "No soportado",
@@ -46,12 +54,15 @@
   "kpis": {
     "totalEvents": "Eventos totales",
     "interpretedEvents": "Eventos interpretados",
-    "totalValue": "Valor no excluido",
-    "coverage": "Cobertura",
+    "walletCapitalIn": "Capital entrante",
+    "walletCapitalOut": "Capital saliente",
+    "protocolVolume": "Volumen de protocolo",
+    "excludedEvents": "Eventos excluidos",
     "allHistory": "Todo el historial",
     "excludesUnsupported": "Excluye no resuelto/excluido",
-    "nonExcluded": "Las filas excluidas no suman",
-    "classificationCoverage": "Filas con evidencia"
+    "walletOnly": "Solo transferencias de wallet",
+    "protocolOnly": "Solo actividad de protocolo",
+    "spamOnly": "Filas spam/excluidas"
   },
   "filters": {
     "search": "Buscar",
@@ -68,10 +79,15 @@
   },
   "charts": {
     "timelineTitle": "Actividad en el tiempo",
-    "timelineSubtitle": "Eventos diarios interpretados por estado de cobertura",
-    "coverageTitle": "Distribución de cobertura",
-    "coverageSubtitle": "Calidad de clasificación en el historial filtrado",
+    "timelineSubtitle": "Eventos diarios por familia de acción",
+    "actionTitle": "Distribución de acciones",
+    "actionSubtitle": "Clasificación por acción interpretada",
     "totalEvents": "eventos"
+  },
+  "movements": {
+    "in": "Movimientos entrantes",
+    "out": "Movimientos salientes",
+    "none": "Sin movimiento de token"
   },
   "panels": {
     "events": "Eventos de actividad",

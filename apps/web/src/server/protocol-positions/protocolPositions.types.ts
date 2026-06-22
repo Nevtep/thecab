@@ -48,6 +48,8 @@ export type OverviewProtocolPosition = {
   valueUpdatedAt: string | null;
   primaryTokenSymbol: string | null;
   secondaryTokenSymbol: string | null;
+  primaryTokenAddress: string | null;
+  secondaryTokenAddress: string | null;
   primaryTokenAmount: number | null;
   secondaryTokenAmount: number | null;
   poolLabel: string | null;

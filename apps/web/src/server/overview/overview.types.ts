@@ -96,7 +96,7 @@ export type OverviewChartPoint = {
 
 export type OverviewChartEvent = {
   id: string;
-  type: "cash_out" | "claim" | "rebalance" | "move_to_idle" | "redeploy" | "lock" | "vote";
+  type: "cash_out" | "claim" | "rebalance" | "move_to_idle" | "redeploy" | "lock" | "vote" | "swap";
   occurredAt: string;
   capturedAt: string;
   detail: string | null;
@@ -113,6 +113,7 @@ export type OverviewChart = OverviewBlockProvenance & {
 
 export type OverviewDistributionCompositionToken = {
   symbol: string;
+  tokenAddress: string | null;
   amount: number | null;
 };
 

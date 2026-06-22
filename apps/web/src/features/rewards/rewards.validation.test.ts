@@ -17,6 +17,7 @@ test("rewards validation normalizes filter inputs conservatively", () => {
   assert.equal(normalizeRewardsPageSize("100"), 100);
   assert.equal(normalizeRewardsPageSize("13"), 25);
   assert.equal(normalizeRewardsUuid("123e4567-e89b-12d3-a456-426614174000"), "123e4567-e89b-12d3-a456-426614174000");
-  assert.equal(normalizeRewardsUuid("bad"), null);
+  assert.equal(normalizeRewardsUuid("reward:8453:0xabc:0"), "reward:8453:0xabc:0");
+  assert.equal(normalizeRewardsUuid("bad/path"), null);
   assert.equal(normalizeRewardsAddress("0x000000000000000000000000000000000000000A"), "0x000000000000000000000000000000000000000a");
 });

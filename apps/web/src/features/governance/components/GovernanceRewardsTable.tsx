@@ -178,8 +178,14 @@ export function GovernanceRewardsTable({ viewModel, state, labels, loading = fal
           pageSizeOptions={[10, 25, 50]}
           labels={labels}
           loading={loading}
-          onPageChange={(page) => onStateChange({ ...state, page })}
-          onPageSizeChange={(pageSize) => onStateChange({ ...state, page: 1, pageSize: pageSize as 10 | 25 | 50 })}
+          onPageChange={(page) => onStateChange({ ...state, selectedKind: null, selectedGovernanceId: null, page })}
+          onPageSizeChange={(pageSize) => onStateChange({
+            ...state,
+            selectedKind: null,
+            selectedGovernanceId: null,
+            page: 1,
+            pageSize: pageSize as 10 | 25 | 50,
+          })}
         />
       </CabBox>
     </CabStack>

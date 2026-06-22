@@ -36,6 +36,9 @@ export type ActivityMovement = {
   tokenSymbol: string | null;
   direction: "in" | "out";
   amountRaw: string | null;
+  amountFormatted?: string | null;
+  tokenDecimals?: number | null;
+  assetType?: string | null;
   amountUsd: string | null;
 };
 
@@ -75,6 +78,9 @@ export type ActivitySummary = {
   totalEvents: number;
   interpretedEvents: number;
   totalValueUsd: string;
+  walletCapitalInUsd: string;
+  walletCapitalOutUsd: string;
+  protocolVolumeUsd: string;
   excludedEvents: number;
   unresolvedEvents: number;
   coveragePercent: string;
@@ -116,11 +122,15 @@ export type ActivityResponse = {
       day: string;
       label: string;
       total: number;
-      full: number;
-      partial: number;
-      unresolved: number;
-      excluded: number;
-      unavailable: number;
+      walletCashflow: number;
+      protocolActivity: number;
+      approvals: number;
+      other: number;
+    }>;
+    actionBreakdown: Array<{
+      id: ActivityAction;
+      labelKey: string;
+      value: number;
     }>;
     coverageBreakdown: Array<{
       id: ActivityCoverage;
@@ -131,6 +141,12 @@ export type ActivityResponse = {
       id: Exclude<ActivitySurfaceFilter, "all">;
       labelKey: string;
       value: number;
+    }>;
+    movementBreakdown: Array<{
+      id: "in" | "out" | "none";
+      labelKey: string;
+      value: number;
+      valueUsd: string;
     }>;
   };
   events: {

@@ -1,6 +1,6 @@
 "use client";
 
-import { createColumnHelper, type ColumnDef } from "@tanstack/react-table";
+import { createColumnHelper, type ColumnDef, type SortingState } from "@tanstack/react-table";
 import { useMemo } from "react";
 
 import {
@@ -69,17 +69,51 @@ function ownerLabel(row: RewardEventRow, labels: Props["labels"]) {
   return labels.getSource(row.owner.status);
 }
 
+function sortKeyToColumnId(key: RewardsUrlState["sort"]["key"]) {
+  if (key === "occurredAt") return "date";
+  if (key === "valueUsd") return "value";
+  if (key === "tokenAmount") return "amount";
+  if (key === "source") return "owner";
+  return key;
+}
+
+function columnIdToSortKey(id: string): RewardsUrlState["sort"]["key"] {
+  if (id === "date") return "occurredAt";
+  if (id === "value") return "valueUsd";
+  if (id === "amount") return "tokenAmount";
+  if (id === "owner") return "owner";
+  if (id === "coverage") return "coverage";
+  return "occurredAt";
+}
+
 export function RewardsEventsTable({ viewModel, state, labels, loading = false, onStateChange }: Props) {
   const pagination = viewModel.events.pagination;
   const from = pagination.totalRows === 0 ? 0 : (pagination.page - 1) * pagination.pageSize + 1;
   const to = Math.min(pagination.totalRows, pagination.page * pagination.pageSize);
+  const sorting: SortingState = [{
+    id: sortKeyToColumnId(state.sort.key),
+    desc: state.sort.direction === "desc",
+  }];
+  function handleSortingChange(updater: SortingState | ((old: SortingState) => SortingState)) {
+    const nextSorting = typeof updater === "function" ? updater(sorting) : updater;
+    const first = nextSorting[0];
+    if (!first) return;
+    onStateChange({
+      ...state,
+      selectedRewardEventId: null,
+      sort: {
+        key: columnIdToSortKey(first.id),
+        direction: first.desc ? "desc" : "asc",
+      },
+      page: 1,
+    });
+  }
   const columns = useMemo<Array<ColumnDef<RewardEventRow, unknown>>>(
     () => {
       const all = [
         columnHelper.accessor("occurredAt", {
           id: "date",
           header: () => labels.date,
-          enableSorting: false,
           meta: { numeric: true },
           cell: ({ getValue }) => (
             <DataTableValueCell primary={labels.formatDateTime(getValue())} align="left" />
@@ -107,21 +141,18 @@ export function RewardsEventsTable({ viewModel, state, labels, loading = false, 
         columnHelper.accessor("tokenAmount", {
           id: "amount",
           header: () => labels.amount,
-          enableSorting: false,
           meta: { numeric: true },
           cell: ({ getValue }) => <DataTableValueCell primary={getValue() ?? ""} />,
         }),
         columnHelper.accessor("usdValueAtClaim", {
           id: "value",
           header: () => labels.value,
-          enableSorting: false,
           meta: { numeric: true },
           cell: ({ getValue }) => <DataTableValueCell primary={getValue() ?? ""} />,
         }),
         columnHelper.display({
           id: "owner",
           header: () => labels.owner,
-          enableSorting: false,
           cell: ({ row }) => (
             <DataTableStatusCell
               tone={row.original.owner.status === "unresolved" ? "warning" : "info"}
@@ -172,7 +203,6 @@ export function RewardsEventsTable({ viewModel, state, labels, loading = false, 
         columnHelper.accessor("coverageState", {
           id: "coverage",
           header: () => labels.coverage,
-          enableSorting: false,
           cell: ({ getValue }) => (
             <CabBadge tone={coverageTone(getValue())} size="sm">
               {labels.getCoverage(getValue())}
@@ -222,6 +252,8 @@ export function RewardsEventsTable({ viewModel, state, labels, loading = false, 
         rowKey={(row) => row.rewardEventId}
         selectedRowId={state.selectedRewardEventId ?? viewModel.selectedReward?.rewardEventId ?? null}
         onRowSelect={(rewardEventId) => onStateChange({ ...state, selectedRewardEventId: rewardEventId })}
+        sorting={sorting}
+        onSortingChange={handleSortingChange}
         stickyHeader
         loading={loading}
         toolbar={
@@ -251,8 +283,8 @@ export function RewardsEventsTable({ viewModel, state, labels, loading = false, 
           rowsPerPage: labels.rowsPerPage,
           showing: labels.showing,
         }}
-        onPageChange={(page) => onStateChange({ ...state, page })}
-        onPageSizeChange={(pageSize) => onStateChange({ ...state, pageSize: pageSize as RewardsUrlState["pageSize"], page: 1 })}
+        onPageChange={(page) => onStateChange({ ...state, selectedRewardEventId: null, page })}
+        onPageSizeChange={(pageSize) => onStateChange({ ...state, selectedRewardEventId: null, pageSize: pageSize as RewardsUrlState["pageSize"], page: 1 })}
       />
     </CabStack>
   );

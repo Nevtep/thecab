@@ -5,6 +5,7 @@ import {
   calculateAvailableActivityFilters,
   mapActivityLedgerRow,
   matchesActivityRequest,
+  normalizeEngineV2ActivityRow,
   sortActivityRows,
 } from "@/server/activity/activity.repository";
 import type { ActivityEventRow, ActivityRequest } from "@/server/activity/activity.types";
@@ -146,4 +147,51 @@ test("calculateAvailableActivityFilters derives distinct options", () => {
   assert.deepEqual(filters.actions, ["claim", "deposit"]);
   assert.deepEqual(filters.surfaces, ["deposits", "rewards"]);
   assert.equal(filters.tokens.length, 1);
+});
+
+test("normalizeEngineV2ActivityRow keeps deterministic Engine V2 taxonomy out of ambiguous", () => {
+  const approval = normalizeEngineV2ActivityRow({
+    activityId: "approval-1",
+    chainId: 8453,
+    walletAddress,
+    txHash: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    action: "approval_position_manager",
+    surface: "approval",
+    coverage: "full",
+    confidence: "high",
+    occurredAt: "2026-03-05T15:05:00.000Z",
+  } as Record<string, unknown>);
+  const failed = normalizeEngineV2ActivityRow({
+    activityId: "failed-1",
+    chainId: 8453,
+    walletAddress,
+    txHash: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    action: "failed_transaction",
+    surface: "activity",
+    coverage: "full",
+    confidence: "high",
+    occurredAt: "2026-03-05T15:02:00.000Z",
+  } as Record<string, unknown>);
+  const mint = normalizeEngineV2ActivityRow({
+    activityId: "mint-1",
+    chainId: 8453,
+    walletAddress,
+    txHash: "0x77a9a087a8eb7ac5136a7da2353eeb35971b5ac8b0afbeb607b5c38c1ee8f9c5",
+    action: "manual_position_created",
+    surface: "deposit",
+    coverage: "partial",
+    confidence: "high",
+    occurredAt: "2026-03-05T14:45:00.000Z",
+    selectedDetail: {
+      summary: "Mint CL position",
+      tokenMovements: [
+        { direction: "out", tokenAddress: "0x4200000000000000000000000000000000000006", tokenSymbol: "WETH", amountRaw: "9288602382803244000", amountUsd: "28039.31" },
+      ],
+    },
+  } as Record<string, unknown>);
+
+  assert.equal(approval.action, "approval");
+  assert.equal(failed.action, "failed");
+  assert.equal(mint.action, "position_created");
+  assert.doesNotMatch(mint.summary, /^ambiguous:/);
 });

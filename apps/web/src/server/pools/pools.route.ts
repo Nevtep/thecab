@@ -1,7 +1,7 @@
-import { cookies } from "next/headers";
 import { z } from "zod";
 
 import { assertSupportedChain, SUPPORTED_CHAIN_ID } from "@/server/chains";
+import { readAuthenticatedWalletAddress as readRequestWalletAddress } from "@/server/auth/walletAuth";
 import type { PoolDetailRequest, PoolsListRequest } from "@/server/pools/pools.types";
 
 const poolsListQuerySchema = z.object({
@@ -25,14 +25,7 @@ const poolDetailQuerySchema = z.object({
 });
 
 async function readAuthenticatedWalletAddress() {
-  const cookieStore = await cookies();
-  const authenticatedAddress = cookieStore.get("cab_authenticated_address")?.value?.toLowerCase() ?? null;
-
-  if (!authenticatedAddress) {
-    throw new Error("POOLS_REQUEST_FAILED:UNAUTHORIZED");
-  }
-
-  return authenticatedAddress;
+  return readRequestWalletAddress({ unauthorizedMessage: "POOLS_REQUEST_FAILED:UNAUTHORIZED" });
 }
 
 export async function parsePoolsListRequest(request: Request): Promise<PoolsListRequest> {

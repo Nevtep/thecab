@@ -107,6 +107,7 @@ test("handleRewardsGet returns ready route response from the service payload", a
     readDataView: async () => buildReadyResponse({
       request: input,
       repository: {
+        summaryRows: [],
         allRows: [],
         rows: [],
         totalRows: 0,

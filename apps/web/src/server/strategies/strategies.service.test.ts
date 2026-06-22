@@ -177,7 +177,7 @@ test("buildStrategiesListResponse keeps unavailable valuation KPIs null and repo
 
   assert.equal(result.kpis.currentStrategyValueUsd, null);
   assert.equal(result.kpis.totalReturnUsd, null);
-  assert.equal(result.kpis.protocolCoveragePct, 0);
+  assert.equal(result.kpis.protocolCoveragePct, null);
   assert.equal(result.kpis.coverageStatus, "unknown");
   assert.deepEqual(result.kpis.coverageReasonCodes, [
     "missingShareValuation",

@@ -134,7 +134,7 @@ export type GovernanceRewardRow = {
 };
 
 export type GovernanceSelectedDetail = {
-  selectionKind: "event" | "reward" | "epoch" | "metric" | "empty";
+  selectionKind: "lock" | "event" | "reward" | "epoch" | "metric" | "empty";
   selectionId: string | null;
   actionSummary: {
     labelKey: string;
@@ -221,7 +221,7 @@ export type GovernanceFilters = {
   tokenAddress: string | null;
   coverage: GovernanceCoverageState | null;
   confidence: GovernanceConfidence | null;
-  selectedKind: "event" | "reward" | "epoch" | "metric" | null;
+  selectedKind: "lock" | "event" | "reward" | "epoch" | "metric" | null;
   selectedGovernanceId: string | null;
   sort: {
     key: GovernanceSortKey;

@@ -140,44 +140,44 @@ export function StrategiesContainer() {
         isRefreshing={strategiesQuery.isFetching && !strategiesQuery.isLoading}
         onRetry={() => void strategiesQuery.refetch()}
         onSearchChange={(value) => {
-          startTransition(() => updateUrl({ ...urlState, search: value, page: 1 }));
+          startTransition(() => updateUrl({ ...urlState, search: value, page: 1, selectedStrategyId: null }));
         }}
         onStatusChange={(status) => {
-          startTransition(() => updateUrl({ ...urlState, status, page: 1 }));
+          startTransition(() => updateUrl({ ...urlState, status, page: 1, selectedStrategyId: null }));
         }}
         onProtocolChange={(protocol) => {
-          startTransition(() => updateUrl({ ...urlState, protocol, page: 1 }));
+          startTransition(() => updateUrl({ ...urlState, protocol, page: 1, selectedStrategyId: null }));
         }}
         onCoverageChange={(coverage) => {
-          startTransition(() => updateUrl({ ...urlState, coverage, page: 1 }));
+          startTransition(() => updateUrl({ ...urlState, coverage, page: 1, selectedStrategyId: null }));
         }}
         onReturnSignChange={(returnSign) => {
-          startTransition(() => updateUrl({ ...urlState, returnSign, page: 1 }));
+          startTransition(() => updateUrl({ ...urlState, returnSign, page: 1, selectedStrategyId: null }));
         }}
         onSortChange={(sort) => {
-          startTransition(() => updateUrl({ ...urlState, sort, page: 1 }));
+          startTransition(() => updateUrl({ ...urlState, sort, page: 1, selectedStrategyId: null }));
         }}
         onClearPool={() => {
-          startTransition(() => updateUrl({ ...urlState, poolId: null, page: 1 }));
+          startTransition(() => updateUrl({ ...urlState, poolId: null, page: 1, selectedStrategyId: null }));
         }}
         onClearFilters={() => {
           const defaults = createDefaultStrategiesListUrlState();
           startTransition(() => updateUrl({
             ...defaults,
-            selectedStrategyId: urlState.selectedStrategyId,
+            selectedStrategyId: null,
           }));
         }}
         onPageChange={(page) => {
-          startTransition(() => updateUrl({ ...urlState, page }));
+          startTransition(() => updateUrl({ ...urlState, page, selectedStrategyId: null }));
         }}
         onPageSizeChange={(pageSize) => {
-          startTransition(() => updateUrl({ ...urlState, pageSize, page: 1 }));
+          startTransition(() => updateUrl({ ...urlState, pageSize, page: 1, selectedStrategyId: null }));
         }}
         onSelectStrategy={(strategyExposureId) => {
           startTransition(() => updateUrl({ ...urlState, selectedStrategyId: strategyExposureId }));
         }}
         onOpenPool={(poolId) => {
-          router.push(`/pools/${poolId}`);
+          router.push(`/pools/${encodeURIComponent(poolId)}`);
         }}
       />
     </ConnectedShell>

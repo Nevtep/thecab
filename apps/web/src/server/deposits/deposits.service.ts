@@ -149,9 +149,9 @@ function aggregateSummary(items: DepositSummaryView[]): DepositsListSummary {
       currentDeployed += item.currentValueUsd;
     }
 
-    if (item.estimatedAnnualizedReturnPct !== null && item.currentValueUsd > 0) {
-      weightedReturnSum += item.estimatedAnnualizedReturnPct * item.currentValueUsd;
-      weightedDenominator += item.currentValueUsd;
+    if (item.estimatedAnnualizedReturnPct !== null && item.openedValueUsd > 0) {
+      weightedReturnSum += item.estimatedAnnualizedReturnPct * item.openedValueUsd;
+      weightedDenominator += item.openedValueUsd;
     }
 
     for (const code of item.coverageReasonCodes) reasonCodeSet.add(code);

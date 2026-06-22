@@ -83,6 +83,7 @@ export function buildStrategiesListResponse(input: {
   analysisStatus: "ready" | "stale";
   request: StrategiesListRequest;
   rows: StrategySummaryView[];
+  kpiRows?: StrategySummaryView[];
   pageInfo?: {
     page: number;
     totalPages: number;
@@ -91,10 +92,11 @@ export function buildStrategiesListResponse(input: {
   selectedStrategy: StrategyDetailView | null;
   availablePools: Array<{ poolId: string; label: string }>;
 }): StrategiesListResponse {
-  const totalReturnValues = input.rows
+  const kpiRows = input.kpiRows ?? input.rows;
+  const totalReturnValues = kpiRows
     .map((row) => row.totalReturnUsd)
     .filter((value): value is number => value !== null);
-  const coverage = combineCoverage(input.rows);
+  const coverage = combineCoverage(kpiRows);
   const selected: StrategyDetailView | null =
     input.selectedStrategy ??
     (input.rows.find((row) => row.strategyExposureId === input.request.selectedStrategyId)
@@ -112,17 +114,17 @@ export function buildStrategiesListResponse(input: {
       endDayUtc: null,
     },
     kpis: {
-      currentStrategyValueUsd: input.rows.some((row) => row.currentEstimatedValueUsd !== null)
-        ? input.rows.reduce((total, row) => total + (row.currentEstimatedValueUsd ?? 0), 0)
+      currentStrategyValueUsd: kpiRows.some((row) => row.currentEstimatedValueUsd !== null)
+        ? kpiRows
+          .filter((row) => row.status === "active")
+          .reduce((total, row) => total + (row.currentEstimatedValueUsd ?? 0), 0)
         : null,
-      activeStrategyCount: input.rows.filter((row) => row.status === "active").length,
-      totalClaimedRewardsUsd: input.rows.reduce((total, row) => total + row.totalRewardsUsd, 0),
+      activeStrategyCount: kpiRows.filter((row) => row.status === "active").length,
+      totalClaimedRewardsUsd: kpiRows.reduce((total, row) => total + row.totalRewardsUsd, 0),
       totalReturnUsd: totalReturnValues.length > 0
         ? totalReturnValues.reduce((total, value) => total + value, 0)
         : null,
-      protocolCoveragePct: input.rows.length > 0
-        ? input.rows.filter((row) => row.coverageStatus === "full" || row.coverageStatus === "share_level").length / input.rows.length
-        : null,
+      protocolCoveragePct: null,
       coverageStatus: coverage.coverageStatus,
       coverageReasonCodes: coverage.coverageReasonCodes,
       trends: {},
@@ -170,6 +172,7 @@ export async function getStrategiesList(input: StrategiesListRequest) {
     analysisStatus,
     request: input,
     rows: listResult.items,
+    kpiRows: listResult.allItems,
     pageInfo: {
       page: listResult.page,
       totalPages: listResult.totalPages,

@@ -164,7 +164,7 @@ function buildKpis(summary: RewardsSummary) {
       labelKey: "rewards:kpis.rewardEvents",
       value: summary.rewardEventCount,
       valueKind: "count" as const,
-      context: { labelKey: "rewards:kpis.visibleRows" },
+      context: { labelKey: "rewards:kpis.allHistory" },
       coverageState: summary.coverageState,
     },
     {
@@ -235,6 +235,7 @@ function buildOverTime(rows: RewardEventRow[], historicalCapital: HistoricalCapi
     const day = row.occurredAt.slice(0, 10);
     buckets.set(day, [...(buckets.get(day) ?? []), row]);
   }
+  let cumulativeClaimedValueUsd = 0;
   const result = [...buckets.entries()].sort(([left], [right]) => left.localeCompare(right)).map(([day, bucketRows]) => {
     const returnMetric = calculateEstimatedRewardReturn({
       rows: bucketRows,
@@ -247,6 +248,7 @@ function buildOverTime(rows: RewardEventRow[], historicalCapital: HistoricalCapi
       .filter((row) => row.owner.status !== "unresolved" && row.owner.status !== "excluded" && row.owner.status !== "unavailable")
       .reduce((sum, row) => sum + (asNumber(row.usdValueAtClaim) ?? 0), 0);
     const unresolvedExcludedValue = Math.max(0, totalValue - resolvedValue);
+    cumulativeClaimedValueUsd += totalValue;
 
     return {
       bucketStart: day,
@@ -254,6 +256,7 @@ function buildOverTime(rows: RewardEventRow[], historicalCapital: HistoricalCapi
       claimedValueUsd: toFixedString(totalValue),
       resolvedValueUsd: toFixedString(resolvedValue),
       unresolvedExcludedValueUsd: toFixedString(unresolvedExcludedValue),
+      cumulativeClaimedValueUsd: toFixedString(cumulativeClaimedValueUsd),
       estimatedRewardReturnPct: returnMetric.estimatedRewardReturnPct,
       rewardEventCount: bucketRows.length,
       claimMarkers: bucketRows.slice(0, 8).map((row) => ({ rewardEventId: row.rewardEventId, tokenSymbol: row.token.symbol })),
@@ -330,7 +333,8 @@ export function buildReadyResponse(input: {
   runId: string | null;
   completedAt: string | null;
 }): RewardsResponse {
-  const summary = buildRewardsSummary(input.repository.allRows, input.repository.historicalCapital);
+  const summaryRows = input.repository.summaryRows ?? input.repository.allRows;
+  const summary = buildRewardsSummary(summaryRows, input.repository.historicalCapital);
   const overTimeBuckets = buildOverTime(input.repository.allRows, input.repository.historicalCapital);
   const selectedRow =
     input.repository.allRows.find((row) => row.rewardEventId === input.request.selectedRewardEventId) ??

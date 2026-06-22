@@ -1,6 +1,7 @@
 import type { EngineV2AccountingOutput } from "@/server/analysis/engine-v2/accounting";
 import { deriveGovernanceLockKind, resolvePrimaryGovernanceLockPanel, selectPrimaryGovernanceLockId } from "@/server/governance/governance-locks";
 import type { GovernanceLockPanel } from "@/server/governance/governance.types";
+import { formatRawTokenAmount } from "@/server/tokens/token-amounts";
 
 import { materializeActivityRows, type EngineV2ReadModelRowInput } from "./activity-materializer";
 import type { EngineV2MaterializationContext, EngineV2MaterializationPoolState } from "./load-materialization-context";
@@ -85,6 +86,22 @@ function asNullableFiniteNumber(value: unknown) {
     return Number.isFinite(parsed) ? parsed : null;
   }
   return null;
+}
+
+function addIntegerStrings(left: string, right: string) {
+  try {
+    return (BigInt(left) + BigInt(right)).toString();
+  } catch {
+    const sum = Number(left) + Number(right);
+    return Number.isFinite(sum) ? Math.trunc(sum).toString() : left;
+  }
+}
+
+function addNullableDecimalStrings(left: string | null, right: string | null) {
+  if (left === null) return right;
+  if (right === null) return left;
+  const sum = Number(left) + Number(right);
+  return Number.isFinite(sum) ? String(sum) : left;
 }
 
 function movementRecords(value: unknown) {
@@ -222,16 +239,8 @@ function normalizeStrategyLifecycleEventType(value: string) {
   return "strategy_internal_rebalance";
 }
 
-function formatTokenAmount(amountRaw: string | null, decimals: number | null) {
-  if (!amountRaw || decimals === null || decimals < 0) return null;
-  if (!/^\d+$/.test(amountRaw)) return null;
-  const raw = BigInt(amountRaw);
-  const base = 10n ** BigInt(decimals);
-  const whole = raw / base;
-  const fraction = raw % base;
-  if (fraction === 0n) return whole.toString();
-  const padded = fraction.toString().padStart(decimals, "0").replace(/0+$/, "");
-  return padded.length > 0 ? `${whole.toString()}.${padded}` : whole.toString();
+function formatTokenAmount(amountRaw: string | null, decimals: number | null, assetType?: string | null) {
+  return formatRawTokenAmount({ amountRaw, tokenDecimals: decimals, assetType });
 }
 
 function buildDepositLifecycleTokenDeltas(input: {
@@ -250,12 +259,15 @@ function buildDepositLifecycleTokenDeltas(input: {
       const tokenAddress = normalizeAddress(asString(movement.tokenAddress));
       const metadata = getTokenMetadata(input.context, tokenAddress);
       const amountRaw = asString(movement.amountRaw) ?? "0";
+      const assetType = asString(movement.assetType) ?? "erc20";
       return [{
         tokenAddress,
         symbol: metadata?.symbol ?? null,
         direction,
         amountRaw,
-        amountFormatted: formatTokenAmount(amountRaw, metadata?.decimals ?? null),
+        tokenDecimals: metadata?.decimals ?? null,
+        assetType,
+        amountFormatted: formatTokenAmount(amountRaw, metadata?.decimals ?? null, assetType),
         usdValue: toNullableNumber(asString(movement.valueUsdAtEvent)),
         priceSource: asString(movement.valueUsdAtEvent) ? "event" : null,
       }];
@@ -328,12 +340,15 @@ function buildStrategyLifecycleTokenDeltas(input: {
       const tokenAddress = normalizeAddress(asString(movement.tokenAddress));
       const metadata = getTokenMetadata(input.context, tokenAddress);
       const amountRaw = asString(movement.amountRaw) ?? "0";
+      const assetType = asString(movement.assetType) ?? "erc20";
       return [{
         tokenAddress,
         symbol: metadata?.symbol ?? null,
         direction,
         amountRaw,
-        amountFormatted: formatTokenAmount(amountRaw, metadata?.decimals ?? null),
+        tokenDecimals: metadata?.decimals ?? null,
+        assetType,
+        amountFormatted: formatTokenAmount(amountRaw, metadata?.decimals ?? null, assetType),
         usdValue: toNullableNumber(asString(movement.valueUsdAtEvent)),
         priceSource: asString(movement.valueUsdAtEvent) ? "alchemyHistorical" : null,
       }];
@@ -448,12 +463,16 @@ function buildGovernanceEventTokenMovements(input: {
     .map((movement) => {
       const tokenAddress = normalizeAddress(asString(movement.tokenAddress));
       const metadata = getTokenMetadata(input.context, tokenAddress);
+      const amountRaw = asString(movement.amountRaw);
+      const assetType = asString(movement.assetType) ?? "erc20";
       return {
         tokenAddress,
         tokenSymbol: metadata?.symbol ?? null,
         direction: asString(movement.direction) ?? "unknown",
-        amountRaw: asString(movement.amountRaw),
-        amountFormatted: formatTokenAmount(asString(movement.amountRaw), metadata?.decimals ?? null),
+        amountRaw,
+        tokenDecimals: metadata?.decimals ?? null,
+        assetType,
+        amountFormatted: formatTokenAmount(amountRaw, metadata?.decimals ?? null, assetType),
         valueUsd: toNullableNumber(asString(movement.valueUsdAtEvent)),
       };
     });
@@ -472,6 +491,85 @@ function strategyCurrentEstimatedValueUsd(
     .reverse()
     .find((event) => !event.eventType.includes("reward") && !event.eventType.includes("claim") && event.valueUsd)?.valueUsd;
   return toNullableNumber(latestNonRewardValue ?? strategy.depositedValueUsd);
+}
+
+function hasPositiveRawAmount(value: string | null | undefined) {
+  if (!value) return false;
+  try {
+    return BigInt(value) > 0n;
+  } catch {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0;
+  }
+}
+
+function isOpenManualDeposit(deposit: EngineV2AccountingOutput["deposits"][number]) {
+  return deposit.status !== "closed";
+}
+
+function isActiveStrategyExposure(
+  strategy: EngineV2AccountingOutput["strategies"][number],
+  context: EngineV2MaterializationContext,
+) {
+  const persistedStrategyState = getStrategyState(context, strategy);
+  if (persistedStrategyState) {
+    return (persistedStrategyState.currentEstimatedValueUsd ?? 0) > 0 || hasPositiveRawAmount(strategy.currentSharesRaw);
+  }
+
+  return hasPositiveRawAmount(strategy.currentSharesRaw);
+}
+
+function poolPositionInRange(input: {
+  manualDeposits: Array<{ isInRange: boolean | null }>;
+  automatedStrategies: Array<{ isInRange?: boolean | null }>;
+}) {
+  const states = [
+    ...input.manualDeposits.map((item) => item.isInRange),
+    ...input.automatedStrategies.map((item) => item.isInRange ?? null),
+  ].filter((value): value is boolean => typeof value === "boolean");
+
+  if (states.some((value) => value === false)) return false;
+  if (states.some((value) => value === true)) return true;
+  return null;
+}
+
+function derivePoolStatus(input: {
+  hasCurrentExposure: boolean;
+  isInRange: boolean | null;
+}): "active" | "inactive" | "closed" | "unknown" {
+  if (!input.hasCurrentExposure) return "closed";
+  if (input.isInRange === false) return "inactive";
+  return "active";
+}
+
+function hasPoolProjectionEvidence(input: {
+  poolId: string;
+  accounting: EngineV2AccountingOutput;
+  context: EngineV2MaterializationContext;
+}) {
+  return input.accounting.deposits.some((deposit) => deposit.poolId === input.poolId)
+    || input.accounting.strategies.some((strategy) => strategy.poolId === input.poolId)
+    || input.accounting.rewards.some((reward) => resolveRewardPoolContext({
+      reward,
+      accounting: input.accounting,
+      context: input.context,
+    }).poolId === input.poolId);
+}
+
+const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
+
+function investedDaysBetween(start: Date | null, end: Date | null) {
+  if (!start || !end) return null;
+  return Math.max(Math.ceil((end.getTime() - start.getTime()) / MILLISECONDS_PER_DAY), 1);
+}
+
+function annualizedRewardReturnPct(input: {
+  investedUsd: number;
+  rewardsUsd: number;
+  investedDays: number | null;
+}) {
+  if (input.investedUsd <= 0 || !input.investedDays) return null;
+  return (input.rewardsUsd / input.investedUsd) * 100 * (365 / input.investedDays);
 }
 
 function strategyDisplayLabel(input: {
@@ -584,10 +682,24 @@ function buildPoolHistoryPoints(input: {
     buckets.set(dayUtc, current);
     return current;
   };
+  const rebalancedPrimitiveEventIds = new Set(
+    input.accounting.rebalances
+      .filter((rebalance) => rebalance.poolId === input.poolId)
+      .flatMap((rebalance) => [
+        rebalance.sourceWithdrawalId,
+        rebalance.withdrawalEventId,
+        rebalance.depositEventId,
+        ...rebalance.swapEventIds,
+      ])
+      .filter((eventId): eventId is string => typeof eventId === "string" && eventId.length > 0),
+  );
 
   for (const deposit of input.accounting.deposits) {
     if (deposit.poolId !== input.poolId) continue;
     for (const event of deposit.lifecycle) {
+      if (event.eventId && rebalancedPrimitiveEventIds.has(event.eventId)) {
+        continue;
+      }
       const flow = classifyManualCapitalFlow(event.eventType);
       const valueUsd = toNumber(event.valueUsd);
       const bucket = upsertBucket(event.occurredAt);
@@ -605,6 +717,9 @@ function buildPoolHistoryPoints(input: {
   for (const strategy of input.accounting.strategies) {
     if (strategy.poolId !== input.poolId) continue;
     for (const event of strategy.lifecycle) {
+      if (event.eventId && rebalancedPrimitiveEventIds.has(event.eventId)) {
+        continue;
+      }
       const flow = classifyStrategyCapitalFlow(event.eventType);
       const valueUsd = toNumber(event.valueUsd);
       const bucket = upsertBucket(event.occurredAt);
@@ -624,7 +739,20 @@ function buildPoolHistoryPoints(input: {
     if (rewardPool.poolId !== input.poolId) continue;
     const bucket = upsertBucket(reward.occurredAt);
     bucket.activityCount += 1;
-    bucket.rewardValueUsd += toNumber(reward.amountUsd);
+      bucket.rewardValueUsd += toNumber(reward.amountUsd);
+  }
+
+  for (const rebalance of input.accounting.rebalances) {
+    if (rebalance.poolId !== input.poolId) continue;
+    const capitalDeltaUsd = toNumber(rebalance.capitalDeltaUsd);
+    const bucket = upsertBucket(rebalance.occurredAt);
+    bucket.activityCount += 1;
+    bucket.manualDeltaUsd += capitalDeltaUsd;
+    if (capitalDeltaUsd >= 0) {
+      bucket.capitalInUsd += capitalDeltaUsd;
+    } else {
+      bucket.capitalOutUsd += Math.abs(capitalDeltaUsd);
+    }
   }
 
   const days = [...buckets.keys()].sort((left, right) => left.localeCompare(right));
@@ -751,6 +879,31 @@ function buildPoolTimelineItems(input: {
     });
   }
 
+  for (const rebalance of input.accounting.rebalances) {
+    if (rebalance.poolId !== input.poolId) continue;
+    items.push({
+      eventKey: rebalance.rebalanceId,
+      eventType: "rebalance_same_pool",
+      occurredAt: rebalance.occurredAt.toISOString(),
+      confidence: confidence(rebalance.confidence),
+      coverageStatus: coverageStatus(rebalance.coverageStatus),
+      attributedValueUsd: toNullableNumber(rebalance.capitalDeltaUsd),
+      relatedDepositId: null,
+      relatedStrategyId: null,
+      metadataJson: {
+        source: "rebalance",
+        txHash: rebalance.txHash,
+        sourceWithdrawalId: rebalance.sourceWithdrawalId,
+        withdrawalEventId: rebalance.withdrawalEventId,
+        swapEventIds: rebalance.swapEventIds,
+        depositEventId: rebalance.depositEventId,
+        withdrawnCapitalUsd: rebalance.withdrawnCapitalUsd,
+        redeployedCapitalUsd: rebalance.redeployedCapitalUsd,
+        capitalDeltaUsd: rebalance.capitalDeltaUsd,
+      },
+    });
+  }
+
   return items.sort((left, right) => right.occurredAt.localeCompare(left.occurredAt));
 }
 
@@ -771,6 +924,13 @@ function governanceCoverageStatus(value: string) {
 
 function governanceConfidence(value: string) {
   return value === "high" || value === "medium" || value === "low" ? value : "none";
+}
+
+function governanceEpochLabel(epochId: string) {
+  if (epochId.startsWith("observed:")) {
+    return `Observed week ${epochId.slice("observed:".length)}`;
+  }
+  return `Epoch ${epochId}`;
 }
 
 function worstGovernanceCoverage(values: string[]) {
@@ -884,6 +1044,12 @@ export function materializeDepositRows(
           : rangeMetadata.isInRange === false
             ? "open_out_of_range"
             : "open_active";
+        const openedValueUsd = toNumber(deposit.openedValueUsd);
+        const resolvedRewardsReturnPct = openedValueUsd > 0 ? resolvedRewardsUsd / openedValueUsd : null;
+        const investedDays = investedDaysBetween(deposit.openedAt ?? null, deposit.closedAt ?? new Date());
+        const estimatedAnnualizedReturnPct = resolvedRewardsReturnPct !== null && investedDays
+          ? resolvedRewardsReturnPct * (365 / investedDays)
+          : null;
 
         return {
       depositId: deposit.depositId,
@@ -904,7 +1070,7 @@ export function materializeDepositRows(
       openedAt: toIso(deposit.openedAt),
       closedAt: toIso(deposit.closedAt),
       openedByTransferIn,
-      openedValueUsd: toNumber(deposit.openedValueUsd),
+      openedValueUsd,
       currentValueUsd: toNumber(deposit.currentOrCloseValueUsd ?? deposit.openedValueUsd),
       capitalEnteredUsd: toNumber(deposit.capitalInUsd),
       capitalWithdrawnUsd: toNumber(deposit.capitalOutUsd),
@@ -912,8 +1078,9 @@ export function materializeDepositRows(
       realizedPnlUsd: 0,
       unrealizedPnlUsd: 0,
       totalReturnUsd: resolvedRewardsUsd,
-      totalReturnPct: null,
-      estimatedAnnualizedReturnPct: null,
+      totalReturnPct: resolvedRewardsReturnPct,
+      estimatedAnnualizedReturnPct,
+      investedDays,
       isInRange: rangeMetadata.isInRange,
       rangeLowerPrice: rangeMetadata.rangeLowerPrice,
       rangeUpperPrice: rangeMetadata.rangeUpperPrice,
@@ -996,14 +1163,42 @@ export function materializeStrategyRows(
         const strategyRewards = accounting.rewards
           .filter((reward) => reward.ownerStatus === "strategy" && reward.linkedEntityId === strategy.strategyExposureId)
           .sort((left, right) => left.occurredAt.getTime() - right.occurredAt.getTime());
-        const currentEstimatedValueUsd = strategyCurrentEstimatedValueUsd(strategy, context);
+        const depositedValueUsd = toNumber(strategy.depositedValueUsd);
+        const withdrawnValueUsd = toNumber(strategy.withdrawnValueUsd);
+        const totalRewardsUsd = toNumber(strategy.rewardsUsd);
+        const strategyIsActive = isActiveStrategyExposure(strategy, context);
+        const closeValueUsd = strategyIsActive ? null : withdrawnValueUsd;
+        const currentEstimatedValueUsd = strategyIsActive
+          ? strategyCurrentEstimatedValueUsd(strategy, context)
+          : closeValueUsd;
+        const displayValueUsd = strategyIsActive ? currentEstimatedValueUsd : closeValueUsd;
+        const totalReturnUsd = displayValueUsd !== null
+          ? displayValueUsd + totalRewardsUsd - depositedValueUsd
+          : null;
+        const totalReturnPct = totalReturnUsd !== null && depositedValueUsd > 0
+          ? totalReturnUsd / depositedValueUsd
+          : null;
+        const firstStrategyActivityAt = strategy.lifecycle
+          .map((event) => event.occurredAt)
+          .filter((value): value is Date => value instanceof Date && Number.isFinite(value.getTime()))
+          .sort((left, right) => left.getTime() - right.getTime())[0] ?? null;
+        const lastStrategyActivityAt = strategy.lifecycle
+          .map((event) => event.occurredAt)
+          .filter((value): value is Date => value instanceof Date && Number.isFinite(value.getTime()))
+          .sort((left, right) => right.getTime() - left.getTime())[0] ?? null;
+        const investedDays = investedDaysBetween(firstStrategyActivityAt, strategyIsActive ? new Date() : lastStrategyActivityAt);
+        const estimatedAnnualizedReturnPct = depositedValueUsd > 0 && investedDays
+          ? (totalRewardsUsd / depositedValueUsd) * (365 / investedDays)
+          : null;
         const rewards = strategyRewards.map((reward) => {
           const sourceMetadata = reward.sourceDomainEventId
             ? asRecord(sourceEventsById.get(reward.sourceDomainEventId)?.metadataJson)
             : {};
-          const tokenMetadata = getTokenMetadata(context, reward.tokenAddress);
-          const resolutionStatus = reward.linkedEntityId && reward.tokenAddress && reward.amountRaw
-            ? "resolved"
+        const tokenMetadata = getTokenMetadata(context, reward.tokenAddress);
+        const tokenDecimals = tokenMetadata?.decimals ?? null;
+        const amountFormatted = formatTokenAmount(reward.amountRaw, tokenDecimals, "erc20");
+        const resolutionStatus = reward.linkedEntityId && reward.tokenAddress && reward.amountRaw
+          ? "resolved"
             : "unresolved";
           return {
             id: reward.rewardId,
@@ -1013,7 +1208,8 @@ export function materializeStrategyRows(
               ?? null,
             tokenAddress: reward.tokenAddress,
             amountRaw: reward.amountRaw,
-            amountFormatted: formatTokenAmount(reward.amountRaw, tokenMetadata?.decimals ?? null),
+            tokenDecimals,
+            amountFormatted,
             amountUsd: toNullableNumber(reward.amountUsd),
             claimedAt: toIso(reward.occurredAt),
             txHash: reward.txHash,
@@ -1032,18 +1228,21 @@ export function materializeStrategyRows(
       primaryPoolId: strategy.poolId,
       poolLabel,
       poolMappingStatus: strategy.poolId ? "confirmed" : "unknown",
-      status: strategy.currentSharesRaw !== "0" ? "active" : "closed",
+      status: strategyIsActive ? "active" : "closed",
       currentEstimatedValueUsd,
-      depositedValueUsd: toNumber(strategy.depositedValueUsd),
-      withdrawnValueUsd: toNumber(strategy.withdrawnValueUsd),
+      closeValueUsd,
+      displayValueUsd,
+      depositedValueUsd,
+      withdrawnValueUsd,
       currentSharesRaw: strategy.currentSharesRaw,
       shareSymbol: shareMetadata?.symbol ?? null,
-      totalRewardsUsd: toNumber(strategy.rewardsUsd),
+      totalRewardsUsd,
       realizedPnlUsd: null,
       unrealizedPnlUsd: null,
-      totalReturnUsd: toNumber(strategy.rewardsUsd),
-      totalReturnPct: null,
-      estimatedAnnualizedReturnPct: null,
+      totalReturnUsd,
+      totalReturnPct,
+      estimatedAnnualizedReturnPct,
+      investedDays,
       coverageStatus: coverageStatus(strategy.coverageStatus),
       confidence: confidence(strategy.confidence),
       coverageReasonCodes: strategy.reasonCodes,
@@ -1116,7 +1315,9 @@ export function materializePoolRows(
       .map((event) => [event.id, event]),
   );
 
-  return accounting.pools.map((pool) => row({
+  return accounting.pools
+    .filter((pool) => hasPoolProjectionEvidence({ poolId: pool.poolId, accounting, context }))
+    .map((pool) => row({
     chainId: accounting.events[0]?.chainId ?? 0,
     walletAddress: accounting.events[0]?.walletAddress ?? "",
     surface: "pools",
@@ -1166,8 +1367,11 @@ export function materializePoolRows(
               annualizedReturnPct: null,
             };
           });
-        const automatedStrategies = accounting.strategies
-          .filter((strategy) => strategy.poolId === pool.poolId)
+        const currentManualDeposits = manualDeposits.filter((deposit) => deposit.status !== "closed");
+        const currentManualValueUsd = currentManualDeposits.reduce((sum, deposit) => sum + (deposit.valueUsd ?? 0), 0);
+        const poolStrategies = accounting.strategies.filter((strategy) => strategy.poolId === pool.poolId);
+        const activePoolStrategies = poolStrategies.filter((strategy) => isActiveStrategyExposure(strategy, context));
+        const automatedStrategies = activePoolStrategies
           .map((strategy) => {
             const poolLabel = resolvedPoolLabel(strategy.poolId, context);
             return {
@@ -1183,6 +1387,41 @@ export function materializePoolRows(
             };
           });
         const linkedStrategyLabels = automatedStrategies.map((strategy) => strategy.strategyLabel);
+        const currentStrategyValueUsd = automatedStrategies.reduce((sum, strategy) => sum + (strategy.valueUsd ?? 0), 0);
+        const currentResiduals = accounting.residualInventory.filter((residual) => residual.poolId === pool.poolId);
+        const currentResidualValueUsd = currentResiduals.reduce((sum, residual) => sum + toNumber(residual.valueUsdAtEvent), 0);
+        const currentAttributedValueUsd = currentManualValueUsd + currentStrategyValueUsd + currentResidualValueUsd;
+        const capitalEnteredUsd = accounting.deposits
+          .filter((deposit) => deposit.poolId === pool.poolId)
+          .reduce((sum, deposit) => sum + toNumber(deposit.openedValueUsd), 0)
+          + poolStrategies.reduce((sum, strategy) => sum + toNumber(strategy.depositedValueUsd), 0);
+        const capitalWithdrawnUsd = accounting.deposits
+          .filter((deposit) => deposit.poolId === pool.poolId)
+          .reduce((sum, deposit) => sum + toNumber(deposit.capitalOutUsd), 0)
+          + poolStrategies.reduce((sum, strategy) => sum + toNumber(strategy.withdrawnValueUsd), 0);
+        const capitalInvestedUsd = Math.max(capitalEnteredUsd - capitalWithdrawnUsd, 0);
+        const hasCurrentExposure = currentManualDeposits.length > 0 || activePoolStrategies.length > 0;
+        const isInRange = poolPositionInRange({ manualDeposits: currentManualDeposits, automatedStrategies: [] });
+        const totalRewardsUsd = toNumber(pool.rewardValueUsd);
+        const firstActivityAt = activityDates[0] ?? null;
+        const lastActivityAt = activityDates.at(-1) ?? null;
+        const investedDays = investedDaysBetween(firstActivityAt, hasCurrentExposure ? new Date() : lastActivityAt ?? null);
+        const investedBasisUsd = capitalInvestedUsd > 0 ? capitalInvestedUsd : currentAttributedValueUsd;
+        const totalReturnPct = investedBasisUsd > 0 ? (totalRewardsUsd / investedBasisUsd) * 100 : null;
+        const annualizedReturnPct = annualizedRewardReturnPct({
+          investedUsd: investedBasisUsd,
+          rewardsUsd: totalRewardsUsd,
+          investedDays,
+        });
+        const exposureMix = currentManualValueUsd > 0 && currentStrategyValueUsd > 0
+          ? "mixed"
+          : currentStrategyValueUsd > 0
+            ? "automated"
+            : currentManualValueUsd > 0
+              ? "manual"
+              : currentResidualValueUsd > 0
+                ? "residual_only"
+                : "unknown";
 
         return {
       poolId: pool.poolId,
@@ -1192,19 +1431,19 @@ export function materializePoolRows(
       feeTierLabel: formatFeeTierLabel(poolState?.tickSpacing),
       poolType: poolState?.tickSpacing !== null && poolState?.tickSpacing !== undefined ? "cl" : poolState?.poolType ?? null,
       protocolFamily: "aerodrome",
-      status: "active",
-      exposureMix: Number(pool.strategyValueUsd) > 0 && Number(pool.manualDepositValueUsd) > 0 ? "mixed" : Number(pool.strategyValueUsd) > 0 ? "automated" : "manual",
-      currentAttributedValueUsd: toNumber(pool.manualDepositValueUsd) + toNumber(pool.strategyValueUsd),
-      capitalInvestedUsd: toNumber(pool.manualDepositValueUsd) + toNumber(pool.strategyValueUsd),
-      capitalEnteredUsd: toNumber(pool.manualDepositValueUsd) + toNumber(pool.strategyValueUsd),
-      capitalWithdrawnUsd: 0,
+      status: derivePoolStatus({ hasCurrentExposure, isInRange }),
+      exposureMix,
+      currentAttributedValueUsd,
+      capitalInvestedUsd,
+      capitalEnteredUsd,
+      capitalWithdrawnUsd,
       realizedPnlUsd: null,
       unrealizedPnlUsd: null,
-      totalRewardsUsd: toNumber(pool.rewardValueUsd),
-      investedDays: null,
-      totalReturnPct: null,
-      annualizedReturnPct: null,
-      isInRange: null,
+      totalRewardsUsd,
+      investedDays,
+      totalReturnPct,
+      annualizedReturnPct,
+      isInRange,
       coverageStatus: coverageStatus(pool.coverageStatus),
       coverageReasonCodes: pool.reasonCodes,
       latestActivityAt: toIso(activityDates.at(-1) ?? null),
@@ -1212,9 +1451,9 @@ export function materializePoolRows(
       metricsEstimated: true,
       coveredStartDayUtc: activityDates[0]?.toISOString().slice(0, 10) ?? null,
       coveredEndDayUtc: activityDates.at(-1)?.toISOString().slice(0, 10) ?? null,
-      currentManualValueUsd: toNumber(pool.manualDepositValueUsd),
-      currentStrategyValueUsd: toNumber(pool.strategyValueUsd),
-      currentResidualValueUsd: 0,
+      currentManualValueUsd,
+      currentStrategyValueUsd,
+      currentResidualValueUsd,
       history: { points: historyPoints },
       timeline: { items: timelineItems },
       positions: {
@@ -1256,6 +1495,8 @@ export function materializeRewardRows(
           ? asRecord(sourceEventsById.get(reward.sourceDomainEventId)?.metadataJson)
           : {};
         const tokenMetadata = getTokenMetadata(context, reward.tokenAddress);
+        const tokenDecimals = tokenMetadata?.decimals ?? null;
+        const tokenAmountFormatted = formatTokenAmount(reward.amountRaw, tokenDecimals, "erc20");
         const rewardPool = resolveRewardPoolContext({ reward, accounting, context });
         const tokenSymbol = tokenMetadata?.symbol
           ?? asString(sourceMetadata.tokenSymbol)
@@ -1279,8 +1520,12 @@ export function materializeRewardRows(
         address: reward.tokenAddress,
         symbol: tokenSymbol,
         iconUrl: asString(sourceMetadata.tokenIconUrl),
+        decimals: tokenDecimals,
       },
-      tokenAmount: reward.amountRaw,
+      tokenAmount: tokenAmountFormatted ?? reward.amountRaw,
+      tokenAmountRaw: reward.amountRaw,
+      tokenAmountFormatted,
+      tokenDecimals,
       usdValueAtClaim: reward.amountUsd,
       owner: {
         status: reward.ownerStatus,
@@ -1333,6 +1578,12 @@ export function materializeGovernanceRows(
     acc.set(event.tokenId, [...(acc.get(event.tokenId) ?? []), event].sort((left, right) => left.occurredAt.getTime() - right.occurredAt.getTime()));
     return acc;
   }, new Map());
+  const governanceEpochByEventId = new Map<string, typeof accounting.governance.epochs[number]>();
+  for (const epoch of accounting.governance.epochs) {
+    for (const eventId of epoch.events) {
+      governanceEpochByEventId.set(eventId, epoch);
+    }
+  }
 
   const lockRows = accounting.governance.locks.map((lock) => {
     const persistedLock = getGovernanceLockContext({ context, lockKey: lock.lockKey, tokenId: lock.tokenId });
@@ -1456,6 +1707,7 @@ export function materializeGovernanceRows(
         const classification = asRecord(sourceMetadata.governanceClassification);
         const poolId = asString(sourceMetadata.poolId);
         const poolLabel = asString(sourceMetadata.poolLabel) ?? resolvedPoolLabel(poolId, context);
+        const epochId = asString(sourceMetadata.epochId) ?? (event.eventId ? governanceEpochByEventId.get(event.eventId)?.epochId : null) ?? null;
         return {
       kind: "event",
       event: {
@@ -1471,7 +1723,7 @@ export function materializeGovernanceRows(
         evidenceRefs: asObjectArray(sourceMetadata.evidenceRefs).concat(asObjectArray(sourceMetadata.sourceEvidenceRefs)),
         metadata: {
           tokenId: event.tokenId,
-          epochId: asString(sourceMetadata.epochId),
+          epochId,
           poolId,
           poolLabel,
           tokenMovements: buildGovernanceEventTokenMovements({
@@ -1515,8 +1767,11 @@ export function materializeGovernanceRows(
           ? asRecord(sourceEventsById.get(reward.sourceDomainEventId)?.metadataJson)
           : {};
         const tokenMetadata = getTokenMetadata(context, reward.tokenAddress);
+        const tokenDecimals = tokenMetadata?.decimals ?? null;
+        const amountFormatted = formatTokenAmount(reward.amountRaw, tokenDecimals, "erc20");
         const rewardType = normalizeGovernanceRewardType(reward.rewardType);
-        const epochId = asString(sourceMetadata.epochId);
+        const epoch = reward.sourceDomainEventId ? governanceEpochByEventId.get(reward.sourceDomainEventId) : null;
+        const epochId = asString(sourceMetadata.epochId) ?? epoch?.epochId ?? null;
         const poolLabel = asString(sourceMetadata.poolLabel)
           ?? resolvedPoolLabel(reward.poolId, context)
           ?? shortId(reward.poolId, "Pool")
@@ -1541,8 +1796,12 @@ export function materializeGovernanceRows(
                 ?? shortId(reward.tokenAddress, "Token")
                 ?? "n/a",
               iconUrl: asString(sourceMetadata.tokenIconUrl),
+              decimals: tokenDecimals,
             },
-            amount: reward.amountRaw,
+            amount: amountFormatted ?? reward.amountRaw,
+            amountRaw: reward.amountRaw,
+            amountFormatted,
+            tokenDecimals,
             valueUsdAtClaim: reward.amountUsd,
             epochId,
             pool: reward.poolId
@@ -1564,7 +1823,7 @@ export function materializeGovernanceRows(
               : "governance:notes.unassociatedRewardNoPoolContribution",
             context: {
               kind: epochId ? "epoch" : reward.poolId ? "pool" : "reward",
-              label: epochId ? `Epoch ${epochId}` : poolLabel,
+              label: epochId ? governanceEpochLabel(epochId) : poolLabel,
             },
             sourceEvidenceRefs: asObjectArray(sourceMetadata.evidenceRefs).concat(asObjectArray(sourceMetadata.sourceEvidenceRefs)),
           },
@@ -1579,10 +1838,14 @@ export function materializeGovernanceRows(
   }));
 
   const epochRows = accounting.governance.epochs.map((epoch) => {
-    const epochSourceEvents = accounting.events.filter((item) => asString(item.metadataJson?.epochId) === epoch.epochId);
+    const epochSourceEvents = epoch.events
+      .map((eventId) => sourceEventsById.get(eventId))
+      .filter((item): item is NonNullable<typeof item> => Boolean(item));
     const epochRewards = governanceRewards.filter((reward) => {
       const metadata = reward.sourceDomainEventId ? asRecord(sourceEventsById.get(reward.sourceDomainEventId)?.metadataJson) : {};
-      return asString(metadata.epochId) === epoch.epochId;
+      return asString(metadata.epochId) === epoch.epochId || (
+        reward.sourceDomainEventId ? governanceEpochByEventId.get(reward.sourceDomainEventId)?.epochId === epoch.epochId : false
+      );
     });
     const votedPools = Array.from(new Map(
       epochSourceEvents
@@ -1620,10 +1883,12 @@ export function materializeGovernanceRows(
       rowKey: `epoch:${epoch.epochId}`,
       sourceDomainEventId: epoch.events[0] ?? null,
       coverageStatus: worstGovernanceCoverage([
+        governanceCoverageStatus(epoch.coverageStatus),
         ...epochSourceEvents.map((event) => governanceCoverageStatus(event.coverageStatus)),
         ...epochRewards.map((reward) => governanceCoverageStatus(reward.coverageStatus)),
       ]),
       confidence: worstGovernanceConfidence([
+        governanceConfidence(epoch.confidence),
         ...epochSourceEvents.map((event) => governanceConfidence(event.confidence)),
         ...epochRewards.map((reward) => governanceConfidence(reward.confidence)),
       ]),
@@ -1631,9 +1896,9 @@ export function materializeGovernanceRows(
         kind: "epoch",
         epoch: {
           epochId: epoch.epochId,
-          epochLabel: `Epoch ${epoch.epochId}`,
-          epochStartAt: explicitEpochStartAt ?? toIso(epochSourceEvents[0]?.occurredAt ?? null),
-          epochEndAt: explicitEpochEndAt ?? toIso(epochSourceEvents.at(-1)?.occurredAt ?? null),
+          epochLabel: governanceEpochLabel(epoch.epochId),
+          epochStartAt: explicitEpochStartAt ?? toIso(epoch.epochStartAt ?? epochSourceEvents[0]?.occurredAt ?? null),
+          epochEndAt: explicitEpochEndAt ?? toIso(epoch.epochEndAt ?? epochSourceEvents.at(-1)?.occurredAt ?? null),
           votedPools,
           voteMode: hasManualVote && hasRelayVote ? "mixed" : hasRelayVote ? "relay" : hasManualVote ? "manual" : "unknown",
           resetState: epochSourceEvents.some((event) => event.eventType.includes("reset")) ? "reset" : "not_reset",
@@ -1642,10 +1907,12 @@ export function materializeGovernanceRows(
           bribesUsd: sumStringNumbers(epochRewards.filter((reward) => normalizeGovernanceRewardType(reward.rewardType) === "bribe").map((reward) => reward.amountUsd)),
           rebasesUsd: sumStringNumbers(epochRewards.filter((reward) => normalizeGovernanceRewardType(reward.rewardType) === "rebase").map((reward) => reward.amountUsd)),
           coverageState: worstGovernanceCoverage([
+            governanceCoverageStatus(epoch.coverageStatus),
             ...epochSourceEvents.map((event) => governanceCoverageStatus(event.coverageStatus)),
             ...epochRewards.map((reward) => governanceCoverageStatus(reward.coverageStatus)),
           ]),
           confidence: worstGovernanceConfidence([
+            governanceConfidence(epoch.confidence),
             ...epochSourceEvents.map((event) => governanceConfidence(event.confidence)),
             ...epochRewards.map((reward) => governanceConfidence(reward.confidence)),
           ]),
@@ -1654,6 +1921,7 @@ export function materializeGovernanceRows(
       evidenceJson: {
         epochId: epoch.epochId,
         eventIds: epoch.events,
+        reasonCodes: epoch.reasonCodes,
       },
     });
   });
@@ -1719,6 +1987,97 @@ export function materializeGovernanceRows(
   return [...lockRows, ...eventRows, ...rewardRows, ...epochRows, ...metricRows];
 }
 
+export function materializeResidualRows(
+  accounting: EngineV2AccountingOutput,
+  context: EngineV2MaterializationContext = defaultMaterializationContext(),
+): EngineV2ReadModelRowInput[] {
+  const chainId = accounting.events[0]?.chainId ?? 0;
+  const walletAddress = accounting.events[0]?.walletAddress ?? "";
+  const residualsByIdentity = new Map<string, EngineV2AccountingOutput["residualInventory"][number]>();
+
+  for (const residual of accounting.residualInventory) {
+    const identity = [
+      residual.sourceWithdrawalId ?? "unresolved",
+      residual.sourceEventId ?? "unresolved",
+      residual.poolId ?? "unresolved",
+      residual.tokenAddress,
+    ].join(":");
+    const existing = residualsByIdentity.get(identity);
+    if (!existing) {
+      residualsByIdentity.set(identity, residual);
+      continue;
+    }
+
+    residualsByIdentity.set(identity, {
+      ...existing,
+      amountRaw: addIntegerStrings(existing.amountRaw, residual.amountRaw),
+      valueUsdAtEvent: addNullableDecimalStrings(existing.valueUsdAtEvent, residual.valueUsdAtEvent),
+      consumedByEventIds: Array.from(new Set([
+        ...existing.consumedByEventIds,
+        ...residual.consumedByEventIds,
+      ])),
+      reasonCodes: Array.from(new Set([
+        ...existing.reasonCodes,
+        ...residual.reasonCodes,
+      ])),
+      coverageStatus: existing.coverageStatus === "full" ? residual.coverageStatus : existing.coverageStatus,
+    });
+  }
+
+  return Array.from(residualsByIdentity.values()).map((residual) => row({
+    chainId,
+    walletAddress,
+    surface: "residuals",
+    rowKey: [
+      "residual",
+      residual.sourceWithdrawalId ?? "unresolved",
+      residual.sourceEventId ?? "unresolved",
+      residual.poolId ?? "unresolved",
+      residual.tokenAddress,
+    ].join(":"),
+    sourceDomainEventId: residual.sourceEventId,
+    coverageStatus: residual.coverageStatus,
+    confidence: residual.poolId && residual.sourceWithdrawalId ? "high" : "low",
+    rowJson: {
+      ...(function buildResidualRow() {
+        const tokenMetadata = getTokenMetadata(context, residual.tokenAddress);
+        const tokenDecimals = tokenMetadata?.decimals ?? null;
+        const amountFormatted = formatTokenAmount(residual.amountRaw, tokenDecimals, "erc20");
+        return {
+          residualId: [
+            "residual",
+            residual.sourceWithdrawalId ?? "unresolved",
+            residual.sourceEventId ?? "unresolved",
+            residual.poolId ?? "unresolved",
+            residual.tokenAddress,
+          ].join(":"),
+          poolId: residual.poolId,
+          poolLabel: residual.poolId ? visiblePoolLabel(residual.poolId, context) : null,
+          sourceWithdrawalId: residual.sourceWithdrawalId,
+          sourceEventId: residual.sourceEventId,
+          tokenAddress: residual.tokenAddress,
+          tokenSymbol: tokenMetadata?.symbol ?? shortId(residual.tokenAddress, "Token"),
+          tokenDecimals,
+          openAmountRaw: residual.amountRaw,
+          openAmountDecimal: amountFormatted,
+          openValueUsd: residual.valueUsdAtEvent,
+          status: "open",
+          consumedByEventIds: residual.consumedByEventIds,
+          coverageStatus: coverageStatus(residual.coverageStatus),
+          confidence: residual.poolId && residual.sourceWithdrawalId ? "high" : "low",
+          reasonCodes: residual.reasonCodes,
+        };
+      })(),
+    },
+    evidenceJson: {
+      sourceWithdrawalId: residual.sourceWithdrawalId,
+      sourceEventId: residual.sourceEventId,
+      consumedByEventIds: residual.consumedByEventIds,
+      reasonCodes: residual.reasonCodes,
+    },
+  }));
+}
+
 export function materializeAllDataViewRows(
   accounting: EngineV2AccountingOutput,
   context: EngineV2MaterializationContext = defaultMaterializationContext(),
@@ -1728,6 +2087,7 @@ export function materializeAllDataViewRows(
     ...materializeDepositRows(accounting, context),
     ...materializeStrategyRows(accounting, context),
     ...materializePoolRows(accounting, context),
+    ...materializeResidualRows(accounting, context),
     ...materializeRewardRows(accounting, context),
     ...materializeGovernanceRows(accounting, context),
   ];

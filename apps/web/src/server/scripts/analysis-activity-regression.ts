@@ -5,8 +5,8 @@ import { and, eq, ne, sql } from "drizzle-orm";
 
 import { SUPPORTED_CHAIN_ID } from "@/server/chains";
 import { closeDb, getDb } from "@/server/db/client";
-import { ledgerEvents, rewardEvents } from "@/server/db/schema";
-import { mapActivityLedgerRow } from "@/server/activity/activity.repository";
+import { engineV2ReadModelRows, ledgerEvents, rewardEvents } from "@/server/db/schema";
+import { mapActivityLedgerRow, normalizeEngineV2ActivityRow } from "@/server/activity/activity.repository";
 
 const PHISHING_AIRDROP_TX_HASH = "0xca23a1618b416be4f082ae26e59dd9bfcea5e028f00a2cd9f1b8dd95fbff77ea";
 
@@ -156,8 +156,32 @@ async function main() {
         .where(rewardWhere)
         .limit(20),
     ]);
+    const engineV2ActivityRows = walletAddress
+      ? await db
+        .select({
+          rowKey: engineV2ReadModelRows.rowKey,
+          rowJson: engineV2ReadModelRows.rowJson,
+        })
+        .from(engineV2ReadModelRows)
+        .where(and(
+          eq(engineV2ReadModelRows.chainId, chainId),
+          eq(engineV2ReadModelRows.walletAddress, walletAddress),
+          eq(engineV2ReadModelRows.surface, "activity"),
+        ))
+      : [];
 
     const mappedLedgerRows = ledgerRows.map((row) => mapActivityLedgerRow(row, []));
+    const deterministicEngineV2Rows = engineV2ActivityRows
+      .map((row) => ({
+        rowKey: row.rowKey,
+        rawAction: typeof row.rowJson.action === "string" ? row.rowJson.action : null,
+        mapped: normalizeEngineV2ActivityRow(row.rowJson),
+      }))
+      .filter((row) => row.rawAction?.startsWith("approval_") ||
+        row.rawAction === "failed_transaction" ||
+        row.rawAction === "manual_position_created");
+    const deterministicEngineV2AmbiguousRows = deterministicEngineV2Rows
+      .filter((row) => row.mapped.action === "ambiguous");
     const checks: CheckResult[] = [
       {
         name: "phishing_airdrop_fixture_present",
@@ -216,6 +240,19 @@ async function main() {
           resolutionStatus: row.resolutionStatus,
           resolvedPoolId: row.resolvedPoolId,
           amountUsd: row.amountUsd,
+        })),
+      },
+      {
+        name: "engine_v2_deterministic_activity_actions_do_not_map_to_ambiguous",
+        passed: deterministicEngineV2AmbiguousRows.length === 0,
+        skipped: deterministicEngineV2Rows.length === 0,
+        details: deterministicEngineV2AmbiguousRows.slice(0, 50).map((row) => ({
+          rowKey: row.rowKey,
+          rawAction: row.rawAction,
+          mappedAction: row.mapped.action,
+          summary: row.mapped.summary,
+          surface: row.mapped.surface,
+          coverage: row.mapped.coverage,
         })),
       },
     ];

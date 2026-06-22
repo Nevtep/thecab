@@ -60,6 +60,14 @@ function uniqueOptions(values: string[] | undefined, getLabel: (value: string) =
     .map((value) => ({ value, label: getLabel(value) }));
 }
 
+function clearSelection(state: GovernanceUrlState): GovernanceUrlState {
+  return {
+    ...state,
+    selectedKind: null,
+    selectedGovernanceId: null,
+  };
+}
+
 export function GovernanceFiltersBar({ state, viewModel, labels, onStateChange, onClearFilter, onClearAll }: Props) {
   const available = asAvailableFilters(viewModel);
   const eventOptions = uniqueOptions(available.eventTypes, labels.getEvent);
@@ -79,13 +87,13 @@ export function GovernanceFiltersBar({ state, viewModel, labels, onStateChange, 
           placeholder={labels.searchPlaceholder}
           value={state.search}
           controlSize="sm"
-          onChangeText={(search) => onStateChange({ ...state, search, page: 1 })}
+          onChangeText={(search) => onStateChange({ ...clearSelection(state), search, page: 1 })}
         />
         <select
           className={styles.select}
           aria-label={labels.datePreset}
           value={state.datePreset}
-          onChange={(event) => onStateChange({ ...state, datePreset: event.target.value as GovernanceUrlState["datePreset"], page: 1 })}
+          onChange={(event) => onStateChange({ ...clearSelection(state), datePreset: event.target.value as GovernanceUrlState["datePreset"], page: 1 })}
         >
           {datePresetOptions.map((preset) => (
             <option key={preset} value={preset}>{preset === "all" ? labels.all : labels.getDatePreset(preset)}</option>
@@ -95,7 +103,7 @@ export function GovernanceFiltersBar({ state, viewModel, labels, onStateChange, 
           className={styles.select}
           aria-label={labels.eventType}
           value={state.eventType}
-          onChange={(event) => onStateChange({ ...state, eventType: event.target.value as GovernanceUrlState["eventType"], page: 1 })}
+          onChange={(event) => onStateChange({ ...clearSelection(state), eventType: event.target.value as GovernanceUrlState["eventType"], page: 1 })}
         >
           <option value="all">{labels.all}</option>
           {eventOptions.map((option) => (
@@ -106,7 +114,7 @@ export function GovernanceFiltersBar({ state, viewModel, labels, onStateChange, 
           className={styles.select}
           aria-label={labels.rewardType}
           value={state.rewardType}
-          onChange={(event) => onStateChange({ ...state, rewardType: event.target.value as GovernanceUrlState["rewardType"], page: 1 })}
+          onChange={(event) => onStateChange({ ...clearSelection(state), rewardType: event.target.value as GovernanceUrlState["rewardType"], page: 1 })}
         >
           <option value="all">{labels.all}</option>
           {rewardOptions.map((option) => (
@@ -117,7 +125,7 @@ export function GovernanceFiltersBar({ state, viewModel, labels, onStateChange, 
           className={styles.select}
           aria-label={labels.protocolSurface}
           value={state.protocolSurface}
-          onChange={(event) => onStateChange({ ...state, protocolSurface: event.target.value as GovernanceUrlState["protocolSurface"], page: 1 })}
+          onChange={(event) => onStateChange({ ...clearSelection(state), protocolSurface: event.target.value as GovernanceUrlState["protocolSurface"], page: 1 })}
         >
           <option value="all">{labels.all}</option>
           {surfaceOptions.map((option) => (
@@ -128,7 +136,7 @@ export function GovernanceFiltersBar({ state, viewModel, labels, onStateChange, 
           className={styles.select}
           aria-label={labels.epoch}
           value={state.epochId ?? "all"}
-          onChange={(event) => onStateChange({ ...state, epochId: event.target.value === "all" ? null : event.target.value, page: 1 })}
+          onChange={(event) => onStateChange({ ...clearSelection(state), epochId: event.target.value === "all" ? null : event.target.value, page: 1 })}
         >
           <option value="all">{labels.all}</option>
           {epochOptions.map((option) => (
@@ -140,7 +148,7 @@ export function GovernanceFiltersBar({ state, viewModel, labels, onStateChange, 
           aria-label={labels.token}
           value={state.tokenAddress ?? "all"}
           onChange={(event) => onStateChange({
-            ...state,
+            ...clearSelection(state),
             tokenAddress: event.target.value === "all" ? null : event.target.value,
             page: 1,
           })}
@@ -155,7 +163,7 @@ export function GovernanceFiltersBar({ state, viewModel, labels, onStateChange, 
           aria-label={labels.coverage}
           value={state.coverage ?? "all"}
           onChange={(event) => onStateChange({
-            ...state,
+            ...clearSelection(state),
             coverage: event.target.value === "all" ? null : event.target.value as NonNullable<GovernanceUrlState["coverage"]>,
             page: 1,
           })}
@@ -169,7 +177,7 @@ export function GovernanceFiltersBar({ state, viewModel, labels, onStateChange, 
           aria-label={labels.confidence}
           value={state.confidence ?? "all"}
           onChange={(event) => onStateChange({
-            ...state,
+            ...clearSelection(state),
             confidence: event.target.value === "all" ? null : event.target.value as NonNullable<GovernanceUrlState["confidence"]>,
             page: 1,
           })}

@@ -28,6 +28,30 @@ function isSettledAnalysisStatus(status: string | null) {
   return status === "ready" || status === "stale" || status === "failed" || status === "not_analyzed";
 }
 
+const selectionContextKeys: Array<keyof ReturnType<typeof parseActivityUrlState>> = [
+  "search",
+  "surface",
+  "action",
+  "coverage",
+  "confidence",
+  "poolId",
+  "depositId",
+  "strategyId",
+  "rewardEventId",
+  "governanceEventId",
+  "page",
+  "pageSize",
+];
+
+function shouldClearActivitySelection(
+  current: ReturnType<typeof parseActivityUrlState>,
+  next: ReturnType<typeof parseActivityUrlState>,
+) {
+  if (!current.selectedActivityId) return false;
+  if (current.sort.key !== next.sort.key || current.sort.direction !== next.sort.direction) return true;
+  return selectionContextKeys.some((key) => current[key] !== next[key]);
+}
+
 export function ActivityContainer() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -81,7 +105,10 @@ export function ActivityContainer() {
   }, [activityQuery.error, activityQuery.isLoading, analysisStatusQuery.data, analysisStatusQuery.isLoading, isWalletReady, viewModel]);
 
   function updateUrl(nextState: typeof urlState) {
-    const query = serializeActivityUrlState(nextState);
+    const resolvedState = shouldClearActivitySelection(urlState, nextState)
+      ? { ...nextState, selectedActivityId: null }
+      : nextState;
+    const query = serializeActivityUrlState(resolvedState);
     router.replace(query ? `/activity?${query}` : "/activity", { scroll: false });
   }
 

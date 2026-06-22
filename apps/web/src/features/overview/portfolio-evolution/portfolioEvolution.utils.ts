@@ -8,7 +8,8 @@ export type PortfolioEvolutionEventType =
   | "move_to_idle"
   | "redeploy"
   | "lock"
-  | "vote";
+  | "vote"
+  | "swap";
 
 export type PortfolioEvolutionMarker = {
   id: string;

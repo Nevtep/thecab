@@ -17,8 +17,8 @@ import type {
   RewardsSortKey,
   RewardsSourceFilter,
 } from "@/features/rewards/rewards.types";
+import { normalizeOpaqueEntityId } from "@/analysis/opaqueEntityId";
 
-const UUID_PATTERN = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 const ADDRESS_PATTERN = /^0x[a-fA-F0-9]{40}$/;
 
 export function normalizeRewardsSearch(value: string | null | undefined) {
@@ -50,7 +50,7 @@ export function normalizeRewardsSortDirection(value: string | null | undefined):
 }
 
 export function normalizeRewardsUuid(value: string | null | undefined) {
-  return value && UUID_PATTERN.test(value) ? value : null;
+  return normalizeOpaqueEntityId(value);
 }
 
 export function normalizeRewardsAddress(value: string | null | undefined) {

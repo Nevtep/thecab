@@ -7,6 +7,7 @@ import styles from "@/features/governance/GovernanceWorkspace.module.css";
 
 type Props = {
   locks: GovernanceViewModel["locks"];
+  selectedLockId: string | null;
   labels: {
     title: string;
     empty: string;
@@ -33,6 +34,7 @@ type Props = {
     formatAmount: (value: string | null) => string;
     formatUsd: (value: string | null) => string;
   };
+  onSelectLock: (lockId: string) => void;
 };
 
 function toneForCoverage(coverage: string) {
@@ -42,7 +44,11 @@ function toneForCoverage(coverage: string) {
   return "neutral" as const;
 }
 
-export function GovernanceLockPanel({ locks, labels }: Props) {
+function lockIdentity(lockPanel: GovernanceViewModel["locks"]["rows"][number]) {
+  return lockPanel.lockExposureId ?? lockPanel.lockId ?? null;
+}
+
+export function GovernanceLockPanel({ locks, selectedLockId, labels, onSelectLock }: Props) {
   return (
     <CabCard density="compact">
       <CabStack gap="$3">
@@ -58,6 +64,8 @@ export function GovernanceLockPanel({ locks, labels }: Props) {
         ) : (
           <CabStack gap="$4">
             {locks.rows.map((lockPanel) => {
+              const identity = lockIdentity(lockPanel);
+              const selected = identity !== null && identity === selectedLockId;
               const items = [
                 { key: "kind", label: labels.kind, value: labels.getKind(lockPanel.lockKind), valueVariant: "mono" as const },
                 { key: "status", label: labels.status, value: labels.getStatus(lockPanel.status), valueVariant: "mono" as const },
@@ -78,7 +86,14 @@ export function GovernanceLockPanel({ locks, labels }: Props) {
               ];
 
               return (
-                <CabStack key={lockPanel.lockExposureId ?? lockPanel.lockId ?? labels.unavailable} gap="$3">
+                <button
+                  key={identity ?? labels.unavailable}
+                  type="button"
+                  className={selected ? `${styles.lockRegisterRow} ${styles.lockRegisterRowSelected}` : styles.lockRegisterRow}
+                  onClick={identity ? () => onSelectLock(identity) : undefined}
+                  disabled={!identity}
+                >
+                <CabStack gap="$3">
                   <CabStack row alignItems="center" justifyContent="space-between" gap="$3">
                     <CabText variant="label">{labels.getKind(lockPanel.lockKind)}</CabText>
                     <CabStack row alignItems="center" gap="$2">
@@ -116,6 +131,7 @@ export function GovernanceLockPanel({ locks, labels }: Props) {
                     )}
                   </CabStack>
                 </CabStack>
+                </button>
               );
             })}
           </CabStack>

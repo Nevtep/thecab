@@ -1,9 +1,28 @@
 import type { ActivityUrlState } from "@/features/activity/activity.types";
-
-const UUID_PATTERN = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+import { normalizeOpaqueEntityId } from "@/analysis/opaqueEntityId";
 
 const surfaces = new Set<ActivityUrlState["surface"]>(["all", "wallet", "pools", "deposits", "strategies", "rewards", "governance", "unknown"]);
-const actions = new Set<ActivityUrlState["action"]>(["all", "deposit", "withdraw", "swap", "claim", "strategy", "governance", "transfer", "airdrop", "unsupported", "ambiguous"]);
+const actions = new Set<ActivityUrlState["action"]>([
+  "all",
+  "approval",
+  "failed",
+  "position_created",
+  "deposit",
+  "withdraw",
+  "swap",
+  "claim",
+  "strategy",
+  "governance",
+  "stake",
+  "unstake",
+  "cash_in",
+  "cash_out",
+  "noop",
+  "transfer",
+  "airdrop",
+  "unsupported",
+  "ambiguous",
+]);
 const coverages = new Set<NonNullable<ActivityUrlState["coverage"]>>(["full", "partial", "unresolved", "excluded", "unavailable"]);
 const confidences = new Set<NonNullable<ActivityUrlState["confidence"]>>(["high", "medium", "low", "none"]);
 const sortKeys = new Set<ActivityUrlState["sort"]["key"]>(["occurredAt", "valueUsd", "action", "coverage", "confidence"]);
@@ -31,7 +50,7 @@ export function normalizeActivityConfidence(value: string | null): ActivityUrlSt
 }
 
 export function normalizeActivityUuid(value: string | null): string | null {
-  return value && UUID_PATTERN.test(value) ? value : null;
+  return normalizeOpaqueEntityId(value);
 }
 
 export function normalizeActivitySortKey(value: string | null): ActivityUrlState["sort"]["key"] {

@@ -29,6 +29,8 @@
     "analysis:governance-regression": "tsx src/server/scripts/analysis-governance-regression.ts",
     "analysis:rewards-regression": "tsx src/server/scripts/analysis-rewards-regression.ts",
     "analysis:activity-regression": "tsx src/server/scripts/analysis-activity-regression.ts",
+    "analysis:strategy-regression": "tsx src/server/scripts/analysis-strategy-regression.ts",
+    "analysis:read-model-audit": "tsx src/server/scripts/analysis-read-model-audit.ts",
     "analysis:v2:run": "tsx src/server/scripts/analysis-engine-v2-run.ts",
     "analysis:v2:regression": "tsx src/server/scripts/analysis-engine-v2-regression.ts",
     "analysis:v2:diagnostics": "tsx src/server/scripts/analysis-engine-v2-diagnostics.ts",
@@ -39,6 +41,9 @@
   },
   "dependencies": {
     "@coinbase/wallet-sdk": "^4.3.7",
+    "@fontsource/ibm-plex-mono": "^5.2.7",
+    "@fontsource/inter": "^5.2.8",
+    "@fontsource/orbitron": "^5.2.8",
     "@gsap/react": "^2.1.2",
     "@metamask/connect-evm": "^1.2.0",
     "@tamagui/config": "2.0.0-rc.42",

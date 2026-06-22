@@ -18,11 +18,8 @@ import {
 import { cabColors } from "@/design-system/tokens";
 import { PoolExposureBar } from "@/features/pools/components/PoolExposureBar";
 import { PoolHistoryChart } from "@/features/pools/components/PoolHistoryChart";
-import { PoolRelatedLinks } from "@/features/pools/components/PoolRelatedLinks";
 import { PoolMetadataFooter } from "@/features/pools/components/PoolMetadataFooter";
 import { PoolTimeline } from "@/features/pools/components/PoolTimeline";
-import { buildPoolRewardsHref } from "@/features/rewards/rewards.navigation";
-import { buildStrategiesListHref } from "@/features/strategies/strategies.navigation";
 import { getPoolsCoverageLabelKey } from "@/features/pools/pools.mappers";
 import type { PoolDetailRange, PoolDetailViewModel } from "@/features/pools/pools.types";
 
@@ -87,9 +84,6 @@ export function PoolDetailComponent(input: PoolDetailComponentProps) {
     t(`coverage:reasons.${reasonCode}`, { defaultValue: reasonCode }),
   );
   const hasManualDeposits = input.viewModel.positions.manualDeposits.length > 0;
-  const hasRelatedLinks = input.viewModel.related.deposits.length > 0
-    || input.viewModel.related.strategies.length > 0
-    || input.viewModel.related.governanceRewards.length > 0;
   const rangeStatusLabel = header.isInRange === null
     ? null
     : header.isInRange
@@ -239,28 +233,6 @@ export function PoolDetailComponent(input: PoolDetailComponentProps) {
           },
         ]}
       />
-      {hasRelatedLinks ? (
-        <PoolRelatedLinks
-          title={t("pools:sections.related")}
-          labels={{
-            deposit: t("pools:values.deposit"),
-            strategy: t("pools:values.strategy"),
-            rewards: t("navigation:items.rewards"),
-            governanceRewards: t("navigation:items.governance"),
-          }}
-          rewardsHref={buildPoolRewardsHref(viewModel.header.poolId)}
-          deposits={viewModel.related.deposits}
-          strategies={viewModel.related.strategies.map((strategy) => ({
-            ...strategy,
-            href: buildStrategiesListHref({
-              chainId: viewModel.chainId,
-              poolId: viewModel.header.poolId,
-              selectedStrategyId: strategy.id,
-            }),
-          }))}
-          governanceRewards={viewModel.related.governanceRewards}
-        />
-      ) : null}
       <PoolHistoryChart data={input.viewModel.chart} title={t("pools:sections.performance")} />
       <PoolTimeline
         title={t("pools:sections.events")}

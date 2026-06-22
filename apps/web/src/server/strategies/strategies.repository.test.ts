@@ -68,7 +68,7 @@ test("mapStrategySummaryRow normalizes persisted strategy values", () => {
   assert.equal(mapped.currentEstimatedValueUsd, 1000);
 });
 
-test("applyStrategiesListRequest filters sorts paginates and selects first visible strategy", () => {
+test("applyStrategiesListRequest filters sorts paginates and clears selected strategy excluded by filters", () => {
   const result = applyStrategiesListRequest({
     request: {
       walletAddress: "0xabc",
@@ -92,7 +92,7 @@ test("applyStrategiesListRequest filters sorts paginates and selects first visib
   });
 
   assert.deepEqual(result.items.map((item) => item.strategyExposureId), ["high", "low"]);
-  assert.equal(result.selectedStrategyId, "high");
+  assert.equal(result.selectedStrategyId, null);
   assert.equal(result.totalItems, 2);
 });
 

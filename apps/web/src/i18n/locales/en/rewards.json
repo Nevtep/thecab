@@ -8,11 +8,12 @@
   "kpis": {
     "totalClaimedRewards": "Total claimed rewards",
     "rewardEvents": "Reward events",
-    "estimatedRewardReturn": "Est. reward return",
+    "estimatedRewardReturn": "Estimated reward APR",
     "resolvedRewardsValue": "Resolved rewards value",
     "unresolvedExcludedValue": "Unresolved / excluded value",
     "coverage": "coverage",
     "visibleRows": "visible rows",
+    "allHistory": "all history",
     "estimated": "estimated",
     "unavailable": "unavailable",
     "ofTotal": "of total"

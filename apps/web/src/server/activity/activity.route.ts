@@ -1,4 +1,3 @@
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -13,14 +12,15 @@ import {
 } from "@/server/activity/activity.contract";
 import type { ActivityRequest } from "@/server/activity/activity.types";
 import { getActivityDataView } from "@/server/activity/activity.service";
+import { normalizeOpaqueEntityId } from "@/analysis/opaqueEntityId";
+import { readAuthenticatedWalletAddress as readRequestWalletAddress } from "@/server/auth/walletAuth";
 import { assertSupportedChain, SUPPORTED_CHAIN_ID } from "@/server/chains";
 
 const RESPONSE_HEADERS = {
   "Cache-Control": "no-store",
 };
 
-const UUID_PATTERN = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
-const nullableUuid = z.string().regex(UUID_PATTERN).nullable().default(null);
+const nullableOpaqueId = z.string().trim().refine((value) => normalizeOpaqueEntityId(value) === value).nullable().default(null);
 
 const activityQuerySchema = z.object({
   chainId: z.coerce.number().int().positive().default(SUPPORTED_CHAIN_ID),
@@ -29,12 +29,12 @@ const activityQuerySchema = z.object({
   action: z.union([z.literal("all"), z.enum(ACTIVITY_ACTION_VALUES)]).default("all"),
   coverage: z.enum(ACTIVITY_COVERAGE_VALUES).nullable().default(null),
   confidence: z.enum(ACTIVITY_CONFIDENCE_VALUES).nullable().default(null),
-  poolId: nullableUuid,
-  depositId: nullableUuid,
-  strategyId: nullableUuid,
-  rewardEventId: nullableUuid,
-  governanceEventId: nullableUuid,
-  selectedActivityId: nullableUuid,
+  poolId: nullableOpaqueId,
+  depositId: nullableOpaqueId,
+  strategyId: nullableOpaqueId,
+  rewardEventId: nullableOpaqueId,
+  governanceEventId: nullableOpaqueId,
+  selectedActivityId: nullableOpaqueId,
   sort: z.enum(ACTIVITY_SORT_KEY_VALUES).default("occurredAt"),
   direction: z.enum(ACTIVITY_SORT_DIRECTION_VALUES).default("desc"),
   page: z.coerce.number().int().min(1).default(1),
@@ -67,14 +67,7 @@ const allowedParams = new Set([
 ]);
 
 async function readAuthenticatedWalletAddress() {
-  const cookieStore = await cookies();
-  const authenticatedAddress = cookieStore.get("cab_authenticated_address")?.value?.toLowerCase() ?? null;
-
-  if (!authenticatedAddress) {
-    throw new Error("ACTIVITY_REQUEST_FAILED:UNAUTHENTICATED_WALLET");
-  }
-
-  return authenticatedAddress;
+  return readRequestWalletAddress({ unauthorizedMessage: "ACTIVITY_REQUEST_FAILED:UNAUTHENTICATED_WALLET" });
 }
 
 export function normalizeActivityQueryParams(searchParams: URLSearchParams) {

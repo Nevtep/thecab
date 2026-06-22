@@ -7,6 +7,7 @@ import {
   parseNamedDepositsSort,
   toNamedDepositsSort,
 } from "@/server/deposits/deposits.contract";
+import { normalizeOpaqueEntityId } from "@/analysis/opaqueEntityId";
 import type {
   DepositsReturnSignFilter,
   DepositsSortDirection,
@@ -43,7 +44,8 @@ export function createDefaultDepositsListUrlState(): DepositsListUrlState {
 }
 
 const DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-const UUID_PATTERN = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const ENGINE_V2_SCOPED_ID_PATTERN = /^\d+:[^:/\\\s]+(?::[^:/\\\s]+)*$/;
 
 function pickInt(value: string | null, fallback: number, { min, max }: { min: number; max: number }) {
   if (!value) return fallback;
@@ -57,11 +59,6 @@ function pickInt(value: string | null, fallback: number, { min, max }: { min: nu
 function pickDay(value: string | null): string | null {
   if (!value) return null;
   return DAY_PATTERN.test(value) ? value : null;
-}
-
-function pickUuid(value: string | null): string | null {
-  if (!value) return null;
-  return UUID_PATTERN.test(value) ? value : null;
 }
 
 function pickFirst(searchParams: URLSearchParams, keys: string[]) {
@@ -81,12 +78,20 @@ function normalizeReturnSign(value: string | null, fallback: DepositsReturnSignF
   return normalizeOneOf(value, DEPOSITS_RETURN_SIGN_FILTER_VALUES, fallback);
 }
 
+function normalizeDepositEntityId(value: string | null) {
+  const normalized = normalizeOpaqueEntityId(value);
+  if (!normalized) return null;
+  return UUID_PATTERN.test(normalized) || ENGINE_V2_SCOPED_ID_PATTERN.test(normalized)
+    ? normalized
+    : null;
+}
+
 export function parseDepositsListUrlState(searchParams: URLSearchParams): DepositsListUrlState {
   const defaults = createDefaultDepositsListUrlState();
   const namedSort = parseNamedDepositsSort(searchParams.get("sort"));
   return {
     status: normalizeOneOf(searchParams.get("status"), DEPOSITS_STATUS_FILTER_VALUES, defaults.status),
-    poolId: pickUuid(pickFirst(searchParams, ["pool", "poolId"])),
+    poolId: normalizeDepositEntityId(pickFirst(searchParams, ["pool", "poolId"])),
     startDayUtc: pickDay(pickFirst(searchParams, ["from", "startDayUtc"])),
     endDayUtc: pickDay(pickFirst(searchParams, ["to", "endDayUtc"])),
     returnSign: normalizeReturnSign(searchParams.get("returnSign"), defaults.returnSign),
@@ -94,7 +99,7 @@ export function parseDepositsListUrlState(searchParams: URLSearchParams): Deposi
     direction: namedSort?.direction ?? normalizeOneOf(searchParams.get("direction"), DEPOSITS_SORT_DIRECTION_VALUES, defaults.direction),
     page: pickInt(searchParams.get("page"), defaults.page, { min: 1, max: 10000 }),
     pageSize: pickInt(searchParams.get("pageSize"), defaults.pageSize, { min: 1, max: 100 }),
-    selectedDepositId: pickUuid(searchParams.get("selectedDepositId")),
+    selectedDepositId: normalizeDepositEntityId(searchParams.get("selectedDepositId")),
   };
 }
 

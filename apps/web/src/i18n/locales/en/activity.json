@@ -17,12 +17,20 @@
   },
   "actions": {
     "refresh": "Refresh",
+    "approval": "Approval",
+    "failed": "Failed",
+    "position_created": "Position created",
     "deposit": "Deposit",
     "withdraw": "Withdraw",
     "swap": "Swap",
     "claim": "Claim",
     "strategy": "Strategy",
     "governance": "Governance",
+    "stake": "Stake",
+    "unstake": "Unstake",
+    "cash_in": "Cash in",
+    "cash_out": "Cash out",
+    "noop": "No-op",
     "transfer": "Transfer",
     "airdrop": "Airdrop",
     "unsupported": "Unsupported",
@@ -46,12 +54,15 @@
   "kpis": {
     "totalEvents": "Total events",
     "interpretedEvents": "Interpreted events",
-    "totalValue": "Non-excluded value",
-    "coverage": "Coverage",
+    "walletCapitalIn": "Wallet capital in",
+    "walletCapitalOut": "Wallet capital out",
+    "protocolVolume": "Protocol volume",
+    "excludedEvents": "Excluded events",
     "allHistory": "All history",
     "excludesUnsupported": "Excludes unresolved/excluded",
-    "nonExcluded": "Excluded rows stay out",
-    "classificationCoverage": "Evidence-backed rows"
+    "walletOnly": "Wallet transfers only",
+    "protocolOnly": "Protocol activity only",
+    "spamOnly": "Spam/excluded rows"
   },
   "filters": {
     "search": "Search",
@@ -68,10 +79,15 @@
   },
   "charts": {
     "timelineTitle": "Activity over time",
-    "timelineSubtitle": "Daily interpreted events by coverage state",
-    "coverageTitle": "Coverage distribution",
-    "coverageSubtitle": "Classification quality across filtered history",
+    "timelineSubtitle": "Daily events by action family",
+    "actionTitle": "Action distribution",
+    "actionSubtitle": "Classification by interpreted action",
     "totalEvents": "events"
+  },
+  "movements": {
+    "in": "Inbound movements",
+    "out": "Outbound movements",
+    "none": "No token movement"
   },
   "panels": {
     "events": "Activity events",

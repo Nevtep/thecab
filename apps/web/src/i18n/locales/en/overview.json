@@ -59,7 +59,8 @@
       "moveToIdle": "Move to idle",
       "redeploy": "Redeploy",
       "lock": "Lock",
-      "vote": "Vote"
+      "vote": "Vote",
+      "swap": "Swap"
     },
     "selectedPoint": {
       "title": "Selected point snapshot",

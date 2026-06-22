@@ -1,14 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
-
 import { engineV2ReadModelsEnabled, readEngineV2SurfaceRows } from "@/server/analysis/engine-v2/materializers";
-import { getDb } from "@/server/db/client";
-import {
-  pools,
-  rewardEvents,
-  strategyHistorySnapshots,
-  strategyLifecycleEvents,
-  strategyWalletSummaries,
-} from "@/server/db/schema";
 import type {
   StrategiesListRequest,
   StrategyLifecycleEventView,
@@ -16,20 +6,6 @@ import type {
   StrategyDetailView,
   StrategySummaryView,
 } from "@/server/strategies/strategies.types";
-
-function hasRichEngineV2StrategyRow(row: Partial<StrategyDetailView | StrategySummaryView>) {
-  const detailRow = row as Partial<StrategyDetailView>;
-  return Boolean(
-    row.shareSymbol
-      || row.totalReturnPct !== null
-      || row.estimatedAnnualizedReturnPct !== null
-      || row.realizedPnlUsd !== null
-      || row.unrealizedPnlUsd !== null
-      || (row.poolLabel && row.primaryPoolId && row.poolLabel !== row.primaryPoolId)
-      || (Array.isArray(detailRow.history) && detailRow.history.length > 0)
-      || (Array.isArray(detailRow.lifecycle) && detailRow.lifecycle.length > 0),
-  );
-}
 
 function asNumber(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -81,6 +57,8 @@ export type StrategySummaryRowRecord = {
   poolMappingStatus: string;
   status: string;
   currentEstimatedValueUsd: unknown;
+  closeValueUsd?: unknown;
+  displayValueUsd?: unknown;
   depositedValueUsd: unknown;
   withdrawnValueUsd: unknown;
   currentSharesRaw: string;
@@ -211,6 +189,8 @@ export function mapStrategySummaryRow(row: StrategySummaryRowRecord): StrategySu
     poolMappingStatus: normalizePoolMapping(row.poolMappingStatus),
     status: normalizeStatus(row.status),
     currentEstimatedValueUsd: asNumber(row.currentEstimatedValueUsd),
+    closeValueUsd: asNumber(row.closeValueUsd),
+    displayValueUsd: asNumber(row.displayValueUsd) ?? asNumber(row.currentEstimatedValueUsd),
     depositedValueUsd: asNumber(row.depositedValueUsd) ?? 0,
     withdrawnValueUsd: asNumber(row.withdrawnValueUsd) ?? 0,
     currentSharesRaw: row.currentSharesRaw,
@@ -342,13 +322,16 @@ export function applyStrategiesListRequest(input: {
   const page = Math.min(input.request.page, totalPages);
   const start = (page - 1) * input.request.pageSize;
   const items = filtered.slice(start, start + input.request.pageSize);
-  const selectedStrategyId =
-    items.find((item) => item.strategyExposureId === input.request.selectedStrategyId)?.strategyExposureId ??
-    items[0]?.strategyExposureId ??
-    null;
+  const requestedSelectedId = input.request.selectedStrategyId;
+  const selectedStrategyId = requestedSelectedId
+    ? filtered.some((item) => item.strategyExposureId === requestedSelectedId)
+      ? requestedSelectedId
+      : null
+    : items[0]?.strategyExposureId ?? null;
 
   return {
     items,
+    allItems: input.rows,
     page,
     totalItems: filtered.length,
     totalPages,
@@ -356,161 +339,17 @@ export function applyStrategiesListRequest(input: {
   };
 }
 
-async function readSummaryRows(input: { walletAddress: string; chainId: number }): Promise<StrategySummaryRowRecord[]> {
-  const db = getDb();
-  return db
-    .select({
-      id: strategyWalletSummaries.id,
-      strategyId: strategyWalletSummaries.strategyId,
-      strategyExposureId: strategyWalletSummaries.strategyExposureId,
-      strategyLabel: strategyWalletSummaries.strategyLabel,
-      protocol: strategyWalletSummaries.protocol,
-      primaryPoolId: strategyWalletSummaries.primaryPoolId,
-      poolLabel: pools.label,
-      poolMappingStatus: strategyWalletSummaries.poolMappingStatus,
-      status: strategyWalletSummaries.status,
-      currentEstimatedValueUsd: strategyWalletSummaries.currentEstimatedValueUsd,
-      depositedValueUsd: strategyWalletSummaries.depositedValueUsd,
-      withdrawnValueUsd: strategyWalletSummaries.withdrawnValueUsd,
-      currentSharesRaw: strategyWalletSummaries.currentSharesRaw,
-      shareSymbol: strategyWalletSummaries.shareSymbol,
-      totalRewardsUsd: strategyWalletSummaries.totalRewardsUsd,
-      realizedPnlUsd: strategyWalletSummaries.realizedPnlUsd,
-      unrealizedPnlUsd: strategyWalletSummaries.unrealizedPnlUsd,
-      totalReturnUsd: strategyWalletSummaries.totalReturnUsd,
-      totalReturnPct: strategyWalletSummaries.totalReturnPct,
-      estimatedAnnualizedReturnPct: strategyWalletSummaries.estimatedAnnualizedReturnPct,
-      coverageStatus: strategyWalletSummaries.coverageStatus,
-      confidence: strategyWalletSummaries.confidence,
-      coverageReasonCodes: strategyWalletSummaries.coverageReasonCodes,
-      wrapperAddress: strategyWalletSummaries.wrapperAddress,
-      stakingRewardsAddress: strategyWalletSummaries.stakingRewardsAddress,
-      externalStrategyPositionReference: strategyWalletSummaries.externalStrategyPositionReference,
-      externalStrategyPositionReferenceStatus: strategyWalletSummaries.externalStrategyPositionReferenceStatus,
-      sharesReceivedRaw: strategyWalletSummaries.sharesReceivedRaw,
-      sharesRedeemedRaw: strategyWalletSummaries.sharesRedeemedRaw,
-      resolvedRewardCount: strategyWalletSummaries.resolvedRewardCount,
-      unresolvedRewardCount: strategyWalletSummaries.unresolvedRewardCount,
-      openedAt: strategyWalletSummaries.openedAt,
-      closedAt: strategyWalletSummaries.closedAt,
-      coveredStartDayUtc: strategyWalletSummaries.coveredStartDayUtc,
-      coveredEndDayUtc: strategyWalletSummaries.coveredEndDayUtc,
-      metadataJson: strategyWalletSummaries.metadataJson,
-    })
-    .from(strategyWalletSummaries)
-    .leftJoin(pools, eq(strategyWalletSummaries.primaryPoolId, pools.id))
-    .where(and(eq(strategyWalletSummaries.walletAddress, input.walletAddress.toLowerCase()), eq(strategyWalletSummaries.chainId, input.chainId)));
-}
-
-async function readHistoryRows(input: {
-  walletAddress: string;
-  chainId: number;
-  strategyExposureId: string;
-}): Promise<StrategyHistoryRowRecord[]> {
-  const db = getDb();
-  return db
-    .select({
-      dayUtc: strategyHistorySnapshots.dayUtc,
-      estimatedValueUsd: strategyHistorySnapshots.estimatedValueUsd,
-      cumulativeRewardsUsd: strategyHistorySnapshots.cumulativeRewardsUsd,
-    })
-    .from(strategyHistorySnapshots)
-    .where(
-      and(
-        eq(strategyHistorySnapshots.walletAddress, input.walletAddress.toLowerCase()),
-        eq(strategyHistorySnapshots.chainId, input.chainId),
-        eq(strategyHistorySnapshots.strategyExposureId, input.strategyExposureId),
-      ),
-    )
-    .orderBy(asc(strategyHistorySnapshots.dayUtc));
-}
-
-async function readRewardRows(input: {
-  walletAddress: string;
-  chainId: number;
-  strategyExposureId: string;
-}): Promise<StrategyRewardRowRecord[]> {
-  const db = getDb();
-  return db
-    .select({
-      id: rewardEvents.id,
-      tokenSymbol: rewardEvents.metadataJson,
-      tokenAddress: rewardEvents.tokenAddress,
-      amountRaw: rewardEvents.amountRaw,
-      amountFormatted: rewardEvents.metadataJson,
-      amountUsd: rewardEvents.amountUsd,
-      claimedAt: rewardEvents.occurredAt,
-      txHash: rewardEvents.txHash,
-      resolutionStatus: rewardEvents.resolutionStatus,
-      coverageReasonCodes: rewardEvents.resolutionReasonCodes,
-    })
-    .from(rewardEvents)
-    .where(
-      and(
-        eq(rewardEvents.walletAddress, input.walletAddress.toLowerCase()),
-        eq(rewardEvents.chainId, input.chainId),
-        eq(rewardEvents.strategyExposureId, input.strategyExposureId),
-        eq(rewardEvents.isAccrualSnapshot, false),
-      ),
-    )
-    .orderBy(asc(rewardEvents.occurredAt), asc(rewardEvents.logIndex))
-    .then((rows) => rows.map((row) => {
-      const metadata = asRecord(row.tokenSymbol);
-      return {
-        ...row,
-        tokenSymbol: typeof metadata.tokenSymbol === "string" ? metadata.tokenSymbol : null,
-        amountFormatted: typeof metadata.amountFormatted === "string" ? metadata.amountFormatted : null,
-      };
-    }));
-}
-
-async function readLifecycleRows(input: {
-  walletAddress: string;
-  chainId: number;
-  strategyExposureId: string;
-}): Promise<StrategyLifecycleRowRecord[]> {
-  const db = getDb();
-  return db
-    .select({
-      id: strategyLifecycleEvents.id,
-      sequenceIndex: strategyLifecycleEvents.sequenceIndex,
-      eventType: strategyLifecycleEvents.eventType,
-      occurredAt: strategyLifecycleEvents.occurredAt,
-      txHash: strategyLifecycleEvents.txHash,
-      logIndex: strategyLifecycleEvents.logIndex,
-      blockNumber: strategyLifecycleEvents.blockNumber,
-      usdValue: strategyLifecycleEvents.usdValue,
-      shareDeltaRaw: strategyLifecycleEvents.shareDeltaRaw,
-      tokenDeltasJson: strategyLifecycleEvents.tokenDeltasJson,
-      priceSource: strategyLifecycleEvents.priceSource,
-      confidence: strategyLifecycleEvents.confidence,
-      coverageStatus: strategyLifecycleEvents.coverageStatus,
-      coverageReasonCodes: strategyLifecycleEvents.coverageReasonCodes,
-      metadataJson: strategyLifecycleEvents.metadataJson,
-    })
-    .from(strategyLifecycleEvents)
-    .where(
-      and(
-        eq(strategyLifecycleEvents.walletAddress, input.walletAddress.toLowerCase()),
-        eq(strategyLifecycleEvents.chainId, input.chainId),
-        eq(strategyLifecycleEvents.strategyExposureId, input.strategyExposureId),
-      ),
-    )
-    .orderBy(asc(strategyLifecycleEvents.sequenceIndex));
-}
-
 export async function findStrategySummaries(input: StrategiesListRequest) {
+  if (!engineV2ReadModelsEnabled()) {
+    return applyStrategiesListRequest({ request: input, rows: [] });
+  }
+
   const engineV2Rows = await readEngineV2SurfaceRows<StrategySummaryView>({
     chainId: input.chainId,
     walletAddress: input.walletAddress,
     surface: "strategies",
   });
-  if (engineV2Rows?.some((row) => hasRichEngineV2StrategyRow(row))) {
-    return applyStrategiesListRequest({ request: input, rows: engineV2Rows });
-  }
-
-  const rows = (await readSummaryRows(input)).map(mapStrategySummaryRow);
-  return applyStrategiesListRequest({ request: input, rows });
+  return applyStrategiesListRequest({ request: input, rows: engineV2Rows ?? [] });
 }
 
 export async function findStrategyDetail(input: {
@@ -518,41 +357,27 @@ export async function findStrategyDetail(input: {
   chainId: number;
   strategyId: string;
 }) {
+  if (!engineV2ReadModelsEnabled()) return null;
+
   const engineV2Rows = await readEngineV2SurfaceRows<StrategyDetailView>({
     chainId: input.chainId,
     walletAddress: input.walletAddress,
     surface: "strategies",
   });
   const engineV2Detail = engineV2Rows?.find((row) => row.strategyExposureId === input.strategyId || row.strategyId === input.strategyId);
-  if (engineV2Detail && hasRichEngineV2StrategyRow(engineV2Detail)) return engineV2Detail;
-
-  const rows = await readSummaryRows(input);
-  const row = rows.find((item) => item.strategyExposureId === input.strategyId || item.strategyId === input.strategyId);
-  if (!row) return null;
-  const [historyRows, rewardRows, lifecycleRows] = await Promise.all([
-    readHistoryRows({
-      walletAddress: input.walletAddress,
-      chainId: input.chainId,
-      strategyExposureId: row.strategyExposureId,
-    }),
-    readRewardRows({
-      walletAddress: input.walletAddress,
-      chainId: input.chainId,
-      strategyExposureId: row.strategyExposureId,
-    }),
-    readLifecycleRows({
-      walletAddress: input.walletAddress,
-      chainId: input.chainId,
-      strategyExposureId: row.strategyExposureId,
-    }),
-  ]);
-  return mapStrategyDetailRow({ row, historyRows, rewardRows, lifecycleRows });
+  return engineV2Detail ?? null;
 }
 
 export async function findAvailableStrategyPools(input: { walletAddress: string; chainId: number }) {
-  const rows = await readSummaryRows(input);
+  if (!engineV2ReadModelsEnabled()) return [];
+
+  const rows = await readEngineV2SurfaceRows<StrategySummaryView>({
+    chainId: input.chainId,
+    walletAddress: input.walletAddress,
+    surface: "strategies",
+  });
   const byPoolId = new Map<string, { poolId: string; label: string }>();
-  for (const row of rows) {
+  for (const row of rows ?? []) {
     if (row.primaryPoolId && row.poolLabel) {
       byPoolId.set(row.primaryPoolId, { poolId: row.primaryPoolId, label: row.poolLabel });
     }

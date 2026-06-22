@@ -286,6 +286,7 @@ test("buildGaugePoolIdByGaugeAddress falls back to gauge lifecycle events when p
       {
         gaugeAddress: "0x519bbd1dd8c6a94c46080e24f316c14ee758c025",
         poolId: "8453:0xcdac0d6c6c59727a65f871236188350531885c43",
+        poolAddress: "0xcdac0d6c6c59727a65f871236188350531885c43",
       },
     ],
   });
@@ -312,6 +313,7 @@ test("buildGaugePoolIdByGaugeAddress keeps protocol metadata as the primary sour
       {
         gaugeAddress: "0x4f09bab2f0e15e2a078a227fe1537665f55b8360",
         poolId: "8453:0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+        poolAddress: "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
       },
     ],
   });

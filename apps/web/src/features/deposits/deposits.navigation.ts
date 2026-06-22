@@ -5,7 +5,7 @@ export function getStrategiesListHref(chainId = SUPPORTED_CHAIN_ID): string {
 }
 
 export function getStrategyDetailHref(strategyId: string, chainId = SUPPORTED_CHAIN_ID): string {
-  return `/strategies/${strategyId}?chainId=${chainId}`;
+  return `/strategies/${encodeURIComponent(strategyId)}?chainId=${chainId}`;
 }
 
 export function buildDepositsPoolHref(input: { chainId: number; poolId: string }) {

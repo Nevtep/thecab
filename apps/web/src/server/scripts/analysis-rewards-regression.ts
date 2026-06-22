@@ -81,6 +81,21 @@ async function main() {
        group by resolution_status
        order by resolution_status
     `, [chainId, walletAddress]);
+    const engineV2RewardOwnerCounts = await client.query<{
+      owner_status: string;
+      reward_count: string;
+      rewards_usd: string;
+    }>(`
+      select coalesce(row_json#>>'{owner,status}', 'unknown') as owner_status,
+             count(*) as reward_count,
+             coalesce(sum(nullif(row_json->>'usdValueAtClaim', '')::numeric), 0) as rewards_usd
+        from engine_v2_read_model_rows
+       where chain_id = $1
+         and wallet_address = $2
+         and surface = 'rewards'
+       group by owner_status
+       order by owner_status
+    `, [chainId, walletAddress]);
 
     const missingChainIdentity = await client.query<{ id: string }>(`
       select id::text
@@ -150,6 +165,18 @@ async function main() {
        order by occurred_at, log_index
        limit 20
     `, [chainId, walletAddress]);
+    const engineV2UnresolvedWithoutReason = await client.query<{ row_key: string; coverage_state: string }>(`
+      select row_key,
+             row_json->>'coverageState' as coverage_state
+        from engine_v2_read_model_rows
+       where chain_id = $1
+         and wallet_address = $2
+         and surface = 'rewards'
+         and row_json->>'coverageState' in ('unresolved', 'excluded', 'unavailable')
+         and jsonb_array_length(coalesce(row_json->'resolutionReasonCodes', '[]'::jsonb)) = 0
+       order by row_key
+       limit 20
+    `, [chainId, walletAddress]);
 
     const excludedIncludedInPool = await client.query<{ id: string; tx_hash: string; resolved_pool_id: string | null }>(`
       select id::text, tx_hash, resolved_pool_id::text
@@ -176,15 +203,55 @@ async function main() {
          and is_accrual_snapshot = false
        group by tx_hash, log_index, reward_type
       having count(*) > 1
-       order by duplicate_count desc
+      order by duplicate_count desc
+    `, [chainId, walletAddress]);
+    const duplicateEngineV2RewardIdentity = await client.query<{
+      row_key: string;
+      duplicate_count: string;
+    }>(`
+      select row_key, count(*) as duplicate_count
+        from engine_v2_read_model_rows
+       where chain_id = $1
+         and wallet_address = $2
+         and surface = 'rewards'
+       group by row_key
+      having count(*) > 1
+      order by duplicate_count desc
+    `, [chainId, walletAddress]);
+    const engineV2RewardRowsMissingDisplayAmount = await client.query<{
+      row_key: string;
+      token_symbol: string | null;
+      token_amount: string | null;
+      token_amount_formatted: string | null;
+      token_decimals: string | null;
+    }>(`
+      select row_key,
+             row_json#>>'{token,symbol}' as token_symbol,
+             row_json->>'tokenAmount' as token_amount,
+             row_json->>'tokenAmountFormatted' as token_amount_formatted,
+             row_json#>>'{token,decimals}' as token_decimals
+        from engine_v2_read_model_rows
+       where chain_id = $1
+         and wallet_address = $2
+         and surface = 'rewards'
+         and coalesce(row_json->>'tokenAmount', '') <> ''
+         and (
+           coalesce(row_json->>'tokenAmountFormatted', '') = ''
+           or coalesce(row_json#>>'{token,decimals}', '') = ''
+         )
+       order by row_key
+       limit 50
     `, [chainId, walletAddress]);
 
     const failedPoolDeltas = poolRewardDeltas.rows.filter((row) => !withinTolerance(row.delta));
     const checks: CheckResult[] = [
       {
         name: "reward_events_exist_for_wallet_chain",
-        passed: rewardStatusCounts.rows.length > 0,
-        details: rewardStatusCounts.rows,
+        passed: rewardStatusCounts.rows.length > 0 || engineV2RewardOwnerCounts.rows.length > 0,
+        details: {
+          legacyRewardEvents: rewardStatusCounts.rows,
+          engineV2RewardRows: engineV2RewardOwnerCounts.rows,
+        },
       },
       {
         name: "reward_events_are_chain_scoped",
@@ -203,8 +270,11 @@ async function main() {
       },
       {
         name: "unresolved_excluded_unavailable_rows_have_reason_codes",
-        passed: unresolvedWithoutReason.rows.length === 0,
-        details: unresolvedWithoutReason.rows,
+        passed: unresolvedWithoutReason.rows.length === 0 && engineV2UnresolvedWithoutReason.rows.length === 0,
+        details: {
+          legacyRewardEvents: unresolvedWithoutReason.rows,
+          engineV2RewardRows: engineV2UnresolvedWithoutReason.rows,
+        },
       },
       {
         name: "excluded_rows_do_not_contribute_to_pool_totals",
@@ -213,8 +283,16 @@ async function main() {
       },
       {
         name: "reward_event_identity_is_deterministic",
-        passed: duplicateRewardIdentity.rows.length === 0,
-        details: duplicateRewardIdentity.rows,
+        passed: duplicateRewardIdentity.rows.length === 0 && duplicateEngineV2RewardIdentity.rows.length === 0,
+        details: {
+          legacyRewardEvents: duplicateRewardIdentity.rows,
+          engineV2RewardRows: duplicateEngineV2RewardIdentity.rows,
+        },
+      },
+      {
+        name: "engine_v2_reward_rows_expose_decimal_display_amounts",
+        passed: engineV2RewardRowsMissingDisplayAmount.rows.length === 0,
+        details: engineV2RewardRowsMissingDisplayAmount.rows,
       },
     ];
 

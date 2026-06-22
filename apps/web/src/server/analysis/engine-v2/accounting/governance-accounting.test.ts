@@ -41,3 +41,26 @@ test("accountGovernance separates direct locks from managed links and tracks epo
   assert.equal(result.managedLinks[0]?.userTokenId, "113464");
   assert.equal(result.epochs.length, 2);
 });
+
+test("accountGovernance derives observed epoch buckets when protocol epoch id is absent", () => {
+  const result = accountGovernance({
+    events: [
+      govEvent({
+        id: "vote-without-epoch",
+        eventType: "governance_vote",
+        occurredAt: new Date("2026-05-29T21:06:33.000Z"),
+        metadataJson: {
+          votingEscrowAddress: "0x00000000000000000000000000000000000000aa",
+          lockTokenId: "110971",
+        },
+      }),
+    ],
+  });
+
+  assert.equal(result.epochs.length, 1);
+  assert.equal(result.epochs[0]?.epochId, "observed:2026-05-28");
+  assert.equal(result.epochs[0]?.epochStartAt?.toISOString(), "2026-05-28T00:00:00.000Z");
+  assert.equal(result.epochs[0]?.epochEndAt?.toISOString(), "2026-06-04T00:00:00.000Z");
+  assert.deepEqual(result.epochs[0]?.reasonCodes, ["derivedEpochFromEventTimestamp"]);
+  assert.equal(result.epochs[0]?.coverageStatus, "partial");
+});

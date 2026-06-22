@@ -380,6 +380,33 @@ test("buildReadyGovernanceResponse can select compact epoch details separately f
   assert.ok(response.selectedDetail.linkedContexts.some((link) => link.kind === "pool" && link.entityId === "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"));
 });
 
+test("buildReadyGovernanceResponse can select lock details without fabricating current balances", () => {
+  const partialLock: GovernanceLockPanel = {
+    ...lockPanel,
+    lockExposureId: "8453:0xebf418fe2512e7e6bd9b87a8f0f294acdc67e6b4:110971",
+    lockId: "110971",
+    lockedAeroAmount: null,
+    lockedAeroValueUsd: null,
+    veAeroExposure: null,
+    reasonCodes: ["missingGovernanceCurrentState"],
+  };
+  const response = buildReadyGovernanceResponse({
+    request: request({ selectedKind: "lock", selectedGovernanceId: partialLock.lockExposureId }),
+    analysis: readyAnalysis,
+    repository: repository({
+      lockPanels: [partialLock],
+      primaryLockId: partialLock.lockExposureId,
+      selectedDetailTarget: { kind: "lock", lock: partialLock },
+    }),
+  });
+
+  assert.equal(response.selectedDetail.selectionKind, "lock");
+  assert.equal(response.selectedDetail.selectionId, partialLock.lockExposureId);
+  assert.equal(response.selectedDetail.valueEffect.valueUsd, null);
+  assert.ok(response.selectedDetail.coverageNotes.reasonCodes.includes("missingGovernanceCurrentState"));
+  assert.equal((response.selectedDetail.epochContext as { lockId: string }).lockId, "110971");
+});
+
 test("buildReadyGovernanceResponse preserves explicit selected detail when filters hide table rows", () => {
   const selected = reward({ governanceRewardId: "ffffffff-ffff-4fff-8fff-ffffffffffff", rewardType: "fee" });
   const response = buildReadyGovernanceResponse({

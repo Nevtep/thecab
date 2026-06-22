@@ -15,21 +15,21 @@ export const REWARDS_PAGE_SIZE_OPTIONS: Array<RewardsUrlState["pageSize"]> = [10
 export function resetRewardsFilter(state: RewardsUrlState, target: string): RewardsUrlState {
   switch (target) {
     case "search":
-      return { ...state, search: "", page: 1 };
+      return { ...state, search: "", selectedRewardEventId: null, page: 1 };
     case "source":
-      return { ...state, source: "all", page: 1 };
+      return { ...state, source: "all", selectedRewardEventId: null, page: 1 };
     case "tokenAddress":
-      return { ...state, tokenAddress: null, page: 1 };
+      return { ...state, tokenAddress: null, selectedRewardEventId: null, page: 1 };
     case "poolId":
-      return { ...state, poolId: null, page: 1 };
+      return { ...state, poolId: null, selectedRewardEventId: null, page: 1 };
     case "depositId":
-      return { ...state, depositId: null, page: 1 };
+      return { ...state, depositId: null, selectedRewardEventId: null, page: 1 };
     case "strategyExposureId":
-      return { ...state, strategyExposureId: null, page: 1 };
+      return { ...state, strategyExposureId: null, selectedRewardEventId: null, page: 1 };
     case "coverage":
-      return { ...state, coverage: null, page: 1 };
+      return { ...state, coverage: null, selectedRewardEventId: null, page: 1 };
     case "resolutionStatus":
-      return { ...state, resolutionStatus: null, page: 1 };
+      return { ...state, resolutionStatus: null, selectedRewardEventId: null, page: 1 };
     default:
       return state;
   }

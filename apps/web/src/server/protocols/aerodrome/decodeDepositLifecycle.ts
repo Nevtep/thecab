@@ -659,6 +659,8 @@ async function buildHistoricalRangeBackfilledRows(input: {
     const token1Metadata = tokenMetadata.get(state.mintParams.token1Address) ?? { symbol: null, decimals: null };
     const primaryTokenSymbol = token0Metadata.symbol ?? row.primaryTokenSymbol;
     const secondaryTokenSymbol = token1Metadata.symbol ?? row.secondaryTokenSymbol;
+    const primaryTokenAddress = state.mintParams.token0Address ?? row.primaryTokenAddress;
+    const secondaryTokenAddress = state.mintParams.token1Address ?? row.secondaryTokenAddress;
     const rangeLowerPrice =
       token0Metadata.decimals !== null && token1Metadata.decimals !== null
         ? convertTickToToken1Price(state.mintParams.tickLower, token0Metadata.decimals, token1Metadata.decimals)
@@ -680,6 +682,8 @@ async function buildHistoricalRangeBackfilledRows(input: {
       }),
       primaryTokenSymbol,
       secondaryTokenSymbol,
+      primaryTokenAddress,
+      secondaryTokenAddress,
       poolLabel:
         primaryTokenSymbol && secondaryTokenSymbol
           ? `${primaryTokenSymbol} / ${secondaryTokenSymbol}`

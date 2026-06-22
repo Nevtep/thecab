@@ -1,6 +1,10 @@
 import { z } from "zod";
 
 const envSchema = z.object({
+  CAB_WALLET_AUTH_MODE: z.enum(["PROD", "DEBUG"]).optional(),
+  DEBUG_WALLET_ADDRESS: z.string().regex(/^0x[a-fA-F0-9]{40}$/).optional(),
+  NEXT_PUBLIC_CAB_WALLET_AUTH_MODE: z.enum(["PROD", "DEBUG"]).optional(),
+  NEXT_PUBLIC_DEBUG_WALLET_ADDRESS: z.string().regex(/^0x[a-fA-F0-9]{40}$/).optional(),
   NEXT_PUBLIC_SUPPORTED_CHAIN_ID: z.coerce.number().default(8453),
   MORALIS_API_KEY: z.string().min(1),
   ALCHEMY_API_KEY: z.string().min(1),

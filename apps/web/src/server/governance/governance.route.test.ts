@@ -79,6 +79,11 @@ test("normalizeGovernanceQueryParams accepts inbound governance and reward ident
   const epoch = normalizeGovernanceQueryParams(new URLSearchParams("chainId=8453&kind=epoch&selected=170"));
   assert.equal(epoch.selectedKind, "epoch");
   assert.equal(epoch.selectedGovernanceId, "170");
+
+  const lockId = "8453:0xebf418fe2512e7e6bd9b87a8f0f294acdc67e6b4:110971";
+  const lock = normalizeGovernanceQueryParams(new URLSearchParams(`chainId=8453&kind=lock&selected=${lockId}`));
+  assert.equal(lock.selectedKind, "lock");
+  assert.equal(lock.selectedGovernanceId, lockId);
 });
 
 test("normalizeGovernanceQueryParams rejects unknown params and invalid controls", () => {

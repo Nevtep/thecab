@@ -25,12 +25,12 @@ test("createDefaultDepositsListUrlState uses the expected defaults", () => {
 
 test("parse and serialize deposits URL state round-trip pool, date, return sign, and selection", () => {
   const parsed = parseDepositsListUrlState(new URLSearchParams(
-    "status=open_active&pool=123e4567-e89b-12d3-a456-426614174000&from=2026-01-01&to=2026-05-28&returnSign=positive&sort=return_asc&page=2&pageSize=50&selectedDepositId=123e4567-e89b-12d3-a456-426614174111",
+    "status=open_active&pool=8453%3A0x70acdf2ad0bf2402c957154f944c19ef4e1cbae1&from=2026-01-01&to=2026-05-28&returnSign=positive&sort=return_asc&page=2&pageSize=50&selectedDepositId=8453%3A0x827922686190790b37229fd06084350e74485b72%3A71663333",
   ));
 
   assert.deepEqual(parsed, {
     status: "open_active",
-    poolId: "123e4567-e89b-12d3-a456-426614174000",
+    poolId: "8453:0x70acdf2ad0bf2402c957154f944c19ef4e1cbae1",
     startDayUtc: "2026-01-01",
     endDayUtc: "2026-05-28",
     returnSign: "positive",
@@ -38,18 +38,18 @@ test("parse and serialize deposits URL state round-trip pool, date, return sign,
     direction: "asc",
     page: 2,
     pageSize: 50,
-    selectedDepositId: "123e4567-e89b-12d3-a456-426614174111",
+    selectedDepositId: "8453:0x827922686190790b37229fd06084350e74485b72:71663333",
   });
 
   assert.equal(
     serializeDepositsListUrlState(parsed),
-    "status=open_active&pool=123e4567-e89b-12d3-a456-426614174000&from=2026-01-01&to=2026-05-28&returnSign=positive&sort=return_asc&page=2&pageSize=50&selectedDepositId=123e4567-e89b-12d3-a456-426614174111",
+    "status=open_active&pool=8453%3A0x70acdf2ad0bf2402c957154f944c19ef4e1cbae1&from=2026-01-01&to=2026-05-28&returnSign=positive&sort=return_asc&page=2&pageSize=50&selectedDepositId=8453%3A0x827922686190790b37229fd06084350e74485b72%3A71663333",
   );
 });
 
 test("parseDepositsListUrlState ignores view-preference params and invalid values", () => {
   const parsed = parseDepositsListUrlState(new URLSearchParams(
-    "status=closed&columns=pool,status&density=compact&pool=invalid&from=bad-date&to=2026-05-28&page=-1&pageSize=1000",
+    "status=closed&columns=pool,status&density=compact&pool=bad%2Fpool&from=bad-date&to=2026-05-28&page=-1&pageSize=1000",
   ));
 
   assert.deepEqual(parsed, {

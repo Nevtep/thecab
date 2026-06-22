@@ -27,6 +27,7 @@ test("governance validation normalizes filter inputs conservatively", () => {
   assert.equal(normalizeGovernanceCoverage("bad"), null);
   assert.equal(normalizeGovernanceConfidence("low"), "low");
   assert.equal(normalizeGovernanceConfidence("bad"), null);
+  assert.equal(normalizeGovernanceSelectionKind("lock"), "lock");
   assert.equal(normalizeGovernanceSelectionKind("reward"), "reward");
   assert.equal(normalizeGovernanceSelectionKind("tx"), null);
   assert.equal(normalizeGovernancePageSize("50"), 50);

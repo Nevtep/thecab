@@ -148,6 +148,8 @@ export function reconstructRecentPositionState(input: {
       valueUpdatedAt: null,
       primaryTokenSymbol,
       secondaryTokenSymbol,
+      primaryTokenAddress: null,
+      secondaryTokenAddress: null,
       primaryTokenAmount: null,
       secondaryTokenAmount: null,
       poolLabel:

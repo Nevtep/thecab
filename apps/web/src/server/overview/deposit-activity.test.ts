@@ -6,6 +6,7 @@ import {
   buildOverviewAnalyzedActivityReadInput,
   buildOverviewApprovalDetail,
   buildOverviewChartEvents,
+  buildOverviewEngineV2ChartEvents,
   buildOverviewDepositMintDetail,
   buildOverviewRewardPriceState,
   buildOverviewRewardFallbackEvents,
@@ -252,4 +253,39 @@ test("buildOverviewChartEvents keeps governance reward-like activity out of over
   assert.equal(events.length, 1);
   assert.equal(events[0]?.type, "vote");
   assert.equal(events[0]?.rewardValueUsd, null);
+});
+
+test("buildOverviewEngineV2ChartEvents restores persisted rebalance and swap markers", () => {
+  const events = buildOverviewEngineV2ChartEvents({
+    range: "30d",
+    startAt: new Date("2026-06-01T00:00:00.000Z"),
+    endAt: new Date("2026-06-03T00:00:00.000Z"),
+    rows: [
+      {
+        activityId: "rebalance-1",
+        action: "rebalance_same_pool",
+        summary: "rebalance_same_pool",
+        occurredAt: "2026-06-02T15:37:31.000Z",
+        txHash: "0xrebalance",
+        selectedDetail: { actionSummary: "rebalance_same_pool" },
+      },
+      {
+        activityId: "swap-1",
+        action: "swap",
+        summary: "swap",
+        occurredAt: "2026-06-02T15:35:37.000Z",
+        txHash: "0xswap",
+      },
+      {
+        activityId: "approval-1",
+        action: "approval_router",
+        summary: "approval_router",
+        occurredAt: "2026-06-02T15:30:00.000Z",
+        txHash: "0xapproval",
+      },
+    ],
+  });
+
+  assert.deepEqual(events.map((event) => event.type), ["swap", "rebalance"]);
+  assert.equal(events[0]?.capturedAt, "2026-06-02T00:00:00.000Z");
 });

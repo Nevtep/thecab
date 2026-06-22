@@ -1,6 +1,10 @@
 :root {
   --background: #040f1c;
   --foreground: #eaf1ff;
+  --cab-font-display: "Orbitron", sans-serif;
+  --cab-font-ui: "Inter", system-ui, -apple-system, sans-serif;
+  --cab-font-body: "Inter", system-ui, -apple-system, sans-serif;
+  --cab-font-data: "IBM Plex Mono", ui-monospace, monospace;
 
   /* Cab semantic tokens (from cabColors) */
   --cab-brand-night: #040f1c;
@@ -34,22 +38,18 @@
 
 html {
   height: 100%;
-  font-family: var(--font-inter), system-ui, sans-serif;
+  font-family: var(--cab-font-ui);
 }
 
 html,
 body {
   max-width: 100%;
   overflow-x: clip;
-  font-family: var(--cab-font-ui), system-ui, sans-serif;
+  font-family: var(--cab-font-ui);
   -webkit-tap-highlight-color: transparent;
 }
 
 body {
-  --cab-font-display: var(--font-orbitron);
-  --cab-font-ui: var(--font-inter);
-  --cab-font-body: var(--font-inter);
-  --cab-font-data: var(--font-ibm-plex-mono);
   min-height: 100vh;
   min-height: 100dvh;
   color: var(--foreground);
@@ -60,28 +60,28 @@ body {
 
 .font-brand,
 .font-heading {
-  font-family: var(--cab-font-display), sans-serif;
+  font-family: var(--cab-font-display);
 }
 
 .landing-display {
-  font-family: var(--cab-font-display), sans-serif;
+  font-family: var(--cab-font-display);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
 .landing-kicker {
-  font-family: var(--cab-font-data), monospace;
+  font-family: var(--cab-font-data);
   letter-spacing: 0.18em;
   text-transform: uppercase;
 }
 
 .font-data {
-  font-family: var(--cab-font-data), monospace;
+  font-family: var(--cab-font-data);
   font-variant-numeric: tabular-nums;
 }
 
 .landing-mono {
-  font-family: var(--cab-font-data), monospace;
+  font-family: var(--cab-font-data);
   font-variant-numeric: tabular-nums;
 }
 

@@ -16,7 +16,7 @@ import { cabColors } from "@/design-system/tokens";
 export type CabRewardsTimelineDatum = {
   timestamp: string;
   rewardValueUsd: number;
-  rewardReturnPct: number | null;
+  cumulativeRewardValueUsd: number | null;
   rewardEventCount: number;
 };
 
@@ -26,7 +26,7 @@ export type CabRewardsTimelineChartProps = {
   subtitle?: string;
   notice?: string;
   valueFormatter?: (value: number) => string;
-  percentFormatter?: (value: number) => string;
+  cumulativeFormatter?: (value: number) => string;
   countFormatter?: (value: number) => string;
 };
 
@@ -36,7 +36,7 @@ export function CabRewardsTimelineChart({
   subtitle,
   notice,
   valueFormatter,
-  percentFormatter,
+  cumulativeFormatter,
   countFormatter,
 }: CabRewardsTimelineChartProps) {
   const gradientId = "cab-rewards-timeline-value";
@@ -74,19 +74,19 @@ export function CabRewardsTimelineChart({
             tickFormatter={(value) => valueFormatter ? valueFormatter(Number(value)) : String(value)}
           />
           <YAxis
-            yAxisId="return"
+            yAxisId="cumulative"
             orientation="right"
             stroke={cabColors.brand.cabGold}
             tick={{ fontSize: 11 }}
-            width={44}
-            tickFormatter={(value) => percentFormatter ? percentFormatter(Number(value)) : String(value)}
+            width={56}
+            tickFormatter={(value) => cumulativeFormatter ? cumulativeFormatter(Number(value)) : String(value)}
           />
           <Tooltip
             cursor={{ fill: "rgba(46, 197, 201, 0.14)" }}
             formatter={(value, name) => {
               const numericValue = Number(value);
-              if (name === "rewardReturnPct") {
-                return [percentFormatter ? percentFormatter(numericValue) : numericValue, "Return"];
+              if (name === "cumulativeRewardValueUsd") {
+                return [cumulativeFormatter ? cumulativeFormatter(numericValue) : numericValue, "Cumulative rewards"];
               }
               if (name === "rewardEventCount") {
                 return [countFormatter ? countFormatter(numericValue) : numericValue, "Events"];
@@ -111,9 +111,9 @@ export function CabRewardsTimelineChart({
             isAnimationActive={false}
           />
           <Line
-            yAxisId="return"
+            yAxisId="cumulative"
             type="monotone"
-            dataKey="rewardReturnPct"
+            dataKey="cumulativeRewardValueUsd"
             stroke={cabColors.brand.cabGold}
             strokeWidth={2.4}
             dot={false}

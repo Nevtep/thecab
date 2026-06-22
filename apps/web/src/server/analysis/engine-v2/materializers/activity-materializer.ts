@@ -25,7 +25,7 @@ function eventEvidence(event: EngineV2DomainEventLike) {
 export function materializeActivityRows(input: {
   accounting: EngineV2AccountingOutput;
 }): EngineV2ReadModelRowInput[] {
-  return input.accounting.events.map((event) => ({
+  const primitiveRows = input.accounting.events.map((event) => ({
     chainId: event.chainId,
     walletAddress: event.walletAddress.toLowerCase(),
     surface: "activity",
@@ -61,4 +61,77 @@ export function materializeActivityRows(input: {
     },
     evidenceJson: eventEvidence(event),
   }));
+
+  const chainId = input.accounting.events[0]?.chainId ?? 0;
+  const walletAddress = input.accounting.events[0]?.walletAddress.toLowerCase() ?? "";
+  const derivedRebalanceRows = input.accounting.rebalances.map((rebalance) => ({
+    chainId,
+    walletAddress,
+    surface: "activity",
+    rowKey: rebalance.rebalanceId,
+    sourceDomainEventId: rebalance.depositEventId,
+    coverageStatus: rebalance.coverageStatus,
+    confidence: rebalance.confidence,
+    rowJson: {
+      activityId: rebalance.rebalanceId,
+      chainId,
+      walletAddress,
+      txHash: rebalance.txHash,
+      occurredAt: rebalance.occurredAt.toISOString(),
+      action: "rebalance_same_pool",
+      surface: "pools",
+      summary: "rebalance_same_pool",
+      coverage: rebalance.coverageStatus,
+      confidence: rebalance.confidence,
+      reasonCodes: rebalance.reasonCodes,
+      selectedDetail: {
+        actionSummary: "rebalance_same_pool",
+        transaction: {
+          txHash: rebalance.txHash,
+          occurredAt: rebalance.occurredAt.toISOString(),
+        },
+        tokenMovements: [],
+        valueEffect: {
+          withdrawnCapitalUsd: rebalance.withdrawnCapitalUsd,
+          redeployedCapitalUsd: rebalance.redeployedCapitalUsd,
+          capitalDeltaUsd: rebalance.capitalDeltaUsd,
+        },
+        linkedContexts: [{
+          kind: "pool",
+          entityId: rebalance.poolId,
+        }],
+        classificationEvidence: {
+          sourceWithdrawalId: rebalance.sourceWithdrawalId,
+          withdrawalEventId: rebalance.withdrawalEventId,
+          swapEventIds: rebalance.swapEventIds,
+          depositEventId: rebalance.depositEventId,
+          classificationBasis: "residual_flow",
+        },
+        sourceEvidence: [
+          rebalance.withdrawalEventId,
+          ...rebalance.swapEventIds,
+          rebalance.depositEventId,
+        ].filter(Boolean),
+        coverageNotes: rebalance.reasonCodes,
+      },
+      metadata: {
+        actionType: "rebalance_same_pool",
+        sourceSurface: "pools",
+        poolId: rebalance.poolId,
+        sourceWithdrawalId: rebalance.sourceWithdrawalId,
+        withdrawalEventId: rebalance.withdrawalEventId,
+        swapEventIds: rebalance.swapEventIds,
+        depositEventId: rebalance.depositEventId,
+      },
+    },
+    evidenceJson: {
+      reasonCodes: rebalance.reasonCodes,
+      sourceWithdrawalId: rebalance.sourceWithdrawalId,
+      withdrawalEventId: rebalance.withdrawalEventId,
+      swapEventIds: rebalance.swapEventIds,
+      depositEventId: rebalance.depositEventId,
+    },
+  }));
+
+  return [...primitiveRows, ...derivedRebalanceRows];
 }

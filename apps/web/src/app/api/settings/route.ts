@@ -1,8 +1,8 @@
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { resolveRequestLocale } from "@/i18n/resolveRequestLocale";
+import { assertAuthenticatedWallet } from "@/server/auth/walletAuth";
 import { assertSupportedChain, SUPPORTED_CHAIN_ID } from "@/server/chains";
 import { OVERVIEW_RANGES } from "@/server/overview/overview.types";
 import { getSettings, updateSettings } from "@/server/settings/settings.service";
@@ -24,15 +24,6 @@ const settingsUpdateSchema = z.object({
     defaultOverviewRange: z.enum(OVERVIEW_RANGES).optional(),
   }).strict(),
 }).strict();
-
-async function assertAuthenticatedWallet(walletAddress: string) {
-  const cookieStore = await cookies();
-  const authenticatedAddress = cookieStore.get("cab_authenticated_address")?.value?.toLowerCase() ?? null;
-
-  if (!authenticatedAddress || authenticatedAddress !== walletAddress.toLowerCase()) {
-    throw new Error("SETTINGS_REQUEST_FAILED:UNAUTHORIZED");
-  }
-}
 
 function getSettingsErrorResponse(error: unknown) {
   if (error instanceof z.ZodError) {
@@ -72,7 +63,7 @@ export async function GET(request: Request) {
     });
 
     assertSupportedChain(payload.chainId);
-    await assertAuthenticatedWallet(payload.walletAddress);
+    await assertAuthenticatedWallet(payload.walletAddress, "SETTINGS_REQUEST_FAILED:UNAUTHORIZED");
 
     const response = await getSettings({
       walletAddress: payload.walletAddress,
@@ -91,7 +82,7 @@ export async function POST(request: Request) {
     const payload = settingsUpdateSchema.parse(await request.json());
 
     assertSupportedChain(payload.chainId);
-    await assertAuthenticatedWallet(payload.walletAddress);
+    await assertAuthenticatedWallet(payload.walletAddress, "SETTINGS_REQUEST_FAILED:UNAUTHORIZED");
 
     const response = await updateSettings({
       walletAddress: payload.walletAddress,

@@ -69,6 +69,12 @@ test("governance URL state accepts inbound explicit IDs and epoch selections", (
   assert.equal(fromEpoch.selectedKind, "epoch");
   assert.equal(fromEpoch.selectedGovernanceId, "170");
   assert.equal(serializeGovernanceUrlState(fromEpoch), "kind=epoch&selected=170");
+
+  const lockId = "8453:0xebf418fe2512e7e6bd9b87a8f0f294acdc67e6b4:110971";
+  const fromLock = parseGovernanceUrlState(new URLSearchParams(`kind=lock&selected=${lockId}`));
+  assert.equal(fromLock.selectedKind, "lock");
+  assert.equal(fromLock.selectedGovernanceId, lockId);
+  assert.equal(serializeGovernanceUrlState(fromLock), `kind=lock&selected=${encodeURIComponent(lockId)}`);
 });
 
 test("resetGovernanceFilter can remove selected inbound context and clear all state", () => {

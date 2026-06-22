@@ -66,6 +66,11 @@ function withinTolerance(value: unknown, tolerance = 0.01) {
   return parsed !== null && Math.abs(parsed) <= tolerance;
 }
 
+function positiveNumber(value: unknown) {
+  const parsed = parseNumber(value);
+  return parsed !== null && parsed > 0;
+}
+
 async function main() {
   loadLocalEnvFile();
 
@@ -82,15 +87,17 @@ async function main() {
       event_types: string[];
       strategy_exposure_ids: string[];
     }>(`
-      select tx_hash,
+      select lifecycle_item->>'txHash' as tx_hash,
              count(*) as event_count,
-             array_agg(event_type order by sequence_index) as event_types,
-             array_agg(distinct strategy_exposure_id::text) as strategy_exposure_ids
-        from strategy_lifecycle_events
-       where chain_id = $1
-         and wallet_address = $2
-       group by tx_hash
-       order by min(occurred_at), tx_hash nulls last
+             array_agg(lifecycle_item->>'eventType' order by (lifecycle_item->>'sequenceIndex')::int) as event_types,
+             array_agg(distinct row_key) as strategy_exposure_ids
+        from engine_v2_read_model_rows rows
+        cross join lateral jsonb_array_elements(coalesce(rows.row_json->'lifecycle', '[]'::jsonb)) lifecycle_item
+       where rows.chain_id = $1
+         and rows.wallet_address = $2
+         and rows.surface = 'strategies'
+       group by lifecycle_item->>'txHash'
+       order by min(lifecycle_item->>'occurredAt'), tx_hash nulls last
     `, [chainId, walletAddress]);
 
     const rewardTraceMismatches = await client.query<{
@@ -213,11 +220,34 @@ async function main() {
         from pool_wallet_summaries
        where chain_id = $1 and wallet_address = $2
     `, [chainId, walletAddress]);
+    const strategyReadModelRows = await client.query<{
+      row_key: string;
+      status: string | null;
+      current_estimated_value_usd: unknown;
+      withdrawn_value_usd: unknown;
+      total_rewards_usd: unknown;
+    }>(`
+      select row_key,
+             row_json->>'status' as status,
+             row_json->'currentEstimatedValueUsd' as current_estimated_value_usd,
+             row_json->'withdrawnValueUsd' as withdrawn_value_usd,
+             row_json->'totalRewardsUsd' as total_rewards_usd
+        from engine_v2_read_model_rows
+       where chain_id = $1
+         and wallet_address = $2
+         and surface = 'strategies'
+       order by row_key
+    `, [chainId, walletAddress]);
 
     const lifecycleTxHashes = lifecycleByTx.rows
       .map((row) => row.tx_hash)
       .filter((txHash): txHash is string => Boolean(txHash));
     const failedPoolDeltas = poolRewardDeltas.rows.filter((row) => !withinTolerance(row.delta));
+    const closedStrategyRowsMissingCloseValue = strategyReadModelRows.rows.filter((row) =>
+      row.status === "closed" &&
+      !positiveNumber(row.current_estimated_value_usd) &&
+      positiveNumber(row.withdrawn_value_usd)
+    );
     const checks: CheckResult[] = [
       {
         name: "strategy_lifecycle_events_have_source_transactions",
@@ -243,6 +273,22 @@ async function main() {
         name: "surface_reward_totals_available",
         passed: surfaceRewardTotals.rows.length === 3,
         details: surfaceRewardTotals.rows,
+      },
+      {
+        name: "engine_v2_strategy_read_model_rows_available",
+        passed: strategyReadModelRows.rows.length > 0,
+        details: strategyReadModelRows.rows.map((row) => ({
+          rowKey: row.row_key,
+          status: row.status,
+          currentEstimatedValueUsd: row.current_estimated_value_usd,
+          withdrawnValueUsd: row.withdrawn_value_usd,
+          totalRewardsUsd: row.total_rewards_usd,
+        })),
+      },
+      {
+        name: "closed_strategy_rows_expose_value_at_close",
+        passed: closedStrategyRowsMissingCloseValue.length === 0,
+        details: closedStrategyRowsMissingCloseValue,
       },
     ];
 

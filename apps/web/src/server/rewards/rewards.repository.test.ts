@@ -6,6 +6,7 @@ import {
   applyRewardsFilters,
   calculateAvailableRewardFilters,
   mapRewardEventRow,
+  normalizeEngineV2RewardRow,
   type RewardEventDbRow,
 } from "@/server/rewards/rewards.repository";
 import type { RewardsRequest } from "@/server/rewards/rewards.types";
@@ -195,4 +196,48 @@ test("aggregateHistoricalCapitalFromEngineV2Pools sums persisted pool history po
     { dayUtc: "2026-05-01", valueUsd: "140", coverageStatus: "time_weighted_estimated" },
     { dayUtc: "2026-05-02", valueUsd: "80", coverageStatus: "time_weighted_estimated" },
   ]);
+});
+
+test("normalizeEngineV2RewardRow formats raw token amounts with persisted token decimals", () => {
+  const usdc = normalizeEngineV2RewardRow({
+    rewardEventId: "usdc-fee",
+    chainId: 8453,
+    walletAddress,
+    txHash: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    rewardType: "fee_claim",
+    ownerStatus: "manual_deposit",
+    linkedEntityId: depositId,
+    poolId,
+    poolLabel: "USDC / AERO Volatile",
+    coverageStatus: "partial",
+    confidence: "high",
+    tokenAddress: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+    tokenSymbol: "USDC",
+    tokenDecimals: 6,
+    amountRaw: "223",
+    amountUsd: "0.0002229437793808",
+    occurredAt: "2026-06-02T12:42:00.000Z",
+  });
+  const aero = normalizeEngineV2RewardRow({
+    rewardEventId: "aero-reward",
+    chainId: 8453,
+    walletAddress,
+    txHash: "0xcccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    rewardType: "reward_claim",
+    ownerStatus: "strategy",
+    linkedEntityId: strategyExposureId,
+    poolId,
+    poolLabel: "WETH / cbBTC 100",
+    coverageStatus: "full",
+    confidence: "high",
+    tokenAddress: "0x940181a94a35a4569e4529a3cdfb74e38fd98631",
+    tokenSymbol: "AERO",
+    tokenDecimals: 18,
+    amountRaw: "14171535420739919393",
+    amountUsd: "5.107447798397512173",
+    occurredAt: "2026-06-02T12:43:00.000Z",
+  });
+
+  assert.equal(usdc.tokenAmount, "0.000223");
+  assert.equal(aero.tokenAmount, "14.171535420739919393");
 });

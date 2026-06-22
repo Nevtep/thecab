@@ -10,21 +10,22 @@ type Props = {
   labels: {
     timelineTitle: string;
     timelineSubtitle: string;
-    coverageTitle: string;
-    coverageSubtitle: string;
+    actionTitle: string;
+    actionSubtitle: string;
     totalEvents: string;
-    getCoverage: (value: string) => string;
+    getAction: (value: string) => string;
     getSurface: (value: string) => string;
+    getMovement: (value: string) => string;
     formatCount: (value: number) => string;
+    formatUsd: (value: string) => string;
   };
 };
 
-const coverageColors = {
-  full: cabColors.semantic.success,
-  partial: cabColors.brand.cabGold,
-  unresolved: cabColors.semantic.warning,
-  excluded: cabColors.semantic.danger,
-  unavailable: cabColors.text.muted,
+const timelineColors = {
+  protocolActivity: cabColors.brand.signalTeal,
+  walletCashflow: cabColors.brand.electricBlue,
+  approvals: cabColors.brand.cabGold,
+  other: cabColors.text.muted,
 } as const;
 
 const surfaceColors = [
@@ -37,12 +38,12 @@ const surfaceColors = [
 ];
 
 export function ActivityInsightsPanel({ charts, labels }: Props) {
-  const totalCoverageEvents = charts.coverageBreakdown.reduce((sum, entry) => sum + entry.value, 0);
-  const donutData = charts.coverageBreakdown.map((entry) => ({
+  const totalActionEvents = charts.actionBreakdown.reduce((sum, entry) => sum + entry.value, 0);
+  const donutData = charts.actionBreakdown.slice(0, 8).map((entry, index) => ({
     id: entry.id,
-    label: labels.getCoverage(entry.id),
+    label: labels.getAction(entry.id),
     value: entry.value,
-    color: coverageColors[entry.id],
+    color: surfaceColors[index % surfaceColors.length],
   }));
   const surfaceLegend = charts.surfaceBreakdown.slice(0, 5).map((entry, index) => ({
     ...entry,
@@ -58,22 +59,22 @@ export function ActivityInsightsPanel({ charts, labels }: Props) {
         data={charts.timeline}
         xKey="label"
         series={[
-          { key: "full", label: labels.getCoverage("full"), color: coverageColors.full },
-          { key: "partial", label: labels.getCoverage("partial"), color: coverageColors.partial },
-          { key: "unresolved", label: labels.getCoverage("unresolved"), color: coverageColors.unresolved },
-          { key: "excluded", label: labels.getCoverage("excluded"), color: coverageColors.excluded },
+          { key: "protocolActivity", label: labels.getAction("strategy"), color: timelineColors.protocolActivity },
+          { key: "walletCashflow", label: labels.getMovement("in"), color: timelineColors.walletCashflow },
+          { key: "approvals", label: labels.getAction("approval"), color: timelineColors.approvals },
+          { key: "other", label: labels.getAction("ambiguous"), color: timelineColors.other },
         ]}
       />
       <CabDonutChart
-        title={labels.coverageTitle}
-        subtitle={labels.coverageSubtitle}
+        title={labels.actionTitle}
+        subtitle={labels.actionSubtitle}
         height={128}
         data={donutData}
         valueFormatter={labels.formatCount}
         centerContent={
           <CabStack alignItems="center" gap="$1">
             <CabText variant="kpi" fontSize={18}>
-              {labels.formatCount(totalCoverageEvents)}
+              {labels.formatCount(totalActionEvents)}
             </CabText>
             <CabText variant="caption" fontSize={10} color={cabColors.text.muted}>
               {labels.totalEvents}
@@ -93,6 +94,19 @@ export function ActivityInsightsPanel({ charts, labels }: Props) {
                   </CabStack>
                   <CabText variant="mono" fontSize={11} color={cabColors.text.secondary}>
                     {labels.formatCount(entry.value)}
+                  </CabText>
+                </CabStack>
+              ))}
+              {charts.movementBreakdown.slice(0, 3).map((entry) => (
+                <CabStack key={`movement-${entry.id}`} row alignItems="center" justifyContent="space-between" gap="$2">
+                  <CabStack row alignItems="center" gap="$2" minWidth={0}>
+                    <span className={styles.legendDot} style={{ backgroundColor: cabColors.brand.cabGold }} />
+                    <CabText variant="caption" fontSize={11}>
+                      {labels.getMovement(entry.id)}
+                    </CabText>
+                  </CabStack>
+                  <CabText variant="mono" fontSize={11} color={cabColors.text.secondary}>
+                    {labels.formatCount(entry.value)} / {labels.formatUsd(entry.valueUsd)}
                   </CabText>
                 </CabStack>
               ))}

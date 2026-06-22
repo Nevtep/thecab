@@ -44,12 +44,12 @@ test("buildActivityApiQueryString carries chain and filter identity", () => {
   assert.equal(normalizeActivityFiltersForQueryKey(state).surface, "strategies");
 });
 
-test("resetActivityFilter clears one filter while preserving selected row", () => {
+test("resetActivityFilter clears one filter and selected row context", () => {
   const state = parseActivityUrlState(new URLSearchParams(`search=spam&coverage=excluded&poolId=${poolId}&selected=${selectedActivityId}&page=4`));
   const next = resetActivityFilter(state, "coverage");
   assert.equal(next.coverage, null);
   assert.equal(next.poolId, poolId);
   assert.equal(next.search, "spam");
-  assert.equal(next.selectedActivityId, selectedActivityId);
+  assert.equal(next.selectedActivityId, null);
   assert.equal(next.page, 1);
 });

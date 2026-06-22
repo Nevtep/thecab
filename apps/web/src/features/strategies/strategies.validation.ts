@@ -7,6 +7,7 @@ import {
   STRATEGIES_SORT_VALUES,
   STRATEGIES_STATUS_FILTER_VALUES,
 } from "@/server/strategies/strategies.contract";
+import { normalizeOpaqueEntityId } from "@/analysis/opaqueEntityId";
 import type {
   StrategiesCoverageFilter,
   StrategiesPageSize,
@@ -18,7 +19,6 @@ import type {
 
 export const STRATEGIES_SEARCH_MAX_LENGTH = 64;
 export const STRATEGIES_MAX_PAGE = 10_000;
-export const STRATEGIES_UUID_PATTERN = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
 export function normalizeStrategiesStatusFilter(value: string | null | undefined): StrategiesStatusFilter {
   return normalizeOneOf(value, STRATEGIES_STATUS_FILTER_VALUES, "active");
@@ -41,8 +41,7 @@ export function normalizeStrategiesSort(value: string | null | undefined): Strat
 }
 
 export function normalizeStrategiesUuid(value: string | null | undefined): string | null {
-  if (!value) return null;
-  return STRATEGIES_UUID_PATTERN.test(value) ? value : null;
+  return normalizeOpaqueEntityId(value);
 }
 
 export function normalizeStrategiesSearch(value: string | null | undefined) {

@@ -34,11 +34,26 @@ export function buildActivityReadModelSummary(rows: ActivityEventRow[]): Activit
   const totalValueUsd = rows
     .filter((row) => row.coverage !== "excluded")
     .reduce((sum, row) => sum + (asNumber(row.valueUsd) ?? 0), 0);
+  const walletCapitalInUsd = rows
+    .filter((row) => row.coverage !== "excluded" && row.action === "cash_in")
+    .reduce((sum, row) => sum + (asNumber(row.valueUsd) ?? 0), 0);
+  const walletCapitalOutUsd = rows
+    .filter((row) => row.coverage !== "excluded" && row.action === "cash_out")
+    .reduce((sum, row) => sum + (asNumber(row.valueUsd) ?? 0), 0);
+  const protocolVolumeUsd = rows
+    .filter((row) =>
+      row.coverage !== "excluded" &&
+      ["deposit", "position_created", "withdraw", "swap", "claim", "strategy", "stake", "unstake", "governance"].includes(row.action),
+    )
+    .reduce((sum, row) => sum + (asNumber(row.valueUsd) ?? 0), 0);
 
   return {
     totalEvents: rows.length,
     interpretedEvents: rows.length - excludedEvents - unresolvedEvents,
     totalValueUsd: toFixed(totalValueUsd),
+    walletCapitalInUsd: toFixed(walletCapitalInUsd),
+    walletCapitalOutUsd: toFixed(walletCapitalOutUsd),
+    protocolVolumeUsd: toFixed(protocolVolumeUsd),
     excludedEvents,
     unresolvedEvents,
     coveragePercent: rows.length > 0 ? toFixed((fullEvents / rows.length) * 100, 1) : "100.0",

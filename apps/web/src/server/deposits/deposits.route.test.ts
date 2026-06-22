@@ -48,14 +48,14 @@ test("normalizeDepositsListQueryParams rejects invalid sort and oversized date w
 test("normalizeDepositDetailQueryParams validates chain and deposit id", () => {
   const normalized = normalizeDepositDetailQueryParams(
     new URLSearchParams({ chainId: "8453" }),
-    "9e10786c-b17a-430e-ad01-c3afa6c82113",
+    "8453:0x827922686190790b37229fd06084350e74485b72:71663333",
   );
 
   assert.equal(normalized.chainId, 8453);
-  assert.equal(normalized.depositId, "9e10786c-b17a-430e-ad01-c3afa6c82113");
+  assert.equal(normalized.depositId, "8453:0x827922686190790b37229fd06084350e74485b72:71663333");
 
   assert.throws(
-    () => normalizeDepositDetailQueryParams(new URLSearchParams(), "not-a-uuid"),
+    () => normalizeDepositDetailQueryParams(new URLSearchParams(), "bad/deposit"),
     /INVALID_PAYLOAD/,
   );
 });

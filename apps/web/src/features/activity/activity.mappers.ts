@@ -4,11 +4,6 @@ export function mapActivityResponseToViewModel(response: ActivityResponse): Acti
   return {
     ...response,
     walletAddress: response.walletAddress.toLowerCase(),
-    events: {
-      ...response.events,
-      rows: [...response.events.rows].sort((left, right) =>
-        right.occurredAt.localeCompare(left.occurredAt),
-      ),
-    },
+    events: response.events,
   };
 }

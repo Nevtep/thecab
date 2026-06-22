@@ -7,11 +7,12 @@ import {
   type GovernanceRepositoryResult,
   type GovernanceSelectedDetailTarget,
 } from "@/server/governance/governance.repository";
-import { resolvePrimaryGovernanceLockPanel } from "@/server/governance/governance-locks";
+import { governanceLockIdentity, resolvePrimaryGovernanceLockPanel } from "@/server/governance/governance-locks";
 import type {
   GovernanceAnalysisState,
   GovernanceCoverageState,
   GovernanceEpochSummary,
+  GovernanceLockPanel,
   GovernanceRequest,
   GovernanceResponse,
   GovernanceRewardRow,
@@ -539,6 +540,57 @@ function selectedDetailFromEpoch(row: GovernanceEpochSummary, chainId: number): 
   };
 }
 
+function selectedDetailFromLock(row: GovernanceLockPanel): GovernanceSelectedDetail {
+  const reasonCodes = dedupeStrings([
+    ...row.reasonCodes,
+    ...(row.lockedAeroAmount === null || row.veAeroExposure === null ? ["missingGovernanceCurrentState"] : []),
+  ]);
+
+  return {
+    ...emptySelectedDetail(),
+    selectionKind: "lock",
+    selectionId: governanceLockIdentity(row),
+    actionSummary: {
+      labelKey: "governance:detail.lockSummary",
+      contextLabel: row.lockId,
+    },
+    transaction: {
+      txHash: null,
+      occurredAt: row.createdAt,
+      externalTxUrl: null,
+    },
+    protocolSurface: "voting_escrow",
+    valueEffect: {
+      valueUsd: row.lockedAeroValueUsd,
+      coverageState: row.coverageState,
+    },
+    epochContext: {
+      lockId: row.lockId,
+      lockKind: row.lockKind,
+      status: row.status,
+      createdAt: row.createdAt,
+      expiresAt: row.expiresAt,
+      managedTokenId: row.managedTokenId,
+      lockedAeroAmount: row.lockedAeroAmount,
+      veAeroExposure: row.veAeroExposure,
+      lifecycleEventCount: row.lifecycle.length,
+      recentLifecycle: row.lifecycle.slice(-8),
+    },
+    classificationEvidence: {
+      basis: ["persistedGovernanceLockRow", "explicitLockTokenId"],
+      reasonCodes,
+      missingEvidenceReasonCodes: row.coverageState === "full" ? [] : reasonCodes,
+    },
+    coverageNotes: {
+      coverageState: row.coverageState,
+      confidence: row.confidence,
+      affectsTotals: false,
+      reasonCodes,
+    },
+    sourceEvidenceRefs: [],
+  };
+}
+
 function buildSelectedDetail(input: {
   request: GovernanceRequest;
   repository: GovernanceRepositoryResult;
@@ -546,6 +598,7 @@ function buildSelectedDetail(input: {
   const explicitSnapshot = input.repository.metricSnapshot?.selectedDetail;
   if (explicitSnapshot) return explicitSnapshot;
   const target: GovernanceSelectedDetailTarget | null = input.repository.selectedDetailTarget;
+  if (target?.kind === "lock") return selectedDetailFromLock(target.lock);
   if (target?.kind === "reward") return selectedDetailFromReward(target.reward, input.request.chainId);
   if (target?.kind === "event") return selectedDetailFromEvent(target.event, input.request.chainId);
   if (target?.kind === "epoch") return selectedDetailFromEpoch(target.epoch, input.request.chainId);

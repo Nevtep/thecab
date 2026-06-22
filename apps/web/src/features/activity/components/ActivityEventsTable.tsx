@@ -1,6 +1,6 @@
 "use client";
 
-import { createColumnHelper, type ColumnDef } from "@tanstack/react-table";
+import { createColumnHelper, type ColumnDef, type SortingState } from "@tanstack/react-table";
 import { useMemo } from "react";
 
 import {
@@ -70,30 +70,59 @@ function confidenceTone(confidence: string): "neutral" | "success" | "warning" |
 }
 
 function actionTone(action: string): "neutral" | "success" | "warning" | "danger" | "info" {
-  if (action === "deposit" || action === "claim" || action === "strategy") return "success";
-  if (action === "swap" || action === "governance") return "info";
+  if (action === "deposit" || action === "position_created" || action === "claim" || action === "strategy" || action === "cash_in") return "success";
+  if (action === "swap" || action === "governance" || action === "approval" || action === "stake" || action === "unstake" || action === "noop") return "info";
   if (action === "airdrop" || action === "unsupported" || action === "ambiguous") return "warning";
-  if (action === "withdraw") return "danger";
+  if (action === "withdraw" || action === "failed" || action === "cash_out") return "danger";
   return "neutral";
+}
+
+function sortKeyToColumnId(key: ActivityUrlState["sort"]["key"]) {
+  if (key === "occurredAt") return "date";
+  if (key === "valueUsd") return "value";
+  return key;
+}
+
+function columnIdToSortKey(id: string): ActivityUrlState["sort"]["key"] {
+  if (id === "date") return "occurredAt";
+  if (id === "value") return "valueUsd";
+  if (id === "action" || id === "coverage" || id === "confidence") return id;
+  return "occurredAt";
 }
 
 export function ActivityEventsTable({ viewModel, state, labels, loading = false, onStateChange }: Props) {
   const pagination = viewModel.events.pagination;
   const from = pagination.totalRows === 0 ? 0 : (pagination.page - 1) * pagination.pageSize + 1;
   const to = Math.min(pagination.totalRows, pagination.page * pagination.pageSize);
+  const sorting: SortingState = [{
+    id: sortKeyToColumnId(state.sort.key),
+    desc: state.sort.direction === "desc",
+  }];
+  function handleSortingChange(updater: SortingState | ((old: SortingState) => SortingState)) {
+    const nextSorting = typeof updater === "function" ? updater(sorting) : updater;
+    const first = nextSorting[0];
+    if (!first) return;
+    onStateChange({
+      ...state,
+      selectedActivityId: null,
+      sort: {
+        key: columnIdToSortKey(first.id),
+        direction: first.desc ? "desc" : "asc",
+      },
+      page: 1,
+    });
+  }
   const columns = useMemo<Array<ColumnDef<ActivityViewModel["events"]["rows"][number], unknown>>>(
     () => {
       const columns = [
       columnHelper.accessor("occurredAt", {
         id: "date",
         header: () => labels.date,
-        enableSorting: false,
         cell: ({ getValue }) => <DataTableValueCell primary={labels.formatDateTime(getValue())} align="left" />,
       }),
       columnHelper.accessor("action", {
         id: "action",
         header: () => labels.action,
-        enableSorting: false,
         cell: ({ getValue }) => (
           <DataTableStatusCell tone={actionTone(getValue())} label={labels.getAction(getValue())} />
         ),
@@ -138,14 +167,12 @@ export function ActivityEventsTable({ viewModel, state, labels, loading = false,
       columnHelper.accessor("valueUsd", {
         id: "value",
         header: () => labels.value,
-        enableSorting: false,
         meta: { numeric: true },
         cell: ({ getValue }) => <DataTableValueCell primary={labels.formatUsd(getValue())} />,
       }),
       columnHelper.accessor("coverage", {
         id: "coverage",
         header: () => labels.coverage,
-        enableSorting: false,
         cell: ({ row, getValue }) => (
           <CabStack gap="$1">
             <CabBadge tone={coverageTone(getValue())} size="sm">{labels.getCoverage(getValue())}</CabBadge>
@@ -160,7 +187,6 @@ export function ActivityEventsTable({ viewModel, state, labels, loading = false,
       columnHelper.accessor("confidence", {
         id: "confidence",
         header: () => labels.confidence,
-        enableSorting: false,
         cell: ({ getValue }) => (
           <CabBadge tone={confidenceTone(getValue())} size="sm">{labels.getConfidence(getValue())}</CabBadge>
         ),
@@ -190,6 +216,8 @@ export function ActivityEventsTable({ viewModel, state, labels, loading = false,
         rowKey={(row) => row.activityId}
         selectedRowId={state.selectedActivityId ?? viewModel.selectedActivity?.activityId ?? null}
         onRowSelect={(activityId) => onStateChange({ ...state, selectedActivityId: activityId })}
+        sorting={sorting}
+        onSortingChange={handleSortingChange}
         stickyHeader
         loading={loading}
         toolbar={
@@ -219,8 +247,8 @@ export function ActivityEventsTable({ viewModel, state, labels, loading = false,
           rowsPerPage: labels.rowsPerPage,
           showing: labels.showing,
         }}
-        onPageChange={(page) => onStateChange({ ...state, page })}
-        onPageSizeChange={(pageSize) => onStateChange({ ...state, pageSize: pageSize as ActivityUrlState["pageSize"], page: 1 })}
+        onPageChange={(page) => onStateChange({ ...state, selectedActivityId: null, page })}
+        onPageSizeChange={(pageSize) => onStateChange({ ...state, selectedActivityId: null, pageSize: pageSize as ActivityUrlState["pageSize"], page: 1 })}
       />
     </CabStack>
   );

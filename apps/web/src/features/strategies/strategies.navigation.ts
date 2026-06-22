@@ -20,7 +20,7 @@ export function buildStrategyDetailHref(input: {
   strategyId: string;
 }): string {
   const params = new URLSearchParams({ chainId: String(input.chainId) });
-  return `/strategies/${input.strategyId}?${params.toString()}`;
+  return `/strategies/${encodeURIComponent(input.strategyId)}?${params.toString()}`;
 }
 
 export function getStrategiesListHref(chainId = SUPPORTED_CHAIN_ID): string {

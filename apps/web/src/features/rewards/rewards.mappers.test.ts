@@ -164,6 +164,7 @@ test("mapRewardsResponseToViewModel keeps KPI, chart, distribution, and table st
         claimedValueUsd: "1245.18",
         resolvedValueUsd: "1245.18",
         unresolvedExcludedValueUsd: "0.00",
+        cumulativeClaimedValueUsd: "1245.18",
         estimatedRewardReturnPct: "8.42",
         rewardEventCount: 1,
         claimMarkers: [{ rewardEventId: row.rewardEventId, tokenSymbol: "AERO" }],

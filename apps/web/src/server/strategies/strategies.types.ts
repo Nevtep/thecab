@@ -71,6 +71,8 @@ export type StrategySummaryView = {
   poolMappingStatus: StrategyPoolMappingStatus;
   status: StrategySummaryStatus;
   currentEstimatedValueUsd: number | null;
+  closeValueUsd?: number | null;
+  displayValueUsd?: number | null;
   depositedValueUsd: number;
   withdrawnValueUsd: number;
   currentSharesRaw: string;
@@ -186,4 +188,3 @@ export type StrategyDetailResponse = {
   coveredRange: StrategiesCoveredRange;
   strategy: StrategyDetailView;
 };
-

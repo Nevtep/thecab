@@ -49,18 +49,18 @@ test("getStrategiesErrorStatus maps stable strategy errors", () => {
 test("normalizeStrategyDetailParams validates chain and strategy identity", () => {
   const normalized = normalizeStrategyDetailParams(
     new URLSearchParams("chainId=8453"),
-    "123e4567-e89b-12d3-a456-426614174111",
+    "8453:0xcd975e6a5f55137755487f0918b8ca74acce7925",
   );
 
   assert.equal(normalized.chainId, 8453);
-  assert.equal(normalized.strategyId, "123e4567-e89b-12d3-a456-426614174111");
+  assert.equal(normalized.strategyId, "8453:0xcd975e6a5f55137755487f0918b8ca74acce7925");
 
   assert.throws(
-    () => normalizeStrategyDetailParams(new URLSearchParams("chainId=8453"), "not-a-strategy-id"),
+    () => normalizeStrategyDetailParams(new URLSearchParams("chainId=8453"), "bad/strategy"),
     /INVALID_REQUEST/,
   );
   assert.throws(
-    () => normalizeStrategyDetailParams(new URLSearchParams("chainId=1"), "123e4567-e89b-12d3-a456-426614174111"),
+    () => normalizeStrategyDetailParams(new URLSearchParams("chainId=1"), "8453:0xcd975e6a5f55137755487f0918b8ca74acce7925"),
     /UNSUPPORTED_CHAIN/,
   );
 });

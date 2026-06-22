@@ -27,10 +27,10 @@ test("strategy validation normalizes enum filters and sort controls", () => {
   assert.equal(normalizeStrategiesSort("created_desc"), "current_value_desc");
 });
 
-test("strategy validation bounds search pagination and UUID controls", () => {
-  const uuid = "123e4567-e89b-12d3-a456-426614174000";
-  assert.equal(normalizeStrategiesUuid(uuid), uuid);
-  assert.equal(normalizeStrategiesUuid("nope"), null);
+test("strategy validation bounds search pagination and opaque id controls", () => {
+  const scopedId = "8453:0xcd975e6a5f55137755487f0918b8ca74acce7925";
+  assert.equal(normalizeStrategiesUuid(scopedId), scopedId);
+  assert.equal(normalizeStrategiesUuid("bad/strategy"), null);
   assert.equal(normalizeStrategiesSearch(`  ${"a".repeat(90)}  `).length, STRATEGIES_SEARCH_MAX_LENGTH);
   assert.equal(normalizeStrategiesPage("2.9"), 2);
   assert.equal(normalizeStrategiesPage("10001"), 1);

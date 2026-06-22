@@ -13,7 +13,7 @@
     "refresh": "Actualizar"
   },
   "panels": {
-    "lock": "Estado del lock",
+    "lock": "Registro de locks",
     "timeline": "Línea de voto por epoch",
     "rewards": "Rewards de gobernanza",
     "breakdown": "Desglose por tipo de reward"
@@ -160,7 +160,7 @@
   },
   "detail": {
     "title": "Detalle de gobernanza seleccionado",
-    "empty": "Seleccioná un reward o evento de gobernanza para inspeccionar el contexto de clasificación.",
+    "empty": "Seleccioná un lock, reward, evento o epoch de gobernanza para inspeccionar el contexto de clasificación.",
     "loading": "Cargando detalle de gobernanza seleccionado...",
     "actionSummary": "Resumen de acción",
     "transaction": "Transacción",
@@ -184,7 +184,8 @@
     "noEvidenceSources": "No se materializaron referencias de evidencia fuente para esta selección.",
     "amount": "Monto",
     "valueUsd": "Valor USD",
-    "epochSummary": "Resumen de epoch"
+    "epochSummary": "Resumen de epoch",
+    "lockSummary": "Resumen del lock"
   },
   "notes": {
     "explicitPoolContributionNoDoubleCount": "La misma identidad de reward se cuenta una vez y se vincula a este pool con evidencia explícita.",

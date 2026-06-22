@@ -19,6 +19,24 @@
   min-width: 0;
 }
 
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 1279px) {
+  .kpiGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .kpiGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (min-width: 1024px) {
   .withDetail {
     grid-template-columns: minmax(0, 1.35fr) minmax(320px, 1fr);

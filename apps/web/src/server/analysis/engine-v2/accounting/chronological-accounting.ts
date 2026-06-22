@@ -42,6 +42,8 @@ export type EngineV2AccountingOutput = {
   events: EngineV2DomainEventLike[];
   cashFlows: ReturnType<typeof accountCashAndResidualInventory>["cashFlows"];
   residualInventory: ReturnType<typeof accountCashAndResidualInventory>["residualInventory"];
+  residualLots: ReturnType<typeof accountCashAndResidualInventory>["residualLots"];
+  rebalances: ReturnType<typeof accountCashAndResidualInventory>["rebalances"];
   deposits: ReturnType<typeof accountManualDeposits>;
   strategies: ReturnType<typeof accountStrategies>;
   pools: ReturnType<typeof accountPools>;
@@ -60,7 +62,7 @@ export function sortDomainEventsChronologically(events: EngineV2DomainEventLike[
 export function runChronologicalAccounting(input: EngineV2AccountingInput): EngineV2AccountingOutput {
   const events = sortDomainEventsChronologically(input.events);
   const links = input.links ?? [];
-  const cash = accountCashAndResidualInventory({ events });
+  const cash = accountCashAndResidualInventory({ events, links });
   const deposits = accountManualDeposits({ events, links });
   const strategies = accountStrategies({ events, links });
   const rewards = accountRewards({
@@ -83,6 +85,8 @@ export function runChronologicalAccounting(input: EngineV2AccountingInput): Engi
     events,
     cashFlows: cash.cashFlows,
     residualInventory: cash.residualInventory,
+    residualLots: cash.residualLots,
+    rebalances: cash.rebalances,
     deposits,
     strategies,
     pools,

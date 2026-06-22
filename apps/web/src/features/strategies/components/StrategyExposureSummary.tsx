@@ -34,7 +34,7 @@ export function StrategyExposureSummary({ labels, locale, strategy }: StrategyEx
     { key: "sharesReceived", label: labels.sharesReceived, value: formatShares(strategy.sharesReceivedRaw, strategy.shareSymbol), valueVariant: "mono" as const },
     { key: "sharesRedeemed", label: labels.sharesRedeemed, value: formatShares(strategy.sharesRedeemedRaw, strategy.shareSymbol), valueVariant: "mono" as const },
     { key: "currentShares", label: labels.currentShares, value: formatShares(strategy.currentSharesRaw, strategy.shareSymbol), valueVariant: "mono" as const },
-    { key: "currentValue", label: labels.currentValue, value: formatNullableUsd(strategy.currentEstimatedValueUsd, locale), valueVariant: "mono" as const },
+    { key: "currentValue", label: labels.currentValue, value: formatNullableUsd(strategy.displayValueUsd ?? strategy.currentEstimatedValueUsd, locale), valueVariant: "mono" as const },
   ];
 
   return (

@@ -15,18 +15,10 @@ test("pools repository exports listPoolSummaries, readPoolSummarySeries, readPoo
 test("pools repository keeps v2 pool ids away from legacy uuid tables", () => {
   const source = readFileSync(resolve(process.cwd(), "src/server/pools/pools.repository.ts"), "utf8");
 
-  assert.match(
-    source,
-    /export async function readPoolSummarySeries[\s\S]*readEngineV2SurfaceRows[\s\S]*hasRichEngineV2PoolRow[\s\S]*from\(poolHistorySnapshots\)/,
-  );
-  assert.match(
-    source,
-    /export async function readPoolTimeline[\s\S]*readEngineV2SurfaceRows[\s\S]*hasRichEngineV2PoolRow[\s\S]*from\(poolTimelineEvents\)/,
-  );
-  assert.match(
-    source,
-    /export async function readPoolPositions[\s\S]*readEngineV2SurfaceRows[\s\S]*hasRichEngineV2PoolRow[\s\S]*from\(deposits\)[\s\S]*from\(strategyExposures\)/,
-  );
+  assert.match(source, /export async function readPoolSummarySeries[\s\S]*readEngineV2SurfaceRows/);
+  assert.match(source, /export async function readPoolTimeline[\s\S]*readEngineV2SurfaceRows/);
+  assert.match(source, /export async function readPoolPositions[\s\S]*readEngineV2SurfaceRows/);
+  assert.doesNotMatch(source, /from\(poolHistorySnapshots\)|from\(poolTimelineEvents\)|from\(deposits\)|from\(strategyExposures\)/);
 });
 
 test("normalizeEngineV2PoolSummaryRow prefers the latest cumulative rewards from history", () => {
@@ -108,4 +100,46 @@ test("list pool normalization keeps only pools backed by manual or strategy expo
   });
 
   assert.equal(visible.label, "WETH / USDC 100");
+});
+
+test("pool normalization marks pools with only closed exposure as closed", () => {
+  const closed = repository.normalizeEngineV2PoolSummaryRow({
+    poolId: "8453:0xpool-closed",
+    label: "WETH / USDC Volatile",
+    poolAddress: "0xpool-closed",
+    tokenSymbols: ["WETH", "USDC"],
+    feeTierLabel: null,
+    poolType: "volatile",
+    protocolFamily: "aerodrome",
+    status: "active",
+    exposureMix: "manual",
+    currentAttributedValueUsd: 14506.55,
+    capitalEnteredUsd: 14506.55,
+    capitalWithdrawnUsd: 14506.55,
+    capitalInvestedUsd: 0,
+    realizedPnlUsd: null,
+    unrealizedPnlUsd: null,
+    totalRewardsUsd: 42.22,
+    investedDays: null,
+    totalReturnPct: null,
+    annualizedReturnPct: null,
+    isInRange: null,
+    coverageStatus: "partial",
+    coverageReasonCodes: ["missing_explicit_evidence"],
+    latestActivityAt: "2026-03-05T13:52:00.000Z",
+    strategyLabels: [],
+    metricsEstimated: true,
+    coveredStartDayUtc: "2026-03-05",
+    coveredEndDayUtc: "2026-06-02",
+    currentManualValueUsd: 14506.55,
+    currentStrategyValueUsd: 0,
+    currentResidualValueUsd: 0,
+    positions: {
+      manualDeposits: [{ depositId: "dep-closed", status: "closed" }],
+      automatedStrategies: [],
+    },
+  });
+
+  assert.equal(closed.status, "closed");
+  assert.equal(closed.currentAttributedValueUsd, 0);
 });

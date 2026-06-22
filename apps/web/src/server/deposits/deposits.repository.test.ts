@@ -7,6 +7,7 @@ import {
   normalizeEngineV2DepositRow,
   type DepositDetailRowRecord,
 } from "@/server/deposits/deposits.repository";
+import type { DepositDetailView } from "@/server/deposits/deposits.types";
 
 function createSummaryRow(overrides: Partial<DepositDetailRowRecord> = {}): DepositDetailRowRecord {
   return {
@@ -183,7 +184,7 @@ test("normalizeEngineV2DepositRow derives closed and out-of-range statuses plus 
         metadata: {},
       },
     ],
-  });
+  } as unknown as DepositDetailView);
 
   assert.equal(mapped.status, "open_out_of_range");
   assert.equal(mapped.totalRewardsUsd, 25);

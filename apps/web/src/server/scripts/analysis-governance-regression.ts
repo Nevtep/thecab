@@ -8,6 +8,12 @@ import { SUPPORTED_CHAIN_ID } from "@/server/chains";
 
 const AIRDROP_PHISHING_TX = "0xca23a1618b416be4f082ae26e59dd9bfcea5e028f00a2cd9f1b8dd95fbff77ea";
 
+type CheckResult = {
+  name: string;
+  passed: boolean;
+  details: unknown;
+};
+
 function loadLocalEnvFile() {
   const envFilePath = resolve(process.cwd(), ".env.local");
   if (!existsSync(envFilePath)) return;
@@ -167,6 +173,45 @@ async function main() {
        limit 50`,
       [walletAddress, chainId],
     );
+    const governanceKindCounts = await client.query<{
+      kind: string | null;
+      count: string;
+    }>(
+      `select row_json->>'kind' as kind, count(*)::text as count
+       from engine_v2_read_model_rows
+       where wallet_address = $1
+         and chain_id = $2
+         and surface = 'governance'
+       group by row_json->>'kind'
+       order by row_json->>'kind'`,
+      [walletAddress, chainId],
+    );
+    const activeLockRowsMissingAmounts = await client.query<{
+      row_key: string;
+      lock_status: string | null;
+      locked_aero_amount: string | null;
+      ve_aero_exposure: string | null;
+      reason_codes: string[] | null;
+    }>(
+      `select row_key,
+              row_json #>> '{lockPanel,status}' as lock_status,
+              row_json #>> '{lockPanel,lockedAeroAmount}' as locked_aero_amount,
+              row_json #>> '{lockPanel,veAeroExposure}' as ve_aero_exposure,
+              coalesce(array(select jsonb_array_elements_text(row_json #> '{lockPanel,reasonCodes}')), '{}') as reason_codes
+       from engine_v2_read_model_rows
+       where wallet_address = $1
+         and chain_id = $2
+         and surface = 'governance'
+         and row_json->>'kind' = 'lock'
+         and coalesce(row_json #>> '{lockPanel,status}', '') not in ('withdrawn', 'closed')
+         and (
+           nullif(row_json #>> '{lockPanel,lockedAeroAmount}', '') is null
+           or nullif(row_json #>> '{lockPanel,veAeroExposure}', '') is null
+         )
+       order by row_key
+       limit 25`,
+      [walletAddress, chainId],
+    );
 
     for (const row of phishingReward.rows) {
       if (row.resolution_status !== "excluded") {
@@ -190,8 +235,28 @@ async function main() {
       }
     }
 
+    const readModelKindCounts = Object.fromEntries(
+      governanceKindCounts.rows.map((row) => [row.kind ?? "unknown", Number(row.count)]),
+    );
+    const undocumentedActiveLockRowsMissingAmounts = activeLockRowsMissingAmounts.rows.filter((row) => (
+      !Array.isArray(row.reason_codes) || !row.reason_codes.includes("missingGovernanceCurrentState")
+    ));
+    const baselineChecks: CheckResult[] = [
+      {
+        name: "engine_v2_governance_lock_rows_document_missing_current_amounts",
+        passed: undocumentedActiveLockRowsMissingAmounts.length === 0,
+        details: activeLockRowsMissingAmounts.rows,
+      },
+      {
+        name: "engine_v2_governance_epoch_rows_exist_when_events_exist",
+        passed: (readModelKindCounts.event ?? 0) === 0 || (readModelKindCounts.epoch ?? 0) > 0,
+        details: readModelKindCounts,
+      },
+    ];
+    const failedBaselineChecks = baselineChecks.filter((check) => !check.passed);
+
     console.log(JSON.stringify({
-      ok: true,
+      ok: failedBaselineChecks.length === 0,
       walletAddress,
       chainId,
       repairedPhishingAirdropRows: repairedPhishingAirdropRows.length,
@@ -199,7 +264,13 @@ async function main() {
       phishingAirdropRowsChecked: phishingReward.rows.length,
       governanceGapEventDetailsChecked: governanceGapEvents.rows.length,
       governanceGapRewardDetailsChecked: governanceGapRewards.rows.length,
+      readModelKindCounts,
+      baselineChecks,
     }, null, 2));
+
+    if (failedBaselineChecks.length > 0) {
+      process.exitCode = 1;
+    }
   } finally {
     await client.end();
   }

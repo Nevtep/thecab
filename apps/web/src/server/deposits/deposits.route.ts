@@ -1,6 +1,7 @@
-import { cookies } from "next/headers";
 import { z } from "zod";
 
+import { assertOpaqueEntityId, normalizeOpaqueEntityId } from "@/analysis/opaqueEntityId";
+import { readAuthenticatedWalletAddress as readRequestWalletAddress } from "@/server/auth/walletAuth";
 import { assertSupportedChain, SUPPORTED_CHAIN_ID } from "@/server/chains";
 import {
   DEPOSITS_SORT_DIRECTION_VALUES,
@@ -22,8 +23,8 @@ const dayString = z.string().regex(DAY_PATTERN, "INVALID_DAY_FORMAT");
 const depositsListQuerySchema = z.object({
   chainId: z.coerce.number().int().positive().default(SUPPORTED_CHAIN_ID),
   status: z.enum(DEPOSITS_STATUS_FILTER_VALUES).default("all"),
-  poolId: z.string().trim().uuid().optional(),
-  pool: z.string().trim().uuid().optional(),
+  poolId: z.string().trim().optional(),
+  pool: z.string().trim().optional(),
   startDayUtc: dayString.optional(),
   from: dayString.optional(),
   endDayUtc: dayString.optional(),
@@ -36,12 +37,7 @@ const depositsListQuerySchema = z.object({
 });
 
 async function readAuthenticatedWalletAddress() {
-  const cookieStore = await cookies();
-  const authenticatedAddress = cookieStore.get("cab_authenticated_address")?.value?.toLowerCase() ?? null;
-  if (!authenticatedAddress) {
-    throw new Error("DEPOSITS_REQUEST_FAILED:UNAUTHORIZED");
-  }
-  return authenticatedAddress;
+  return readRequestWalletAddress({ unauthorizedMessage: "DEPOSITS_REQUEST_FAILED:UNAUTHORIZED" });
 }
 
 function clampDateRange(start: string | null, end: string | null) {
@@ -89,7 +85,7 @@ export function normalizeDepositsListQueryParams(searchParams: URLSearchParams):
   return {
     chainId: parsed.chainId,
     status: parsed.status,
-    poolId: parsed.pool ?? parsed.poolId ?? null,
+    poolId: normalizeOpaqueEntityId(parsed.pool ?? parsed.poolId ?? null),
     startDayUtc: parsed.from ?? parsed.startDayUtc ?? null,
     endDayUtc: parsed.to ?? parsed.endDayUtc ?? null,
     returnSign: parsed.returnSign === "any" ? "all" : parsed.returnSign,
@@ -120,13 +116,9 @@ export function normalizeDepositDetailQueryParams(searchParams: URLSearchParams,
   });
 
   assertSupportedChain(parsed.chainId);
-  if (!z.string().uuid().safeParse(depositId).success) {
-    throw new Error("DEPOSITS_REQUEST_FAILED:INVALID_PAYLOAD");
-  }
-
   return {
     chainId: parsed.chainId,
-    depositId,
+    depositId: assertOpaqueEntityId(depositId, "DEPOSITS_REQUEST_FAILED:INVALID_PAYLOAD"),
   };
 }
 

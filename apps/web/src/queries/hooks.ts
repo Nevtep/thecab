@@ -199,7 +199,7 @@ export function useDepositsListQuery(
 export function useDepositDetailQuery(chainId: number, depositId: string) {
   return useQuery({
     queryKey: queryKeys.depositDetail(chainId, depositId),
-    queryFn: () => apiClient(`/api/deposits/${depositId}?chainId=${chainId}`),
+    queryFn: () => apiClient(`/api/deposits/${encodeURIComponent(depositId)}?chainId=${chainId}`),
     enabled: false,
   });
 }
@@ -211,7 +211,7 @@ export function useDepositDetailViewQuery(
   return useQuery<DepositDetailResponse>({
     queryKey: queryKeys.depositDetail(input.chainId, input.depositId ?? ""),
     queryFn: () =>
-      apiClient<DepositDetailResponse>(`/api/deposits/${input.depositId}?chainId=${input.chainId}`),
+      apiClient<DepositDetailResponse>(`/api/deposits/${encodeURIComponent(input.depositId ?? "")}?chainId=${input.chainId}`),
     enabled:
       (options?.enabled ?? true) && Boolean(input.walletAddress) && Boolean(input.depositId),
   });

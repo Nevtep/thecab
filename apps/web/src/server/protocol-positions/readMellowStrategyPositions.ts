@@ -624,6 +624,8 @@ export async function readMellowStrategyPositions(input: {
         valueUpdatedAt: pickPriceTimestamp(price0?.pricedAt ?? null, price1?.pricedAt ?? null) ?? now.toISOString(),
         primaryTokenSymbol,
         secondaryTokenSymbol,
+        primaryTokenAddress: state.token0Address,
+        secondaryTokenAddress: state.token1Address,
         primaryTokenAmount,
         secondaryTokenAmount,
         poolLabel:

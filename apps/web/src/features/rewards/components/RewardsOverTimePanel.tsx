@@ -21,7 +21,7 @@ export function RewardsOverTimePanel({ viewModel, labels }: Props) {
   const chartData = viewModel.overTime.buckets.map((bucket) => ({
     timestamp: bucket.bucketStart,
     rewardValueUsd: Number(bucket.claimedValueUsd),
-    rewardReturnPct: bucket.estimatedRewardReturnPct === null ? null : Number(bucket.estimatedRewardReturnPct),
+    cumulativeRewardValueUsd: Number(bucket.cumulativeClaimedValueUsd),
     rewardEventCount: bucket.rewardEventCount,
   }));
   const subtitle = `${labels.coverage}: ${viewModel.overTime.coveragePercent}%`;
@@ -34,7 +34,7 @@ export function RewardsOverTimePanel({ viewModel, labels }: Props) {
       notice={notice}
       data={chartData}
       valueFormatter={labels.formatUsd}
-      percentFormatter={labels.formatPercent}
+      cumulativeFormatter={labels.formatUsd}
       countFormatter={labels.formatCount}
     />
   );

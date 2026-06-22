@@ -8,8 +8,10 @@ import {
   serializeStrategiesListUrlState,
 } from "@/features/strategies/strategies.urlState";
 
-const poolId = "123e4567-e89b-12d3-a456-426614174000";
-const selectedStrategyId = "123e4567-e89b-12d3-a456-426614174111";
+const poolId = "8453:0x70acdf2ad0bf2402c957154f944c19ef4e1cbae1";
+const selectedStrategyId = "8453:0xcd975e6a5f55137755487f0918b8ca74acce7925";
+const encodedPoolId = encodeURIComponent(poolId);
+const encodedSelectedStrategyId = encodeURIComponent(selectedStrategyId);
 
 test("parse and serialize strategies URL state round-trip all list controls", () => {
   const state = parseStrategiesListUrlState(new URLSearchParams(
@@ -30,13 +32,13 @@ test("parse and serialize strategies URL state round-trip all list controls", ()
   });
   assert.equal(
     serializeStrategiesListUrlState(state),
-    `status=closed&protocol=all&pool=${poolId}&coverage=partial&returnSign=negative&search=cbBTC&sort=return_asc&page=2&pageSize=25&selectedStrategyId=${selectedStrategyId}`,
+    `status=closed&protocol=all&pool=${encodedPoolId}&coverage=partial&returnSign=negative&search=cbBTC&sort=return_asc&page=2&pageSize=25&selectedStrategyId=${encodedSelectedStrategyId}`,
   );
 });
 
 test("parseStrategiesListUrlState drops invalid query values", () => {
   const state = parseStrategiesListUrlState(new URLSearchParams(
-    "status=weird&protocol=bad&pool=not-a-uuid&coverage=nope&returnSign=no&page=99999&pageSize=13&selectedStrategyId=nope",
+    "status=weird&protocol=bad&pool=bad%2Fpool&coverage=nope&returnSign=no&page=99999&pageSize=13&selectedStrategyId=bad%2Fstrategy",
   ));
 
   assert.deepEqual(state, {
@@ -90,6 +92,6 @@ test("buildStrategiesApiQueryString emits explicit DB request controls", () => {
 
   assert.equal(
     query,
-    `chainId=8453&status=all&protocol=all&pool=${poolId}&coverage=unknown&returnSign=positive&search=aero&sort=coverage_asc&page=3&pageSize=50&selectedStrategyId=${selectedStrategyId}`,
+    `chainId=8453&status=all&protocol=all&pool=${encodedPoolId}&coverage=unknown&returnSign=positive&search=aero&sort=coverage_asc&page=3&pageSize=50&selectedStrategyId=${encodedSelectedStrategyId}`,
   );
 });

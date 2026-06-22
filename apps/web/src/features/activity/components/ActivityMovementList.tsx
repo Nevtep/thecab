@@ -38,7 +38,7 @@ export function ActivityMovementList({ chainId, movements, labels }: Props) {
             />
             <CabStack gap="$1" alignItems="flex-end" minWidth={0}>
               <CabText variant="mono" fontSize={12}>
-                {movement.tokenSymbol ?? movement.tokenAddress ?? ""} {labels.formatAmount(movement.amountRaw)}
+                {movement.tokenSymbol ?? movement.tokenAddress ?? ""} {movement.amountFormatted ?? labels.formatAmount(movement.amountRaw)}
               </CabText>
               {movement.amountUsd ? (
                 <CabText variant="caption" fontSize={11} color={cabColors.text.secondary}>

@@ -146,12 +146,17 @@ export function ActivityComponent(input: Props) {
             labels={{
               timelineTitle: t("activity:charts.timelineTitle"),
               timelineSubtitle: t("activity:charts.timelineSubtitle"),
-              coverageTitle: t("activity:charts.coverageTitle"),
-              coverageSubtitle: t("activity:charts.coverageSubtitle"),
+              actionTitle: t("activity:charts.actionTitle"),
+              actionSubtitle: t("activity:charts.actionSubtitle"),
               totalEvents: t("activity:charts.totalEvents"),
-              getCoverage: (value) => t(`coverage:level.${value}`, { defaultValue: value }),
+              getAction: (value) => t(`activity:actions.${value}`, { defaultValue: value }),
               getSurface: (value) => t(`activity:surfaces.${value}`, { defaultValue: value }),
+              getMovement: (value) => t(`activity:movements.${value}`, { defaultValue: value }),
               formatCount: (value) => formatCompactNumber(value, i18n.language),
+              formatUsd: (value) => {
+                const parsed = Number(value);
+                return Number.isFinite(parsed) ? formatUsd(parsed, i18n.language) : "";
+              },
             }}
           />
           <ActivityEventsTable

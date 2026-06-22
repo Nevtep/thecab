@@ -214,6 +214,9 @@ export function GovernanceComponent(input: Props) {
           <div className={styles.panelGrid}>
             <GovernanceLockPanel
               locks={input.viewModel.locks}
+              selectedLockId={input.urlState.selectedKind === "lock"
+                ? input.urlState.selectedGovernanceId
+                : input.viewModel.locks.primaryLockId}
               labels={{
                 title: t("governance:panels.lock"),
                 empty: t("governance:lock.empty"),
@@ -251,9 +254,15 @@ export function GovernanceComponent(input: Props) {
                 formatAmount: (value) => formatAmount(value, i18n.language, unavailable, 2),
                 formatUsd: (value) => formatCurrency(value, i18n.language, unavailable),
               }}
+              onSelectLock={(lockId) => input.onStateChange({
+                ...input.urlState,
+                selectedKind: "lock",
+                selectedGovernanceId: lockId,
+              })}
             />
             <GovernanceEpochTimeline
               epochs={input.viewModel.epochTimeline.epochs}
+              selectedEpochId={input.urlState.selectedKind === "epoch" ? input.urlState.selectedGovernanceId : null}
               labels={{
                 title: t("governance:panels.timeline"),
                 empty: t("governance:timeline.empty"),
@@ -271,6 +280,11 @@ export function GovernanceComponent(input: Props) {
                 unavailable,
                 formatUsd: (value) => formatCurrency(value, i18n.language, unavailable),
               }}
+              onSelectEpoch={(epochId) => input.onStateChange({
+                ...input.urlState,
+                selectedKind: "epoch",
+                selectedGovernanceId: epochId,
+              })}
             />
           </div>
 

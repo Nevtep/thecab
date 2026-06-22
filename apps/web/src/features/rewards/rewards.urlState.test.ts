@@ -37,7 +37,7 @@ test("parse and serialize rewards URL state round-trips core filters and selecti
 });
 
 test("parseRewardsUrlState normalizes invalid values to safe defaults", () => {
-  const state = parseRewardsUrlState(new URLSearchParams("datePreset=nope&source=bad&pool=no&coverage=maybe&page=-1&pageSize=13"));
+  const state = parseRewardsUrlState(new URLSearchParams("datePreset=nope&source=bad&pool=no/path&coverage=maybe&page=-1&pageSize=13"));
   assert.equal(state.datePreset, "all");
   assert.equal(state.source, "all");
   assert.equal(state.poolId, null);

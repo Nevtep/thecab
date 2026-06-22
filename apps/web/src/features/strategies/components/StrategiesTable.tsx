@@ -7,7 +7,6 @@ import {
   CabBadge,
   DataTable,
   DataTablePercentCell,
-  DataTableRowActionCell,
   DataTableStatusCell,
   DataTableValueCell,
 } from "@/design-system";
@@ -28,7 +27,6 @@ type StrategiesTableProps = {
     result: string;
     apr: string;
     coverage: string;
-    select: string;
   };
   getCoverageLabel: (coverage: StrategyRowViewModel["coverageStatus"]) => string;
   onSelect: (strategyExposureId: string) => void;
@@ -110,19 +108,6 @@ export function StrategiesTable({ items, loading = false, labels, getCoverageLab
           <CabBadge size="sm" tone={row.original.coverageStatus === "full" ? "success" : "warning"}>
             {getCoverageLabel(row.original.coverageStatus)}
           </CabBadge>
-        ),
-      }),
-      columnHelper.display({
-        id: "select",
-        header: () => labels.select,
-        enableSorting: false,
-        meta: { align: "center" },
-        cell: ({ row }) => (
-          <DataTableRowActionCell
-            label={labels.select}
-            tone="secondary"
-            onPress={() => onSelect(row.original.strategyExposureId)}
-          />
         ),
       }),
     ];

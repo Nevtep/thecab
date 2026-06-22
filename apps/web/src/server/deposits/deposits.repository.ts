@@ -1,14 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
-
 import { engineV2ReadModelsEnabled, readEngineV2SurfaceRows } from "@/server/analysis/engine-v2/materializers";
-import { getDb } from "@/server/db/client";
-import {
-  depositLifecycleEvents,
-  depositPerformanceDecompositions,
-  depositWalletSummaries,
-  pools,
-  strategyExposures,
-} from "@/server/db/schema";
 import type {
   DepositDetailView,
   DepositLifecycleEventView,
@@ -16,21 +6,6 @@ import type {
   DepositPerformanceDecompositionView,
   DepositSummaryView,
 } from "@/server/deposits/deposits.types";
-
-function hasRichEngineV2DepositRow(row: Partial<DepositDetailView>) {
-  return Boolean(
-    (row.poolLabel && row.poolId && row.poolLabel !== row.poolId)
-      || row.token0Symbol
-      || row.token1Symbol
-      || row.coveredStartDayUtc
-      || row.coveredEndDayUtc
-      || row.tickLower !== null
-      || row.tickUpper !== null
-      || row.rangeLowerPrice !== null
-      || row.rangeUpperPrice !== null
-      || (Array.isArray(row.lifecycle) && row.lifecycle.length > 0),
-  );
-}
 
 function asNumber(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -386,61 +361,14 @@ export async function findDepositSummaries(input: {
   walletAddress: string;
   chainId: number;
 }): Promise<DepositSummaryView[]> {
+  if (!engineV2ReadModelsEnabled()) return [];
+
   const engineV2Rows = await readEngineV2SurfaceRows<DepositSummaryView>({
     chainId: input.chainId,
     walletAddress: input.walletAddress,
     surface: "deposits",
   });
-  if (engineV2Rows?.some((row) => hasRichEngineV2DepositRow(row))) {
-    return engineV2Rows.map((row) => normalizeEngineV2DepositRow(row));
-  }
-
-  const db = await getDb();
-  const rows = await db
-    .select({
-      depositId: depositWalletSummaries.depositId,
-      poolId: depositWalletSummaries.poolId,
-      poolLabel: pools.label,
-      positionLabel: depositWalletSummaries.positionLabel,
-      poolKind: depositWalletSummaries.poolKind,
-      feeTierBps: depositWalletSummaries.feeTierBps,
-      tokenId: depositWalletSummaries.tokenId,
-      token0Symbol: depositWalletSummaries.token0Symbol,
-      token1Symbol: depositWalletSummaries.token1Symbol,
-      status: depositWalletSummaries.status,
-      openedAt: depositWalletSummaries.openedAt,
-      closedAt: depositWalletSummaries.closedAt,
-      openedByTransferIn: depositWalletSummaries.openedByTransferIn,
-      openedValueUsd: depositWalletSummaries.openedValueUsd,
-      currentValueUsd: depositWalletSummaries.currentValueUsd,
-      capitalEnteredUsd: depositWalletSummaries.capitalEnteredUsd,
-      capitalWithdrawnUsd: depositWalletSummaries.capitalWithdrawnUsd,
-      totalRewardsUsd: depositWalletSummaries.totalRewardsUsd,
-      realizedPnlUsd: depositWalletSummaries.realizedPnlUsd,
-      unrealizedPnlUsd: depositWalletSummaries.unrealizedPnlUsd,
-      totalReturnUsd: depositWalletSummaries.totalReturnUsd,
-      totalReturnPct: depositWalletSummaries.totalReturnPct,
-      estimatedAnnualizedReturnPct: depositWalletSummaries.estimatedAnnualizedReturnPct,
-      isInRange: depositWalletSummaries.isInRange,
-      rangeLowerPrice: depositWalletSummaries.rangeLowerPrice,
-      rangeUpperPrice: depositWalletSummaries.rangeUpperPrice,
-      coverageStatus: depositWalletSummaries.coverageStatus,
-      confidence: depositWalletSummaries.confidence,
-      coverageReasonCodes: depositWalletSummaries.coverageReasonCodes,
-      coveredStartDayUtc: depositWalletSummaries.coveredStartDayUtc,
-      coveredEndDayUtc: depositWalletSummaries.coveredEndDayUtc,
-      metadataJson: depositWalletSummaries.metadataJson,
-    })
-    .from(depositWalletSummaries)
-    .innerJoin(pools, eq(pools.id, depositWalletSummaries.poolId))
-    .where(
-      and(
-        eq(depositWalletSummaries.chainId, input.chainId),
-        eq(depositWalletSummaries.walletAddress, input.walletAddress),
-      ),
-    );
-
-  return rows.map((row) => mapDepositSummaryRow(row));
+  return (engineV2Rows ?? []).map((row) => normalizeEngineV2DepositRow(row));
 }
 
 export async function findDepositDetail(input: {
@@ -448,116 +376,27 @@ export async function findDepositDetail(input: {
   chainId: number;
   depositId: string;
 }): Promise<DepositDetailView | null> {
+  if (!engineV2ReadModelsEnabled()) return null;
+
   const engineV2Rows = await readEngineV2SurfaceRows<DepositDetailView>({
     chainId: input.chainId,
     walletAddress: input.walletAddress,
     surface: "deposits",
   });
   const engineV2Detail = engineV2Rows?.find((row) => row.depositId === input.depositId);
-  if (engineV2Detail && hasRichEngineV2DepositRow(engineV2Detail)) return normalizeEngineV2DepositRow(engineV2Detail);
-
-  const db = await getDb();
-  const rows = await db
-    .select({
-      depositId: depositWalletSummaries.depositId,
-      poolId: depositWalletSummaries.poolId,
-      poolLabel: pools.label,
-      positionLabel: depositWalletSummaries.positionLabel,
-      poolKind: depositWalletSummaries.poolKind,
-      feeTierBps: depositWalletSummaries.feeTierBps,
-      tokenId: depositWalletSummaries.tokenId,
-      token0Address: depositWalletSummaries.token0Address,
-      token0Symbol: depositWalletSummaries.token0Symbol,
-      token1Address: depositWalletSummaries.token1Address,
-      token1Symbol: depositWalletSummaries.token1Symbol,
-      status: depositWalletSummaries.status,
-      openedAt: depositWalletSummaries.openedAt,
-      closedAt: depositWalletSummaries.closedAt,
-      openedByTransferIn: depositWalletSummaries.openedByTransferIn,
-      openedValueUsd: depositWalletSummaries.openedValueUsd,
-      currentValueUsd: depositWalletSummaries.currentValueUsd,
-      capitalEnteredUsd: depositWalletSummaries.capitalEnteredUsd,
-      capitalWithdrawnUsd: depositWalletSummaries.capitalWithdrawnUsd,
-      totalRewardsUsd: depositWalletSummaries.totalRewardsUsd,
-      realizedPnlUsd: depositWalletSummaries.realizedPnlUsd,
-      unrealizedPnlUsd: depositWalletSummaries.unrealizedPnlUsd,
-      totalReturnUsd: depositWalletSummaries.totalReturnUsd,
-      totalReturnPct: depositWalletSummaries.totalReturnPct,
-      estimatedAnnualizedReturnPct: depositWalletSummaries.estimatedAnnualizedReturnPct,
-      tickLower: depositWalletSummaries.tickLower,
-      tickUpper: depositWalletSummaries.tickUpper,
-      isInRange: depositWalletSummaries.isInRange,
-      rangeLowerPrice: depositWalletSummaries.rangeLowerPrice,
-      rangeUpperPrice: depositWalletSummaries.rangeUpperPrice,
-      coverageStatus: depositWalletSummaries.coverageStatus,
-      confidence: depositWalletSummaries.confidence,
-      coverageReasonCodes: depositWalletSummaries.coverageReasonCodes,
-      coveredStartDayUtc: depositWalletSummaries.coveredStartDayUtc,
-      coveredEndDayUtc: depositWalletSummaries.coveredEndDayUtc,
-      mellowStrategyCrossLinkId: depositWalletSummaries.mellowStrategyCrossLinkId,
-      metadataJson: depositWalletSummaries.metadataJson,
-    })
-    .from(depositWalletSummaries)
-    .innerJoin(pools, eq(pools.id, depositWalletSummaries.poolId))
-    .where(
-      and(
-        eq(depositWalletSummaries.chainId, input.chainId),
-        eq(depositWalletSummaries.walletAddress, input.walletAddress),
-        eq(depositWalletSummaries.depositId, input.depositId),
-      ),
-    )
-    .limit(1);
-
-  const row = rows[0];
-  if (!row) return null;
-
-  const [decompositionRows, lifecycleRows] = await Promise.all([
-    db
-      .select()
-      .from(depositPerformanceDecompositions)
-      .where(
-        and(
-          eq(depositPerformanceDecompositions.chainId, input.chainId),
-          eq(depositPerformanceDecompositions.walletAddress, input.walletAddress),
-          eq(depositPerformanceDecompositions.depositId, input.depositId),
-        ),
-      )
-      .limit(1),
-    db
-      .select()
-      .from(depositLifecycleEvents)
-      .where(
-        and(
-          eq(depositLifecycleEvents.chainId, input.chainId),
-          eq(depositLifecycleEvents.walletAddress, input.walletAddress),
-          eq(depositLifecycleEvents.depositId, input.depositId),
-        ),
-      )
-      .orderBy(asc(depositLifecycleEvents.sequenceIndex)),
-  ]);
-
-  return mapDepositDetailRows({
-    row,
-    decompositionRow: decompositionRows[0],
-    lifecycleRows,
-  });
+  return engineV2Detail ? normalizeEngineV2DepositRow(engineV2Detail) : null;
 }
 
 export async function hasAutomatedStrategyExposure(input: {
   walletAddress: string;
   chainId: number;
 }): Promise<boolean> {
-  const db = await getDb();
-  const rows = await db
-    .select({ id: strategyExposures.id })
-    .from(strategyExposures)
-    .where(
-      and(
-        eq(strategyExposures.chainId, input.chainId),
-        eq(strategyExposures.walletAddress, input.walletAddress),
-      ),
-    )
-    .limit(1);
+  if (!engineV2ReadModelsEnabled()) return false;
 
-  return rows.length > 0;
+  const rows = await readEngineV2SurfaceRows<{ status?: string }>({
+    chainId: input.chainId,
+    walletAddress: input.walletAddress,
+    surface: "strategies",
+  });
+  return (rows ?? []).some((row) => row.status === "active");
 }

@@ -72,6 +72,7 @@ function reward(overrides: Partial<RewardEventRow> = {}): RewardEventRow {
 
 function repository(rows: RewardEventRow[]): RewardsRepositoryResult {
   return {
+    summaryRows: rows,
     allRows: rows,
     rows,
     totalRows: rows.length,

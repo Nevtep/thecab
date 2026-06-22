@@ -13,7 +13,7 @@
     "refresh": "Refresh"
   },
   "panels": {
-    "lock": "Lock status",
+    "lock": "Lock register",
     "timeline": "Vote timeline by epoch",
     "rewards": "Governance rewards",
     "breakdown": "Reward type breakdown"
@@ -160,7 +160,7 @@
   },
   "detail": {
     "title": "Selected governance detail",
-    "empty": "Select a governance reward or event to inspect classification context.",
+    "empty": "Select a lock, governance reward, event, or epoch to inspect classification context.",
     "loading": "Loading selected governance detail...",
     "actionSummary": "Action summary",
     "transaction": "Transaction",
@@ -184,7 +184,8 @@
     "noEvidenceSources": "No source evidence references were materialized for this selection.",
     "amount": "Amount",
     "valueUsd": "USD value",
-    "epochSummary": "Epoch summary"
+    "epochSummary": "Epoch summary",
+    "lockSummary": "Lock summary"
   },
   "notes": {
     "explicitPoolContributionNoDoubleCount": "Same reward identity is counted once and linked to this pool by explicit evidence.",

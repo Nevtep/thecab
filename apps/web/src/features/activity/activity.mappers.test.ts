@@ -14,6 +14,9 @@ function response(overrides: Partial<ActivityViewModel> = {}): ActivityViewModel
       totalEvents: 2,
       interpretedEvents: 1,
       totalValueUsd: "100.00",
+      walletCapitalInUsd: "0.00",
+      walletCapitalOutUsd: "0.00",
+      protocolVolumeUsd: "100.00",
       excludedEvents: 1,
       unresolvedEvents: 0,
       coveragePercent: "50.0",
@@ -21,8 +24,10 @@ function response(overrides: Partial<ActivityViewModel> = {}): ActivityViewModel
     kpis: [],
     charts: {
       timeline: [],
+      actionBreakdown: [],
       coverageBreakdown: [],
       surfaceBreakdown: [],
+      movementBreakdown: [],
     },
     events: {
       rows: [
@@ -38,8 +43,8 @@ function response(overrides: Partial<ActivityViewModel> = {}): ActivityViewModel
   };
 }
 
-test("mapActivityResponseToViewModel normalizes wallet and sorts newest activity first", () => {
+test("mapActivityResponseToViewModel normalizes wallet and preserves server row order", () => {
   const viewModel = mapActivityResponseToViewModel(response());
   assert.equal(viewModel.walletAddress, "0xabc0000000000000000000000000000000000000");
-  assert.deepEqual(viewModel.events.rows.map((row) => row.activityId), ["new", "old"]);
+  assert.deepEqual(viewModel.events.rows.map((row) => row.activityId), ["old", "new"]);
 });

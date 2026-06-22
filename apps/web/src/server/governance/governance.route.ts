@@ -1,4 +1,3 @@
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -13,6 +12,7 @@ import {
 } from "@/server/governance/governance.contract";
 import { getGovernanceDataView } from "@/server/governance/governance.service";
 import type { GovernanceRequest } from "@/server/governance/governance.types";
+import { readAuthenticatedWalletAddress as readRequestWalletAddress } from "@/server/auth/walletAuth";
 import { assertSupportedChain, SUPPORTED_CHAIN_ID } from "@/server/chains";
 
 const RESPONSE_HEADERS = {
@@ -38,7 +38,7 @@ const governanceQuerySchema = z.object({
   tokenAddress: nullableAddress,
   coverage: z.enum(GOVERNANCE_COVERAGE_STATES).nullable().default(null),
   confidence: z.enum(GOVERNANCE_CONFIDENCE_STATES).nullable().default(null),
-  selectedKind: z.enum(["event", "reward", "epoch", "metric"]).nullable().default(null),
+  selectedKind: z.enum(["lock", "event", "reward", "epoch", "metric"]).nullable().default(null),
   selectedGovernanceId: nullableSelectionId,
   sort: z.enum(GOVERNANCE_SORT_KEYS).default("occurredAt"),
   direction: z.enum(["asc", "desc"]).default("desc"),
@@ -76,14 +76,7 @@ const allowedParams = new Set([
 ]);
 
 async function readAuthenticatedWalletAddress() {
-  const cookieStore = await cookies();
-  const authenticatedAddress = cookieStore.get("cab_authenticated_address")?.value?.toLowerCase() ?? null;
-
-  if (!authenticatedAddress) {
-    throw new Error("GOVERNANCE_REQUEST_FAILED:UNAUTHENTICATED_WALLET");
-  }
-
-  return authenticatedAddress;
+  return readRequestWalletAddress({ unauthorizedMessage: "GOVERNANCE_REQUEST_FAILED:UNAUTHENTICATED_WALLET" });
 }
 
 export function normalizeGovernanceQueryParams(searchParams: URLSearchParams) {

@@ -7,6 +7,7 @@ import styles from "@/features/governance/GovernanceWorkspace.module.css";
 
 type Props = {
   epochs: GovernanceViewModel["epochTimeline"]["epochs"];
+  selectedEpochId: string | null;
   labels: {
     title: string;
     empty: string;
@@ -24,6 +25,7 @@ type Props = {
     unavailable: string;
     formatUsd: (value: string | null) => string;
   };
+  onSelectEpoch: (epochId: string) => void;
 };
 
 function toneForCoverage(coverage: string) {
@@ -33,7 +35,7 @@ function toneForCoverage(coverage: string) {
   return "neutral" as const;
 }
 
-export function GovernanceEpochTimeline({ epochs, labels }: Props) {
+export function GovernanceEpochTimeline({ epochs, selectedEpochId, labels, onSelectEpoch }: Props) {
   return (
     <CabCard density="compact">
       <CabStack gap="$3">
@@ -47,7 +49,13 @@ export function GovernanceEpochTimeline({ epochs, labels }: Props) {
         ) : (
           <div className={styles.epochList}>
             {epochs.slice(-4).map((epoch) => (
-              <CabCard key={epoch.epochId} density="compact" className={styles.epochCard}>
+              <button
+                key={epoch.epochId}
+                type="button"
+                className={epoch.epochId === selectedEpochId ? `${styles.epochButton} ${styles.epochButtonSelected}` : styles.epochButton}
+                onClick={() => onSelectEpoch(epoch.epochId)}
+              >
+              <CabCard density="compact" className={styles.epochCard}>
                 <CabStack gap="$2">
                   <CabStack row justifyContent="space-between" alignItems="center" gap="$2">
                     <CabText variant="label">{epoch.epochLabel}</CabText>
@@ -82,6 +90,7 @@ export function GovernanceEpochTimeline({ epochs, labels }: Props) {
                   </CabStack>
                 </CabStack>
               </CabCard>
+              </button>
             ))}
           </div>
         )}

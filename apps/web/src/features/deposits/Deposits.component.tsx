@@ -180,7 +180,7 @@ export function DepositsComponent(input: DepositsComponentProps) {
               currentValue: t("deposits:list.kpis.currentValue"),
               totalRewards: t("deposits:list.kpis.totalRewards"),
               weightedAnnualizedReturn: t("deposits:list.kpis.weightedAnnualizedReturn"),
-              capitalDeployed: t("deposits:list.kpis.capitalDeployed"),
+              openPositions: t("deposits:list.kpis.openPositions"),
             }}
           />
           <DepositsFiltersBar

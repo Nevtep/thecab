@@ -111,6 +111,7 @@ export type RewardsOverTimeBucket = {
   claimedValueUsd: string;
   resolvedValueUsd: string;
   unresolvedExcludedValueUsd: string;
+  cumulativeClaimedValueUsd: string;
   estimatedRewardReturnPct: string | null;
   rewardEventCount: number;
   claimMarkers: Array<{ rewardEventId: string; tokenSymbol: string | null }>;
@@ -158,8 +159,11 @@ export type RewardEventRow = {
     address: string | null;
     symbol: string | null;
     iconUrl: string | null;
+    decimals?: number | null;
   };
   tokenAmount: string | null;
+  tokenAmountRaw?: string | null;
+  tokenAmountFormatted?: string | null;
   usdValueAtClaim: string | null;
   owner: RewardOwner;
   sourceSurface: string;

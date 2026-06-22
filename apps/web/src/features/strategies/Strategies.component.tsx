@@ -86,7 +86,6 @@ export function StrategiesComponent(input: StrategiesComponentProps) {
           activeCount: t("strategies:kpis.activeCount"),
           claimedRewards: t("strategies:kpis.claimedRewards"),
           totalReturn: t("strategies:kpis.totalReturn"),
-          protocolCoverage: t("strategies:kpis.protocolCoverage"),
           coverage: t(getStrategyCoverageLabelKey(input.viewModel.kpis.coverageStatus)),
         }}
       />
@@ -144,7 +143,6 @@ export function StrategiesComponent(input: StrategiesComponentProps) {
               result: t("strategies:table.columns.result"),
               apr: t("strategies:table.columns.estimatedApr"),
               coverage: t("strategies:table.columns.coverage"),
-              select: t("strategies:actions.openStrategy"),
             }}
             getCoverageLabel={(coverage) => t(getStrategyCoverageLabelKey(coverage))}
             onSelect={input.onSelectStrategy}

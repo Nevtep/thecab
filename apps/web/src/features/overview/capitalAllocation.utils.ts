@@ -8,6 +8,7 @@ export type DistributionSlice = OverviewViewModel["distribution"]["slices"][numb
 
 export type DistributionCompositionTokenBreakdown = {
   symbol: string;
+  tokenAddress: string | null;
   amount: number;
   estimatedValueUsd: number | null;
   color: string;
@@ -78,7 +79,7 @@ export function getDistributionSliceKey(slice: DistributionSlice) {
 }
 
 export function formatDistributionCompositionToken(
-  token: { symbol: string; amount: number },
+  token: { symbol: string; amount: number; tokenAddress?: string | null },
   locale: string,
   translate: Translate,
 ) {
@@ -124,38 +125,57 @@ export function buildDistributionCompositionBreakdown(
   }
 
   const priceBySymbol = new Map<string, number>();
+  const priceByAddress = new Map<string, number>();
   for (const row of assetRows) {
-    if (!row.symbol || typeof row.priceUsd !== "number" || priceBySymbol.has(row.symbol)) {
+    if (typeof row.priceUsd !== "number") {
       continue;
     }
 
-    priceBySymbol.set(row.symbol, row.priceUsd);
+    if (row.tokenAddress && !priceByAddress.has(row.tokenAddress.toLowerCase())) {
+      priceByAddress.set(row.tokenAddress.toLowerCase(), row.priceUsd);
+    }
+
+    if (row.symbol && !priceBySymbol.has(row.symbol)) {
+      priceBySymbol.set(row.symbol, row.priceUsd);
+    }
   }
 
-  const tokenTotals = new Map<string, { amount: number; estimatedValueUsd: number | null }>();
+  const tokenTotals = new Map<string, {
+    symbol: string;
+    tokenAddress: string | null;
+    amount: number;
+    estimatedValueUsd: number | null;
+  }>();
   for (const entry of slice.composition) {
     for (const token of entry.tokens) {
       if (typeof token.amount !== "number") {
         continue;
       }
 
-      const existingToken = tokenTotals.get(token.symbol);
+      const tokenAddress = token.tokenAddress?.toLowerCase() ?? null;
+      const tokenKey = tokenAddress ?? token.symbol;
+      const existingToken = tokenTotals.get(tokenKey);
       const nextAmount = (existingToken?.amount ?? 0) + token.amount;
-      const tokenPriceUsd = priceBySymbol.get(token.symbol) ?? null;
+      const tokenPriceUsd = tokenAddress
+        ? priceByAddress.get(tokenAddress) ?? priceBySymbol.get(token.symbol) ?? null
+        : priceBySymbol.get(token.symbol) ?? null;
       const nextEstimatedValueUsd = tokenPriceUsd === null
         ? existingToken?.estimatedValueUsd ?? null
         : (existingToken?.estimatedValueUsd ?? 0) + (token.amount * tokenPriceUsd);
 
-      tokenTotals.set(token.symbol, {
+      tokenTotals.set(tokenKey, {
+        symbol: token.symbol,
+        tokenAddress,
         amount: nextAmount,
         estimatedValueUsd: nextEstimatedValueUsd,
       });
     }
   }
 
-  const tokens = Array.from(tokenTotals.entries())
-    .map(([symbol, token], index) => ({
-      symbol,
+  const tokens = Array.from(tokenTotals.values())
+    .map((token, index) => ({
+      symbol: token.symbol,
+      tokenAddress: token.tokenAddress,
       amount: token.amount,
       estimatedValueUsd: token.estimatedValueUsd,
       color: getDistributionCompositionColor(index),
@@ -190,6 +210,7 @@ export function buildIdleAssetBreakdown(
   const tokens = assetRows
     .map((row, index) => ({
       symbol: row.symbol,
+      tokenAddress: row.tokenAddress,
       amount: Number.parseFloat(row.balance),
       estimatedValueUsd: row.valueUsd,
       color: getDistributionCompositionColor(index),

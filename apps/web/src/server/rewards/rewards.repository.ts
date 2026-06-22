@@ -5,6 +5,7 @@ import { engineV2ReadModelsEnabled, readEngineV2SurfaceRows } from "@/server/ana
 import { getDb } from "@/server/db/client";
 import { performanceSnapshots, pools, rewardEvents } from "@/server/db/schema";
 import { getExplorerTxUrl, getSupportedChain } from "@/server/chains";
+import { formatRawTokenAmount } from "@/server/tokens/token-amounts";
 import type {
   RewardEventRow,
   RewardsCoverageState,
@@ -34,6 +35,7 @@ export type RewardEventDbRow = {
 };
 
 export type RewardsRepositoryResult = {
+  summaryRows: RewardEventRow[];
   allRows: RewardEventRow[];
   rows: RewardEventRow[];
   totalRows: number;
@@ -70,6 +72,15 @@ function asNumber(value: unknown) {
   if (typeof value === "string" && value.trim().length > 0) {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function asInteger(value: unknown) {
+  if (typeof value === "number" && Number.isInteger(value)) return value;
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    return Number.isInteger(parsed) ? parsed : null;
   }
   return null;
 }
@@ -193,6 +204,13 @@ export function mapRewardEventRow(row: RewardEventDbRow): RewardEventRow {
   const metadata = asRecord(row.metadataJson);
   const owner = resolveOwner(row);
   const coverageState = normalizeCoverage(row);
+  const tokenDecimals = asInteger(metadata.tokenDecimals) ?? asInteger(metadata.decimals);
+  const tokenAmountFormatted = asString(metadata.amountFormatted)
+    ?? formatRawTokenAmount({
+      amountRaw: row.amountRaw,
+      tokenDecimals,
+      assetType: asString(metadata.assetType) ?? "erc20",
+    });
   const sourceSurface =
     asString(metadata.sourceSurface) ??
     asString(metadata.surfaceKind) ??
@@ -218,8 +236,11 @@ export function mapRewardEventRow(row: RewardEventDbRow): RewardEventRow {
       address: row.tokenAddress,
       symbol: resolveTokenSymbol(metadata, row.tokenAddress),
       iconUrl: asString(metadata.tokenIconUrl),
+      decimals: tokenDecimals,
     },
-    tokenAmount: asString(metadata.amountFormatted) ?? row.amountRaw,
+    tokenAmount: tokenAmountFormatted ?? row.amountRaw,
+    tokenAmountRaw: row.amountRaw,
+    tokenAmountFormatted,
     usdValueAtClaim: row.amountUsd,
     owner,
     sourceSurface,
@@ -263,6 +284,20 @@ export function normalizeEngineV2RewardRow(row: Partial<RewardEventRow> & Record
   const poolContribution = asString(row.poolContribution);
   const coverageStatus = asString(row.coverageStatus);
   const confidence = asString(row.confidence);
+  const tokenRecord = asRecord(row.token);
+  const tokenDecimals = asInteger(row.tokenDecimals)
+    ?? asInteger(row.decimals)
+    ?? asInteger(tokenRecord.decimals);
+  const amountRaw = asString(row.amountRaw)
+    ?? asString(row.tokenAmountRaw)
+    ?? asString(row.tokenAmount);
+  const amountFormatted = asString(row.tokenAmountFormatted)
+    ?? asString(row.amountFormatted)
+    ?? formatRawTokenAmount({
+      amountRaw,
+      tokenDecimals,
+      assetType: asString(row.assetType) ?? "erc20",
+    });
   const rewardDbRow: RewardEventDbRow = {
     rewardEventId: asString(row.rewardId) ?? asString(row.rewardEventId) ?? asString(row.txHash) ?? "engine-v2-reward",
     chainId: typeof row.chainId === "number" ? row.chainId : Number(row.chainId ?? 0),
@@ -276,8 +311,8 @@ export function normalizeEngineV2RewardRow(row: Partial<RewardEventRow> & Record
     poolLabel: asString(row.poolLabel),
     resolutionBasis: ownerStatus && ownerStatus !== "unresolved" ? "engine_v2_explicit_owner" : null,
     resolutionReasonCodes: Array.isArray(row.reasonCodes) ? row.reasonCodes.filter((item): item is string => typeof item === "string") : null,
-    tokenAddress: asString(row.tokenAddress),
-    amountRaw: asString(row.amountRaw),
+    tokenAddress: asString(row.tokenAddress) ?? asString(tokenRecord.address),
+    amountRaw,
     amountUsd: asString(row.amountUsd),
     occurredAt: asString(row.occurredAt) ?? new Date(0).toISOString(),
     resolutionStatus:
@@ -289,7 +324,10 @@ export function normalizeEngineV2RewardRow(row: Partial<RewardEventRow> & Record
             ? "unavailable"
             : "resolved",
     metadataJson: {
-      tokenSymbol: asString(row.tokenSymbol),
+      tokenSymbol: asString(row.tokenSymbol) ?? asString(tokenRecord.symbol),
+      tokenIconUrl: asString(row.tokenIconUrl) ?? asString(tokenRecord.iconUrl),
+      tokenDecimals,
+      amountFormatted,
       sourceSurface: ownerStatus === "governance" ? "governance" : "engine_v2_reward",
       confidence,
       affectsTotals: row.affectsTotals,
@@ -591,6 +629,7 @@ export async function findRewards(input: RewardsRequest): Promise<RewardsReposit
       range: getRewardsDateRange(input),
     });
     return {
+      summaryRows: normalizedRows,
       allRows: filtered,
       rows: filtered.slice(startIndex, startIndex + input.pageSize),
       totalRows: filtered.length,
@@ -600,6 +639,7 @@ export async function findRewards(input: RewardsRequest): Promise<RewardsReposit
   }
   if (engineV2ReadModelsEnabled()) {
     return {
+      summaryRows: [],
       allRows: [],
       rows: [],
       totalRows: 0,
@@ -659,6 +699,7 @@ export async function findRewards(input: RewardsRequest): Promise<RewardsReposit
   const rows = filtered.slice(startIndex, startIndex + input.pageSize);
 
   return {
+    summaryRows: baseRows,
     allRows: filtered,
     rows,
     totalRows: filtered.length,

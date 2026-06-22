@@ -11,6 +11,7 @@ import type { SelectedReward } from "@/features/rewards/rewards.types";
 import styles from "@/features/rewards/RewardsWorkspace.module.css";
 
 type Props = {
+  chainId: number;
   selectedReward: SelectedReward | null;
   loading?: boolean;
   labels: {
@@ -45,7 +46,7 @@ type Props = {
   };
 };
 
-export function SelectedRewardRail({ selectedReward, loading = false, labels }: Props) {
+export function SelectedRewardRail({ chainId, selectedReward, loading = false, labels }: Props) {
   if (loading) {
     return (
       <aside className={styles.rail}>
@@ -69,6 +70,7 @@ export function SelectedRewardRail({ selectedReward, loading = false, labels }: 
         <CabStack row justifyContent="space-between" alignItems="flex-start" gap="$3">
           <CabStack row alignItems="center" gap="$2.5" minWidth={0}>
             <CabTokenIcon
+              chainId={chainId}
               tokenAddress={selectedReward.summary.tokenAddress}
               symbol={selectedReward.summary.tokenSymbol}
               size={44}

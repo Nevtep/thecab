@@ -3,7 +3,8 @@ import test from "node:test";
 
 import { runChronologicalAccounting } from "@/server/analysis/engine-v2/accounting";
 
-import { materializeDepositRows, materializeStrategyRows } from "./dataview-materializers";
+import { materializeDepositRows, materializePoolRows, materializeResidualRows, materializeStrategyRows } from "./dataview-materializers";
+import { materializeAllDataViewRows } from "./index";
 import {
   collectMaterializationPoolIds,
   type EngineV2MaterializationContext,
@@ -135,15 +136,337 @@ test("materializers prefer normalized pool labels and avoid raw pool ids", () =>
   assert.equal((strategyRow?.rowJson as { poolLabel?: string | null }).poolLabel, "WETH / USDC 100");
   assert.equal((strategyRow?.rowJson as { strategyLabel?: string }).strategyLabel, "Mellow WETH / USDC 100");
   assert.equal((unresolvedDepositRow?.rowJson as { poolLabel?: string }).poolLabel, "Unresolved pool");
-});import assert from "node:assert/strict";
-import test from "node:test";
+});
 
-import { runChronologicalAccounting } from "@/server/analysis/engine-v2/accounting";
-import type { EngineV2MaterializationContext } from "@/server/analysis/engine-v2/materializers/load-materialization-context";
+test("materializePoolRows applies same-pool rebalances as capital delta in history", () => {
+  const poolId = "8453:0xpool";
+  const token0 = "0x00000000000000000000000000000000000000aa";
+  const token1 = "0x00000000000000000000000000000000000000bb";
+  const baseEvent = {
+    chainId: 8453,
+    walletAddress: "0x0000000000000000000000000000000000000001",
+    eventFamily: "deposit",
+    coverageStatus: "full",
+    confidence: "high",
+    reasonCodes: [],
+  };
+  const accounting = runChronologicalAccounting({
+    events: [
+      {
+        ...baseEvent,
+        id: "initial-deposit",
+        eventType: "manual_position_created",
+        occurredAt: new Date("2026-01-01T00:00:00.000Z"),
+        txHash: "0xinitial",
+        sequenceIndex: 0,
+        metadataJson: { depositId: "dep-1", tokenId: "1", poolId, valueUsd: "100" },
+        evidenceJson: { movements: [{ direction: "out", tokenAddress: token0, amountRaw: "100", amountUsd: "100" }] },
+      },
+      {
+        ...baseEvent,
+        id: "withdraw-1",
+        eventType: "manual_position_withdraw",
+        occurredAt: new Date("2026-01-02T00:00:00.000Z"),
+        txHash: "0xwithdraw",
+        sequenceIndex: 1,
+        metadataJson: { depositId: "dep-1", tokenId: "1", poolId, valueUsd: "100" },
+        evidenceJson: { movements: [{ direction: "in", tokenAddress: token0, amountRaw: "100", amountUsd: "100" }] },
+      },
+      {
+        ...baseEvent,
+        id: "swap-1",
+        eventType: "swap",
+        eventFamily: "swap",
+        occurredAt: new Date("2026-01-02T00:01:00.000Z"),
+        txHash: "0xswap",
+        sequenceIndex: 2,
+        evidenceJson: {
+          movements: [
+            { direction: "out", tokenAddress: token0, amountRaw: "100", amountUsd: "100" },
+            { direction: "in", tokenAddress: token1, amountRaw: "90", amountUsd: "90" },
+          ],
+        },
+      },
+      {
+        ...baseEvent,
+        id: "redeposit-1",
+        eventType: "manual_position_created",
+        occurredAt: new Date("2026-01-03T00:00:00.000Z"),
+        txHash: "0xredeposit",
+        sequenceIndex: 3,
+        metadataJson: { depositId: "dep-2", tokenId: "2", poolId, valueUsd: "90" },
+        evidenceJson: { movements: [{ direction: "out", tokenAddress: token1, amountRaw: "90", amountUsd: "90" }] },
+      },
+    ],
+  });
 
-import { materializeAllDataViewRows } from "./index";
+  const [poolRow] = materializePoolRows(accounting, buildContext());
+  const pool = poolRow?.rowJson as {
+    history?: { points?: Array<{ dayUtc: string; deployedValueUsd: number; capitalOutUsd: number }> };
+    timeline?: { items?: Array<{ eventType: string; metadataJson?: Record<string, unknown> }> };
+  };
+
+  assert.deepEqual(
+    pool.history?.points?.map((point) => [point.dayUtc, point.deployedValueUsd, point.capitalOutUsd]),
+    [
+      ["2026-01-01", 100, 0],
+      ["2026-01-03", 90, 10],
+    ],
+  );
+  assert.ok(pool.timeline?.items?.some((item) => item.eventType === "rebalance_same_pool"));
+});
+
+test("materializeResidualRows keeps same withdrawal token lots unique by source event", () => {
+  const accounting = {
+    events: [{
+      chainId: 8453,
+      walletAddress: "0x0000000000000000000000000000000000000001",
+    }],
+    residualInventory: [
+      {
+        tokenAddress: "0x00000000000000000000000000000000000000aa",
+        amountRaw: "100",
+        poolId: "8453:0xpool",
+        sourceWithdrawalId: "withdrawal-1",
+        sourceEventId: "event-1",
+        consumedByEventIds: [],
+        valueUsdAtEvent: "1",
+        coverageStatus: "full",
+        confidence: "high",
+        reasonCodes: [],
+      },
+      {
+        tokenAddress: "0x00000000000000000000000000000000000000aa",
+        amountRaw: "200",
+        poolId: "8453:0xpool",
+        sourceWithdrawalId: "withdrawal-1",
+        sourceEventId: "event-2",
+        consumedByEventIds: [],
+        valueUsdAtEvent: "2",
+        coverageStatus: "full",
+        confidence: "high",
+        reasonCodes: [],
+      },
+    ],
+  } as unknown as Parameters<typeof materializeResidualRows>[0];
+
+  const rowKeys = materializeResidualRows(accounting, buildContext()).map((row) => row.rowKey);
+
+  assert.equal(new Set(rowKeys).size, 2);
+  assert.ok(rowKeys.every((rowKey) => rowKey.includes("withdrawal-1")));
+  assert.ok(rowKeys.some((rowKey) => rowKey.includes("event-1")));
+  assert.ok(rowKeys.some((rowKey) => rowKey.includes("event-2")));
+});
+
+test("materializeResidualRows aggregates exact same source token balance identity", () => {
+  const accounting = {
+    events: [{
+      chainId: 8453,
+      walletAddress: "0x0000000000000000000000000000000000000001",
+    }],
+    residualInventory: [
+      {
+        tokenAddress: "0x00000000000000000000000000000000000000aa",
+        amountRaw: "100",
+        poolId: "8453:0xpool",
+        sourceWithdrawalId: "withdrawal-1",
+        sourceEventId: "event-1",
+        consumedByEventIds: ["consume-1"],
+        valueUsdAtEvent: "1.5",
+        coverageStatus: "full",
+        confidence: "high",
+        reasonCodes: ["first_reason"],
+      },
+      {
+        tokenAddress: "0x00000000000000000000000000000000000000aa",
+        amountRaw: "200",
+        poolId: "8453:0xpool",
+        sourceWithdrawalId: "withdrawal-1",
+        sourceEventId: "event-1",
+        consumedByEventIds: ["consume-2"],
+        valueUsdAtEvent: "2.5",
+        coverageStatus: "partial",
+        confidence: "high",
+        reasonCodes: ["second_reason"],
+      },
+    ],
+  } as unknown as Parameters<typeof materializeResidualRows>[0];
+
+  const [row] = materializeResidualRows(accounting, buildContext());
+  const residual = row?.rowJson as {
+    openAmountRaw?: string;
+    openValueUsd?: string | null;
+    consumedByEventIds?: string[];
+    reasonCodes?: string[];
+  };
+
+  assert.equal(row?.coverageStatus, "partial");
+  assert.equal(residual.openAmountRaw, "300");
+  assert.equal(residual.openValueUsd, "4");
+  assert.deepEqual(residual.consumedByEventIds, ["consume-1", "consume-2"]);
+  assert.deepEqual(residual.reasonCodes, ["first_reason", "second_reason"]);
+});
 
 const walletAddress = "0x0000000000000000000000000000000000000001";
+
+test("materializeDepositRows derives closed deposit APR from opened value, rewards, and invested days", () => {
+  const depositId = "8453:0x00000000000000000000000000000000000000aa:1";
+  const accounting = {
+    events: [{
+      id: "deposit-open",
+      chainId: 8453,
+      walletAddress,
+      eventType: "manual_position_created",
+      eventFamily: "deposit",
+      occurredAt: new Date("2026-01-01T00:00:00.000Z"),
+      txHash: "0xdeposit-open",
+      sequenceIndex: 0,
+      coverageStatus: "full",
+      confidence: "high",
+      reasonCodes: [],
+      metadataJson: {},
+      evidenceJson: {},
+    }],
+    deposits: [{
+      depositId,
+      tokenId: "1",
+      poolId: "8453:0xpool",
+      status: "closed",
+      openedAt: new Date("2026-01-01T00:00:00.000Z"),
+      closedAt: new Date("2026-01-11T00:00:00.000Z"),
+      openedValueUsd: "1000",
+      currentOrCloseValueUsd: "900",
+      capitalInUsd: "1000",
+      capitalOutUsd: "900",
+      rewardsUsd: "100",
+      lifecycle: [{
+        eventId: "deposit-open",
+        eventType: "manual_position_created",
+        occurredAt: new Date("2026-01-01T00:00:00.000Z"),
+        txHash: "0xdeposit-open",
+        valueUsd: "1000",
+        reasonCodes: [],
+      }],
+      coverageStatus: "full",
+      confidence: "high",
+      reasonCodes: [],
+    }],
+    rewards: [{
+      rewardId: "reward-1",
+      rewardType: "reward_claim",
+      tokenAddress: null,
+      amountRaw: null,
+      amountUsd: "100",
+      ownerStatus: "manual_deposit",
+      linkedEntityId: depositId,
+      poolId: "8453:0xpool",
+      affectsTotals: true,
+      poolContribution: "contributes",
+      coverageStatus: "full",
+      confidence: "high",
+      reasonCodes: [],
+      txHash: "0xreward",
+      occurredAt: new Date("2026-01-05T00:00:00.000Z"),
+    }],
+    strategies: [],
+    pools: [],
+    residualInventory: [],
+  } as unknown as Parameters<typeof materializeDepositRows>[0];
+
+  const [row] = materializeDepositRows(accounting, buildContext());
+  const deposit = row?.rowJson as Record<string, unknown>;
+
+  assert.equal(deposit.totalRewardsUsd, 100);
+  assert.equal(deposit.totalReturnPct, 0.1);
+  assert.equal(deposit.investedDays, 10);
+  assert.ok(Math.abs(Number(deposit.estimatedAnnualizedReturnPct) - 3.65) < 0.0000001);
+});
+
+test("materializeStrategyRows uses close value for closed strategies and annualizes rewards", () => {
+  const strategyExposureId = "8453:0x00000000000000000000000000000000000000dd";
+  const accounting = {
+    events: [{
+      id: "strategy-open",
+      chainId: 8453,
+      walletAddress,
+      eventType: "strategy_deposit",
+      eventFamily: "strategy",
+      occurredAt: new Date("2026-01-01T00:00:00.000Z"),
+      txHash: "0xstrategy-open",
+      sequenceIndex: 0,
+      coverageStatus: "full",
+      confidence: "high",
+      reasonCodes: [],
+      metadataJson: {},
+      evidenceJson: {},
+    }],
+    deposits: [],
+    strategies: [{
+      strategyExposureId,
+      strategyId: strategyExposureId,
+      wrapperAddress: "0x00000000000000000000000000000000000000dd",
+      poolId: "8453:0xpool",
+      currentSharesRaw: "0",
+      sharesReceivedRaw: "100",
+      sharesRedeemedRaw: "100",
+      depositedValueUsd: "1000",
+      withdrawnValueUsd: "900",
+      rewardsUsd: "120",
+      lifecycle: [
+        {
+          eventId: "strategy-open",
+          eventType: "strategy_deposit",
+          occurredAt: new Date("2026-01-01T00:00:00.000Z"),
+          txHash: "0xstrategy-open",
+          valueUsd: "1000",
+          reasonCodes: [],
+        },
+        {
+          eventId: "strategy-close",
+          eventType: "strategy_withdraw",
+          occurredAt: new Date("2026-01-11T00:00:00.000Z"),
+          txHash: "0xstrategy-close",
+          valueUsd: "900",
+          reasonCodes: [],
+        },
+      ],
+      coverageStatus: "full",
+      confidence: "high",
+      reasonCodes: [],
+    }],
+    rewards: [{
+      rewardId: "strategy-reward-1",
+      rewardType: "strategy_reward",
+      tokenAddress: "0x00000000000000000000000000000000000000aa",
+      amountRaw: "120000000000000000000",
+      amountUsd: "120",
+      ownerStatus: "strategy",
+      linkedEntityId: strategyExposureId,
+      poolId: "8453:0xpool",
+      affectsTotals: true,
+      poolContribution: "contributes",
+      coverageStatus: "full",
+      confidence: "high",
+      reasonCodes: [],
+      txHash: "0xreward",
+      occurredAt: new Date("2026-01-05T00:00:00.000Z"),
+    }],
+    pools: [],
+    residualInventory: [],
+  } as unknown as Parameters<typeof materializeStrategyRows>[0];
+
+  const [row] = materializeStrategyRows(accounting, buildContext());
+  const strategy = row?.rowJson as Record<string, unknown>;
+
+  assert.equal(strategy.status, "closed");
+  assert.equal(strategy.currentEstimatedValueUsd, 900);
+  assert.equal(strategy.closeValueUsd, 900);
+  assert.equal(strategy.displayValueUsd, 900);
+  assert.equal(strategy.totalReturnUsd, 20);
+  assert.equal(strategy.totalReturnPct, 0.02);
+  assert.equal(strategy.investedDays, 10);
+  assert.equal(strategy.estimatedAnnualizedReturnPct, 4.38);
+});
 
 test("materializeAllDataViewRows emits Activity, Deposits, Strategies, Pools, Rewards, and Governance rows", () => {
   const accounting = runChronologicalAccounting({
@@ -896,6 +1219,87 @@ test("materializeAllDataViewRows enriches governance rows from persisted lock me
   assert.equal(governanceEpoch.epochEndAt, "2026-01-09T00:00:00.000Z");
   assert.equal(metricSnapshot.summary.lockedAero, "2203245000000000000000");
   assert.equal(metricSnapshot.summary.veAeroExposure, "1845.771");
+});
+
+test("materializeAllDataViewRows preserves observed governance epoch buckets without explicit protocol epoch ids", () => {
+  const votingEscrowAddress = "0x00000000000000000000000000000000000000aa";
+  const lockKey = `8453:${votingEscrowAddress}:110971`;
+  const accounting = runChronologicalAccounting({
+    events: [
+      {
+        id: "gov-vote-without-epoch",
+        chainId: 8453,
+        walletAddress,
+        eventType: "governance_vote",
+        eventFamily: "governance",
+        occurredAt: new Date("2026-05-29T21:06:33.000Z"),
+        txHash: "0xgov-vote-without-epoch",
+        sequenceIndex: 0,
+        coverageStatus: "full",
+        confidence: "high",
+        reasonCodes: [],
+        metadataJson: {
+          lockTokenId: "110971",
+          tokenId: "110971",
+          votingEscrowAddress,
+        },
+      },
+      {
+        id: "gov-fee-without-epoch",
+        chainId: 8453,
+        walletAddress,
+        eventType: "governance_fee_claim",
+        eventFamily: "governance",
+        occurredAt: new Date("2026-05-29T21:07:33.000Z"),
+        txHash: "0xgov-fee-without-epoch",
+        sequenceIndex: 1,
+        coverageStatus: "partial",
+        confidence: "medium",
+        reasonCodes: ["missing_distributor_pool_link"],
+        metadataJson: {
+          lockTokenId: "110971",
+          tokenId: "110971",
+          votingEscrowAddress,
+          rewardId: "governance-fee-without-epoch",
+          rewardType: "governance_fee",
+          tokenAddress: "0x00000000000000000000000000000000000000aa",
+          amountRaw: "1000000000000000000",
+          amountUsd: "2.5",
+        },
+      },
+    ],
+    links: [
+      { domainEventId: "gov-vote-without-epoch", entityType: "governance_lock", entityId: lockKey },
+      { domainEventId: "gov-fee-without-epoch", entityType: "governance_lock", entityId: lockKey },
+    ],
+  });
+
+  const rows = materializeAllDataViewRows(accounting, buildContext()).filter((row) => row.surface === "governance");
+  const eventRow = rows.find((row) => (row.rowJson as Record<string, unknown>)?.kind === "event");
+  const rewardRow = rows.find((row) => (row.rowJson as Record<string, unknown>)?.kind === "reward");
+  const epochRow = rows.find((row) => (row.rowJson as Record<string, unknown>)?.kind === "epoch");
+
+  const governanceEvent = (eventRow?.rowJson as { event: { metadata: Record<string, unknown> } }).event;
+  const governanceReward = (rewardRow?.rowJson as { reward: { context: Record<string, unknown>; epochId: string | null } }).reward;
+  const governanceEpoch = (epochRow?.rowJson as { epoch: Record<string, unknown> }).epoch;
+
+  assert.equal(governanceEvent.metadata.epochId, "observed:2026-05-28");
+  assert.equal(governanceReward.epochId, "observed:2026-05-28");
+  assert.deepEqual(governanceReward.context, {
+    kind: "epoch",
+    label: "Observed week 2026-05-28",
+  });
+  assert.equal(governanceEpoch.epochId, "observed:2026-05-28");
+  assert.equal(governanceEpoch.epochLabel, "Observed week 2026-05-28");
+  assert.equal(governanceEpoch.epochStartAt, "2026-05-28T00:00:00.000Z");
+  assert.equal(governanceEpoch.epochEndAt, "2026-06-04T00:00:00.000Z");
+  assert.equal(governanceEpoch.coverageState, "partial");
+  assert.equal(governanceEpoch.confidence, "medium");
+  assert.deepEqual(epochRow?.evidenceJson, {
+    epochId: "observed:2026-05-28",
+    eventIds: ["gov-vote-without-epoch", "gov-fee-without-epoch"],
+    reasonCodes: ["derivedEpochFromEventTimestamp"],
+  });
 });
 
 test("materializeAllDataViewRows uses the primary direct lock in governance summary metrics when multiple locks exist", () => {

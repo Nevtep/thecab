@@ -1,9 +1,5 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
-
 import { engineV2ReadModelsEnabled, readEngineV2SurfaceRows } from "@/server/analysis/engine-v2/materializers";
-import { getDb } from "@/server/db/client";
-import { deposits, poolHistorySnapshots, poolTimelineEvents, poolWalletSummaries, strategies, strategyExposures } from "@/server/db/schema";
-import type { PoolDetailRange, PoolHistoryPoint, PoolPositionToken, PoolPositions, PoolsListItem } from "@/server/pools/pools.types";
+import type { PoolDetailRange, PoolHistoryPoint, PoolPositions, PoolPositionToken, PoolsListItem } from "@/server/pools/pools.types";
 
 type PoolsListRepositoryItem = PoolsListItem & {
   coveredStartDayUtc: string | null;
@@ -214,6 +210,14 @@ function hasVisibleEngineV2PoolExposure(row: EngineV2PoolReadModelRow) {
   return row.currentManualValueUsd > 0 || row.currentStrategyValueUsd > 0;
 }
 
+function isClosedManualPosition(position: unknown) {
+  return asRecord(position).status === "closed";
+}
+
+function positionValueUsd(position: unknown) {
+  return asNumber(asRecord(position).valueUsd) ?? 0;
+}
+
 export function normalizeEngineV2PoolSummaryRow(row: EngineV2PoolReadModelRow) {
   const normalizedHistoryPoints = Array.isArray(row.history?.points)
     ? normalizeEngineV2PoolHistoryPoints(row.history.points)
@@ -225,10 +229,38 @@ export function normalizeEngineV2PoolSummaryRow(row: EngineV2PoolReadModelRow) {
     feeTierLabel: row.feeTierLabel,
     poolType: row.poolType,
   });
+  const manualPositions = Array.isArray(row.positions?.manualDeposits) ? row.positions.manualDeposits : [];
+  const automatedPositions = Array.isArray(row.positions?.automatedStrategies) ? row.positions.automatedStrategies : [];
+  const openManualPositions = manualPositions.filter((position) => !isClosedManualPosition(position));
+  const openManualValueUsd = openManualPositions.reduce<number>((sum, position) => sum + positionValueUsd(position), 0);
+  const hasClosedOnlyManualPositions = manualPositions.length > 0 && openManualPositions.length === 0 && automatedPositions.length === 0;
+  const storedCurrentManualValueUsd = asNumber(row.currentManualValueUsd) ?? 0;
+  const currentStrategyValueUsd = asNumber(row.currentStrategyValueUsd) ?? 0;
+  const currentResidualValueUsd = asNumber(row.currentResidualValueUsd) ?? 0;
+  const currentManualValueUsd = hasClosedOnlyManualPositions
+    ? 0
+    : openManualPositions.length > 0
+      ? openManualValueUsd
+      : storedCurrentManualValueUsd;
+  const currentAttributedValueUsd = Math.max(currentManualValueUsd + currentStrategyValueUsd + currentResidualValueUsd, 0);
+  const hasCurrentExposure = openManualPositions.length > 0
+    || automatedPositions.length > 0
+    || currentManualValueUsd > 0
+    || currentStrategyValueUsd > 0;
+  const normalizedStatus = !hasCurrentExposure
+    ? "closed"
+    : row.isInRange === false
+      ? "inactive"
+      : "active";
 
   return {
     ...row,
     label,
+    status: normalizedStatus,
+    currentAttributedValueUsd,
+    currentManualValueUsd,
+    currentStrategyValueUsd,
+    currentResidualValueUsd,
     totalRewardsUsd: latestCumulativeRewardsUsd ?? row.totalRewardsUsd,
   } satisfies EngineV2PoolReadModelRow;
 }
@@ -455,82 +487,16 @@ export async function listPoolSummaries(input: {
   walletAddress: string;
   chainId: number;
 }) {
+  if (!engineV2ReadModelsEnabled()) return [];
+
   const engineV2Rows = await readEngineV2SurfaceRows<EngineV2PoolReadModelRow>({
     chainId: input.chainId,
     walletAddress: input.walletAddress,
     surface: "pools",
   });
-  if (engineV2Rows?.some((row) => hasRichEngineV2PoolRow(row))) {
-    return engineV2Rows
-      .filter(hasVisibleEngineV2PoolExposure)
-      .map(normalizeEngineV2PoolSummaryRow);
-  }
-
-  const db = getDb();
-  const rows = await db
-    .select()
-    .from(poolWalletSummaries)
-    .where(
-      and(
-        eq(poolWalletSummaries.walletAddress, input.walletAddress.toLowerCase()),
-        eq(poolWalletSummaries.chainId, input.chainId),
-      ),
-    );
-
-  return rows.map((row) => {
-    const metadata = row.metadataJson ?? {};
-    const status = normalizeStatus(row.status);
-    const capitalEnteredUsd = Number(row.capitalEnteredUsd);
-    const capitalWithdrawnUsd = Number(row.capitalWithdrawnUsd);
-    const capitalInvestedUsd = Math.max(capitalEnteredUsd - capitalWithdrawnUsd, 0);
-    const totalRewardsUsd = Number(row.totalRewardsUsd);
-    const performance = deriveRewardPerformanceMetrics({
-      firstParticipatedAt: row.firstParticipatedAt,
-      lastParticipatedAt: row.lastParticipatedAt,
-      coveredEndDayUtc: row.coveredEndDayUtc,
-      status,
-      capitalInvestedUsd,
-      totalRewardsUsd,
-    });
-
-    return {
-      poolId: row.poolId,
-      label: resolveDisplayPoolLabel({
-        rawLabel: metadata.label,
-        tokenSymbols: asStringArray(metadata.tokenSymbols),
-        feeTierLabel: typeof metadata.feeTierLabel === "string" ? metadata.feeTierLabel : null,
-        poolType: typeof metadata.poolType === "string" ? metadata.poolType : null,
-      }),
-      poolAddress: typeof metadata.poolAddress === "string" ? metadata.poolAddress : "",
-      tokenSymbols: asStringArray(metadata.tokenSymbols),
-      feeTierLabel: typeof metadata.feeTierLabel === "string" ? metadata.feeTierLabel : null,
-      poolType: typeof metadata.poolType === "string" ? metadata.poolType : null,
-      protocolFamily: "aerodrome",
-      status,
-      exposureMix: normalizeExposureMix(row.exposureMix),
-      currentAttributedValueUsd: Number(row.currentAttributedValueUsd),
-      capitalEnteredUsd,
-      capitalWithdrawnUsd,
-      capitalInvestedUsd,
-      realizedPnlUsd: asNumber(row.realizedPnlUsd),
-      unrealizedPnlUsd: asNumber(row.unrealizedPnlUsd),
-      totalRewardsUsd,
-      investedDays: performance.investedDays,
-      totalReturnPct: performance.totalReturnPct,
-      annualizedReturnPct: performance.annualizedReturnPct,
-      isInRange: typeof metadata.isInRange === "boolean" ? metadata.isInRange : null,
-      coverageStatus: normalizeCoverageStatus(row.coverageStatus),
-      coverageReasonCodes: asStringArray(metadata.coverageReasonCodes),
-      latestActivityAt: row.lastParticipatedAt?.toISOString() ?? null,
-      strategyLabels: asStringArray(metadata.strategyLabels),
-      metricsEstimated: metadata.metricsEstimated === true,
-      coveredStartDayUtc: row.coveredStartDayUtc,
-      coveredEndDayUtc: row.coveredEndDayUtc,
-      currentManualValueUsd: Number(row.currentManualValueUsd),
-      currentStrategyValueUsd: Number(row.currentStrategyValueUsd),
-      currentResidualValueUsd: Number(row.currentResidualValueUsd),
-    };
-  });
+  return (engineV2Rows ?? [])
+    .filter(hasVisibleEngineV2PoolExposure)
+    .map(normalizeEngineV2PoolSummaryRow);
 }
 
 export async function readPoolSummarySeries(input: {
@@ -541,70 +507,14 @@ export async function readPoolSummarySeries(input: {
   if (input.poolIds.length === 0) {
     return emptyPoolSummarySeries();
   }
+  if (!engineV2ReadModelsEnabled()) return emptyPoolSummarySeries();
 
   const engineV2Rows = await readEngineV2SurfaceRows<EngineV2PoolReadModelRow>({
     chainId: input.chainId,
     walletAddress: input.walletAddress,
     surface: "pools",
   });
-  if (engineV2Rows?.some((row) => hasRichEngineV2PoolRow(row))) {
-    return summarizeEngineV2PoolRows(engineV2Rows.filter((row) => input.poolIds.includes(row.poolId)));
-  }
-
-  const db = getDb();
-  const rows = await db
-    .select()
-    .from(poolHistorySnapshots)
-    .where(
-      and(
-        eq(poolHistorySnapshots.walletAddress, input.walletAddress.toLowerCase()),
-        eq(poolHistorySnapshots.chainId, input.chainId),
-        inArray(poolHistorySnapshots.poolId, input.poolIds),
-      ),
-    )
-    .orderBy(asc(poolHistorySnapshots.dayUtc));
-
-  const buckets = new Map<string, {
-    activePoolCount: number;
-    currentAttributedValueUsd: number;
-    totalRewardsUsd: number;
-    rewardValueUsd: number;
-  }>();
-
-  for (const row of rows) {
-    const bucket = buckets.get(row.dayUtc) ?? {
-      activePoolCount: 0,
-      currentAttributedValueUsd: 0,
-      totalRewardsUsd: 0,
-      rewardValueUsd: 0,
-    };
-
-    const totalValueUsd = Number(row.totalValueUsd);
-    bucket.currentAttributedValueUsd += totalValueUsd;
-    bucket.totalRewardsUsd += Number(row.cumulativeRewardsUsd);
-    bucket.rewardValueUsd += Number(row.rewardValueUsd);
-    if (totalValueUsd > 0) {
-      bucket.activePoolCount += 1;
-    }
-
-    buckets.set(row.dayUtc, bucket);
-  }
-
-  const sortedDays = Array.from(buckets.keys()).sort((left, right) => left.localeCompare(right));
-
-  return {
-    activePoolCount: sortedDays.map((dayUtc) => buckets.get(dayUtc)?.activePoolCount ?? 0),
-    currentAttributedValueUsd: sortedDays.map((dayUtc) => buckets.get(dayUtc)?.currentAttributedValueUsd ?? 0),
-    totalRewardsUsd: sortedDays.map((dayUtc) => buckets.get(dayUtc)?.totalRewardsUsd ?? 0),
-    estimatedAnnualizedReturnPct: sortedDays.map((dayUtc) => {
-      const bucket = buckets.get(dayUtc);
-      if (!bucket || bucket.currentAttributedValueUsd <= 0) {
-        return 0;
-      }
-
-      return (bucket.rewardValueUsd / bucket.currentAttributedValueUsd) * 365 * 100;
-    }),
-  };
+  return summarizeEngineV2PoolRows((engineV2Rows ?? []).filter((row) => input.poolIds.includes(row.poolId)));
 }
 
 export async function readPoolHistory(input: {
@@ -613,46 +523,17 @@ export async function readPoolHistory(input: {
   poolId: string;
   range: PoolDetailRange;
 }) {
+  if (!engineV2ReadModelsEnabled()) return [];
+
   const engineV2Rows = await readEngineV2SurfaceRows<EngineV2PoolReadModelRow>({
     chainId: input.chainId,
     walletAddress: input.walletAddress,
     surface: "pools",
   });
   const engineV2Pool = engineV2Rows?.find((row) => row.poolId === input.poolId);
-  if (engineV2Pool && hasRichEngineV2PoolRow(engineV2Pool) && engineV2Pool.history?.points) {
-    return normalizeEngineV2PoolHistoryPoints(engineV2Pool.history.points);
-  }
-
-  const db = getDb();
-  const rows = await db
-    .select()
-    .from(poolHistorySnapshots)
-    .where(
-      and(
-        eq(poolHistorySnapshots.walletAddress, input.walletAddress.toLowerCase()),
-        eq(poolHistorySnapshots.chainId, input.chainId),
-        eq(poolHistorySnapshots.poolId, input.poolId),
-      ),
-    );
-
-  const sorted = rows.sort((left, right) => left.dayUtc.localeCompare(right.dayUtc));
+  const sorted = normalizeEngineV2PoolHistoryPoints(engineV2Pool?.history?.points ?? []);
   const rangeDays = daysForRange(input.range);
-  const filtered = rangeDays === null ? sorted : sorted.slice(-rangeDays);
-
-  return filtered.map((row) => ({
-    dayUtc: row.dayUtc,
-    totalValueUsd: Number(row.totalValueUsd),
-    deployedValueUsd: Number(row.deployedValueUsd),
-    residualValueUsd: Number(row.residualValueUsd),
-    manualValueUsd: Number(row.manualValueUsd),
-    strategyValueUsd: Number(row.strategyValueUsd),
-    rewardValueUsd: Number(row.rewardValueUsd),
-    cumulativeRewardsUsd: Number(row.cumulativeRewardsUsd),
-    capitalInUsd: Number(row.capitalInUsd),
-    capitalOutUsd: Number(row.capitalOutUsd),
-    coverageStatus: normalizeCoverageStatus(row.coverageStatus),
-    metadata: row.metadataJson ?? {},
-  }));
+  return rangeDays === null ? sorted : sorted.slice(-rangeDays);
 }
 
 export async function readPoolTimeline(input: {
@@ -660,34 +541,15 @@ export async function readPoolTimeline(input: {
   chainId: number;
   poolId: string;
 }) {
+  if (!engineV2ReadModelsEnabled()) return [];
+
   const engineV2Rows = await readEngineV2SurfaceRows<EngineV2PoolReadModelRow>({
     chainId: input.chainId,
     walletAddress: input.walletAddress,
     surface: "pools",
   });
   const engineV2Pool = engineV2Rows?.find((row) => row.poolId === input.poolId);
-  if (engineV2Pool && hasRichEngineV2PoolRow(engineV2Pool) && Array.isArray(engineV2Pool.timeline?.items)) {
-    return normalizeEngineV2PoolTimelineItems(engineV2Pool.timeline.items);
-  }
-
-  const db = getDb();
-  const rows = await db
-    .select()
-    .from(poolTimelineEvents)
-    .where(
-      and(
-        eq(poolTimelineEvents.walletAddress, input.walletAddress.toLowerCase()),
-        eq(poolTimelineEvents.chainId, input.chainId),
-        eq(poolTimelineEvents.poolId, input.poolId),
-      ),
-    );
-
-  return rows
-    .map((row) => ({
-      ...row,
-      coverageStatus: normalizeCoverageStatus(row.coverageStatus),
-    }))
-    .sort((left, right) => right.occurredAt.getTime() - left.occurredAt.getTime());
+  return normalizeEngineV2PoolTimelineItems(engineV2Pool?.timeline?.items ?? []);
 }
 
 export async function readPoolPositions(input: {
@@ -696,113 +558,23 @@ export async function readPoolPositions(input: {
   poolId: string;
   fallbackTokenSymbols: string[];
 }): Promise<PoolPositions> {
+  if (!engineV2ReadModelsEnabled()) {
+    return { manualDeposits: [], automatedStrategies: [] };
+  }
+
   const engineV2Rows = await readEngineV2SurfaceRows<EngineV2PoolReadModelRow>({
     chainId: input.chainId,
     walletAddress: input.walletAddress,
     surface: "pools",
   });
   const engineV2Pool = engineV2Rows?.find((row) => row.poolId === input.poolId);
-  if (engineV2Pool && hasRichEngineV2PoolRow(engineV2Pool) && engineV2Pool.positions) {
-    return {
-      manualDeposits: Array.isArray(engineV2Pool.positions.manualDeposits)
-        ? engineV2Pool.positions.manualDeposits as PoolPositions["manualDeposits"]
-        : [],
-      automatedStrategies: Array.isArray(engineV2Pool.positions.automatedStrategies)
-        ? engineV2Pool.positions.automatedStrategies as PoolPositions["automatedStrategies"]
-        : [],
-    };
-  }
-
-  const db = getDb();
-  const walletAddress = input.walletAddress.toLowerCase();
-  const [depositRows, strategyRows] = await Promise.all([
-    db
-      .select()
-      .from(deposits)
-      .where(
-        and(
-          eq(deposits.walletAddress, walletAddress),
-          eq(deposits.chainId, input.chainId),
-          eq(deposits.poolId, input.poolId),
-        ),
-      ),
-    db
-      .select({
-        exposureId: strategyExposures.id,
-        strategyId: strategyExposures.strategyId,
-        coverageStatus: strategyExposures.coverageStatus,
-        metadataJson: strategyExposures.metadataJson,
-        strategyLabel: strategies.label,
-      })
-      .from(strategyExposures)
-      .innerJoin(strategies, eq(strategyExposures.strategyId, strategies.id))
-      .where(
-        and(
-          eq(strategyExposures.walletAddress, walletAddress),
-          eq(strategyExposures.chainId, input.chainId),
-          eq(strategies.primaryPoolId, input.poolId),
-        ),
-      ),
-  ]);
-
   return {
-    manualDeposits: depositRows
-      .filter((row) => normalizeDepositStatus(row.status) !== "closed")
-      .map((row) => {
-      const metadata = asRecord(row.metadataJson);
-      const nestedMetadata = asRecord(metadata.metadata);
-
-      return {
-        depositId: row.id,
-        tokenId: row.tokenId,
-        status: normalizeDepositStatus(row.status),
-        coverageStatus: normalizeCoverageStatus(row.coverageStatus),
-        tickLower: asTick(nestedMetadata.rangeLowerTick),
-        tickUpper: asTick(nestedMetadata.rangeUpperTick),
-        rangeLowerPrice: asNumber(nestedMetadata.rangeLowerPrice),
-        rangeUpperPrice: asNumber(nestedMetadata.rangeUpperPrice),
-        rangeQuoteTokenSymbol:
-          typeof nestedMetadata.rangeQuoteTokenSymbol === "string" && nestedMetadata.rangeQuoteTokenSymbol.trim().length > 0
-            ? nestedMetadata.rangeQuoteTokenSymbol.trim()
-            : null,
-        rangeDisplayFractionDigits: asNullableInteger(nestedMetadata.rangeDisplayFractionDigits),
-        isInRange: typeof nestedMetadata.isInRange === "boolean" ? nestedMetadata.isInRange : null,
-        valueUsd: asNumber(metadata.valueUsd),
-        tokens: buildPositionTokens({
-          primaryTokenSymbol: metadata.primaryTokenSymbol,
-          secondaryTokenSymbol: metadata.secondaryTokenSymbol,
-          primaryTokenAmount: metadata.primaryTokenAmount,
-          secondaryTokenAmount: metadata.secondaryTokenAmount,
-          fallbackSymbols: input.fallbackTokenSymbols,
-        }),
-        annualizedReturnPct: null,
-      };
-    }),
-    automatedStrategies: strategyRows.map((row) => {
-      const metadata = asRecord(row.metadataJson);
-      const nestedMetadata = asRecord(metadata.metadata);
-
-      return {
-        exposureId: row.exposureId,
-        strategyId: row.strategyId,
-        strategyLabel: row.strategyLabel,
-        coverageStatus: normalizeCoverageStatus(row.coverageStatus),
-        valueUsd: asNumber(metadata.valueUsd),
-        externalStrategyPositionReference:
-          typeof metadata.externalDepositReference === "string" ? metadata.externalDepositReference : null,
-        externalStrategyPositionReferenceStatus:
-          metadata.externalDepositReferenceStatus === "resolved" || metadata.externalDepositReferenceStatus === "unresolved"
-            ? metadata.externalDepositReferenceStatus
-            : null,
-        tokens: buildPositionTokens({
-          primaryTokenSymbol: metadata.primaryTokenSymbol ?? nestedMetadata.primaryTokenSymbol,
-          secondaryTokenSymbol: metadata.secondaryTokenSymbol ?? nestedMetadata.secondaryTokenSymbol,
-          primaryTokenAmount: metadata.primaryTokenAmount ?? nestedMetadata.primaryTokenAmount,
-          secondaryTokenAmount: metadata.secondaryTokenAmount ?? nestedMetadata.secondaryTokenAmount,
-          fallbackSymbols: input.fallbackTokenSymbols,
-        }),
-        annualizedReturnPct: null,
-      };
-    }),
+    manualDeposits: Array.isArray(engineV2Pool?.positions?.manualDeposits)
+      ? (engineV2Pool.positions.manualDeposits as PoolPositions["manualDeposits"])
+        .filter((position) => position.status !== "closed")
+      : [],
+    automatedStrategies: Array.isArray(engineV2Pool?.positions?.automatedStrategies)
+      ? engineV2Pool.positions.automatedStrategies as PoolPositions["automatedStrategies"]
+      : [],
   };
 }

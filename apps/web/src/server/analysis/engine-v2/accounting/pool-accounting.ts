@@ -77,10 +77,10 @@ export function accountPools(input: {
   }
 
   for (const residual of input.residualInventory ?? []) {
-    for (const pool of pools.values()) {
-      if (!pool.residualTokenAddresses.includes(residual.tokenAddress)) {
-        pool.residualTokenAddresses.push(residual.tokenAddress);
-      }
+    if (!residual.poolId) continue;
+    const pool = upsertPool(pools, residual.poolId);
+    if (!pool.residualTokenAddresses.includes(residual.tokenAddress)) {
+      pool.residualTokenAddresses.push(residual.tokenAddress);
     }
   }
 

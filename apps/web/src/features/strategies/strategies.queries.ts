@@ -32,7 +32,6 @@ export function getStrategyDetailQueryOptions(input: {
   return {
     queryKey: queryKeys.strategyDetail(input.chainId, input.strategyId),
     queryFn: () =>
-      apiClient<StrategyDetailResponse>(`/api/strategies/${input.strategyId}?chainId=${input.chainId}`),
+      apiClient<StrategyDetailResponse>(`/api/strategies/${encodeURIComponent(input.strategyId)}?chainId=${input.chainId}`),
   };
 }
-

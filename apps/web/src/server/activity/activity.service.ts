@@ -3,6 +3,7 @@ import { findActivity, readActivityAnalysisContext } from "@/server/activity/act
 import type { ActivityEventRow, ActivityRequest, ActivityResponse, ActivitySummary } from "@/server/activity/activity.types";
 
 const COVERAGE_ORDER = ["full", "partial", "unresolved", "excluded", "unavailable"] as const;
+const PROTOCOL_VOLUME_ACTIONS = new Set(["deposit", "position_created", "withdraw", "swap", "claim", "strategy", "stake", "unstake", "governance"]);
 
 function asNumber(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -22,6 +23,9 @@ export function buildEmptyActivitySummary(): ActivitySummary {
     totalEvents: 0,
     interpretedEvents: 0,
     totalValueUsd: "0.00",
+    walletCapitalInUsd: "0.00",
+    walletCapitalOutUsd: "0.00",
+    protocolVolumeUsd: "0.00",
     excludedEvents: 0,
     unresolvedEvents: 0,
     coveragePercent: "100.0",
@@ -36,20 +40,39 @@ export function buildActivitySummary(rows: ActivityEventRow[]): ActivitySummary 
   const totalValueUsd = rows
     .filter((row) => row.coverage !== "excluded")
     .reduce((sum, row) => sum + (asNumber(row.valueUsd) ?? 0), 0);
+  const walletCapitalInUsd = rows
+    .filter((row) => row.coverage !== "excluded" && row.action === "cash_in")
+    .reduce((sum, row) => sum + resolveDirectionalMovementValue(row, "in"), 0);
+  const walletCapitalOutUsd = rows
+    .filter((row) => row.coverage !== "excluded" && row.action === "cash_out")
+    .reduce((sum, row) => sum + resolveDirectionalMovementValue(row, "out"), 0);
+  const protocolVolumeUsd = rows
+    .filter((row) => row.coverage !== "excluded" && PROTOCOL_VOLUME_ACTIONS.has(row.action))
+    .reduce((sum, row) => sum + (asNumber(row.valueUsd) ?? 0), 0);
 
   return {
     totalEvents: rows.length,
     interpretedEvents,
     totalValueUsd: fixed(totalValueUsd),
+    walletCapitalInUsd: fixed(walletCapitalInUsd),
+    walletCapitalOutUsd: fixed(walletCapitalOutUsd),
+    protocolVolumeUsd: fixed(protocolVolumeUsd),
     excludedEvents,
     unresolvedEvents,
     coveragePercent: rows.length > 0 ? fixed((fullEvents / rows.length) * 100, 1) : "100.0",
   };
 }
 
+function resolveDirectionalMovementValue(row: ActivityEventRow, direction: "in" | "out") {
+  const movementValue = row.movements
+    .filter((movement) => movement.direction === direction)
+    .reduce((sum, movement) => sum + Math.abs(asNumber(movement.amountUsd) ?? 0), 0);
+  return movementValue > 0 ? movementValue : asNumber(row.valueUsd) ?? 0;
+}
+
 export function buildActivityKpis(summary: ActivitySummary): ActivityResponse["kpis"] {
   const coverage = Number(summary.coveragePercent) >= 99.9 ? "full" : "partial";
-  return [
+  const kpis: ActivityResponse["kpis"] = [
     {
       id: "totalEvents",
       labelKey: "activity:kpis.totalEvents",
@@ -67,28 +90,47 @@ export function buildActivityKpis(summary: ActivitySummary): ActivityResponse["k
       coverage,
     },
     {
-      id: "totalValue",
-      labelKey: "activity:kpis.totalValue",
-      value: summary.totalValueUsd,
+      id: "walletCapitalIn",
+      labelKey: "activity:kpis.walletCapitalIn",
+      value: summary.walletCapitalInUsd,
       valueKind: "currency",
-      contextLabelKey: "activity:kpis.nonExcluded",
+      contextLabelKey: "activity:kpis.walletOnly",
       coverage,
     },
     {
-      id: "coverage",
-      labelKey: "activity:kpis.coverage",
-      value: summary.coveragePercent,
-      valueKind: "percent",
-      contextLabelKey: "activity:kpis.classificationCoverage",
+      id: "walletCapitalOut",
+      labelKey: "activity:kpis.walletCapitalOut",
+      value: summary.walletCapitalOutUsd,
+      valueKind: "currency",
+      contextLabelKey: "activity:kpis.walletOnly",
       coverage,
     },
+    {
+      id: "protocolVolume",
+      labelKey: "activity:kpis.protocolVolume",
+      value: summary.protocolVolumeUsd,
+      valueKind: "currency",
+      contextLabelKey: "activity:kpis.protocolOnly",
+      coverage,
+    },
+    {
+      id: "excludedEvents",
+      labelKey: "activity:kpis.excludedEvents",
+      value: summary.excludedEvents,
+      valueKind: "count",
+      contextLabelKey: "activity:kpis.spamOnly",
+      coverage: summary.excludedEvents > 0 ? "partial" : "full",
+    },
   ];
+  return summary.excludedEvents > 0 ? kpis : kpis.filter((kpi) => kpi.id !== "excludedEvents");
 }
 
 export function buildActivityCharts(rows: ActivityEventRow[]): ActivityResponse["charts"] {
   const dayMap = new Map<string, ActivityResponse["charts"]["timeline"][number]>();
+  const actionMap = new Map<string, number>();
   const coverageMap = new Map<string, number>();
   const surfaceMap = new Map<string, number>();
+  const movementMap = new Map<"in" | "out" | "none", { count: number; valueUsd: number }>();
 
   for (const row of rows) {
     const day = row.occurredAt.slice(0, 10);
@@ -96,21 +138,44 @@ export function buildActivityCharts(rows: ActivityEventRow[]): ActivityResponse[
       day,
       label: day.slice(5),
       total: 0,
-      full: 0,
-      partial: 0,
-      unresolved: 0,
-      excluded: 0,
-      unavailable: 0,
+      walletCashflow: 0,
+      protocolActivity: 0,
+      approvals: 0,
+      other: 0,
     };
     existingDay.total += 1;
-    existingDay[row.coverage] += 1;
+    if (row.action === "cash_in" || row.action === "cash_out") existingDay.walletCashflow += 1;
+    else if (PROTOCOL_VOLUME_ACTIONS.has(row.action)) existingDay.protocolActivity += 1;
+    else if (row.action === "approval") existingDay.approvals += 1;
+    else existingDay.other += 1;
     dayMap.set(day, existingDay);
+    actionMap.set(row.action, (actionMap.get(row.action) ?? 0) + 1);
     coverageMap.set(row.coverage, (coverageMap.get(row.coverage) ?? 0) + 1);
     surfaceMap.set(row.surface, (surfaceMap.get(row.surface) ?? 0) + 1);
+    if (row.movements.length === 0) {
+      const existing = movementMap.get("none") ?? { count: 0, valueUsd: 0 };
+      existing.count += 1;
+      existing.valueUsd += asNumber(row.valueUsd) ?? 0;
+      movementMap.set("none", existing);
+    } else {
+      for (const movement of row.movements) {
+        const existing = movementMap.get(movement.direction) ?? { count: 0, valueUsd: 0 };
+        existing.count += 1;
+        existing.valueUsd += Math.abs(asNumber(movement.amountUsd) ?? 0);
+        movementMap.set(movement.direction, existing);
+      }
+    }
   }
 
   return {
     timeline: [...dayMap.values()].sort((left, right) => left.day.localeCompare(right.day)).slice(-30),
+    actionBreakdown: [...actionMap.entries()]
+      .map(([action, value]) => ({
+        id: action as ActivityResponse["charts"]["actionBreakdown"][number]["id"],
+        labelKey: `activity:actions.${action}`,
+        value,
+      }))
+      .sort((left, right) => right.value - left.value),
     coverageBreakdown: COVERAGE_ORDER
       .map((coverage) => ({
         id: coverage,
@@ -123,6 +188,14 @@ export function buildActivityCharts(rows: ActivityEventRow[]): ActivityResponse[
         id: surface as ActivityResponse["charts"]["surfaceBreakdown"][number]["id"],
         labelKey: `activity:surfaces.${surface}`,
         value,
+      }))
+      .sort((left, right) => right.value - left.value),
+    movementBreakdown: [...movementMap.entries()]
+      .map(([direction, value]) => ({
+        id: direction,
+        labelKey: `activity:movements.${direction}`,
+        value: value.count,
+        valueUsd: fixed(value.valueUsd),
       }))
       .sort((left, right) => right.value - left.value),
   };

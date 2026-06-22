@@ -23,7 +23,7 @@
       "currentValue": "Latest valuation",
       "totalRewards": "Total rewards",
       "weightedAnnualizedReturn": "Weighted est. annualized",
-      "capitalDeployed": "Capital deployed",
+      "openPositions": "Open positions",
       "capitalDeployedHint": "Share of manual capital still deployed."
     },
     "filters": {

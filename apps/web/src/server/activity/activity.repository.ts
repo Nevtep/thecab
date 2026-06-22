@@ -5,6 +5,7 @@ import { engineV2ReadModelsEnabled, readEngineV2SurfaceRows } from "@/server/ana
 import { getExplorerTxUrl, getSupportedChain } from "@/server/chains";
 import { getDb } from "@/server/db/client";
 import { assetMovements, ledgerEvents } from "@/server/db/schema";
+import { formatRawTokenAmount } from "@/server/tokens/token-amounts";
 import type {
   ActivityAction,
   ActivityConfidence,
@@ -64,6 +65,15 @@ function asNumber(value: unknown) {
   return null;
 }
 
+function asInteger(value: unknown) {
+  if (typeof value === "number" && Number.isInteger(value)) return value;
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value);
+    return Number.isInteger(parsed) ? parsed : null;
+  }
+  return null;
+}
+
 function toIso(value: Date | string) {
   return value instanceof Date ? value.toISOString() : value;
 }
@@ -93,12 +103,20 @@ function normalizeAction(row: LedgerDbRow): ActivityAction {
   const exclusion = asString(metadata.economicExclusionReason);
 
   if (exclusion === "airdrop_spam" || source.includes("airdrop")) return "airdrop";
+  if (source.includes("failed_transaction") || source.includes("failed")) return "failed";
+  if (source.includes("approval")) return "approval";
+  if (source.includes("manual_position_created") || source.includes("position_created") || source.includes("mint")) return "position_created";
   if (source.includes("governance") || source.includes("vote") || source.includes("proposal")) return "governance";
   if (source.includes("claim") || source.includes("reward")) return "claim";
+  if (source.includes("unstake")) return "unstake";
+  if (source.includes("stake")) return "stake";
   if (source.includes("strategy")) return "strategy";
+  if (source.includes("cash_in")) return "cash_in";
+  if (source.includes("cash_out")) return "cash_out";
   if (source.includes("deposit") || source.includes("increase")) return "deposit";
   if (source.includes("withdraw") || source.includes("decrease")) return "withdraw";
   if (source.includes("swap") || source.includes("rebalance")) return "swap";
+  if (source.includes("noop")) return "noop";
   if (source.includes("transfer")) return "transfer";
   if (source.includes("unsupported")) return "unsupported";
   if (source.includes("ambiguous") || source.includes("unknown")) return "ambiguous";
@@ -154,12 +172,21 @@ function resolveTokenSymbol(metadata: Record<string, unknown>, tokenAddress: str
 
 export function mapActivityMovement(row: MovementDbRow): ActivityMovement {
   const metadata = asRecord(row.metadataJson);
+  const tokenDecimals = asInteger(metadata.tokenDecimals) ?? asInteger(metadata.decimals);
+  const assetType = asString(metadata.assetType) ?? "erc20";
   return {
     id: row.id,
     tokenAddress: row.tokenAddress,
     tokenSymbol: resolveTokenSymbol(metadata, row.tokenAddress),
     direction: row.directionIn ? "in" : "out",
     amountRaw: row.amountRaw,
+    amountFormatted: asString(metadata.amountFormatted) ?? formatRawTokenAmount({
+      amountRaw: row.amountRaw,
+      tokenDecimals,
+      assetType,
+    }),
+    tokenDecimals,
+    assetType,
     amountUsd: row.amountUsd,
   };
 }
@@ -280,12 +307,21 @@ function movementFromEngineV2(value: unknown, index: number): ActivityMovement |
   const record = asRecord(value);
   const direction = asString(record.direction);
   if (direction !== "in" && direction !== "out") return null;
+  const tokenRecord = asRecord(record.token);
+  const tokenDecimals = asInteger(record.tokenDecimals)
+    ?? asInteger(record.decimals)
+    ?? asInteger(tokenRecord.decimals);
+  const assetType = asString(record.assetType) ?? "erc20";
+  const amountRaw = asString(record.amountRaw);
   return {
     id: asString(record.id) ?? `engine-v2-movement:${index}`,
-    tokenAddress: asString(record.tokenAddress),
-    tokenSymbol: resolveTokenSymbol(record, asString(record.tokenAddress)),
+    tokenAddress: asString(record.tokenAddress) ?? asString(tokenRecord.address),
+    tokenSymbol: resolveTokenSymbol(record, asString(record.tokenAddress) ?? asString(tokenRecord.address)),
     direction,
-    amountRaw: asString(record.amountRaw),
+    amountRaw,
+    amountFormatted: asString(record.amountFormatted) ?? formatRawTokenAmount({ amountRaw, tokenDecimals, assetType }),
+    tokenDecimals,
+    assetType,
     amountUsd: asString(record.amountUsd) ?? asString(record.valueUsdAtEvent),
   };
 }

@@ -97,6 +97,7 @@ export function RewardsComponent(input: RewardsComponentProps) {
       source: typeof target.source === "string" ? target.source as RewardsUrlState["source"] : input.urlState.source,
       poolId: typeof target.poolId === "string" ? target.poolId : input.urlState.poolId,
       tokenAddress: typeof target.tokenAddress === "string" ? target.tokenAddress : input.urlState.tokenAddress,
+      selectedRewardEventId: null,
       page: 1,
     });
   }
@@ -228,6 +229,7 @@ export function RewardsComponent(input: RewardsComponentProps) {
           />
         </CabStack>
         <SelectedRewardRail
+          chainId={input.viewModel.chainId}
           selectedReward={input.viewModel.selectedReward}
           loading={selectedRewardIsLoading}
           labels={{

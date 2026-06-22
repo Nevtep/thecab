@@ -48,6 +48,46 @@
   min-width: 0;
 }
 
+.epochButton {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+
+.epochButtonSelected {
+  outline: 1px solid rgba(125, 88, 255, 0.72);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.lockRegisterRow {
+  width: 100%;
+  border: 1px solid rgba(184, 199, 230, 0.12);
+  border-radius: 6px;
+  background: rgba(15, 24, 41, 0.48);
+  color: inherit;
+  cursor: pointer;
+  padding: 10px;
+  text-align: left;
+}
+
+.lockRegisterRow:hover {
+  border-color: rgba(0, 224, 225, 0.34);
+  background: rgba(0, 224, 225, 0.06);
+}
+
+.lockRegisterRow:disabled {
+  cursor: default;
+}
+
+.lockRegisterRowSelected {
+  border-color: rgba(0, 224, 225, 0.62);
+  box-shadow: inset 3px 0 0 rgba(0, 224, 225, 0.84);
+}
+
 .breakdownLayout {
   display: grid;
   grid-template-columns: minmax(230px, 0.4fr) minmax(0, 1fr);

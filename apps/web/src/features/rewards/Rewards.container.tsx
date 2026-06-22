@@ -28,6 +28,32 @@ function isSettledAnalysisStatus(status: string | null) {
   return status === "ready" || status === "stale" || status === "failed" || status === "not_analyzed";
 }
 
+const selectionContextKeys: Array<keyof ReturnType<typeof parseRewardsUrlState>> = [
+  "search",
+  "datePreset",
+  "dateStart",
+  "dateEnd",
+  "source",
+  "tokenAddress",
+  "poolId",
+  "depositId",
+  "strategyExposureId",
+  "rewardType",
+  "coverage",
+  "resolutionStatus",
+  "page",
+  "pageSize",
+];
+
+function shouldClearRewardSelection(
+  current: ReturnType<typeof parseRewardsUrlState>,
+  next: ReturnType<typeof parseRewardsUrlState>,
+) {
+  if (!current.selectedRewardEventId) return false;
+  if (current.sort.key !== next.sort.key || current.sort.direction !== next.sort.direction) return true;
+  return selectionContextKeys.some((key) => current[key] !== next[key]);
+}
+
 export function RewardsContainer() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -81,7 +107,10 @@ export function RewardsContainer() {
   }, [analysisStatusQuery.data, analysisStatusQuery.isLoading, isWalletReady, rewardsQuery.error, rewardsQuery.isLoading, viewModel]);
 
   function updateUrl(nextState: typeof urlState) {
-    const query = serializeRewardsUrlState(nextState);
+    const resolvedState = shouldClearRewardSelection(urlState, nextState)
+      ? { ...nextState, selectedRewardEventId: null }
+      : nextState;
+    const query = serializeRewardsUrlState(resolvedState);
     router.replace(query ? `/rewards?${query}` : "/rewards", { scroll: false });
   }
 

@@ -106,7 +106,7 @@ export function mapStrategiesListResponseToViewModel(
     },
     items: response.strategies.map((item) => ({
       ...item,
-      formattedCurrentValue: formatNullableUsd(item.currentEstimatedValueUsd, locale),
+      formattedCurrentValue: formatNullableUsd(item.displayValueUsd ?? item.currentEstimatedValueUsd, locale),
       formattedRewards: formatNullableUsd(item.totalRewardsUsd, locale),
       formattedTotalReturn: formatNullableUsd(item.totalReturnUsd, locale),
       formattedApr: formatNullablePercent(item.estimatedAnnualizedReturnPct, locale),
@@ -130,7 +130,7 @@ export function mapStrategyDetailResponseToViewModel(
   return {
     ...response,
     formattedHeader: {
-      currentValue: formatNullableUsd(response.strategy.currentEstimatedValueUsd, locale),
+      currentValue: formatNullableUsd(response.strategy.displayValueUsd ?? response.strategy.currentEstimatedValueUsd, locale),
       totalReturn: formatNullableUsd(response.strategy.totalReturnUsd, locale),
       rewards: formatNullableUsd(response.strategy.totalRewardsUsd, locale),
     },

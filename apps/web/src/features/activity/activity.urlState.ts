@@ -128,6 +128,7 @@ export function resetActivityFilter(state: ActivityUrlState, target: string): Ac
     strategyId: target === "strategyId" ? null : state.strategyId,
     rewardEventId: target === "rewardEventId" ? null : state.rewardEventId,
     governanceEventId: target === "governanceEventId" ? null : state.governanceEventId,
+    selectedActivityId: null,
     page: 1,
   };
 }

@@ -1,8 +1,9 @@
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { assertSupportedChain, SUPPORTED_CHAIN_ID } from "@/server/chains";
+import { readAuthenticatedWalletAddress as readRequestWalletAddress } from "@/server/auth/walletAuth";
+import { normalizeOpaqueEntityId } from "@/analysis/opaqueEntityId";
 import {
   REWARDS_COVERAGE_VALUES,
   REWARDS_DATE_PRESET_VALUES,
@@ -24,11 +25,10 @@ type RewardsRouteDeps = {
   readDataView: typeof getRewardsDataView;
 };
 
-const UUID_PATTERN = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 const ADDRESS_PATTERN = /^0x[a-fA-F0-9]{40}$/;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
-const nullableUuid = z.string().regex(UUID_PATTERN).nullable().default(null);
+const nullableOpaqueId = z.string().trim().refine((value) => normalizeOpaqueEntityId(value) === value).nullable().default(null);
 const nullableAddress = z.string().regex(ADDRESS_PATTERN).transform((value) => value.toLowerCase()).nullable().default(null);
 const nullableDate = z.string().regex(DATE_PATTERN).refine((value) => !Number.isNaN(Date.parse(`${value}T00:00:00.000Z`))).nullable().default(null);
 
@@ -40,13 +40,13 @@ const rewardsQuerySchema = z.object({
   dateEnd: nullableDate,
   source: z.enum(REWARDS_SOURCE_FILTER_VALUES).default("all"),
   tokenAddress: nullableAddress,
-  poolId: nullableUuid,
-  depositId: nullableUuid,
-  strategyExposureId: nullableUuid,
+  poolId: nullableOpaqueId,
+  depositId: nullableOpaqueId,
+  strategyExposureId: nullableOpaqueId,
   rewardType: z.string().trim().max(64).nullable().default(null),
   coverage: z.enum(REWARDS_COVERAGE_VALUES).nullable().default(null),
   resolutionStatus: z.enum(REWARDS_RESOLUTION_STATUS_VALUES).nullable().default(null),
-  selectedRewardEventId: nullableUuid,
+  selectedRewardEventId: nullableOpaqueId,
   sort: z.enum(REWARDS_SORT_KEY_VALUES).default("occurredAt"),
   direction: z.enum(REWARDS_SORT_DIRECTION_VALUES).default("desc"),
   page: z.coerce.number().int().min(1).default(1),
@@ -80,14 +80,7 @@ const allowedParams = new Set([
 ]);
 
 async function readAuthenticatedWalletAddress() {
-  const cookieStore = await cookies();
-  const authenticatedAddress = cookieStore.get("cab_authenticated_address")?.value?.toLowerCase() ?? null;
-
-  if (!authenticatedAddress) {
-    throw new Error("REWARDS_REQUEST_FAILED:UNAUTHENTICATED_WALLET");
-  }
-
-  return authenticatedAddress;
+  return readRequestWalletAddress({ unauthorizedMessage: "REWARDS_REQUEST_FAILED:UNAUTHENTICATED_WALLET" });
 }
 
 export function normalizeRewardsQueryParams(searchParams: URLSearchParams) {

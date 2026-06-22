@@ -165,6 +165,8 @@ function createCurrentPositionRow(input: {
     valueUpdatedAt: extractTimestamp(input.position),
     primaryTokenSymbol,
     secondaryTokenSymbol,
+    primaryTokenAddress: null,
+    secondaryTokenAddress: null,
     primaryTokenAmount: null,
     secondaryTokenAmount: null,
     poolLabel:
@@ -237,6 +239,8 @@ function promoteReconstructedStakedRows(input: {
 
     const primaryTokenSymbol = manualRow.primaryTokenSymbol ?? row.primaryTokenSymbol;
     const secondaryTokenSymbol = manualRow.secondaryTokenSymbol ?? row.secondaryTokenSymbol;
+    const primaryTokenAddress = manualRow.primaryTokenAddress ?? row.primaryTokenAddress;
+    const secondaryTokenAddress = manualRow.secondaryTokenAddress ?? row.secondaryTokenAddress;
     const valueUsd = manualRow.valueUsd;
     const coverageReasonCodes = row.coverageReasonCodes;
 
@@ -263,6 +267,8 @@ function promoteReconstructedStakedRows(input: {
       valueUpdatedAt: manualRow.valueUpdatedAt,
       primaryTokenSymbol,
       secondaryTokenSymbol,
+      primaryTokenAddress,
+      secondaryTokenAddress,
       primaryTokenAmount: manualRow.primaryTokenAmount,
       secondaryTokenAmount: manualRow.secondaryTokenAmount,
       poolLabel:

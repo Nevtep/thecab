@@ -53,6 +53,11 @@ export const portfolioEvolutionEventMeta: Record<
     color: cabColors.dataViz.cobalt,
     tone: "info",
   },
+  swap: {
+    labelKey: "overview:portfolioEvolution.events.swap",
+    color: cabColors.brand.signalTeal,
+    tone: "info",
+  },
 };
 
 export const portfolioEvolutionEventOrder: PortfolioEvolutionEventType[] = [
@@ -61,6 +66,7 @@ export const portfolioEvolutionEventOrder: PortfolioEvolutionEventType[] = [
   "redeploy",
   "move_to_idle",
   "rebalance",
+  "swap",
   "lock",
   "vote",
 ];
@@ -71,6 +77,7 @@ export const portfolioEvolutionEventIcons: Record<PortfolioEvolutionEventType, C
   redeploy: "arrowUpToLine",
   move_to_idle: "arrowDownToLine",
   rebalance: "refreshCcw",
+  swap: "activity",
   lock: "lock",
   vote: "governance",
 };

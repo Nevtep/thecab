@@ -1,16 +1,15 @@
-import { cookies } from "next/headers";
 import { z } from "zod";
 
+import { assertOpaqueEntityId, normalizeOpaqueEntityId } from "@/analysis/opaqueEntityId";
+import { readAuthenticatedWalletAddress as readRequestWalletAddress } from "@/server/auth/walletAuth";
 import { assertSupportedChain, SUPPORTED_CHAIN_ID } from "@/server/chains";
 import type { StrategiesListRequest, StrategyDetailRequest } from "@/server/strategies/strategies.types";
-
-const UUID_PATTERN = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
 const strategiesListQuerySchema = z.object({
   chainId: z.coerce.number().int().positive().default(SUPPORTED_CHAIN_ID),
   status: z.enum(["active", "closed", "all"] as const).default("active"),
   protocol: z.enum(["mellow", "all"] as const).default("mellow"),
-  poolId: z.string().regex(UUID_PATTERN).nullable().default(null),
+  poolId: z.string().trim().nullable().default(null),
   coverage: z.enum(["full", "share_level", "partial", "unknown", "all"] as const).default("all"),
   returnSign: z.enum(["positive", "negative", "any"] as const).default("any"),
   search: z.string().trim().max(64).default(""),
@@ -24,7 +23,7 @@ const strategiesListQuerySchema = z.object({
     "coverage_asc",
     "coverage_desc",
   ] as const).default("current_value_desc"),
-  selectedStrategyId: z.string().regex(UUID_PATTERN).nullable().default(null),
+  selectedStrategyId: z.string().trim().nullable().default(null),
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().pipe(z.union([z.literal(10), z.literal(25), z.literal(50)])).default(10),
 });
@@ -70,18 +69,15 @@ export function normalizeStrategiesListQueryParams(searchParams: URLSearchParams
   }
 
   assertSupportedChain(parsed.data.chainId);
-  return parsed.data;
+  return {
+    ...parsed.data,
+    poolId: normalizeOpaqueEntityId(parsed.data.poolId),
+    selectedStrategyId: normalizeOpaqueEntityId(parsed.data.selectedStrategyId),
+  };
 }
 
 async function readAuthenticatedWalletAddress() {
-  const cookieStore = await cookies();
-  const authenticatedAddress = cookieStore.get("cab_authenticated_address")?.value?.toLowerCase() ?? null;
-
-  if (!authenticatedAddress) {
-    throw new Error("STRATEGIES_REQUEST_FAILED:UNAUTHORIZED");
-  }
-
-  return authenticatedAddress;
+  return readRequestWalletAddress({ unauthorizedMessage: "STRATEGIES_REQUEST_FAILED:UNAUTHORIZED" });
 }
 
 export async function parseStrategiesListRequest(request: Request): Promise<StrategiesListRequest> {
@@ -115,12 +111,9 @@ export function normalizeStrategyDetailParams(searchParams: URLSearchParams, str
   }
 
   assertSupportedChain(parsed.data.chainId);
-  if (!UUID_PATTERN.test(strategyId)) {
-    throw new Error("STRATEGIES_REQUEST_FAILED:INVALID_REQUEST");
-  }
   return {
     chainId: parsed.data.chainId,
-    strategyId,
+    strategyId: assertOpaqueEntityId(strategyId, "STRATEGIES_REQUEST_FAILED:INVALID_REQUEST"),
   };
 }
 

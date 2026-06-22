@@ -12,6 +12,7 @@ import {
 } from "@/server/db/schema";
 import {
   deriveGovernanceLockKind,
+  governanceLockIdentity,
   normalizeGovernanceLockKind,
   selectPrimaryGovernanceLockId,
   sortGovernanceLockPanels,
@@ -64,6 +65,7 @@ export type GovernanceRepositoryResult = {
 
 type JsonRecord = Record<string, unknown>;
 export type GovernanceSelectedDetailTarget =
+  | { kind: "lock"; lock: GovernanceLockPanel }
   | { kind: "reward"; reward: GovernanceRewardRow }
   | { kind: "event"; event: GovernanceRepositoryEventRow }
   | { kind: "epoch"; epoch: GovernanceEpochSummary };
@@ -493,9 +495,14 @@ function resolveSelectedDetailTarget(input: {
   visibleEvents: GovernanceRepositoryEventRow[];
   allEvents: GovernanceRepositoryEventRow[];
   epochs: GovernanceEpochSummary[];
+  lockPanels: GovernanceLockPanel[];
 }): GovernanceSelectedDetailTarget | null {
   const selectedId = input.request.selectedGovernanceId;
   if (selectedId) {
+    if (input.request.selectedKind === "lock") {
+      const lock = input.lockPanels.find((row) => governanceLockIdentity(row) === selectedId || row.lockId === selectedId);
+      if (lock) return { kind: "lock", lock };
+    }
     if (input.request.selectedKind === "reward") {
       const reward = input.allRewards.find((row) =>
         row.governanceRewardId === selectedId ||
@@ -523,8 +530,12 @@ function resolveSelectedDetailTarget(input: {
     if (event) return { kind: "event", event };
     const epoch = input.epochs.find((row) => row.epochId === selectedId);
     if (epoch) return { kind: "epoch", epoch };
+    const lock = input.lockPanels.find((row) => governanceLockIdentity(row) === selectedId || row.lockId === selectedId);
+    if (lock) return { kind: "lock", lock };
   }
 
+  const primaryLock = input.lockPanels[0];
+  if (primaryLock) return { kind: "lock", lock: primaryLock };
   const firstReward = input.visibleRewards[0];
   if (firstReward) return { kind: "reward", reward: firstReward };
   const firstEvent = input.visibleEvents[0];
@@ -578,6 +589,7 @@ export async function findGovernanceDataView(input: GovernanceRequest): Promise<
         allEvents: eventRows,
         visibleEvents: events,
         epochs: epochRows,
+        lockPanels,
       }),
       metricSnapshot: engineV2Rows.find((row) => row.metricSnapshot)?.metricSnapshot ?? null,
       availableFilters: buildAvailableFilters({ rewardRows, epochs: epochRows, events: eventRows }),
@@ -659,6 +671,7 @@ export async function findGovernanceDataView(input: GovernanceRequest): Promise<
       allEvents,
       visibleEvents: events,
       epochs,
+      lockPanels,
     }),
     metricSnapshot: metricRow
       ? {

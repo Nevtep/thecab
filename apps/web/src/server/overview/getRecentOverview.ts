@@ -778,6 +778,117 @@ export function buildOverviewRewardFallbackEvents(input: {
   );
 }
 
+type OverviewEngineV2ActivityChartRow = {
+  activityId?: string | null;
+  action?: string | null;
+  summary?: string | null;
+  occurredAt?: string | null;
+  txHash?: string | null;
+  selectedDetail?: {
+    actionSummary?: string | null;
+    valueEffect?: {
+      rewardValueUsd?: number | string | null;
+      amountUsd?: number | string | null;
+    } | null;
+  } | null;
+};
+
+function mapEngineV2OverviewChartEventType(action: string | null | undefined): OverviewResponse["chart"]["events"][number]["type"] | null {
+  const normalized = action?.toLowerCase() ?? "";
+
+  if (normalized === "rebalance_same_pool" || normalized.includes("rebalance")) {
+    return "rebalance";
+  }
+  if (normalized.includes("reward") || normalized.includes("claim") || normalized.includes("fee")) {
+    return "claim";
+  }
+  if (normalized.includes("cash_out")) {
+    return "cash_out";
+  }
+  if (normalized === "swap") {
+    return "swap";
+  }
+  if (normalized.includes("created") || normalized.includes("deposit") || normalized.includes("stake")) {
+    return "redeploy";
+  }
+  if (normalized.includes("withdraw") || normalized.includes("unstake")) {
+    return "move_to_idle";
+  }
+  if (normalized.includes("lock")) {
+    return "lock";
+  }
+  if (normalized.includes("vote")) {
+    return "vote";
+  }
+
+  return null;
+}
+
+export function buildOverviewEngineV2ChartEvents(input: {
+  range: OverviewRange;
+  rows: OverviewEngineV2ActivityChartRow[] | null;
+  startAt: Date;
+  endAt: Date;
+}) {
+  const granularity = getRecentOverviewBucketConfig(input.range).granularity;
+  const events: OverviewResponse["chart"]["events"] = [];
+
+  for (const row of input.rows ?? []) {
+    const occurredAt = row.occurredAt ? new Date(row.occurredAt) : null;
+    if (!occurredAt || Number.isNaN(occurredAt.getTime()) || occurredAt < input.startAt || occurredAt > input.endAt) {
+      continue;
+    }
+
+    const type = mapEngineV2OverviewChartEventType(row.action);
+    if (!type) {
+      continue;
+    }
+
+    const rewardValueUsd = type === "claim"
+      ? asNumber(row.selectedDetail?.valueEffect?.rewardValueUsd)
+        ?? asNumber(row.selectedDetail?.valueEffect?.amountUsd)
+      : null;
+
+    events.push({
+      id: row.activityId ?? `${row.txHash ?? "engine-v2"}:${row.action ?? "activity"}:${row.occurredAt}`,
+      type,
+      occurredAt: occurredAt.toISOString(),
+      capturedAt: toBucketTimestamp(occurredAt.toISOString(), granularity),
+      detail: row.selectedDetail?.actionSummary ?? row.summary ?? row.action ?? null,
+      txHash: row.txHash ?? null,
+      rewardValueUsd,
+    });
+  }
+
+  return events.sort((left, right) => left.occurredAt.localeCompare(right.occurredAt));
+}
+
+function mergeOverviewChartEvents(
+  left: OverviewResponse["chart"]["events"],
+  right: OverviewResponse["chart"]["events"],
+) {
+  const merged = new Map<string, OverviewResponse["chart"]["events"][number]>();
+
+  for (const event of [...left, ...right]) {
+    const key = `${event.type}:${event.txHash ?? event.id}:${event.capturedAt}`;
+    const existing = merged.get(key);
+    if (!existing) {
+      merged.set(key, event);
+      continue;
+    }
+
+    merged.set(key, {
+      ...existing,
+      rewardValueUsd: (existing.rewardValueUsd ?? 0) > 0 ? existing.rewardValueUsd : event.rewardValueUsd,
+      detail: existing.detail ?? event.detail,
+    });
+  }
+
+  return [...merged.values()].sort((leftEvent, rightEvent) =>
+    leftEvent.occurredAt.localeCompare(rightEvent.occurredAt),
+  );
+}
+
 export function buildOverviewChartEvents(input: {
   chainId: number;
   rows: Awaited<ReturnType<typeof readRecentOverviewAnalyzedActivity>>;
@@ -879,16 +990,18 @@ function buildDistributionSliceComposition(
         row.primaryTokenSymbol
           ? {
               symbol: row.primaryTokenSymbol,
+              tokenAddress: row.primaryTokenAddress,
               amount: row.primaryTokenAmount,
             }
           : null,
         row.secondaryTokenSymbol
           ? {
               symbol: row.secondaryTokenSymbol,
+              tokenAddress: row.secondaryTokenAddress,
               amount: row.secondaryTokenAmount,
             }
           : null,
-      ].filter((token): token is { symbol: string; amount: number | null } => token !== null),
+      ].filter((token): token is { symbol: string; tokenAddress: string | null; amount: number | null } => token !== null),
     }))
     .filter((entry) => entry.label.length > 0 || entry.tokens.length > 0 || entry.valueUsd !== null)
     .sort((left, right) => {
@@ -2633,6 +2746,18 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
         }),
       )
     : [];
+  const engineV2ChartEvents = canUseAnalyzedOverviewActivity(response.analysis.status)
+    ? buildOverviewEngineV2ChartEvents({
+        range: input.range,
+        rows: await readEngineV2SurfaceRows<OverviewEngineV2ActivityChartRow>({
+          chainId: input.chainId,
+          walletAddress: input.walletAddress,
+          surface: "activity",
+        }),
+        startAt: rangeStartAt,
+        endAt: now,
+      })
+    : [];
   const claimRewardPricingAddresses = Array.from(
     new Set(
       analyzedActivityRows.flatMap((row) => {
@@ -3121,14 +3246,17 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
     coverageReasonCodes: chartPartial ? uniqueCoverageReasonCodes : uniqueCoverageReasonCodes,
     hasRewardMarkers,
     points: chartSeries.points,
-    events: buildOverviewChartEvents({
-      chainId: input.chainId,
-      rows: analyzedActivityRows,
-      range: input.range,
-      rewardValueByTxHash,
-      rewardPriceState,
-      rewardRows: realizedRewardRows,
-    }),
+    events: mergeOverviewChartEvents(
+      buildOverviewChartEvents({
+        chainId: input.chainId,
+        rows: analyzedActivityRows,
+        range: input.range,
+        rewardValueByTxHash,
+        rewardPriceState,
+        rewardRows: realizedRewardRows,
+      }),
+      engineV2ChartEvents,
+    ),
   };
 
   await Promise.all(

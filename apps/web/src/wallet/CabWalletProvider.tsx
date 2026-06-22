@@ -1,10 +1,16 @@
 "use client";
 
-import { createContext, type PropsWithChildren, useCallback, useMemo, useState } from "react";
+import { createContext, type PropsWithChildren, useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { stringToHex } from "viem";
 import { WagmiProvider, useAccount, useConnect, useDisconnect, useSwitchChain } from "wagmi";
 
+import {
+  AUTHENTICATED_ADDRESS_COOKIE,
+  normalizeWalletAddress,
+  resolveDebugWalletAddress,
+  resolveWalletAuthMode,
+} from "@/wallet/walletAuth.shared";
 import { wagmiConfig } from "@/wallet/createWagmiConfig";
 import { isSupportedChain, SUPPORTED_CHAIN_ID } from "@/wallet/supportedChains";
 
@@ -32,7 +38,14 @@ type PersonalSignProvider = {
 
 export const CabWalletContext = createContext<CabWalletContextValue | undefined>(undefined);
 
-const AUTHENTICATED_ADDRESS_COOKIE = "cab_authenticated_address";
+const AUTHENTICATED_ADDRESS_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
+const CLIENT_WALLET_AUTH_MODE = resolveWalletAuthMode({
+  explicitMode: process.env.NEXT_PUBLIC_CAB_WALLET_AUTH_MODE ?? null,
+  nodeEnv: process.env.NODE_ENV ?? "development",
+});
+const CLIENT_DEBUG_WALLET_ADDRESS = CLIENT_WALLET_AUTH_MODE === "PROD"
+  ? null
+  : resolveDebugWalletAddress(process.env.NEXT_PUBLIC_DEBUG_WALLET_ADDRESS ?? null);
 
 function readAuthenticatedAddressCookie() {
   if (typeof document === "undefined") {
@@ -52,7 +65,7 @@ function writeAuthenticatedAddressCookie(address: string) {
     return;
   }
 
-  document.cookie = `${AUTHENTICATED_ADDRESS_COOKIE}=${encodeURIComponent(address.toLowerCase())}; Path=/; SameSite=Lax`;
+  document.cookie = `${AUTHENTICATED_ADDRESS_COOKIE}=${encodeURIComponent(address.toLowerCase())}; Max-Age=${AUTHENTICATED_ADDRESS_COOKIE_MAX_AGE_SECONDS}; Path=/; SameSite=Lax`;
 }
 
 function clearAuthenticatedAddressCookie() {
@@ -73,12 +86,26 @@ function CabWalletStateProvider({ children }: PropsWithChildren) {
   const persistedAuthenticatedAddress = readAuthenticatedAddressCookie();
   const playwrightAuthenticatedAddress =
     typeof navigator !== "undefined" && navigator.webdriver ? persistedAuthenticatedAddress : null;
-  const effectiveAddress = playwrightAuthenticatedAddress ?? address;
-  const effectiveChainId = playwrightAuthenticatedAddress ? SUPPORTED_CHAIN_ID : chainId;
-  const effectiveStatus = playwrightAuthenticatedAddress ? "connected" : status;
-  const effectiveIsConnected = playwrightAuthenticatedAddress ? true : isConnected;
+  const debugAuthenticatedAddress = CLIENT_DEBUG_WALLET_ADDRESS;
+  const forcedAuthenticatedAddress = playwrightAuthenticatedAddress ?? debugAuthenticatedAddress;
+  const effectiveAddress = forcedAuthenticatedAddress ?? address;
+  const effectiveChainId = forcedAuthenticatedAddress ? SUPPORTED_CHAIN_ID : chainId;
+  const effectiveStatus = forcedAuthenticatedAddress ? "connected" : status;
+  const effectiveIsConnected = forcedAuthenticatedAddress ? true : isConnected;
   const normalizedAddress = effectiveAddress?.toLowerCase() ?? null;
   const isAuthReady = effectiveStatus !== "connecting" && effectiveStatus !== "reconnecting";
+
+  useEffect(() => {
+    if (!normalizedAddress || !effectiveIsConnected) {
+      return;
+    }
+
+    if (persistedAuthenticatedAddress === normalizedAddress) {
+      return;
+    }
+
+    writeAuthenticatedAddressCookie(normalizedAddress);
+  }, [effectiveIsConnected, normalizedAddress, persistedAuthenticatedAddress]);
 
   const requestSignature = useCallback(async (signerProvider: unknown, connectedAddress: string) => {
     if (
@@ -182,17 +209,17 @@ function CabWalletStateProvider({ children }: PropsWithChildren) {
       status: effectiveStatus,
       isConnected: effectiveIsConnected,
       isAuthenticated: Boolean(
-        playwrightAuthenticatedAddress || (normalizedAddress && persistedAuthenticatedAddress === normalizedAddress),
+        forcedAuthenticatedAddress || (normalizedAddress && persistedAuthenticatedAddress === normalizedAddress),
       ),
       isAuthReady,
       isAuthenticating,
       isSupportedChain: isSupportedChain(effectiveChainId),
-      connectorName: playwrightAuthenticatedAddress ? "playwright" : connector?.name ?? null,
+      connectorName: playwrightAuthenticatedAddress ? "playwright" : debugAuthenticatedAddress ? "debug" : connector?.name ?? null,
       connect,
       disconnect,
       switchToSupportedChain,
     }),
-    [connect, connector?.name, disconnect, effectiveAddress, effectiveChainId, effectiveIsConnected, effectiveStatus, isAuthReady, isAuthenticating, normalizedAddress, persistedAuthenticatedAddress, playwrightAuthenticatedAddress, switchToSupportedChain],
+    [connect, connector?.name, debugAuthenticatedAddress, disconnect, effectiveAddress, effectiveChainId, effectiveIsConnected, effectiveStatus, forcedAuthenticatedAddress, isAuthReady, isAuthenticating, normalizedAddress, persistedAuthenticatedAddress, playwrightAuthenticatedAddress, switchToSupportedChain],
   );
 
   return <CabWalletContext.Provider value={value}>{children}</CabWalletContext.Provider>;

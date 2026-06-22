@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { runStartAnalysis, type StartAnalysisPayload } from "@/app/api/analysis/start/start-analysis";
+import { SUPPORTED_CHAINS } from "@/chains/chains";
+import { runStartAnalysis, type StartAnalysisDeps, type StartAnalysisPayload } from "@/app/api/analysis/start/start-analysis";
 
 function createPayload(overrides: Partial<StartAnalysisPayload> = {}): StartAnalysisPayload {
   return {
@@ -19,9 +20,37 @@ function createDeps() {
   const mergedMetadata: Array<Record<string, unknown>> = [];
   const failedUpdates: Array<Record<string, unknown>> = [];
 
+  const createRunRow = (input: Record<string, unknown>) => {
+    const triggeredAtUtc = input.triggeredAtUtc instanceof Date
+      ? input.triggeredAtUtc
+      : new Date("2026-06-01T12:00:00.000Z");
+
+    return {
+      id: "run-1",
+      walletAddress: String(input.walletAddress),
+      chainId: Number(input.chainId),
+      status: "queued",
+      stage: "queued",
+      progressPct: 0,
+      mode: String(input.mode),
+      triggeredAtUtc,
+      utcDayBucket: "2026-06-01",
+      coverage: "unknown",
+      coverageReasonsJson: [],
+      startedAt: triggeredAtUtc,
+      completedAt: null,
+      cancelledAt: null,
+      cancelledReason: null,
+      lastError: null,
+      metadataJson: {},
+      createdAt: triggeredAtUtc,
+      updatedAt: triggeredAtUtc,
+    };
+  };
+
   return {
     deps: {
-      assertSupportedChain: () => undefined,
+      assertSupportedChain: () => SUPPORTED_CHAINS.base,
       assertAuthenticatedWallet: async () => undefined,
       findActiveAnalysisRun: async () => null,
       findLatestSameDayAnalysisRun: async () => null,
@@ -33,19 +62,7 @@ function createDeps() {
       },
       createAnalysisRun: async (input: Record<string, unknown>) => {
         createdRuns.push(input);
-        return {
-          id: "run-1",
-          walletAddress: input.walletAddress,
-          chainId: input.chainId,
-          status: "queued",
-          mode: input.mode,
-          triggeredAtUtc: input.triggeredAtUtc,
-          updatedAt: input.triggeredAtUtc,
-          completedAt: null,
-          coverage: "unknown",
-          coverageReasonsJson: [],
-          lastError: null,
-        };
+        return createRunRow(input);
       },
       triggerAnalysisRunTask: async (input: Record<string, unknown>) => {
         triggeredTasks.push(input);
@@ -59,7 +76,7 @@ function createDeps() {
       },
       now: () => new Date("2026-06-01T12:00:00.000Z"),
       todayUtcBucket: () => "2026-06-01",
-    },
+    } as unknown as StartAnalysisDeps,
     createdRuns,
     triggeredTasks,
     supersededRunIds,
@@ -82,18 +99,27 @@ test("runStartAnalysis forwards incremental mode into the persisted run and trig
 });
 
 test("runStartAnalysis reuses same-day completed runs only for full-history requests", async () => {
+  const completedAt = new Date("2026-06-01T10:00:00.000Z");
   const sameDayRun = {
     id: "run-existing",
     walletAddress: "0x0000000000000000000000000000000000000001",
     chainId: 8453,
     status: "complete",
+    stage: "complete",
+    progressPct: 100,
     mode: "full_history",
     triggeredAtUtc: new Date("2026-06-01T09:00:00.000Z"),
-    updatedAt: new Date("2026-06-01T10:00:00.000Z"),
-    completedAt: new Date("2026-06-01T10:00:00.000Z"),
+    utcDayBucket: "2026-06-01",
+    startedAt: new Date("2026-06-01T09:00:00.000Z"),
+    completedAt,
+    cancelledAt: null,
+    cancelledReason: null,
     coverage: "full",
     coverageReasonsJson: [],
     lastError: null,
+    metadataJson: {},
+    createdAt: new Date("2026-06-01T09:00:00.000Z"),
+    updatedAt: completedAt,
   };
 
   const fullHistoryCase = createDeps();

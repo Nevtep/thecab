@@ -152,51 +152,51 @@ export function DepositsContainer() {
 
   const onStatusChange = useCallback(
     (value: DepositsStatusFilter) => {
-      pushUrlState({ ...urlState, status: value, page: 1 });
+      pushUrlState({ ...urlState, status: value, page: 1, selectedDepositId: null });
     },
     [pushUrlState, urlState],
   );
 
   const onReturnSignChange = useCallback(
     (value: DepositsReturnSignFilter) => {
-      pushUrlState({ ...urlState, returnSign: value, page: 1 });
+      pushUrlState({ ...urlState, returnSign: value, page: 1, selectedDepositId: null });
     },
     [pushUrlState, urlState],
   );
 
   const onClearPool = useCallback(() => {
-    pushUrlState({ ...urlState, poolId: null, page: 1 });
+    pushUrlState({ ...urlState, poolId: null, page: 1, selectedDepositId: null });
   }, [pushUrlState, urlState]);
 
   const onStartDayChange = useCallback((value: string | null) => {
-    pushUrlState({ ...urlState, startDayUtc: value, page: 1 });
+    pushUrlState({ ...urlState, startDayUtc: value, page: 1, selectedDepositId: null });
   }, [pushUrlState, urlState]);
 
   const onEndDayChange = useCallback((value: string | null) => {
-    pushUrlState({ ...urlState, endDayUtc: value, page: 1 });
+    pushUrlState({ ...urlState, endDayUtc: value, page: 1, selectedDepositId: null });
   }, [pushUrlState, urlState]);
 
   const onClearDateRange = useCallback(() => {
-    pushUrlState({ ...urlState, startDayUtc: null, endDayUtc: null, page: 1 });
+    pushUrlState({ ...urlState, startDayUtc: null, endDayUtc: null, page: 1, selectedDepositId: null });
   }, [pushUrlState, urlState]);
 
   const onSortChange = useCallback(
     (sort: DepositsSortField, direction: DepositsSortDirection) => {
-      pushUrlState({ ...urlState, sort, direction, page: 1 });
+      pushUrlState({ ...urlState, sort, direction, page: 1, selectedDepositId: null });
     },
     [pushUrlState, urlState],
   );
 
   const onPageChange = useCallback(
     (page: number) => {
-      pushUrlState({ ...urlState, page });
+      pushUrlState({ ...urlState, page, selectedDepositId: null });
     },
     [pushUrlState, urlState],
   );
 
   const onPageSizeChange = useCallback(
     (pageSize: number) => {
-      pushUrlState({ ...urlState, pageSize, page: 1 });
+      pushUrlState({ ...urlState, pageSize, page: 1, selectedDepositId: null });
     },
     [pushUrlState, urlState],
   );
@@ -206,7 +206,7 @@ export function DepositsContainer() {
       if (typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches) {
         const currentQuery = serializeDepositsListUrlState(urlState);
         const returnTo = currentQuery ? `/deposits?${currentQuery}` : "/deposits";
-        router.push(`/deposits/${depositId}?chainId=${resolvedChainId}&returnTo=${encodeURIComponent(returnTo)}`);
+        router.push(`/deposits/${encodeURIComponent(depositId)}?chainId=${resolvedChainId}&returnTo=${encodeURIComponent(returnTo)}`);
         return;
       }
       pushUrlState({ ...urlState, selectedDepositId: depositId });
