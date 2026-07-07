@@ -4,6 +4,7 @@ import { readAnalysisStatusContext } from "@/server/analysis/analysis-run.reposi
 import { engineV2ReadModelsEnabled, readEngineV2SurfaceRows } from "@/server/analysis/engine-v2/materializers";
 import { getDb } from "@/server/db/client";
 import { performanceSnapshots, pools, rewardEvents } from "@/server/db/schema";
+import { densifyPoolHistoryPoints } from "@/server/pools/poolHistorySeries";
 import { getExplorerTxUrl, getSupportedChain } from "@/server/chains";
 import { formatRawTokenAmount } from "@/server/tokens/token-amounts";
 import type {
@@ -54,6 +55,8 @@ export type HistoricalCapitalPoint = {
 };
 
 type EngineV2PoolHistoryReadModelRow = {
+  coveredStartDayUtc?: string | null;
+  coveredEndDayUtc?: string | null;
   history?: {
     points?: unknown[];
   };
@@ -496,7 +499,27 @@ export function aggregateHistoricalCapitalFromEngineV2Pools(input: {
   const buckets = new Map<string, number>();
 
   for (const row of input.rows) {
-    const points = Array.isArray(row.history?.points) ? row.history.points : [];
+    const points = Array.isArray(row.history?.points)
+      ? densifyPoolHistoryPoints({
+        points: row.history.points
+          .map((pointCandidate) => asRecord(pointCandidate))
+          .map((point) => ({
+            dayUtc: asString(point.dayUtc) ?? "",
+            totalValueUsd: asNumber(point.totalValueUsd) ?? 0,
+            deployedValueUsd: asNumber(point.deployedValueUsd) ?? 0,
+            residualValueUsd: asNumber(point.residualValueUsd) ?? 0,
+            manualValueUsd: asNumber(point.manualValueUsd) ?? 0,
+            strategyValueUsd: asNumber(point.strategyValueUsd) ?? 0,
+            rewardValueUsd: asNumber(point.rewardValueUsd) ?? 0,
+            cumulativeRewardsUsd: asNumber(point.cumulativeRewardsUsd) ?? 0,
+            capitalInUsd: asNumber(point.capitalInUsd) ?? 0,
+            capitalOutUsd: asNumber(point.capitalOutUsd) ?? 0,
+            metadata: asRecord(point.metadata),
+          })),
+        coveredStartDayUtc: row.coveredStartDayUtc ?? null,
+        coveredEndDayUtc: row.coveredEndDayUtc ?? null,
+      })
+      : [];
     for (const point of points) {
       const record = asRecord(point);
       const dayUtc = asString(record.dayUtc);

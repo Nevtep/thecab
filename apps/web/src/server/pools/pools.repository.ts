@@ -1,4 +1,5 @@
 import { engineV2ReadModelsEnabled, readEngineV2SurfaceRows } from "@/server/analysis/engine-v2/materializers";
+import { densifyPoolHistoryPoints } from "@/server/pools/poolHistorySeries";
 import type { PoolDetailRange, PoolHistoryPoint, PoolPositions, PoolPositionToken, PoolsListItem } from "@/server/pools/pools.types";
 
 type PoolsListRepositoryItem = PoolsListItem & {
@@ -275,7 +276,11 @@ function summarizeEngineV2PoolRows(rows: EngineV2PoolReadModelRow[]) {
 
   for (const row of rows) {
     const historyPoints = Array.isArray(row.history?.points)
-      ? row.history.points as EngineV2PoolHistoryPoint[]
+      ? densifyPoolHistoryPoints({
+        points: normalizeEngineV2PoolHistoryPoints(row.history.points),
+        coveredStartDayUtc: row.coveredStartDayUtc,
+        coveredEndDayUtc: row.coveredEndDayUtc,
+      })
       : [];
 
     for (const point of historyPoints) {
@@ -531,7 +536,11 @@ export async function readPoolHistory(input: {
     surface: "pools",
   });
   const engineV2Pool = engineV2Rows?.find((row) => row.poolId === input.poolId);
-  const sorted = normalizeEngineV2PoolHistoryPoints(engineV2Pool?.history?.points ?? []);
+  const sorted = densifyPoolHistoryPoints({
+    points: normalizeEngineV2PoolHistoryPoints(engineV2Pool?.history?.points ?? []),
+    coveredStartDayUtc: engineV2Pool?.coveredStartDayUtc ?? null,
+    coveredEndDayUtc: engineV2Pool?.coveredEndDayUtc ?? null,
+  });
   const rangeDays = daysForRange(input.range);
   return rangeDays === null ? sorted : sorted.slice(-rangeDays);
 }

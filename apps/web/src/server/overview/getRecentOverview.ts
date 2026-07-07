@@ -1903,13 +1903,14 @@ async function hydrateHistoricalPriceLookup(input: {
 
   const startTime = input.bucketTimestamps[0] ?? new Date().toISOString();
   const endTime = input.bucketTimestamps[input.bucketTimestamps.length - 1] ?? new Date().toISOString();
-  const resolution = input.granularity === "hour" ? "1h" : "1d";
+  const providerInterval = input.granularity === "hour" ? "1h" : "1d";
+  const cacheResolution = input.granularity === "hour" ? "hourly" : "daily";
   const cachedPriceRows = await readOverviewPricePointsInRange({
     chainId: input.chainId,
     tokenAddresses: normalizedAddresses,
     startAt: new Date(startTime),
     endAt: new Date(endTime),
-    resolution,
+    resolution: cacheResolution,
   });
   const cachedRowsByAddress = new Map<string, typeof cachedPriceRows>();
 
@@ -1955,7 +1956,7 @@ async function hydrateHistoricalPriceLookup(input: {
     fillMissingBucketPrices(
       input.bucketTimestamps,
       priceSeriesByBucket,
-      latestHistoricalPoint?.priceUsd ?? input.currentPriceLookup.get(address)?.priceUsd ?? null,
+      latestHistoricalPoint?.priceUsd ?? null,
     );
 
     if (priceSeriesByBucket.size > 0) {
@@ -1965,20 +1966,6 @@ async function hydrateHistoricalPriceLookup(input: {
         input.latestHistoricalPriceLookup.set(address, latestHistoricalPoint);
       }
 
-      continue;
-    }
-
-    const currentPriceFallback = input.currentPriceLookup.get(address);
-    if (currentPriceFallback) {
-      for (const bucketTimestamp of input.bucketTimestamps) {
-        priceSeriesByBucket.set(bucketTimestamp, currentPriceFallback.priceUsd);
-      }
-
-      input.historicalPriceLookup.set(address, priceSeriesByBucket);
-      input.latestHistoricalPriceLookup.set(address, {
-        priceUsd: currentPriceFallback.priceUsd,
-        pricedAt: currentPriceFallback.pricedAt,
-      });
       continue;
     }
 
@@ -2005,7 +1992,7 @@ async function hydrateHistoricalPriceLookup(input: {
             address,
             startTime,
             endTime,
-            interval: resolution,
+            interval: providerInterval,
           });
 
           await insertOverviewRawProviderRecord({
@@ -2018,7 +2005,7 @@ async function hydrateHistoricalPriceLookup(input: {
               address,
               startTime,
               endTime,
-              interval: resolution,
+              interval: providerInterval,
               range: input.range,
               maxAddressesPerRequest: MAX_ALCHEMY_HISTORICAL_ADDRESSES_PER_REQUEST,
               skippedAddressCount,
@@ -2051,7 +2038,7 @@ async function hydrateHistoricalPriceLookup(input: {
               tokenAddress: address,
               pricedAt: new Date(pricePoint.timestamp),
               priceUsd: String(priceUsd),
-              resolution,
+              resolution: cacheResolution,
               metadataJson: {
                 provider: "alchemy",
                 range: input.range,
@@ -2059,30 +2046,18 @@ async function hydrateHistoricalPriceLookup(input: {
             });
           }
         } catch (error) {
-          const fallbackPriceEntry = input.currentPriceLookup.get(address);
-          if (!fallbackPriceEntry) {
-            throw error;
-          }
-
-          latestHistoricalPoint = {
-            priceUsd: fallbackPriceEntry.priceUsd,
-            pricedAt: fallbackPriceEntry.pricedAt,
-          };
-        }
-
-        if (priceSeriesByBucket.size === 0 && latestHistoricalPoint) {
-          for (const bucketTimestamp of input.bucketTimestamps) {
-            priceSeriesByBucket.set(bucketTimestamp, latestHistoricalPoint.priceUsd);
-          }
+          throw error;
         }
 
         fillMissingBucketPrices(
           input.bucketTimestamps,
           priceSeriesByBucket,
-          latestHistoricalPoint?.priceUsd ?? input.currentPriceLookup.get(address)?.priceUsd ?? null,
+          latestHistoricalPoint?.priceUsd ?? null,
         );
 
-        input.historicalPriceLookup.set(address, priceSeriesByBucket);
+        if (priceSeriesByBucket.size > 0) {
+          input.historicalPriceLookup.set(address, priceSeriesByBucket);
+        }
 
         if (latestHistoricalPoint) {
           input.latestHistoricalPriceLookup.set(address, latestHistoricalPoint);
@@ -2188,6 +2163,173 @@ function buildHistoricalProtocolValueLookup(input: {
     estimatedDeployedValueByBucket: estimatedValues.valueByBucket,
     hasPartialHistory: hasPartialHistory || estimatedValues.hasPartialHistory,
   };
+}
+
+function buildCurrentDeployedTokenBalances(
+  chainId: number,
+  rows: OverviewResponse["protocolPositions"]["rows"],
+) {
+  const balancesByToken = new Map<string, number>();
+
+  for (const row of rows) {
+    if (row.family === "governance_lock") {
+      continue;
+    }
+
+    const primaryTokenAddress = resolveAlchemyPricingAddress(
+      chainId,
+      row.primaryTokenAddress,
+      row.primaryTokenSymbol,
+      { verifiedContract: true },
+    );
+    const secondaryTokenAddress = resolveAlchemyPricingAddress(
+      chainId,
+      row.secondaryTokenAddress,
+      row.secondaryTokenSymbol,
+      { verifiedContract: true },
+    );
+
+    if (primaryTokenAddress && typeof row.primaryTokenAmount === "number" && row.primaryTokenAmount > 0) {
+      balancesByToken.set(
+        primaryTokenAddress,
+        (balancesByToken.get(primaryTokenAddress) ?? 0) + row.primaryTokenAmount,
+      );
+    }
+
+    if (secondaryTokenAddress && typeof row.secondaryTokenAmount === "number" && row.secondaryTokenAmount > 0) {
+      balancesByToken.set(
+        secondaryTokenAddress,
+        (balancesByToken.get(secondaryTokenAddress) ?? 0) + row.secondaryTokenAmount,
+      );
+    }
+  }
+
+  return Array.from(balancesByToken.entries()).map(([tokenAddress, amount]) => ({ tokenAddress, amount }));
+}
+
+function sumCurrentDeployedTokenBalancesUsd(
+  balances: Array<{ tokenAddress: string; amount: number }>,
+  currentPriceLookup: Map<string, { priceUsd: number; pricedAt: string | null; confidence: "high" | "medium" }>,
+) {
+  let hasPricedBalance = false;
+  let totalValueUsd = 0;
+
+  for (const balance of balances) {
+    if (!Number.isFinite(balance.amount) || balance.amount <= 0) {
+      continue;
+    }
+
+    const priceUsd = currentPriceLookup.get(balance.tokenAddress)?.priceUsd ?? null;
+    if (priceUsd === null) {
+      continue;
+    }
+
+    hasPricedBalance = true;
+    totalValueUsd += balance.amount * priceUsd;
+  }
+
+  return hasPricedBalance ? totalValueUsd : null;
+}
+
+function revalueAnalyzedSnapshotRows(input: {
+  chainId: number;
+  currentBucketTimestamp: string;
+  rows: Array<{
+    capturedAt: Date;
+    totalValueUsd: string | null;
+    deployedValueUsd: string | null;
+    idleValueUsd: string | null;
+    metadataJson: Record<string, unknown>;
+  }>;
+  granularity: "hour" | "day";
+  historicalPriceLookup: Map<string, Map<string, number>>;
+  latestHistoricalPriceLookup: Map<string, { priceUsd: number; pricedAt: string | null }>;
+  currentPriceLookup: Map<string, { priceUsd: number; pricedAt: string | null; confidence: "high" | "medium" }>;
+}) {
+  return input.rows.map((row) => {
+    const bucketTimestamp = toBucketTimestamp(row.capturedAt.toISOString(), input.granularity);
+    const metadataJson = row.metadataJson ?? {};
+    const underlyingTokenBalances = Array.isArray(metadataJson.underlyingTokenBalances)
+      ? metadataJson.underlyingTokenBalances as Array<Record<string, unknown>>
+      : [];
+    const idleTokens = Array.isArray(metadataJson.idleTokens)
+      ? metadataJson.idleTokens as Array<Record<string, unknown>>
+      : [];
+
+    let deployedValueUsd: number | null = null;
+    if (underlyingTokenBalances.length > 0) {
+      deployedValueUsd = 0;
+      for (const balance of underlyingTokenBalances) {
+        const tokenAddress = resolveAlchemyPricingAddress(
+          input.chainId,
+          typeof balance.tokenAddress === "string" ? balance.tokenAddress : null,
+          null,
+          { verifiedContract: true },
+        );
+        const amount = asNumber(balance.amount);
+        if (!tokenAddress || amount === null || amount <= 0) {
+          continue;
+        }
+
+        const isCurrentBucket = bucketTimestamp === input.currentBucketTimestamp;
+        const historicalPriceUsd = input.historicalPriceLookup.get(tokenAddress)?.get(bucketTimestamp) ?? null;
+        const currentPriceUsd = isCurrentBucket
+          ? input.currentPriceLookup.get(tokenAddress)?.priceUsd ?? null
+          : null;
+        const priceUsd = isCurrentBucket
+          ? currentPriceUsd ?? historicalPriceUsd
+          : historicalPriceUsd;
+        if (priceUsd === null) {
+          continue;
+        }
+
+        deployedValueUsd += amount * priceUsd;
+      }
+    }
+
+    let idleValueUsd: number | null = row.idleValueUsd !== null ? Number(row.idleValueUsd) : null;
+    if (idleTokens.length > 0) {
+      idleValueUsd = 0;
+      for (const token of idleTokens) {
+        const tokenAddress = resolveAlchemyPricingAddress(
+          input.chainId,
+          typeof token.tokenAddress === "string" ? token.tokenAddress : null,
+          typeof token.symbol === "string" ? token.symbol : null,
+          { verifiedContract: true },
+        );
+        const amount = asNumber(token.balanceFormatted);
+        if (!tokenAddress || amount === null || amount <= 0) {
+          continue;
+        }
+
+        const isCurrentBucket = bucketTimestamp === input.currentBucketTimestamp;
+        const historicalPriceUsd = input.historicalPriceLookup.get(tokenAddress)?.get(bucketTimestamp) ?? null;
+        const currentPriceUsd = isCurrentBucket
+          ? input.currentPriceLookup.get(tokenAddress)?.priceUsd ?? null
+          : null;
+        const priceUsd = isCurrentBucket
+          ? currentPriceUsd ?? historicalPriceUsd
+          : historicalPriceUsd;
+        if (priceUsd === null) {
+          continue;
+        }
+
+        idleValueUsd += amount * priceUsd;
+      }
+    }
+
+    const totalValueUsd =
+      deployedValueUsd === null && idleValueUsd === null
+        ? row.totalValueUsd
+        : String((deployedValueUsd ?? 0) + (idleValueUsd ?? 0));
+
+    return {
+      ...row,
+      totalValueUsd,
+      deployedValueUsd: deployedValueUsd === null ? row.deployedValueUsd : String(deployedValueUsd),
+      idleValueUsd: idleValueUsd === null ? row.idleValueUsd : String(idleValueUsd),
+    };
+  });
 }
 
 function calculatePercentChange(currentValue: number | null, previousValue: number | null) {
@@ -2891,22 +3033,12 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
     priceLookup,
   });
 
-  const [historicalSnapshotRows, analyzedSnapshotRows] = await Promise.all([
-    readOverviewPortfolioSnapshots({
-      walletAddress: input.walletAddress,
-      chainId: input.chainId,
-      startAt: rangeStartAt,
-      endAt: now,
-    }),
-    canUseAnalyzedOverviewActivity(response.analysis.status) && bucketConfig.granularity === "day"
-      ? readOverviewAnalyzedPortfolioSnapshots({
-          walletAddress: input.walletAddress,
-          chainId: input.chainId,
-          startAt: rangeStartAt,
-          endAt: now,
-        })
-      : Promise.resolve([]),
-  ]);
+  const historicalSnapshotRowsPromise = readOverviewPortfolioSnapshots({
+    walletAddress: input.walletAddress,
+    chainId: input.chainId,
+    startAt: rangeStartAt,
+    endAt: now,
+  });
 
   historicalPriceFetchFailed = await hydrateHistoricalPriceLookup({
     walletAddress: input.walletAddress,
@@ -2999,6 +3131,27 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
   const assetRows = hydratedAssetRows.map((row) => row.assetRow);
   const hiddenAssetRows = hydratedAssetRows.filter((row) => row.assetRow.isHiddenByDefault);
   const visibleAssetRows = hydratedAssetRows.filter((row) => !row.assetRow.isHiddenByDefault);
+  const visibleIdleTokens = visibleAssetRows.flatMap((row) => {
+    const tokenAddress = row.assetRow.tokenAddress;
+    if (typeof tokenAddress !== "string" || tokenAddress.length === 0) {
+      return [];
+    }
+
+    return [{
+      tokenAddress,
+      symbol: row.assetRow.symbol,
+      name: row.assetRow.name,
+      balanceFormatted: Number.parseFloat(row.assetRow.balance),
+      currentPriceUsd: row.assetRow.priceUsd,
+      decimals: asNumber(
+        tokenPricingContexts.find((context) => context.tokenAddress === tokenAddress)?.token.decimals,
+      ),
+      possibleSpam: row.trustInput.moralisPossibleSpam,
+      verifiedContract: row.trustInput.moralisVerifiedContract,
+      isNativeAsset: row.trustInput.isNativeAsset,
+    }];
+  });
+  const historicalSnapshotRows = await historicalSnapshotRowsPromise;
   const pricedVisibleAssetRows = visibleAssetRows.filter((row) => row.assetRow.valueUsd !== null);
   const idleValueUsd = sumNullableUsd(pricedVisibleAssetRows.map((row) => row.assetRow.valueUsd));
   const hiddenAssetReasonCodes = buildHiddenAssetReasonCodes(hiddenAssetRows);
@@ -3059,11 +3212,8 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
       .filter((row) => row.family === "staked_lp")
       .map((row) => row.valueUsd),
   );
-  const deployedValueUsd = sumNullableUsd(protocolPositions.block.rows.map((row) => row.valueUsd));
-  const totalValueUsd =
-    idleValueUsd === null && deployedValueUsd === null
-      ? null
-      : (idleValueUsd ?? 0) + (deployedValueUsd ?? 0);
+  const protocolReportedDeployedValueUsd = sumNullableUsd(protocolPositions.block.rows.map((row) => row.valueUsd));
+  const currentDeployedTokenBalances = buildCurrentDeployedTokenBalances(input.chainId, protocolPositions.block.rows);
 
   const protocolPriceAddresses = Array.from(
     new Set(
@@ -3088,6 +3238,14 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
       })) || priceFetchFailed;
   }
 
+  const deployedValueUsd =
+    sumCurrentDeployedTokenBalancesUsd(currentDeployedTokenBalances, priceLookup)
+    ?? protocolReportedDeployedValueUsd;
+  const totalValueUsd =
+    idleValueUsd === null && deployedValueUsd === null
+      ? null
+      : (idleValueUsd ?? 0) + (deployedValueUsd ?? 0);
+
   historicalPriceFetchFailed =
     (await hydrateHistoricalPriceLookup({
       walletAddress: input.walletAddress,
@@ -3107,6 +3265,26 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
     protocolRows: protocolPositions.block.rows,
     manualArtifacts: protocolPositions.artifacts.manualCurrentState,
     mellowArtifacts: protocolPositions.artifacts.mellowCurrentState,
+  });
+
+  const analyzedSnapshotRowsRaw = canUseAnalyzedOverviewActivity(response.analysis.status) && bucketConfig.granularity === "day"
+    ? await readOverviewAnalyzedPortfolioSnapshots({
+      walletAddress: input.walletAddress,
+      chainId: input.chainId,
+      startAt: rangeStartAt,
+      endAt: now,
+      currentIdleTokens: visibleIdleTokens,
+      currentDeployedTokenBalances,
+    })
+    : [];
+  const analyzedSnapshotRows = revalueAnalyzedSnapshotRows({
+    chainId: input.chainId,
+    currentBucketTimestamp: toBucketTimestamp(now.toISOString(), bucketConfig.granularity),
+    rows: analyzedSnapshotRowsRaw,
+    granularity: bucketConfig.granularity,
+    historicalPriceLookup,
+    latestHistoricalPriceLookup,
+    currentPriceLookup: priceLookup,
   });
 
   const snapshotValuesByBucket = buildSnapshotValueLookup({
@@ -3136,7 +3314,7 @@ export async function getRecentOverview(input: OverviewRequest): Promise<Overvie
         tokenAddresses: claimRewardPricingAddresses,
         startAt: rangeStartAt,
         endAt: now,
-        resolution: bucketConfig.granularity === "hour" ? "1h" : "1d",
+        resolution: bucketConfig.granularity === "hour" ? "hourly" : "daily",
       })
     : [];
   const rewardPriceState = buildOverviewRewardPriceState({

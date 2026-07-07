@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { sumAnalyzedOverviewRewardTotals } from "@/server/overview/getRecentOverview";
 import {
+  buildOverviewDeployedSnapshotsFromEngineV2,
   mergeAnalyzedPerformanceSnapshotRows,
   shouldExcludeLedgerEventFromOverviewUi,
   shouldPreserveAnalyzedPortfolioSnapshot,
@@ -56,6 +57,154 @@ test("mergeAnalyzedPerformanceSnapshotRows prefers analyzed idle scope values fo
       source: "analyzed_history",
     },
   });
+});
+
+test("buildOverviewDeployedSnapshotsFromEngineV2 seeds balances from events before the requested range", () => {
+  const rows = buildOverviewDeployedSnapshotsFromEngineV2({
+    depositRows: [
+      {
+        token0Address: "0x4200000000000000000000000000000000000006",
+        token1Address: null,
+        lifecycle: [
+          {
+            id: "deposit-1",
+            sequenceIndex: 0,
+            eventType: "mint_position",
+            occurredAt: "2026-01-01T12:00:00.000Z",
+            txHash: "0x1",
+            logIndex: 0,
+            blockNumber: 0,
+            usdValue: 200,
+            signedTokenDeltas: [
+              {
+                tokenAddress: "0x4200000000000000000000000000000000000006",
+                symbol: "WETH",
+                direction: "out",
+                amountRaw: "1000000000000000000",
+                amountFormatted: "1",
+                usdValue: 200,
+                priceSource: "event",
+              },
+            ],
+            priceSource: "event",
+            confidence: "high",
+            inferredActionId: null,
+            coverageReasonCodes: [],
+            metadata: {},
+          },
+        ],
+      },
+    ],
+    strategyRows: [],
+    priceRows: [
+      {
+        tokenAddress: "0x4200000000000000000000000000000000000006",
+        priceUsd: "200",
+        pricedAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+    ],
+    startAt: new Date("2026-01-15T00:00:00.000Z"),
+    endAt: new Date("2026-01-20T00:00:00.000Z"),
+  });
+
+  assert.equal(rows.at(0)?.deployedValueUsd, "200");
+  assert.equal(rows.at(-1)?.deployedValueUsd, "200");
+  assert.deepEqual(rows.at(-1)?.metadataJson.underlyingTokenBalances, [
+    {
+      tokenAddress: "0x4200000000000000000000000000000000000006",
+      amount: 1,
+      valueUsd: 200,
+    },
+  ]);
+});
+
+test("buildOverviewDeployedSnapshotsFromEngineV2 can reverse-walk from current balances", () => {
+  const rows = buildOverviewDeployedSnapshotsFromEngineV2({
+    depositRows: [
+      {
+        token0Address: "0x4200000000000000000000000000000000000006",
+        token1Address: null,
+        lifecycle: [
+          {
+            id: "deposit-1",
+            sequenceIndex: 0,
+            eventType: "mint_position",
+            occurredAt: "2026-06-10T12:00:00.000Z",
+            txHash: "0x1",
+            logIndex: 0,
+            blockNumber: 0,
+            usdValue: 200,
+            signedTokenDeltas: [
+              {
+                tokenAddress: "0x4200000000000000000000000000000000000006",
+                symbol: "WETH",
+                direction: "out",
+                amountRaw: "1000000000000000000",
+                amountFormatted: "1",
+                usdValue: 200,
+                priceSource: "event",
+              },
+            ],
+            priceSource: "event",
+            confidence: "high",
+            inferredActionId: null,
+            coverageReasonCodes: [],
+            metadata: {},
+          },
+          {
+            id: "withdraw-1",
+            sequenceIndex: 1,
+            eventType: "withdraw",
+            occurredAt: "2026-06-20T12:00:00.000Z",
+            txHash: "0x2",
+            logIndex: 1,
+            blockNumber: 0,
+            usdValue: 100,
+            signedTokenDeltas: [
+              {
+                tokenAddress: "0x4200000000000000000000000000000000000006",
+                symbol: "WETH",
+                direction: "in",
+                amountRaw: "500000000000000000",
+                amountFormatted: "0.5",
+                usdValue: 100,
+                priceSource: "event",
+              },
+            ],
+            priceSource: "event",
+            confidence: "high",
+            inferredActionId: null,
+            coverageReasonCodes: [],
+            metadata: {},
+          },
+        ],
+      },
+    ],
+    strategyRows: [],
+    priceRows: [
+      {
+        tokenAddress: "0x4200000000000000000000000000000000000006",
+        priceUsd: "200",
+        pricedAt: new Date("2026-06-10T00:00:00.000Z"),
+      },
+      {
+        tokenAddress: "0x4200000000000000000000000000000000000006",
+        priceUsd: "210",
+        pricedAt: new Date("2026-06-20T12:00:00.000Z"),
+      },
+    ],
+    startAt: new Date("2026-06-19T00:00:00.000Z"),
+    endAt: new Date("2026-06-20T23:59:59.999Z"),
+    currentTokenBalances: [
+      {
+        tokenAddress: "0x4200000000000000000000000000000000000006",
+        amount: 0.5,
+      },
+    ],
+  });
+
+  assert.equal(rows.at(-1)?.deployedValueUsd, "105");
+  assert.equal(rows.at(0)?.deployedValueUsd, "200");
 });
 
 test("shouldPreserveAnalyzedPortfolioSnapshot keeps analysis snapshots from recent overwrite", () => {

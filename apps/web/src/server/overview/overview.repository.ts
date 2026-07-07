@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 
 import { readEngineV2SurfaceRows } from "@/server/analysis/engine-v2/materializers";
 import { getDb } from "@/server/db/client";
@@ -18,7 +18,9 @@ import {
   rewardEvents,
   walletContexts,
 } from "@/server/db/schema";
+import type { DepositDetailView } from "@/server/deposits/deposits.types";
 import type { OverviewRequest } from "@/server/overview/overview.types";
+import type { StrategyDetailView } from "@/server/strategies/strategies.types";
 import { AERODROME_CL_POSITION_MANAGER_ADDRESS } from "@/server/protocol-positions/protocolMetadata";
 
 type ScopedWalletInput = Pick<OverviewRequest, "walletAddress" | "chainId">;
@@ -58,7 +60,26 @@ type MergedAnalyzedPerformanceSnapshotRow = {
   metadataJson: Record<string, unknown>;
 };
 
+type CurrentOverviewIdleTokenInput = {
+  tokenAddress: string;
+  symbol: string | null;
+  name: string | null;
+  balanceFormatted: number;
+  currentPriceUsd: number | null;
+  decimals: number | null;
+  possibleSpam: boolean | null;
+  verifiedContract: boolean | null;
+  isNativeAsset: boolean;
+};
+
+type CurrentOverviewDeployedTokenInput = {
+  tokenAddress: string;
+  amount: number;
+};
+
 type EngineV2PoolHistoryReadModelRow = {
+  coveredStartDayUtc?: string | null;
+  coveredEndDayUtc?: string | null;
   history?: {
     points?: unknown[];
   };
@@ -70,57 +91,587 @@ function asRecord(value: unknown): Record<string, unknown> {
     : {};
 }
 
-function readOverviewPoolHistorySnapshotsFromEngineV2(input: {
-  rows: EngineV2PoolHistoryReadModelRow[];
+function asString(value: unknown) {
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+function asNumber(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string" && value.trim().length > 0) {
+    const parsed = Number(value.replaceAll(",", ""));
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+}
+
+function iterateUtcDays(startDayUtc: string, endDayUtc: string) {
+  const days: string[] = [];
+  const cursor = new Date(`${startDayUtc}T00:00:00.000Z`);
+  const end = new Date(`${endDayUtc}T00:00:00.000Z`);
+
+  while (cursor.getTime() <= end.getTime()) {
+    days.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+
+  return days;
+}
+
+function endOfDayUtc(dayUtc: string) {
+  const date = new Date(`${dayUtc}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + 1);
+  return date;
+}
+
+function dayUtcFromDate(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function dividePow10(rawAmount: string, decimals: number) {
+  if (!/^-?\d+$/.test(rawAmount)) {
+    return 0;
+  }
+
+  const negative = rawAmount.startsWith("-");
+  const digits = negative ? rawAmount.slice(1) : rawAmount;
+  const padded = digits.padStart(decimals + 1, "0");
+  const whole = padded.slice(0, padded.length - decimals);
+  const fraction = padded.slice(padded.length - decimals);
+  const value = Number(`${whole}.${fraction}`);
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return negative ? -value : value;
+}
+
+function buildDailyPriceSeriesByToken(input: {
+  dayRows: string[];
+  priceRows: Array<{ tokenAddress: string; priceUsd: string; pricedAt: Date }>;
+  capturedAt: Date;
+}) {
+  const rowsByToken = new Map<string, Array<{ pricedAt: Date; priceUsd: number }>>();
+
+  for (const row of input.priceRows) {
+    const tokenAddress = row.tokenAddress.toLowerCase();
+    const priceUsd = asNumber(row.priceUsd);
+    if (priceUsd === null) {
+      continue;
+    }
+
+    const bucket = rowsByToken.get(tokenAddress) ?? [];
+    bucket.push({ pricedAt: row.pricedAt, priceUsd });
+    rowsByToken.set(tokenAddress, bucket);
+  }
+
+  const latestPriceByToken = new Map<string, number>();
+  const priceSeriesByToken = new Map<string, Map<string, number>>();
+
+  for (const [tokenAddress, rows] of rowsByToken.entries()) {
+    rows.sort((left, right) => left.pricedAt.getTime() - right.pricedAt.getTime());
+    const latestRow = rows[rows.length - 1];
+    if (latestRow) {
+      latestPriceByToken.set(tokenAddress, latestRow.priceUsd);
+    }
+
+    const daySeries = new Map<string, number>();
+    let lastSeenPrice: number | null = null;
+    let cursor = 0;
+
+    for (const dayUtc of input.dayRows) {
+      const boundary = dayUtc === input.dayRows[input.dayRows.length - 1]
+        ? input.capturedAt
+        : endOfDayUtc(dayUtc);
+
+      while (cursor < rows.length && rows[cursor].pricedAt.getTime() <= boundary.getTime()) {
+        lastSeenPrice = rows[cursor].priceUsd;
+        cursor += 1;
+      }
+
+      if (lastSeenPrice !== null) {
+        daySeries.set(dayUtc, lastSeenPrice);
+      }
+    }
+
+    priceSeriesByToken.set(tokenAddress, daySeries);
+  }
+
+  return { latestPriceByToken, priceSeriesByToken };
+}
+
+function resolveTokenPriceForDay(input: {
+  tokenAddress: string;
+  dayUtc: string;
+  priceSeriesByToken: Map<string, Map<string, number>>;
+  latestPriceByToken: Map<string, number>;
+}) {
+  return input.priceSeriesByToken.get(input.tokenAddress)?.get(input.dayUtc)
+    ?? input.latestPriceByToken.get(input.tokenAddress)
+    ?? null;
+}
+
+type OverviewDepositHistoryRow = Pick<DepositDetailView, "token0Address" | "token1Address" | "lifecycle">;
+type OverviewStrategyHistoryRow = Pick<StrategyDetailView, "wrapperAddress" | "lifecycle">;
+
+function mergeLiveOverviewSnapshotRows(input: {
+  deployedRows: MergedAnalyzedPerformanceSnapshotRow[];
+  idleRows: MergedAnalyzedPerformanceSnapshotRow[];
+}) {
+  const byDay = new Map<string, MergedAnalyzedPerformanceSnapshotRow>();
+
+  for (const row of input.deployedRows) {
+    byDay.set(dayUtcFromDate(row.capturedAt), { ...row, metadataJson: { ...(row.metadataJson ?? {}) } });
+  }
+
+  for (const row of input.idleRows) {
+    const dayUtc = dayUtcFromDate(row.capturedAt);
+    const existing = byDay.get(dayUtc);
+    if (!existing) {
+      byDay.set(dayUtc, {
+        ...row,
+        totalValueUsd: row.idleValueUsd,
+        metadataJson: { ...(row.metadataJson ?? {}) },
+      });
+      continue;
+    }
+
+    const deployedValueUsd = asNumber(existing.deployedValueUsd);
+    const idleValueUsd = asNumber(row.idleValueUsd);
+    const mergedTotalValueUsd =
+      deployedValueUsd === null && idleValueUsd === null
+        ? asNumber(existing.totalValueUsd)
+        : (deployedValueUsd ?? 0) + (idleValueUsd ?? 0);
+
+    byDay.set(dayUtc, {
+      capturedAt: existing.capturedAt,
+      deployedValueUsd: existing.deployedValueUsd,
+      idleValueUsd: row.idleValueUsd,
+      totalValueUsd: mergedTotalValueUsd === null ? existing.totalValueUsd : formatSnapshotUsd(mergedTotalValueUsd),
+      metadataJson: {
+        ...(existing.metadataJson ?? {}),
+        ...(row.metadataJson ?? {}),
+      },
+    });
+  }
+
+  return Array.from(byDay.values()).sort((left, right) => left.capturedAt.getTime() - right.capturedAt.getTime());
+}
+
+async function readOverviewIdleSnapshotsFromCurrentTokens(input: ScopedWalletInput & {
+  currentIdleTokens: CurrentOverviewIdleTokenInput[];
+  strategyRows: OverviewStrategyHistoryRow[];
   startAt: Date;
   endAt: Date;
 }) {
-  const buckets = new Map<string, { capturedAt: Date; deployedValueUsd: number; rewardValueUsd: number }>();
+  const db = getDb();
+  const dayRows = iterateUtcDays(dayUtcFromDate(input.startAt), dayUtcFromDate(input.endAt));
+  if (dayRows.length === 0 || input.currentIdleTokens.length === 0) {
+    return [] as MergedAnalyzedPerformanceSnapshotRow[];
+  }
 
-  for (const row of input.rows) {
-    const historyPoints = Array.isArray(row.history?.points) ? row.history.points : [];
+  const excludedTokenAddresses = new Set(
+    input.strategyRows
+      .map((row) => asString(row.wrapperAddress)?.toLowerCase() ?? null)
+      .filter((value): value is string => Boolean(value)),
+  );
 
-    for (const pointCandidate of historyPoints) {
-      const point = asRecord(pointCandidate);
-      const dayUtc = typeof point.dayUtc === "string" ? point.dayUtc : null;
-      if (!dayUtc) {
-        continue;
-      }
+  const protocolAddressRows = await db
+    .select({ address: protocolContracts.address })
+    .from(protocolContracts)
+    .where(eq(protocolContracts.chainId, input.chainId));
+  const protocolAddressSet = new Set(protocolAddressRows.map((row) => row.address.toLowerCase()));
 
-      const capturedAt = new Date(`${dayUtc}T00:00:00.000Z`);
-      if (Number.isNaN(capturedAt.getTime()) || capturedAt < input.startAt || capturedAt > input.endAt) {
-        continue;
-      }
+  const tokenMeta = new Map<string, {
+    symbol: string | null;
+    name: string | null;
+    decimals: number | null;
+    possibleSpam: boolean | null;
+    verifiedContract: boolean | null;
+    isNativeAsset: boolean;
+  }>();
+  const currentBalanceByToken = new Map<string, number>();
+  const fallbackCurrentPriceByToken = new Map<string, number>();
 
-      const bucket = buckets.get(dayUtc) ?? {
-        capturedAt,
-        deployedValueUsd: 0,
-        rewardValueUsd: 0,
-      };
-      const deployedValueUsd = Number(point.deployedValueUsd ?? 0);
-      const rewardValueUsd = Number(point.rewardValueUsd ?? 0);
+  for (const token of input.currentIdleTokens) {
+    const tokenAddress = token.tokenAddress.toLowerCase();
+    if (excludedTokenAddresses.has(tokenAddress)) {
+      continue;
+    }
 
-      bucket.deployedValueUsd += Number.isFinite(deployedValueUsd) ? deployedValueUsd : 0;
-      bucket.rewardValueUsd += Number.isFinite(rewardValueUsd) ? rewardValueUsd : 0;
-      buckets.set(dayUtc, bucket);
+    tokenMeta.set(tokenAddress, {
+      symbol: token.symbol,
+      name: token.name,
+      decimals: token.decimals,
+      possibleSpam: token.possibleSpam,
+      verifiedContract: token.verifiedContract,
+      isNativeAsset: token.isNativeAsset,
+    });
+    currentBalanceByToken.set(tokenAddress, token.balanceFormatted);
+    if (token.currentPriceUsd !== null && token.currentPriceUsd > 0) {
+      fallbackCurrentPriceByToken.set(tokenAddress, token.currentPriceUsd);
     }
   }
 
-  return Array.from(buckets.entries())
-    .sort(([leftDay], [rightDay]) => leftDay.localeCompare(rightDay))
-    .map(([, bucket]) => ({
-      capturedAt: bucket.capturedAt,
-      totalValueUsd: null,
-      deployedValueUsd: formatSnapshotUsd(bucket.deployedValueUsd),
-      idleValueUsd: null,
+  const movementRows = await db
+    .select({
+      tokenAddress: assetMovements.tokenAddress,
+      directionIn: assetMovements.directionIn,
+      amountRaw: assetMovements.amountRaw,
+      metadataJson: assetMovements.metadataJson,
+      occurredAt: ledgerEvents.occurredAt,
+    })
+    .from(assetMovements)
+    .innerJoin(ledgerEvents, eq(assetMovements.ledgerEventId, ledgerEvents.id))
+    .where(
+      and(
+        eq(assetMovements.walletAddress, input.walletAddress.toLowerCase()),
+        eq(assetMovements.chainId, input.chainId),
+        gte(ledgerEvents.occurredAt, input.startAt),
+        lte(ledgerEvents.occurredAt, endOfDayUtc(dayUtcFromDate(input.endAt))),
+      ),
+    );
+
+  for (const row of movementRows) {
+    const tokenAddress = row.tokenAddress.toLowerCase();
+    if (excludedTokenAddresses.has(tokenAddress)) {
+      continue;
+    }
+
+    if (!tokenMeta.has(tokenAddress)) {
+      const metadataJson = asRecord(row.metadataJson);
+      tokenMeta.set(tokenAddress, {
+        symbol: asString(metadataJson.symbol),
+        name: asString(metadataJson.name),
+        decimals: asNumber(metadataJson.decimals),
+        possibleSpam: typeof metadataJson.possibleSpam === "boolean" ? metadataJson.possibleSpam : null,
+        verifiedContract: typeof metadataJson.verifiedContract === "boolean" ? metadataJson.verifiedContract : null,
+        isNativeAsset: tokenAddress === "0x4200000000000000000000000000000000000006",
+      });
+      currentBalanceByToken.set(tokenAddress, 0);
+    }
+  }
+
+  const relevantTokenAddresses = Array.from(tokenMeta.keys()).filter((tokenAddress) => !protocolAddressSet.has(tokenAddress));
+  if (relevantTokenAddresses.length === 0) {
+    return [] as MergedAnalyzedPerformanceSnapshotRow[];
+  }
+
+  const priceRows = await db
+    .select({
+      tokenAddress: pricePoints.tokenAddress,
+      priceUsd: pricePoints.priceUsd,
+      pricedAt: pricePoints.pricedAt,
+    })
+    .from(pricePoints)
+    .where(
+      and(
+        eq(pricePoints.chainId, input.chainId),
+        inArray(pricePoints.tokenAddress, relevantTokenAddresses),
+        lte(pricePoints.pricedAt, input.endAt),
+      ),
+    )
+    .orderBy(asc(pricePoints.tokenAddress), asc(pricePoints.pricedAt));
+
+  const { latestPriceByToken, priceSeriesByToken } = buildDailyPriceSeriesByToken({
+    dayRows,
+    priceRows,
+    capturedAt: input.endAt,
+  });
+
+  for (const [tokenAddress, currentPriceUsd] of fallbackCurrentPriceByToken.entries()) {
+    if (!latestPriceByToken.has(tokenAddress)) {
+      latestPriceByToken.set(tokenAddress, currentPriceUsd);
+    }
+  }
+
+  const netInflowByDayToken = new Map<string, Map<string, number>>();
+  for (const row of movementRows) {
+    const tokenAddress = row.tokenAddress.toLowerCase();
+    if (excludedTokenAddresses.has(tokenAddress) || protocolAddressSet.has(tokenAddress)) {
+      continue;
+    }
+
+    const meta = tokenMeta.get(tokenAddress);
+    if (!meta || meta.decimals === null || meta.decimals < 0) {
+      continue;
+    }
+
+    const dayUtc = dayUtcFromDate(row.occurredAt);
+    const tokenAmount = dividePow10(row.amountRaw, meta.decimals);
+    const signedAmount = row.directionIn ? tokenAmount : -tokenAmount;
+    const bucket = netInflowByDayToken.get(dayUtc) ?? new Map<string, number>();
+    bucket.set(tokenAddress, (bucket.get(tokenAddress) ?? 0) + signedAmount);
+    netInflowByDayToken.set(dayUtc, bucket);
+  }
+
+  const balancesPerDay = new Map<string, Map<string, number>>();
+  const workingBalances = new Map(currentBalanceByToken);
+  for (let index = dayRows.length - 1; index >= 0; index -= 1) {
+    const dayUtc = dayRows[index];
+    balancesPerDay.set(dayUtc, new Map(workingBalances));
+    const dayDelta = netInflowByDayToken.get(dayUtc);
+    if (!dayDelta) {
+      continue;
+    }
+
+    for (const [tokenAddress, delta] of dayDelta.entries()) {
+      const nextBalance = (workingBalances.get(tokenAddress) ?? 0) - delta;
+      workingBalances.set(tokenAddress, Math.abs(nextBalance) < 1e-12 ? 0 : nextBalance);
+    }
+  }
+
+  return dayRows.map((dayUtc) => {
+    const idleTokens: Array<{ tokenAddress: string; symbol: string | null; balanceFormatted: number; valueUsd: number }> = [];
+    let idleValueUsd = 0;
+
+    for (const [tokenAddress, balanceFormatted] of (balancesPerDay.get(dayUtc) ?? new Map()).entries()) {
+      if (balanceFormatted <= 0 || protocolAddressSet.has(tokenAddress) || excludedTokenAddresses.has(tokenAddress)) {
+        continue;
+      }
+
+      const meta = tokenMeta.get(tokenAddress);
+      if (!meta || meta.possibleSpam === true) {
+        continue;
+      }
+
+      const priceUsd = resolveTokenPriceForDay({
+        tokenAddress,
+        dayUtc,
+        priceSeriesByToken,
+        latestPriceByToken,
+      });
+      if (priceUsd === null || priceUsd <= 0) {
+        continue;
+      }
+
+      const valueUsd = balanceFormatted * priceUsd;
+      idleValueUsd += valueUsd;
+      idleTokens.push({
+        tokenAddress,
+        symbol: meta.symbol,
+        balanceFormatted,
+        valueUsd,
+      });
+    }
+
+    return {
+      capturedAt: new Date(`${dayUtc}T00:00:00.000Z`),
+      totalValueUsd: formatSnapshotUsd(idleValueUsd),
+      deployedValueUsd: null,
+      idleValueUsd: formatSnapshotUsd(idleValueUsd),
       metadataJson: {
-        dayUtc: bucket.capturedAt.toISOString().slice(0, 10),
-        rewardValueUsd: bucket.rewardValueUsd,
+        dayUtc,
         snapshotKind: "analysis_engine_daily",
         source: "analyzed_history",
-        sourceSurface: "engine_v2_pools",
+        sourceSurface: "wallet_idle_asset_movements",
+        valueBasis: "historical_idle_balances_priced_daily",
+        idleTokens,
       },
-    } satisfies MergedAnalyzedPerformanceSnapshotRow));
+    } satisfies MergedAnalyzedPerformanceSnapshotRow;
+  });
+}
+
+export function buildOverviewDeployedSnapshotsFromEngineV2(input: {
+  depositRows: OverviewDepositHistoryRow[];
+  strategyRows: OverviewStrategyHistoryRow[];
+  priceRows: Array<{ tokenAddress: string; priceUsd: string; pricedAt: Date }>;
+  startAt: Date;
+  endAt: Date;
+  currentTokenBalances?: CurrentOverviewDeployedTokenInput[];
+}) {
+  const events: Array<{ occurredAt: Date; dayUtc: string; tokenAddress: string; signedAmount: number }> = [];
+  const relevantTokenAddresses = new Set<string>();
+
+  for (const row of input.depositRows) {
+    const allowedTokenAddresses = new Set(
+      [row.token0Address, row.token1Address]
+        .map((value) => asString(value)?.toLowerCase() ?? null)
+        .filter((value): value is string => Boolean(value)),
+    );
+
+    for (const event of row.lifecycle) {
+      const occurredAt = new Date(event.occurredAt);
+      if (Number.isNaN(occurredAt.getTime())) {
+        continue;
+      }
+
+      for (const delta of event.signedTokenDeltas) {
+        const tokenAddress = asString(delta.tokenAddress)?.toLowerCase() ?? null;
+        const amount = asNumber(delta.amountFormatted);
+        if (!tokenAddress || amount === null || amount <= 0 || !allowedTokenAddresses.has(tokenAddress)) {
+          continue;
+        }
+
+        relevantTokenAddresses.add(tokenAddress);
+        events.push({
+          occurredAt,
+          dayUtc: occurredAt.toISOString().slice(0, 10),
+          tokenAddress,
+          signedAmount: delta.direction === "out" ? amount : -amount,
+        });
+      }
+    }
+  }
+
+  for (const row of input.strategyRows) {
+    const wrapperAddress = asString(row.wrapperAddress)?.toLowerCase() ?? null;
+
+    for (const event of row.lifecycle) {
+      if (event.eventType === "strategy_claim" || event.eventType === "unresolved_strategy_reward") {
+        continue;
+      }
+
+      const occurredAt = new Date(event.occurredAt);
+      if (Number.isNaN(occurredAt.getTime())) {
+        continue;
+      }
+
+      for (const delta of event.tokenDeltas) {
+        const tokenAddress = asString(delta.tokenAddress)?.toLowerCase() ?? null;
+        const amount = asNumber(delta.amountFormatted);
+        if (!tokenAddress || amount === null || amount <= 0 || tokenAddress === wrapperAddress) {
+          continue;
+        }
+
+        relevantTokenAddresses.add(tokenAddress);
+        events.push({
+          occurredAt,
+          dayUtc: occurredAt.toISOString().slice(0, 10),
+          tokenAddress,
+          signedAmount: delta.direction === "out" ? amount : -amount,
+        });
+      }
+    }
+  }
+
+  if (events.length === 0) {
+    return [] as MergedAnalyzedPerformanceSnapshotRow[];
+  }
+
+  const startDayUtc = input.startAt.toISOString().slice(0, 10);
+  const endDayUtc = input.endAt.toISOString().slice(0, 10);
+  const dayRows = iterateUtcDays(startDayUtc, endDayUtc);
+  const { latestPriceByToken, priceSeriesByToken } = buildDailyPriceSeriesByToken({
+    dayRows,
+    priceRows: input.priceRows.filter((row) => relevantTokenAddresses.has(row.tokenAddress.toLowerCase())),
+    capturedAt: input.endAt,
+  });
+
+  const eventsByDay = new Map<string, Array<{ occurredAt: Date; tokenAddress: string; signedAmount: number }>>();
+  for (const event of events) {
+    const bucket = eventsByDay.get(event.dayUtc) ?? [];
+    bucket.push({ occurredAt: event.occurredAt, tokenAddress: event.tokenAddress, signedAmount: event.signedAmount });
+    eventsByDay.set(event.dayUtc, bucket);
+  }
+
+  const balancesByToken = new Map<string, number>();
+
+  if (input.currentTokenBalances && input.currentTokenBalances.length > 0) {
+    for (const balance of input.currentTokenBalances) {
+      if (balance.amount <= 0) {
+        continue;
+      }
+
+      const tokenAddress = balance.tokenAddress.toLowerCase();
+      relevantTokenAddresses.add(tokenAddress);
+      balancesByToken.set(tokenAddress, balance.amount);
+    }
+
+    const balancesPerDay = new Map<string, Map<string, number>>();
+    for (let index = dayRows.length - 1; index >= 0; index -= 1) {
+      const dayUtc = dayRows[index];
+      balancesPerDay.set(dayUtc, new Map(balancesByToken));
+      const dayEvents = eventsByDay.get(dayUtc) ?? [];
+
+      for (const event of dayEvents) {
+        const nextBalance = (balancesByToken.get(event.tokenAddress) ?? 0) - event.signedAmount;
+        balancesByToken.set(event.tokenAddress, Math.max(0, nextBalance));
+      }
+    }
+
+    return dayRows.map((dayUtc) => {
+      let deployedValueUsd = 0;
+      const underlyingTokenBalances: Array<{ tokenAddress: string; amount: number; valueUsd: number | null }> = [];
+
+      for (const [tokenAddress, amount] of (balancesPerDay.get(dayUtc) ?? new Map()).entries()) {
+        if (amount <= 0) {
+          continue;
+        }
+
+        const priceUsd = priceSeriesByToken.get(tokenAddress)?.get(dayUtc) ?? latestPriceByToken.get(tokenAddress) ?? null;
+        const valueUsd = priceUsd === null ? null : amount * priceUsd;
+        deployedValueUsd += valueUsd ?? 0;
+        underlyingTokenBalances.push({ tokenAddress, amount, valueUsd });
+      }
+
+      return {
+        capturedAt: new Date(`${dayUtc}T00:00:00.000Z`),
+        totalValueUsd: null,
+        deployedValueUsd: formatSnapshotUsd(deployedValueUsd),
+        idleValueUsd: null,
+        metadataJson: {
+          dayUtc,
+          rewardValueUsd: 0,
+          snapshotKind: "analysis_engine_daily",
+          source: "analyzed_history",
+          sourceSurface: "engine_v2_deposits+strategies",
+          valueBasis: "historical_token_balances_priced_daily",
+          underlyingTokenBalances,
+        },
+      } satisfies MergedAnalyzedPerformanceSnapshotRow;
+    });
+  }
+
+  const seededEvents = events
+    .filter((event) => event.dayUtc < startDayUtc)
+    .sort((left, right) => left.occurredAt.getTime() - right.occurredAt.getTime());
+
+  for (const event of seededEvents) {
+    const nextBalance = (balancesByToken.get(event.tokenAddress) ?? 0) + event.signedAmount;
+    balancesByToken.set(event.tokenAddress, Math.max(0, nextBalance));
+  }
+
+  return dayRows.map((dayUtc) => {
+    const dayEvents = (eventsByDay.get(dayUtc) ?? []).sort((left, right) => left.occurredAt.getTime() - right.occurredAt.getTime());
+    for (const event of dayEvents) {
+      const nextBalance = (balancesByToken.get(event.tokenAddress) ?? 0) + event.signedAmount;
+      balancesByToken.set(event.tokenAddress, Math.max(0, nextBalance));
+    }
+
+    let deployedValueUsd = 0;
+    const underlyingTokenBalances: Array<{ tokenAddress: string; amount: number; valueUsd: number | null }> = [];
+
+    for (const [tokenAddress, amount] of balancesByToken.entries()) {
+      if (amount <= 0) {
+        continue;
+      }
+
+      const priceUsd = priceSeriesByToken.get(tokenAddress)?.get(dayUtc) ?? latestPriceByToken.get(tokenAddress) ?? null;
+      const valueUsd = priceUsd === null ? null : amount * priceUsd;
+      deployedValueUsd += valueUsd ?? 0;
+      underlyingTokenBalances.push({ tokenAddress, amount, valueUsd });
+    }
+
+    return {
+      capturedAt: new Date(`${dayUtc}T00:00:00.000Z`),
+      totalValueUsd: null,
+      deployedValueUsd: formatSnapshotUsd(deployedValueUsd),
+      idleValueUsd: null,
+      metadataJson: {
+        dayUtc,
+        rewardValueUsd: 0,
+        snapshotKind: "analysis_engine_daily",
+        source: "analyzed_history",
+        sourceSurface: "engine_v2_deposits+strategies",
+        valueBasis: "historical_token_balances_priced_daily",
+        underlyingTokenBalances,
+      },
+    } satisfies MergedAnalyzedPerformanceSnapshotRow;
+  });
 }
 
 function readOverviewEarliestEngineV2PoolHistoryAt(rows: EngineV2PoolHistoryReadModelRow[]) {
@@ -478,6 +1029,12 @@ export async function readOverviewPricePointsInRange(input: {
 
   const db = getDb();
   const normalizedAddresses = Array.from(new Set(input.tokenAddresses.map((address) => address.toLowerCase())));
+  const resolutionAliases =
+    input.resolution === "1d" || input.resolution === "daily"
+      ? ["1d", "daily"]
+      : input.resolution === "1h" || input.resolution === "hourly"
+        ? ["1h", "hourly"]
+        : [input.resolution];
 
   return db
     .select({
@@ -493,7 +1050,7 @@ export async function readOverviewPricePointsInRange(input: {
         inArray(pricePoints.tokenAddress, normalizedAddresses),
         gte(pricePoints.pricedAt, input.startAt),
         lte(pricePoints.pricedAt, input.endAt),
-        eq(pricePoints.resolution, input.resolution),
+        inArray(pricePoints.resolution, resolutionAliases),
       ),
     )
     .orderBy(desc(pricePoints.pricedAt));
@@ -574,26 +1131,92 @@ export async function insertOverviewPortfolioSnapshot(
 export async function readOverviewAnalyzedPortfolioSnapshots(input: ScopedWalletInput & {
   startAt: Date;
   endAt: Date;
+  currentIdleTokens?: CurrentOverviewIdleTokenInput[];
+  currentDeployedTokenBalances?: CurrentOverviewDeployedTokenInput[];
 }) {
-  const engineV2Rows = await readEngineV2SurfaceRows<EngineV2PoolHistoryReadModelRow>({
-    chainId: input.chainId,
-    walletAddress: input.walletAddress,
-    surface: "pools",
-  });
+  const db = getDb();
 
-  if (engineV2Rows && engineV2Rows.length > 0) {
-    const engineV2Snapshots = readOverviewPoolHistorySnapshotsFromEngineV2({
-      rows: engineV2Rows,
-      startAt: input.startAt,
-      endAt: input.endAt,
-    });
+  const [depositRows, strategyRows] = await Promise.all([
+    readEngineV2SurfaceRows<DepositDetailView>({
+      chainId: input.chainId,
+      walletAddress: input.walletAddress,
+      surface: "deposits",
+    }),
+    readEngineV2SurfaceRows<StrategyDetailView>({
+      chainId: input.chainId,
+      walletAddress: input.walletAddress,
+      surface: "strategies",
+    }),
+  ]);
 
-    if (engineV2Snapshots.length > 0) {
-      return engineV2Snapshots;
+  const relevantTokenAddresses = new Set<string>();
+  for (const row of depositRows ?? []) {
+    for (const event of row.lifecycle ?? []) {
+      for (const delta of event.signedTokenDeltas ?? []) {
+        const tokenAddress = asString(delta.tokenAddress)?.toLowerCase();
+        if (tokenAddress) {
+          relevantTokenAddresses.add(tokenAddress);
+        }
+      }
+    }
+  }
+  for (const row of strategyRows ?? []) {
+    for (const event of row.lifecycle ?? []) {
+      for (const delta of event.tokenDeltas ?? []) {
+        const tokenAddress = asString(delta.tokenAddress)?.toLowerCase();
+        if (tokenAddress) {
+          relevantTokenAddresses.add(tokenAddress);
+        }
+      }
     }
   }
 
-  const db = getDb();
+  const priceRows = relevantTokenAddresses.size === 0
+    ? []
+    : await db
+      .select({
+        tokenAddress: pricePoints.tokenAddress,
+        priceUsd: pricePoints.priceUsd,
+        pricedAt: pricePoints.pricedAt,
+      })
+      .from(pricePoints)
+      .where(
+        and(
+          eq(pricePoints.chainId, input.chainId),
+          inArray(pricePoints.tokenAddress, Array.from(relevantTokenAddresses)),
+          lte(pricePoints.pricedAt, input.endAt),
+        ),
+      )
+      .orderBy(desc(pricePoints.pricedAt));
+
+  const engineV2Snapshots = buildOverviewDeployedSnapshotsFromEngineV2({
+    depositRows: depositRows ?? [],
+    strategyRows: strategyRows ?? [],
+    priceRows,
+    startAt: input.startAt,
+    endAt: input.endAt,
+    currentTokenBalances: input.currentDeployedTokenBalances,
+  });
+
+  const idleSnapshots = input.currentIdleTokens && input.currentIdleTokens.length > 0
+    ? await readOverviewIdleSnapshotsFromCurrentTokens({
+      walletAddress: input.walletAddress,
+      chainId: input.chainId,
+      currentIdleTokens: input.currentIdleTokens,
+      strategyRows: strategyRows ?? [],
+      startAt: input.startAt,
+      endAt: input.endAt,
+    })
+    : [];
+
+  const liveSnapshots = mergeLiveOverviewSnapshotRows({
+    deployedRows: engineV2Snapshots,
+    idleRows: idleSnapshots,
+  });
+
+  if (liveSnapshots.length > 0) {
+    return liveSnapshots;
+  }
 
   const rows = await db
     .select({

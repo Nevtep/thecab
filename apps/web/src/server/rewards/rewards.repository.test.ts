@@ -166,7 +166,7 @@ test("calculateAvailableRewardFilters derives option lists from persisted reward
   assert.deepEqual(filters.tokens.map((item) => item.symbol).sort(), ["AERO", "WETH"]);
 });
 
-test("aggregateHistoricalCapitalFromEngineV2Pools sums persisted pool history points by day", () => {
+test("aggregateHistoricalCapitalFromEngineV2Pools builds daily carried-forward capital from persisted pool history points", () => {
   const historicalCapital = aggregateHistoricalCapitalFromEngineV2Pools({
     rows: [
       {
@@ -194,7 +194,7 @@ test("aggregateHistoricalCapitalFromEngineV2Pools sums persisted pool history po
 
   assert.deepEqual(historicalCapital, [
     { dayUtc: "2026-05-01", valueUsd: "140", coverageStatus: "time_weighted_estimated" },
-    { dayUtc: "2026-05-02", valueUsd: "80", coverageStatus: "time_weighted_estimated" },
+    { dayUtc: "2026-05-02", valueUsd: "120", coverageStatus: "time_weighted_estimated" },
   ]);
 });
 
